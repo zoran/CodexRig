@@ -1,0 +1,28 @@
+#!/bin/sh
+# Managed by this repository; installed by hooks:install.
+set -eu
+
+script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+root="$(CDPATH='' cd -- "$script_dir/../.." && pwd -P)"
+if [ "$script_dir" != "$root/scripts/git-hooks" ] || [ ! -f "$root/scripts/verify/pre-push.sh" ]; then
+  echo "Repository-managed pre-push source is not root-bound; run hooks:install." >&2
+  exit 1
+fi
+
+git_exec_path="${GIT_EXEC_PATH-}"
+unset BASH_ENV ENV NODE_OPTIONS NODE_PATH
+for git_name in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do
+  unset "$git_name"
+done
+
+if [ -n "$git_exec_path" ]; then
+  case "${PATH-}" in
+    "$git_exec_path":*)
+      PATH="${PATH#"$git_exec_path":}"
+      export PATH
+      ;;
+  esac
+fi
+
+cd "$root"
+exec mise exec --locked -- pnpm verify:pre-push -- "$@"

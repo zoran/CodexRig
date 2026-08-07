@@ -1,0 +1,30 @@
+packages:
+  - "apps/*"
+  - "services/*"
+  - "packages/*"
+verifyDepsBeforeRun: error
+# Compatible refreshes fail instead of accepting invalid peers or packages that exclude the
+# mise-pinned Node.js runtime.
+strictPeerDependencies: true
+engineStrict: true
+overrides:
+  # Transformers.js 4.2 permits only sharp 0.34.x, which is affected by GHSA-f88m-g3jw-g9cj.
+  # Keep its public API consumer-local while resolving the newest reviewed 0.35.x security line.
+  "@huggingface/transformers@4.2.0>sharp": "^0.35.0"
+  # onnxruntime-node 1.24.3 permits only adm-zip 0.5.x, which is affected by
+  # GHSA-xcpc-8h2w-3j85. Its install script is disabled, but the graph must remain advisory-clean.
+  "onnxruntime-node@1.24.3>adm-zip": "^0.6.0"
+  # Its only consumer is the disabled onnxruntime-node install script. Excluding it keeps the
+  # runtime graph free of an unmaintained proxy stack without changing embedding execution.
+  "onnxruntime-node@1.24.3>global-agent": "-"
+ignoredOptionalDependencies:
+  # LanceDB exposes duplicate optional embedding providers; this project supplies Transformers.js
+  # directly and does not use LanceDB's optional OpenAI integration.
+  - "@huggingface/transformers"
+  - "openai"
+allowBuilds:
+  # The built-in retrieval path does not require these install scripts. A downstream project that
+  # needs one must review that package and change its decision explicitly.
+  onnxruntime-node: false
+  protobufjs: false
+  sharp: false

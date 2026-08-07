@@ -1,0 +1,5 @@
+interface:
+  display_name: "Reset CodexRig Framework"
+  short_description: "Restore the reusable CodexRig baseline"
+  default_prompt:
+    "Use $reset-framework to return this repository to a clean reusable framework baseline."

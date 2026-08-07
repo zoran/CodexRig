@@ -1,0 +1,52 @@
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+
+stages:
+  - verify
+  - compatibility
+
+default:
+  image: node:24.19.0-bookworm
+  interruptible: true
+
+verify:
+  stage: verify
+  timeout: 15 minutes
+  before_script:
+    - npm install --global pnpm@11.20.0 --ignore-scripts
+    - npm install --global @openai/codex@latest --ignore-scripts
+    - pnpm install --frozen-lockfile --ignore-scripts
+  script:
+    - pnpm framework:doctor
+    - pnpm verify
+
+compatibility-matrix:
+  stage: compatibility
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  before_script: []
+  script:
+    - node scripts/framework/compatibility-matrix.mjs --gitlab-child > compatibility-child.yml
+  artifacts:
+    expire_in: 1 day
+    paths:
+      - compatibility-child.yml
+
+compatibility-canaries:
+  stage: compatibility
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  needs:
+    - job: compatibility-matrix
+      artifacts: true
+  trigger:
+    include:
+      - artifact: compatibility-child.yml
+        job: compatibility-matrix
+    strategy: depend

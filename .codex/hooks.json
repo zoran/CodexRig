@@ -1,0 +1,31 @@
+{
+  "description": "Verify canonical startup and keep the local context index current between turns.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "^(startup|resume)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CODEXRIG_PROJECT_ROOT/scripts/setup/verify-startup-attestation-on-session-start.sh\"",
+            "timeout": 30,
+            "statusMessage": "Verifying CodexRig startup",
+            "additionalContextLimit": 200
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/context/refresh-context-index-on-stop.sh",
+            "timeout": 600,
+            "statusMessage": "Refreshing local context index"
+          }
+        ]
+      }
+    ]
+  }
+}

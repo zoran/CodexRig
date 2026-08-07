@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "invariants": [
+    {
+      "id": "definition-intake",
+      "statement": "A pending manifest makes the first user interaction a focused Project Definition Intake; Codex challenges material ambiguity, gives a final correction opportunity, records only user-confirmed durable truth, and the same focused intake resumes later when a material decision changes.",
+      "surfaces": ["agents", "manifest", "readme"]
+    },
+    {
+      "id": "memory-isolation",
+      "statement": "Local Codex memory isolation is repository-local and root-bound under ignored `.codex/runtime/`; generated projects receive no framework or sibling runtime or memory state and use memories only inside their own clean runtime home.",
+      "surfaces": ["agents", "manifest", "readme"]
+    },
+    {
+      "id": "modular-boundaries",
+      "statement": "Root `src/` is the default Product Root; non-trivial product code starts as a modular monolith with cohesive replaceable modules, narrow public contracts, private internals, owned data and migrations, and explicit acyclic dependencies.",
+      "surfaces": ["agents", "manifest", "readme"]
+    },
+    {
+      "id": "central-integration",
+      "statement": "Central `main` is the only durable integration branch; a serialized writer uses it directly only when branch policy permits, different developers use temporary task branches, parallel writers use disjoint scopes and one write owner per module or shared surface, same-account worktrees are not an authentication boundary, and shared-contract work has one integrator.",
+      "surfaces": ["agents", "manifest", "readme"]
+    },
+    {
+      "id": "verification-lifecycle",
+      "statement": "Every new feature and complex task uses reviewable slices; every completed slice repeats focused verification and review/repair until no relevant finding remains, then receives a fresh audit and whole-repository course check, any audit finding reopens the loop, and the course check repeats at each major milestone.",
+      "surfaces": ["agents", "manifest", "readme"]
+    },
+    {
+      "id": "authorized-continuation",
+      "statement": "Never end at \"ready to implement\" when implementation is already authorized. Plans, research, recaps, gates, reviews, audits, and readiness statements are intermediate, and published goals advance with `pnpm goal:new` without waiting for another prompt until the outcome or a real blocker is reached.",
+      "surfaces": ["agents", "manifest", "readme"]
+    },
+    {
+      "id": "provider-parity",
+      "statement": "GitHub and GitLab keep equivalent portable CI, protected review and green-CI intent, provider-owned API configuration, and read-back verification; GitHub merge queues and GitLab merge trains provide equivalent merge serialization.",
+      "surfaces": ["agents", "manifest", "readme"]
+    },
+    {
+      "id": "framework-lifecycle",
+      "statement": "`.codexrig/framework.json` and `.codexrig/` own versioned compatibility, startup, provider, and upgrade policy; `pnpm framework:doctor -- --online` diagnoses health, only a reviewed, trusted CodexRig checkout may be applied, and transactional upgrades preserve unrelated local changes.",
+      "surfaces": ["agents", "manifest", "readme"]
+    }
+  ]
+}

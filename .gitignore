@@ -1,0 +1,65 @@
+# Dependencies and generated output.
+node_modules/
+.pnpm-store/
+.next/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+test-results/
+playwright-report/
+blob-report/
+playwright/.auth/
+.context-index/
+.project-state/
+backup/
+backups/
+*.bak
+*.bak.*
+
+# Mutable Codex state is contained in ignored .codex/runtime/. The root-bound entries below are
+# legacy quarantine patterns so upgrades can remove old layouts without ever admitting them.
+/.tmp
+/cache
+/log
+/logs
+/memories
+/plugins
+/sessions
+/shell_snapshots
+/skills
+/thread-writer-locks
+/tmp
+/.sandbox_migration
+/auth.json
+/config.toml
+/history.jsonl
+/installation_id
+/models_cache.json
+/version.json
+/goals_*.sqlite*
+/logs_*.sqlite*
+/memories_*.sqlite*
+/queue_*.sqlite*
+/state_*.sqlite*
+/thread_history_*.sqlite*
+
+# Keep only portable project config, hooks, roles, and documentation under .codex/.
+.codex/*
+!.codex/
+!.codex/config.toml
+!.codex/hooks.json
+!.codex/README.md
+!.codex/agents/
+.codex/agents/*
+!.codex/agents/*.toml
+
+# Local environment and secrets.
+.env
+.env.*
+!.env.example
+*.local
+
+# OS/editor noise.
+.DS_Store
+*.swp

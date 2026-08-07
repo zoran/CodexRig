@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "frameworkId": "codexrig",
+  "frameworkVersion": "1.0.0",
+  "compatibilityFile": ".codexrig/compatibility.json",
+  "startup": {
+    "attestationMaxAgeSeconds": 1800
+  },
+  "platform": {
+    "provider": "auto",
+    "integrationBranch": "main",
+    "hosts": {
+      "github": ["github.com"],
+      "gitlab": ["gitlab.com"]
+    },
+    "apiBaseUrls": {
+      "github": {
+        "github.com": "https://api.github.com"
+      },
+      "gitlab": {
+        "gitlab.com": "https://gitlab.com/api/v4"
+      }
+    },
+    "ci": {
+      "requiredCheck": "verify"
+    },
+    "protection": {
+      "requiredApprovals": 1,
+      "requireCodeOwnerReview": false,
+      "preventAuthorApproval": true,
+      "preventCommitterApproval": true,
+      "preventApprovalRuleOverrides": true,
+      "resetApprovalsOnPush": true,
+      "mergeSerialization": "prefer"
+    }
+  },
+  "upgrade": {
+    "receiptFile": ".codexrig/installation.json",
+    "managedRoots": [
+      ".agents/skills/context-retrieval",
+      ".agents/skills/project-implementation",
+      ".agents/skills/resume-project",
+      ".agents/skills/task-quality",
+      ".codex/agents",
+      ".codex/config.toml",
+      ".codex/hooks.json",
+      ".codexrig/framework.json",
+      ".codexrig/compatibility.json",
+      ".codexrig/policy-projection.json",
+      ".github/workflows/ci.yml",
+      ".gitlab-ci.yml",
+      "dependency-policy.json",
+      "mise.lock",
+      "mise.toml",
+      "pnpm-workspace.yaml",
+      "scripts"
+    ],
+    "excludedPaths": [
+      "scripts/setup/project-initialization-test-helpers.mjs",
+      "scripts/setup/project-initialization-boundaries.source.test.mjs",
+      "scripts/setup/project-initialization.source.test.mjs",
+      "scripts/setup/project-initialization-transfer.source.test.mjs",
+      "scripts/setup/project-creator-contract.source.test.mjs",
+      "scripts/setup/project-generator-state.test.mjs",
+      "scripts/verify/source-baseline.mjs"
+    ],
+    "managedPackageScripts": [
+      "codex:start",
+      "codex:validate",
+      "compatibility:matrix",
+      "context:check",
+      "context:clean",
+      "context:index",
+      "context:search",
+      "context:test",
+      "context:test:integration",
+      "deps:install",
+      "deps:report",
+      "deps:update",
+      "deps:update:patch",
+      "deps:update:patch:apply",
+      "docs:check",
+      "format",
+      "format:check",
+      "framework:doctor",
+      "framework:upgrade",
+      "goal:new",
+      "hooks:install",
+      "platform:configure",
+      "platform:detect",
+      "project:export",
+      "setup",
+      "stack:detect",
+      "verify",
+      "verify:changed",
+      "verify:external",
+      "verify:pre-push",
+      "web:update-sitemap-lastmod"
+    ],
+    "managedDevDependencies": [
+      "@huggingface/transformers",
+      "@lancedb/lancedb",
+      "onnxruntime-common",
+      "prettier"
+    ]
+  }
+}

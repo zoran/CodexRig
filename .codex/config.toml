@@ -1,0 +1,33 @@
+# Portable project-scoped Codex defaults and policy.
+#
+# Mutable state belongs in the ignored repository-local .codex/runtime CODEX_HOME, not this file.
+# Keep trust, credentials, provider secrets, telemetry targets, notification commands,
+# absolute paths, and machine-local settings out of portable project configuration.
+
+project_doc_max_bytes = 65536
+project_doc_fallback_filenames = ["instructions.md"]
+model_reasoning_effort = "max"
+model_verbosity = "medium"
+web_search = "cached"
+model = "gpt-5.6-sol"
+service_tier = "fast"
+approvals_reviewer = "user"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+
+[agents]
+max_concurrent_threads_per_session = 4
+max_depth = 1
+
+[features]
+hooks = true
+# Reusable source disables this; clean generated projects enable isolated project-local memories.
+memories = false
+network_proxy = true
+prevent_idle_sleep = true
+
+[tui]
+status_line = ["model-with-reasoning", "run-state", "weekly-limit", "five-hour-limit", "task-progress", "used-tokens"]
+status_line_use_colors = true
+terminal_title = ["activity", "project-name", "five-hour-limit", "weekly-limit", "task-progress"]
+theme = "catppuccin-mocha"
