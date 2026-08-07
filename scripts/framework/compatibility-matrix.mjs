@@ -67,6 +67,8 @@ export function gitlabChildPipeline(matrix = readCompatibilityMatrix()) {
       "  variables:",
       `    CODEXRIG_COMPATIBILITY_TRACK: ${yamlSingleQuoted(track.id)}`,
       "  before_script:",
+      "    - apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck && rm -rf /var/lib/apt/lists/*",
+      "    - npm install --global mise@latest",
       `    - npm install --global ${yamlSingleQuoted(`pnpm@${track.pnpm}`)} ${yamlSingleQuoted(`@openai/codex@${track.codex}`)} --ignore-scripts`,
       "    - pnpm install --frozen-lockfile --ignore-scripts",
       "  script:",

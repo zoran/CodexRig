@@ -379,6 +379,8 @@ test("compatibility matrix renders equivalent provider tracks", () => {
   assert.match(gitlab, /compatibility:next-node-lts:/);
   assert.match(gitlab, /CODEXRIG_COMPATIBILITY_TRACK: 'next-node-lts'/);
   assert.match(gitlab, /allow_failure: true/);
+  assert.match(gitlab, /apt-get install -y --no-install-recommends ripgrep shellcheck/);
+  assert.match(gitlab, /npm install --global mise@latest/);
 });
 
 test("generated policy surfaces derive shared invariants from one machine-readable owner", () => {

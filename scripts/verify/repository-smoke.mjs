@@ -41,6 +41,13 @@ function requireExactContent(relativePath, expected) {
   }
 }
 
+function requireOccurrenceCount(relativePath, expected, count) {
+  const occurrences = readRelative(relativePath).split(expected).length - 1;
+  if (occurrences !== count) {
+    failures.push(`${relativePath} must include ${expected} exactly ${count} time(s)`);
+  }
+}
+
 function validateMinimalMiseTools(content) {
   const versions = Object.create(null);
   const errors = [];
@@ -586,10 +593,19 @@ for (const filePath of [
 if (existsSync(path.join(root, ".github/workflows/ci.yml"))) {
   requireContent(".github/workflows/ci.yml", `version: ${miseVersions.pnpm}`);
   requireContent(".github/workflows/ci.yml", `node-version: ${miseVersions.node}`);
+  requireOccurrenceCount(
+    ".github/workflows/ci.yml",
+    "jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4",
+    2,
+  );
+  requireOccurrenceCount(".github/workflows/ci.yml", "install: false", 2);
+  requireOccurrenceCount(".github/workflows/ci.yml", "cache: false", 2);
 }
 if (existsSync(path.join(root, ".gitlab-ci.yml"))) {
   requireContent(".gitlab-ci.yml", `pnpm@${miseVersions.pnpm}`);
   requireContent(".gitlab-ci.yml", `node:${miseVersions.node}-bookworm`);
+  requireContent(".gitlab-ci.yml", "ripgrep shellcheck");
+  requireContent(".gitlab-ci.yml", "mise@latest");
 }
 for (const runtimePath of ["mise.lock", "mise.toml"]) {
   const categories = classifyPath(runtimePath, { productLayout });

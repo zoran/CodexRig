@@ -17,6 +17,9 @@ verify:
   stage: verify
   timeout: 15 minutes
   before_script:
+    - apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck && rm -rf
+      /var/lib/apt/lists/*
+    - npm install --global mise@latest
     - npm install --global pnpm@11.20.0 --ignore-scripts
     - npm install --global @openai/codex@latest --ignore-scripts
     - pnpm install --frozen-lockfile --ignore-scripts

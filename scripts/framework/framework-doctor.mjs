@@ -151,8 +151,18 @@ function validateCiAdapters({ root, errors }) {
     const content = readRegularFrameworkFile(root, relativePath);
     const markers =
       provider === "github"
-        ? ["merge_group:", "scripts/framework/compatibility-matrix.mjs --github-matrix"]
-        : ["merge_request_event", "scripts/framework/compatibility-matrix.mjs --gitlab-child"];
+        ? [
+            "merge_group:",
+            "scripts/framework/compatibility-matrix.mjs --github-matrix",
+            "jdx/mise-action@",
+            "install: false",
+          ]
+        : [
+            "merge_request_event",
+            "scripts/framework/compatibility-matrix.mjs --gitlab-child",
+            "mise@latest",
+            "shellcheck",
+          ];
     for (const marker of markers) {
       if (!content.includes(marker)) {
         pushFinding(
