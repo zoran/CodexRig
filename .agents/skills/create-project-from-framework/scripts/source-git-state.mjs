@@ -25,7 +25,7 @@ function runGit(metadata, args, label) {
   return result.stdout;
 }
 
-export function captureSourceGitState(sourceRoot) {
+function requireSourceGitMetadata(sourceRoot) {
   let gitMetadata;
   try {
     gitMetadata = resolveOwnedGitMetadata(sourceRoot);
@@ -39,6 +39,22 @@ export function captureSourceGitState(sourceRoot) {
   if (!gitRoot || realpathSync(gitRoot) !== gitMetadata.workTree) {
     fail("Source repository must be the root of a real Git worktree.");
   }
+  return gitMetadata;
+}
+
+export function sourceHasGitChanges(sourceRoot) {
+  const gitMetadata = requireSourceGitMetadata(sourceRoot);
+  return (
+    runGit(
+      gitMetadata,
+      ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+      "Source Git change probe",
+    ).length > 0
+  );
+}
+
+export function captureSourceGitState(sourceRoot) {
+  const gitMetadata = requireSourceGitMetadata(sourceRoot);
   const trackedState = runGit(
     gitMetadata,
     ["status", "--porcelain=v1", "-z", "--untracked-files=no"],

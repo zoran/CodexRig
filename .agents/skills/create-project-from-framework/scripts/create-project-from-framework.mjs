@@ -42,8 +42,14 @@ import {
 import {
   assertSourceBaselineClean,
   assertSourceProductBoundaryClean,
+  cleanupSourceAfterProjectCreation,
+  postProjectCreationGuidance,
 } from "./source-readiness.mjs";
-import { assertSourceGitStateUnchanged, captureSourceGitState } from "./source-git-state.mjs";
+import {
+  assertSourceGitStateUnchanged,
+  captureSourceGitState,
+  sourceHasGitChanges,
+} from "./source-git-state.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultSourceRoot = path.resolve(scriptDirectory, "..", "..", "..", "..");
@@ -485,6 +491,7 @@ function main() {
   const stagingRoot = path.join(stagingProjectRoot, "code");
   let staged = false;
   let published = false;
+  let sourceHasChanges = false;
 
   try {
     mkdirSync(stagingProjectRoot, { mode: 0o700 });
@@ -515,6 +522,11 @@ function main() {
     assertSourceBaselineClean(roots.sourceRoot);
     assertSourceProductBoundaryClean(roots.sourceRoot);
     assertSourceGitStateUnchanged(roots.sourceRoot, sourceGitState);
+    cleanupSourceAfterProjectCreation(roots.sourceRoot);
+    assertSourceBaselineClean(roots.sourceRoot);
+    assertSourceProductBoundaryClean(roots.sourceRoot);
+    assertSourceGitStateUnchanged(roots.sourceRoot, sourceGitState);
+    sourceHasChanges = sourceHasGitChanges(roots.sourceRoot);
     published = false;
   } catch (error) {
     if (staged && existsSync(stagingProjectRoot)) {
@@ -526,8 +538,9 @@ function main() {
     throw error;
   }
   console.log("Created the project successfully in its requested output workspace.");
-  console.log("Source framework state remained unchanged and baseline-clean.");
+  console.log("Source framework tracked and portable state remained unchanged and baseline-clean.");
   console.log("Run pnpm setup in the generated project to create and validate .context-index/.");
+  for (const line of postProjectCreationGuidance({ sourceHasChanges })) console.log(line);
 }
 
 try {

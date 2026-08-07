@@ -29,12 +29,20 @@ first. Creation uses the source's locked runtime and pinned formatter to make ge
 deterministic. This is a source-only tooling hydration step, not the generated project's dependency
 freshness policy.
 
-Project creation must never edit the source framework or add the requested project name to source
-tests, documentation, or policy. The generator requires a clean portable-source reset baseline,
-which still rejects process/planning residue while ignoring active contained runtime and index
-state, snapshots the full source Git status including ignored entries, rechecks both before
-publication, and discards staging if the source changes. Use neutral fixture names for generator
-regression coverage.
+Project creation must never change tracked or portable source-framework content or add the requested
+project name to source tests, documentation, or policy. The generator requires a clean
+portable-source reset baseline, which still rejects process/planning residue while ignoring active
+contained runtime and index state, snapshots the tracked and portable source state, rechecks it
+before publication, and discards staging if that state changes. After publication it invokes the
+reset boundary's restricted active-session cleanup, which removes only reset-owned nonportable
+process/export residue and deliberately preserves local runtime and `.context-index/`; it then
+rechecks the portable baseline and source state before retaining the target. Use neutral fixture
+names for generator regression coverage.
+
+The success output must state that no commit or push occurred and must always give the exact
+post-exit reset preview, review, apply, and clean-preview sequence for the source framework. Only
+when the source Git worktree has changes may it additionally print optional verify, status, stage,
+commit, and push commands. Those Git commands are guidance for the user, never generator actions.
 
 The default transfer uses the source repository's tracked files plus the required `mise.toml` and
 `mise.lock` runtime contract, which staged validation checks before publication. Other local drafts
@@ -92,7 +100,8 @@ changed sources current once per Codex turn after local hash-bound approval thro
   temporary index; policy-sensitive probes disable repository-local FSMonitor execution and reject
   hidden index flags; a Git-less nested root remains Git-less;
 - staged validation runs from its copied validator, accepts no caller-selected stage path, and keeps
-  its canonical stage-directory identity stable through validation;
+  its canonical stage-directory identity stable through validation; it parses every copied `.mjs`
+  module and rejects static relative imports that are missing or escape the staged project;
 - the executable `goal:new` publication gate retained and required before any subsequent goal; it
   fails closed unless central `main` is current, the non-ignored worktree is clean, and `main`
   exactly matches a locally verifiable configured remote-tracking `main` upstream, with no active
@@ -154,8 +163,14 @@ changed sources current once per Codex turn after local hash-bound approval thro
   before bootstrap, uses the mise-pinned runtime afterward, refreshes incrementally through the
   sanitized worker, and keeps local hook trust out of portable source;
 - refusal when the outer project directory already exists and post-copy verification before handoff;
-- refusal when the source has resettable process state or changes during generation;
-- no source-framework mutation or project-specific source trace from creating the new project.
+- refusal when the source has resettable process state or its tracked/portable content changes
+  during generation;
+- automatic active-session-safe cleanup after publication, followed by exact post-exit full-reset
+  instructions; local runtime and `.context-index/` remain untouched until every owning Codex
+  session has ended;
+- no tracked/portable source-framework mutation or project-specific source trace from creating the
+  new project, and no automatic Git initialization, commit, or push.
 
-Do not initialize Git, create a remote, commit, or push unless the user separately asks. Report the
+Project generation never initializes Git, creates a remote, commits, or pushes. If the source
+worktree is dirty, print those operations only as optional post-cleanup instructions. Report the
 generated path, package name, and verification result.

@@ -30,6 +30,24 @@ mise exec --locked -- node scripts/deps/install-compatible.mjs
 mise exec --locked -- pnpm setup
 ```
 
+## Create A Project
+
+Tell Codex: `Create a new project called <Project Name>. Short description: <one or two sentences>.`
+No framework skill name or detailed specification is needed at this point. The generated
+`<apps>/<Project Name>/code` repository contains both provider adapters, a versioned CodexRig
+installation receipt, an empty `src/`, and a pending `docs/project.md`.
+
+After creation, open the generated `code` repository and start Codex there. In your first message,
+provide the full project description. Codex then runs the detailed Project Definition Intake,
+resolves material questions with you, and records only the definition you confirm before
+implementation begins.
+
+After publication, the generator automatically removes only source-framework residue that is safe to
+clean while Codex is still active. It preserves local runtime and `.context-index/`, never commits
+or pushes, and always prints the exact reset preview/apply/clean-preview sequence to run from the
+framework root after every owning Codex/CodexRig session has ended. Optional verify, status, stage,
+commit, and push commands appear only when the source worktree actually has changes.
+
 ## Core Contract
 
 - **First Prompt: Define The Project.** A generated project has a pending manifest. Codex performs
@@ -49,12 +67,6 @@ mise exec --locked -- pnpm setup
   branch, review, green-CI, and merge-serialization policy and verifies it by provider read-back.
 - Central `main` is the only durable integration branch. Parallel writers use disjoint scopes and
   one owner per shared module, contract, schema, migration, configuration surface, or file.
-
-## Create A Project
-
-Ask Codex to use `$create-project-from-framework` with a project name. The generated
-`<apps>/<Project Name>/code` repository contains both provider adapters, a versioned CodexRig
-installation receipt, an empty `src/`, and a pending `docs/project.md`.
 
 ## Essential Commands
 

@@ -7,6 +7,7 @@ import test from "node:test";
 import {
   assertSourceGitStateUnchanged,
   captureSourceGitState,
+  sourceHasGitChanges,
 } from "../../.agents/skills/create-project-from-framework/scripts/source-git-state.mjs";
 
 test("generator source state detects content changes inside an already dirty tracked path", (t) => {
@@ -80,4 +81,30 @@ test("generator source state rejects a Git-less root nested below another reposi
     () => captureSourceGitState(root),
     /Source repository must be the root of a real Git worktree/,
   );
+});
+
+test("generator source change guidance distinguishes clean and dirty worktrees", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "project-generator-dirty-state-"));
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  writeFileSync(path.join(root, "tracked.txt"), "clean\n");
+  execFileSync("git", ["add", "tracked.txt"], { cwd: root });
+  execFileSync(
+    "git",
+    [
+      "-c",
+      "user.name=Generator Test",
+      "-c",
+      "user.email=generator@example.invalid",
+      "commit",
+      "-q",
+      "-m",
+      "fixture",
+    ],
+    { cwd: root },
+  );
+
+  assert.equal(sourceHasGitChanges(root), false);
+  writeFileSync(path.join(root, "untracked.txt"), "dirty\n");
+  assert.equal(sourceHasGitChanges(root), true);
 });

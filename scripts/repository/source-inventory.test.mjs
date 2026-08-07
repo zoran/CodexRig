@@ -17,7 +17,6 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { portableContextContractFiles } from "../context/portable-context-contract.mjs";
-import { enableGeneratedProjectMemories } from "../../.agents/skills/create-project-from-framework/scripts/generated-codex-config.mjs";
 import {
   gitlessPreDescentExcludePatterns,
   isRepositoryCodexHomePath,
@@ -60,11 +59,6 @@ function write(root, relativePath, content = relativePath) {
 }
 
 function writePortableCodexFiles(targetRoot) {
-  write(
-    targetRoot,
-    ".codex/config.toml",
-    readFileSync(path.join(repositoryRoot, ".codex", "config.toml"), "utf8"),
-  );
   write(targetRoot, ".codex/README.md", "portable config\n");
   write(
     targetRoot,
@@ -88,7 +82,12 @@ function writePortableCodexFiles(targetRoot) {
       readFileSync(path.join(repositoryRoot, "scripts", "context", name), "utf8"),
     );
   }
-  enableGeneratedProjectMemories(targetRoot);
+  const configPath = path.join(targetRoot, ".codex", "config.toml");
+  write(
+    targetRoot,
+    ".codex/config.toml",
+    readFileSync(configPath, "utf8").replace(/^memories\s*=\s*false\s*$/mu, "memories = true"),
+  );
   write(targetRoot, "src/.gitkeep", "");
 }
 

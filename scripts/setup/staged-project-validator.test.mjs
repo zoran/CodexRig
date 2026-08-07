@@ -86,6 +86,36 @@ test("the staged validator rejects caller-selected roots and unsafe validator id
   assert.equal(valid.status, 0, valid.stderr);
 });
 
+test("the staged validator rejects unresolved or escaping static relative module imports", () => {
+  const stage = createStage("staged-validator-imports-");
+  appendFileSync(
+    path.join(stage, "scripts/framework/framework-lifecycle.test.mjs"),
+    '\nimport "../../.agents/skills/create-project-from-framework/scripts/missing.mjs";\n',
+  );
+
+  const result = runValidator(stage);
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /framework-lifecycle\.test\.mjs imports a missing relative module: .*missing\.mjs/u,
+  );
+  assert.equal(`${result.stdout}${result.stderr}`.includes(stage), false);
+
+  const escapingStage = createStage("staged-validator-escaping-imports-");
+  appendFileSync(
+    path.join(escapingStage, "scripts/framework/framework-lifecycle.test.mjs"),
+    '\nimport "../../../outside-stage.mjs";\n',
+  );
+
+  const escapingResult = runValidator(escapingStage);
+  assert.equal(escapingResult.status, 1);
+  assert.match(
+    escapingResult.stderr,
+    /framework-lifecycle\.test\.mjs imports a module outside the staged project: .*outside-stage\.mjs/u,
+  );
+  assert.equal(`${escapingResult.stdout}${escapingResult.stderr}`.includes(escapingStage), false);
+});
+
 test("portable snapshots reject process state and a missing lockfile", () => {
   const source = createStage("staged-validator-process-source-");
   assert.equal(spawnSync("git", ["init", "-q"], { cwd: source }).status, 0);

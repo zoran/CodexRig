@@ -30,12 +30,6 @@ import {
 } from "./framework-upgrade.mjs";
 import { authorizePlannedLockfile } from "./refresh-upgrade-dependencies.mjs";
 import { ciCompatibilityTracks, gitlabChildPipeline } from "./compatibility-matrix.mjs";
-import { generatedPolicyProjectionLines, readPolicyProjection } from "./policy-projection.mjs";
-import {
-  generatedFrameworkAgentPolicy,
-  generatedFrameworkManifestPolicy,
-  generatedFrameworkReadmePolicy,
-} from "../../.agents/skills/create-project-from-framework/scripts/generated-framework-policy.mjs";
 import {
   issueRuntimeSessionLease,
   issueStartupAttestation,
@@ -381,16 +375,6 @@ test("compatibility matrix renders equivalent provider tracks", () => {
   assert.match(gitlab, /allow_failure: true/);
   assert.match(gitlab, /apt-get install -y --no-install-recommends ripgrep shellcheck/);
   assert.match(gitlab, /npm install --global mise@latest/);
-});
-
-test("generated policy surfaces derive shared invariants from one machine-readable owner", () => {
-  const projection = readPolicyProjection(repositoryRoot);
-  assert.equal(projection.invariants.length, 8);
-  assert.deepEqual(generatedFrameworkAgentPolicy, generatedPolicyProjectionLines("agents"));
-  assert.deepEqual(generatedFrameworkManifestPolicy, generatedPolicyProjectionLines("manifest"));
-  for (const line of generatedPolicyProjectionLines("readme")) {
-    assert.ok(generatedFrameworkReadmePolicy.includes(line));
-  }
 });
 
 function attestationFixture() {

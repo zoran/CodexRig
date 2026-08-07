@@ -94,6 +94,7 @@ function parseArgs(argv) {
   const options = {
     apply: false,
     portableSourceBaseline: false,
+    postProjectCreation: false,
     root: defaultRoot,
     verificationSourceBaseline: false,
   };
@@ -101,6 +102,7 @@ function parseArgs(argv) {
     const argument = argv[index];
     if (argument === "--apply") options.apply = true;
     else if (argument === "--portable-source-baseline") options.portableSourceBaseline = true;
+    else if (argument === "--post-project-creation") options.postProjectCreation = true;
     else if (argument === "--verification-source-baseline") {
       options.verificationSourceBaseline = true;
     } else if (argument === "--root") {
@@ -111,10 +113,15 @@ function parseArgs(argv) {
     } else if (argument.startsWith("--root=")) options.root = path.resolve(argument.slice(7));
     else fail(`Unknown argument: ${argument}`);
   }
-  if (
-    (options.apply && (options.portableSourceBaseline || options.verificationSourceBaseline)) ||
-    (options.portableSourceBaseline && options.verificationSourceBaseline)
-  ) {
+  const selectedModes = [
+    options.portableSourceBaseline,
+    options.postProjectCreation,
+    options.verificationSourceBaseline,
+  ].filter(Boolean).length;
+  if (selectedModes > 1) {
+    fail("Reset modes are mutually exclusive.");
+  }
+  if (options.apply && (options.portableSourceBaseline || options.verificationSourceBaseline)) {
     fail("Source-baseline modes are read-only, mutually exclusive, and cannot use --apply.");
   }
   return options;
@@ -530,7 +537,7 @@ async function applyReset(root, migrations, candidates) {
   }
 }
 
-function printPreview(migrations, candidates) {
+function printPreview(migrations, candidates, applyArguments = "--apply") {
   if (migrations.length > 0) {
     console.log("Framework reset would preserve runtime identity by migrating:");
     for (const migration of migrations) console.log(`- ${migration.from} -> ${migration.to}`);
@@ -539,7 +546,7 @@ function printPreview(migrations, candidates) {
     console.log("Framework reset would remove:");
     for (const candidate of candidates) console.log(`- ${candidate}`);
   }
-  console.log("Re-run with --apply after reviewing this list.");
+  console.log(`Re-run with ${applyArguments} after reviewing this list.`);
 }
 
 async function main() {
@@ -553,10 +560,12 @@ async function main() {
   }
   const reducedSourceBaseline =
     options.portableSourceBaseline || options.verificationSourceBaseline;
-  if (!reducedSourceBaseline) assertRuntimeInactive(root);
-  const migrations = reducedSourceBaseline ? [] : planMigrations(root);
+  const activeSessionCleanup = options.postProjectCreation;
+  if (!reducedSourceBaseline && !activeSessionCleanup) assertRuntimeInactive(root);
+  const includeLocalRuntime = !reducedSourceBaseline && !activeSessionCleanup;
+  const migrations = includeLocalRuntime ? planMigrations(root) : [];
   const candidates = collectCandidates(root, {
-    includeLocalRuntime: !reducedSourceBaseline,
+    includeLocalRuntime,
   });
 
   if (!options.apply) {
@@ -564,18 +573,24 @@ async function main() {
       console.log(
         reducedSourceBaseline
           ? "Framework portable source baseline is clean."
-          : "Framework baseline is clean.",
+          : activeSessionCleanup
+            ? "Framework active-session cleanup is clean; local runtime and .context-index are deferred until Codex exits."
+            : "Framework baseline is clean.",
       );
       return;
     }
-    printPreview(migrations, candidates);
+    printPreview(
+      migrations,
+      candidates,
+      activeSessionCleanup ? "--post-project-creation --apply" : "--apply",
+    );
     process.exitCode = 1;
     return;
   }
 
   await applyReset(root, migrations, candidates);
-  const residualMigrations = planMigrations(root);
-  const residual = collectCandidates(root);
+  const residualMigrations = includeLocalRuntime ? planMigrations(root) : [];
+  const residual = collectCandidates(root, { includeLocalRuntime });
   if (residualMigrations.length > 0 || residual.length > 0) {
     fail(
       `Reset left removable state: ${[
@@ -584,12 +599,21 @@ async function main() {
       ].join(", ")}`,
     );
   }
-  console.log(
-    `Framework reset complete; migrated ${migrations.length} and removed ${candidates.length} path(s).`,
-  );
-  console.log(
-    "Source, portable .codex policy, required runtime identity, and exact verification evidence were preserved.",
-  );
+  if (activeSessionCleanup) {
+    console.log(
+      `Framework active-session cleanup complete; removed ${candidates.length} safe path(s).`,
+    );
+    console.log(
+      "Local runtime and .context-index were preserved for the mandatory post-exit reset.",
+    );
+  } else {
+    console.log(
+      `Framework reset complete; migrated ${migrations.length} and removed ${candidates.length} path(s).`,
+    );
+    console.log(
+      "Source, portable .codex policy, required runtime identity, and exact verification evidence were preserved.",
+    );
+  }
 }
 
 try {

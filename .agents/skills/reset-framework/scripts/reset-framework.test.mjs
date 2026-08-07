@@ -150,6 +150,50 @@ test("reset refuses an active Codex runtime lease without deleting state", (t) =
   assert.equal(readFileSync(path.join(root, "history.jsonl"), "utf8"), "preserve while active\n");
 });
 
+test("post-project-creation cleanup removes safe residue while preserving active runtime and index", (t) => {
+  const root = fixture("reset-framework-post-creation-");
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  write(root, "docs/planning/current-goal.md", "# Safe process residue\n");
+  write(root, ".project-state/generator/transaction.json", "{}\n");
+  write(root, "dist/exports/generated.tar.gz", "generated\n");
+  write(root, ".context-index/manifest.json", "{}\n");
+  write(root, ".codex/runtime/logs_2.sqlite", "active runtime\n");
+  write(root, "history.jsonl", "active legacy runtime\n");
+  issueRuntimeSessionLease({ root, pid: process.pid });
+  t.after(() => {
+    if (existsSync(path.join(root, ".codex/runtime/codexrig-session.json"))) {
+      releaseRuntimeSessionLease({ root, pid: process.pid });
+    }
+  });
+
+  const preview = run(root, ["--post-project-creation"]);
+  assert.equal(preview.status, 1);
+  assert.match(preview.stdout, /docs\/planning/);
+  assert.match(preview.stdout, /\.project-state/);
+  assert.match(preview.stdout, /dist\/exports/);
+  assert.doesNotMatch(preview.stdout, /\.context-index/);
+  assert.doesNotMatch(preview.stdout, /logs_2\.sqlite|history\.jsonl/);
+  assert.match(preview.stdout, /--post-project-creation --apply/);
+
+  const applied = run(root, ["--post-project-creation", "--apply"]);
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.match(applied.stdout, /active-session cleanup complete/);
+  for (const removed of ["docs/planning", ".project-state", "dist/exports"]) {
+    assert.equal(existsSync(path.join(root, ...removed.split("/"))), false, removed);
+  }
+  for (const preserved of [
+    ".context-index/manifest.json",
+    ".codex/runtime/logs_2.sqlite",
+    ".codex/runtime/codexrig-session.json",
+    "history.jsonl",
+  ]) {
+    assert.equal(existsSync(path.join(root, ...preserved.split("/"))), true, preserved);
+  }
+  const clean = run(root, ["--post-project-creation"]);
+  assert.equal(clean.status, 0, clean.stderr);
+  assert.match(clean.stdout, /local runtime and \.context-index are deferred until Codex exits/);
+});
+
 test("portable source baseline ignores contained active runtime but not process documents", (t) => {
   const root = fixture("reset-framework-portable-source-");
   issueRuntimeSessionLease({ root, pid: process.pid });

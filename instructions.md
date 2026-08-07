@@ -431,6 +431,15 @@ becomes a visible conflict. Apply journals originals, authorizes the planned dep
 replacement, writes the new receipt last, and restores files, lockfile, and installed dependencies
 if the transaction fails. Never resolve an upgrade conflict by silently overwriting project changes.
 
+Project creation is a distinct non-publication workflow. After atomically publishing the target, the
+generator applies the reset boundary's restricted active-session cleanup to reset-owned nonportable
+process/export residue, while preserving local runtime, SQLite/WAL state, and `.context-index/`. It
+revalidates the source baseline before retaining the target, never initializes Git, commits, or
+pushes, and always prints the exact full-reset preview, review, apply, and clean preview sequence
+that the user must run from the source root after all owning Codex/CodexRig sessions end. Optional
+verify, status, stage, commit, and push instructions are printed only when the source Git worktree
+has changes.
+
 Provider detection prefers CI identity, then the selected branch upstream, `origin`, or the sole
 remote. Standard GitHub/GitLab hosts work without configuration; self-hosted domains must have one
 unambiguous owner and an explicit credential-free HTTPS API base in the framework contract;
@@ -646,8 +655,10 @@ remain read-only. The reset never rewrites Git history. It sanitizes legacy and 
 runtime only when no active session owns that state, while retaining only authentication, runtime
 configuration, installation identity, and exact publication evidence needed for the next start and
 push. Source-framework pre-push repeats the clean preview and fails closed if resettable state
-reappears. The final source-framework order is verification, Codex exit, reset preview, applied
-reset, clean reset preview, commit, and push.
+reappears. For an explicitly authorized source publication, the final order is verification, Codex
+exit, reset preview, applied reset, clean reset preview, commit, and push. Project creation itself
+stops after its active-session-safe cleanup and user instructions; it never performs the optional
+publication steps.
 
 When admission identifies a real uncovered risk, the full plan covers syntax/format, tests,
 build/typecheck when present, repository contracts, secrets, dependencies, and relevant product

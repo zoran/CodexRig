@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -52,6 +53,26 @@ function assertStageRootBinding(binding) {
     }
   } catch {
     throw new Error("Staged project root identity changed during validation.");
+  }
+}
+
+function assertStaticModuleImports(binding) {
+  const validatorPath = path.join(binding.root, "scripts/setup/validate-static-module-imports.mjs");
+  const result = spawnSync(
+    process.execPath,
+    ["--no-warnings", "--experimental-vm-modules", validatorPath],
+    {
+      cwd: binding.root,
+      encoding: "utf8",
+      env: { ...process.env, NODE_OPTIONS: "" },
+      input: "",
+      stdio: "pipe",
+      timeout: 30_000,
+    },
+  );
+  if (result.error || result.status !== 0) {
+    const detail = result.error?.message ?? `${result.stdout}${result.stderr}`.trim();
+    throw new Error(detail || "Staged project static module import validation failed.");
   }
 }
 
@@ -113,6 +134,8 @@ async function validateBoundStagedProject(binding) {
       ].join("\n"),
     );
   }
+  assertStaticModuleImports(binding);
+  assertStageRootBinding(binding);
 }
 
 async function main() {

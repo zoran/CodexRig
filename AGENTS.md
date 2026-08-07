@@ -114,6 +114,10 @@ bootstrap.
   the portable baseline under its active verification lock. After Codex exits,
   `$reset-framework --apply` performs the strict runtime/index cleanup before commit and push. Full
   coverage runs only when the plan names a concrete uncovered reason.
+- Creating a sibling project is not source publication. After target publication, the generator
+  removes only active-session-safe reset residue, preserves runtime and `.context-index/`, and
+  prints the exact full reset to run after Codex exits. It never commits or pushes; optional Git
+  instructions appear only when the source worktree has changes.
 - A goal is a quality and publication checkpoint, not a conversational stop. In serialized
   direct-main mode, finish the clean review/audit, course check, cleanup, reset, final gate, exact
   commit, and push on `main`. With a temporary branch or protected `main`, one integrator or the

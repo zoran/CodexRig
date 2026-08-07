@@ -45,7 +45,18 @@ test("clean project initialization removes inherited state and source-specific t
     assert.equal(`${result.stdout}${result.stderr}`.includes(localValue), false, localValue);
   }
   assert.deepEqual(gitState(root), sourceStateBefore);
-  assert.match(result.stdout, /Source framework state remained unchanged and baseline-clean\./);
+  assert.match(
+    result.stdout,
+    /Source framework tracked and portable state remained unchanged and baseline-clean\./,
+  );
+  assert.match(result.stdout, /active-session cleanup completed; no commit or push was performed/i);
+  assert.match(result.stdout, /After ending every Codex\/CodexRig session/);
+  assert.match(result.stdout, /pnpm framework:reset --apply/);
+  assert.match(result.stdout, /Optional Git publication/);
+  assert.match(result.stdout, /git status --short/);
+  assert.match(result.stdout, /git add -- <reviewed-paths>/);
+  assert.match(result.stdout, /git commit -m "<message>"/);
+  assert.match(result.stdout, /git push/);
 
   const generated = path.join(outputParent, "generated-isolation-fixture", "code");
   const generatedAgents = readFileSync(path.join(generated, "AGENTS.md"), "utf8");

@@ -102,6 +102,7 @@ export const portableContextContractFiles = Object.freeze([
   "scripts/setup/startup-attestation.mjs",
   "scripts/setup/stage-project-export.mjs",
   "scripts/setup/validate-staged-project.mjs",
+  "scripts/setup/validate-static-module-imports.mjs",
   "scripts/setup/validate-codex-bootstrap.sh",
   "scripts/setup/validate-codex-config.mjs",
   "scripts/setup/verify-startup-attestation-on-session-start.sh",

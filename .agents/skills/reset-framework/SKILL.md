@@ -19,6 +19,11 @@ The first command is a read-only preview and exits non-zero while reset candidat
 exact list before using `--apply`. Runtime sanitation is allowed only after every Codex session for
 the repository has ended; the launcher-owned runtime lease makes the reset fail closed otherwise.
 
+Project generation uses the internal `--post-project-creation --apply` mode after publishing a new
+target. That restricted mode may remove only reset-owned process/export residue that is safe during
+the active session. It never migrates or deletes local runtime, SQLite/WAL state, or
+`.context-index/`, and it never substitutes for the mandatory full reset after Codex exits.
+
 ## Workflow
 
 1. Confirm this is the CodexRig Framework and inspect Git status, branch, and remotes.
@@ -50,9 +55,12 @@ the repository has ended; the launcher-owned runtime lease makes the reset fail 
    evidence is retained. The source-framework pre-push path repeats the read-only clean preview and
    fails closed if resettable state reappears. The next setup, explicit index operation, or semantic
    search rebuilds the vector state.
-7. Commit or push only when the user explicitly requested those external mutations. When the active
-   Codex process itself owns the runtime, hand the user the exact post-exit reset/verify sequence;
-   do not delete open SQLite databases or WAL files from inside that process.
+7. Commit or push only when the user explicitly requested those external mutations. Project
+   generation never performs them. Its success output always gives the exact post-exit full-reset
+   sequence—preview, review, apply, and clean preview—and prints optional
+   verify/status/stage/commit/ push guidance only when the source worktree has changes. When an
+   active Codex process owns the runtime, do not delete open SQLite databases or WAL files from
+   inside that process.
 
 Keep the result in code and configuration. Do not create reset reports, completion docs, or
 archives.

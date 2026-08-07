@@ -205,8 +205,12 @@ CodexRig is the neutral reusable source framework. No generated product has been
   `main` upstream. It rejects any active repository-local Git exclude rule, requires exact-current
   successful verification evidence, and does not contact the remote; the preceding push owns
   authentication and publication.
-- Project creation is source-read-only: resettable process state blocks generation, and the source
-  Git state must remain unchanged through publication.
+- Project creation preserves tracked and portable source content: resettable process state blocks
+  generation, source state is revalidated through publication, and a restricted post-publication
+  reset removes only active-session-safe nonportable process/export residue. Runtime, SQLite/WAL
+  state, and `.context-index/` are deferred to the mandatory full reset after every owning Codex
+  session ends. The generator always prints that exact post-exit reset sequence, never commits or
+  pushes, and shows optional Git publication commands only when the source worktree has changes.
 - This manifest is authoritative for project intent and durable decisions. An optional
   `docs/project-context.md` may add current goal/slice state but cannot override the manifest.
 - Maintained executable modules have a 700-physical-line maximum. Documentation, styles, declarative

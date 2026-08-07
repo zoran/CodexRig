@@ -212,6 +212,8 @@ export function assertGeneratedProjectQuality(targetRoot) {
     process.execPath,
     [
       "--test",
+      "scripts/framework/framework-lifecycle.test.mjs",
+      "scripts/repository/source-inventory.test.mjs",
       "scripts/verify/adaptive-cli.test.mjs",
       "scripts/verify/adaptive-runner-routing.test.mjs",
       "scripts/verify/adaptive-runner.test.mjs",
