@@ -105,6 +105,24 @@ test("runtime identity hashes every forwarded semantic child control", () => {
   }
 });
 
+test("child verification disables npm user and global config through distinct absent paths", () => {
+  const environment = verificationChildEnvironment();
+  assert.notEqual(environment.NPM_CONFIG_GLOBALCONFIG, environment.NPM_CONFIG_USERCONFIG);
+  for (const configPath of [
+    environment.NPM_CONFIG_GLOBALCONFIG,
+    environment.NPM_CONFIG_USERCONFIG,
+  ]) {
+    assert.throws(() => lstatSync(configPath), { code: "ENOENT" });
+  }
+  const npm = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["--version"], {
+    encoding: "utf8",
+    env: environment,
+    input: "",
+    stdio: "pipe",
+  });
+  assert.equal(npm.status, 0, npm.stderr);
+});
+
 test("tool versions are probed once per process, repository, executable, and environment", () => {
   const root = fixture();
   const toolDirectory = path.join(root, "counted-tools");

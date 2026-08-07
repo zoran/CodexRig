@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { accessSync, constants, realpathSync, statSync } from "node:fs";
+import { accessSync, constants, lstatSync, realpathSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -15,9 +15,10 @@ const forbiddenChildEnvironmentKeys = new Set([
   "PNPM_CONFIG_NODE_OPTIONS",
   "PNPM_CONFIG_SCRIPT_SHELL",
 ]);
+const disabledNpmConfigDirectory = path.join(os.tmpdir(), "codexrig-npm-config-disabled");
 const forcedChildEnvironment = Object.freeze({
-  NPM_CONFIG_GLOBALCONFIG: os.devNull,
-  NPM_CONFIG_USERCONFIG: os.devNull,
+  NPM_CONFIG_GLOBALCONFIG: path.join(disabledNpmConfigDirectory, "global.npmrc"),
+  NPM_CONFIG_USERCONFIG: path.join(disabledNpmConfigDirectory, "user.npmrc"),
   PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "error",
 });
 const identityKeys = Object.freeze([
@@ -32,6 +33,17 @@ const identityKeys = Object.freeze([
 const versionProbeCache = new Map();
 
 export function verificationChildEnvironment(environment = process.env) {
+  for (const configPath of [
+    forcedChildEnvironment.NPM_CONFIG_GLOBALCONFIG,
+    forcedChildEnvironment.NPM_CONFIG_USERCONFIG,
+  ]) {
+    try {
+      lstatSync(configPath);
+      throw new Error(`Disabled npm config path unexpectedly exists: ${configPath}`);
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
   const childEnvironment = {};
   for (const key of Object.keys(environment)) {
     const normalizedKey = key.toUpperCase();
