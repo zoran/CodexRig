@@ -294,6 +294,12 @@ test("automatic context-index Stop hook skips bootstrap and reports unsafe state
     "  done",
     "  printf '%s\\0' \"$@\"",
     '} > "$CAPTURE_PATH"',
+    'if [[ -n "${MISE_OUTPUT:-}" ]]; then',
+    "  printf '%s\\n' \"$MISE_OUTPUT\"",
+    "fi",
+    'if [[ -n "${MISE_ERROR_OUTPUT:-}" ]]; then',
+    "  printf '%s\\n' \"$MISE_ERROR_OUTPUT\" >&2",
+    "fi",
   ].join("\n");
   for (const shellSource of [readFileSync(launcher, "utf8"), fakeMiseSource]) {
     assert.doesNotMatch(shellSource, /declare\s+-A|\[\[\s+-v\b/);
@@ -321,6 +327,21 @@ test("automatic context-index Stop hook skips bootstrap and reports unsafe state
     "node",
     "scripts/context/refresh-context-index-on-stop.mjs",
   ]);
+
+  const continuedOutput = JSON.stringify({ decision: "block", reason: "Continue the outcome" });
+  const continued = run("bash", [launcher], {
+    cwd: beforeSetup,
+    env: {
+      CAPTURE_PATH: capturePath,
+      CODEX_HOME: beforeSetup,
+      MISE_ERROR_OUTPUT: `${beforeSetup}/sanitized-worker-warning`,
+      MISE_OUTPUT: continuedOutput,
+      PATH: `${binDirectory}:/usr/bin:/bin`,
+    },
+  });
+  assert.equal(continued.status, 0, continued.stderr);
+  assert.equal(continued.stderr, "");
+  assert.deepEqual(JSON.parse(continued.stdout), JSON.parse(continuedOutput));
 
   const failedMise = run("bash", [launcher], {
     cwd: beforeSetup,

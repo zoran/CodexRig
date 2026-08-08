@@ -187,6 +187,30 @@ export function assertGeneratedDependencyFreshnessContract(generated) {
   assert.match(workspaceConfig, /strictPeerDependencies: true[\s\S]*engineStrict: true/);
 }
 
+export function assertGeneratedAutonomousContinuationContract({
+  generated,
+  policyDocuments,
+  instructions,
+  codexReadme,
+}) {
+  for (const content of policyDocuments) {
+    assert.match(content, /codexrig-work-state/i);
+    assert.match(content, /failed\s+publication.*current\s+goal.*open/is);
+  }
+  assert.match(
+    instructions,
+    /<!-- codexrig-work-state\s+\{"version":1,"revision":1,"status":"active"/,
+  );
+  assert.match(instructions, /stop_hook_active/);
+  assert.match(instructions, /untrusted resume metadata/i);
+  assert.match(codexReadme, /same turn was already continued/i);
+  assert.match(codexReadme, /resume\s+metadata\s+rather\s+than\s+authority/i);
+  assert.equal(
+    existsSync(path.join(generated, "scripts/context/refresh-context-index-on-stop.mjs")),
+    true,
+  );
+}
+
 export function assertGeneratedProjectQuality(targetRoot) {
   const formatterPath = path.join(root, "node_modules", "prettier", "bin", "prettier.cjs");
   const formatResult = spawnSync(process.execPath, [formatterPath, "--check", "."], {
@@ -319,7 +343,7 @@ export function recordGeneratedVerificationEvidence(generated) {
       lock.release();
     }
   `;
-  const result = spawnSync(process.execPath, ["--input-type=module", "--eval", source], {
+  const result = spawnSync("node", ["--input-type=module", "--eval", source], {
     cwd: generated,
     encoding: "utf8",
     env: { ...process.env, PATH: runtimePath },
@@ -331,7 +355,7 @@ export function recordGeneratedVerificationEvidence(generated) {
 
 export function runGeneratedGoalGate(generated, cwd = generated) {
   return spawnSync(
-    process.execPath,
+    "node",
     [path.join(generated, "scripts/goals/goal-publication-precondition.mjs")],
     {
       cwd,

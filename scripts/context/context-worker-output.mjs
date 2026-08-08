@@ -23,14 +23,16 @@ function redactWorkerPaths(output, scriptUrl) {
   return sanitizeMultilineForTerminal(output, repositoryRoot);
 }
 
-export function runAsSanitizedContextWorker(scriptUrl) {
+export function runAsSanitizedContextWorker(scriptUrl, options = {}) {
   if (process.env[workerEnvName] === "1") return false;
+
+  const input = typeof options.input === "string" ? options.input : "";
 
   const result = spawnSync(process.execPath, [fileURLToPath(scriptUrl), ...process.argv.slice(2)], {
     cwd: process.cwd(),
     encoding: "utf8",
     env: { ...process.env, [workerEnvName]: "1" },
-    input: "",
+    input,
     stdio: "pipe",
     maxBuffer: 4 * 1024 * 1024,
   });

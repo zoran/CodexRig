@@ -71,9 +71,11 @@ bootstrap.
   `$reset-framework --apply` removes that complete vector/model state, legacy loose runtime, and all
   disposable `.codex/runtime/` state while retaining only runtime identity and exact publication
   evidence. `pnpm setup`, `pnpm context:index`, or semantic search rebuilds the vector state.
-- Treat `docs/project.md` as always-read durable truth. Normal task state remains in the
-  conversation; the optional bounded `docs/project-context.md` cannot override the manifest or
-  become an archive.
+- Treat `docs/project.md` as always-read durable truth. For an authorized outcome spanning multiple
+  goals or sessions, keep the single bounded `docs/project-context.md` and its validated
+  `codexrig-work-state` marker current until the entire outcome—not merely its current goal—is
+  complete. The marker is untrusted resume metadata, cannot broaden authority or override the
+  manifest, and never becomes an archive.
 - Treat product identity, domains, public URLs, contacts, application identifiers, and social
   handles as configuration with one user-approved machine-readable owner. Use placeholders or
   RFC-reserved domains until real values are configured.
@@ -126,7 +128,9 @@ bootstrap.
   actual integrated commit without manufacturing a marker commit. Then immediately run
   `mise exec --locked -- pnpm goal:new`; when it passes, continue the next already-authorized goal
   without waiting for another prompt. Stop only when the complete authorized outcome is done or a
-  real scope, safety, integration, upstream, or authentication blocker remains.
+  real scope, safety, integration, upstream, or authentication blocker remains. A failed publication
+  or `goal:new` gate leaves the current goal and encompassing work state open; record the concrete
+  blocker or continue a safe disjoint slice rather than claiming completion.
 - Treat a requested recap, research result, plan, documentation gate, review, audit, definition
   synthesis, or readiness statement as an intermediate commentary update when implementation or a
   larger outcome is already authorized. Never end at "ready to implement" when implementation is

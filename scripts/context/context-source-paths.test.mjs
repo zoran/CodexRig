@@ -246,8 +246,11 @@ test("sanitized context workers redact both output streams and native paths", ()
     root,
     "scripts/context/worker-fixture.mjs",
     [
+      'import { readFileSync } from "node:fs";',
       `import { runAsSanitizedContextWorker } from ${JSON.stringify(workerModule)};`,
-      "runAsSanitizedContextWorker(import.meta.url);",
+      'const input = readFileSync(0, "utf8");',
+      "runAsSanitizedContextWorker(import.meta.url, { input });",
+      "console.log(`worker input ${input}`);",
       `console.log(${JSON.stringify(`worker stdout ${root}/private`)});`,
       `console.error(${JSON.stringify(
         `[fixture WARN lance::dataset::write::insert] No existing dataset at ${root}/lancedb, it will be created`,
@@ -263,9 +266,11 @@ test("sanitized context workers redact both output streams and native paths", ()
   const result = spawnSync(process.execPath, [script], {
     cwd: root,
     encoding: "utf8",
+    input: "forwarded-stdin",
     timeout: 2_000,
   });
   assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /worker input forwarded-stdin/);
   assert.match(result.stdout, /worker stdout \.\/private/);
   assert.match(result.stderr, /worker stderr <local-path>/);
   assert.doesNotMatch(result.stderr, /No existing dataset/);

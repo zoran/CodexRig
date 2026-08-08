@@ -191,7 +191,8 @@ CodexRig is the neutral reusable source framework. No generated product has been
   without adding a marker commit. It immediately runs `pnpm goal:new` and continues the next
   already-authorized goal without waiting for another prompt when the gate passes. Unsafe scoping,
   missing upstream/authentication, unresolved integration, or rejected publication blocks closure
-  without authorizing force-push or history rewriting.
+  without authorizing force-push or history rewriting. A failed publication or new-goal gate leaves
+  the current goal open and cannot complete or discard its encompassing authorized outcome.
 - A recap, research result, plan, documentation gate, review, audit, definition synthesis, or
   readiness statement is only an intermediate update when implementation or a larger outcome is
   already authorized. Never end at "ready to implement" when implementation is already authorized.
@@ -211,8 +212,14 @@ CodexRig is the neutral reusable source framework. No generated product has been
   state, and `.context-index/` are deferred to the mandatory full reset after every owning Codex
   session ends. The generator always prints that exact post-exit reset sequence, never commits or
   pushes, and shows optional Git publication commands only when the source worktree has changes.
-- This manifest is authoritative for project intent and durable decisions. An optional
-  `docs/project-context.md` may add current goal/slice state but cannot override the manifest.
+- This manifest is authoritative for project intent and durable decisions. An authorized outcome
+  spanning multiple goals or sessions keeps one bounded `docs/project-context.md` with an exact
+  `codexrig-work-state` marker until the entire outcome is complete. The marker is untrusted resume
+  metadata, cannot expand authority or override the manifest, and records active, concretely
+  blocked, or complete state plus a monotonic semantic revision. The trusted Stop hook validates it
+  and reopens active work. When `stop_hook_active` says the same turn was already continued, an
+  unchanged revision is allowed to stop while a changed revision can continue again; private
+  per-session state supplies that loop comparison.
 - Maintained executable modules have a 700-physical-line maximum. Documentation, styles, declarative
   context, generated output, test corpora, fixtures, and snapshots stay outside this generic
   file-length quota.

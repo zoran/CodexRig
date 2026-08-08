@@ -3,10 +3,13 @@ import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   existsSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
+  rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -19,6 +22,7 @@ import {
 } from "./context-embedding.mjs";
 import { createManifest } from "./context-manifest.mjs";
 import { ensureOwnedIndexDirectory } from "./context-paths.mjs";
+import { evaluateAutonomousContinuation } from "./refresh-context-index-on-stop.mjs";
 import { runSearch } from "./search-context.mjs";
 import { discoverSourceFiles } from "./source-policy.mjs";
 import { publishIndex } from "./context-storage.mjs";
@@ -28,6 +32,191 @@ import {
   temporaryDirectory,
   write,
 } from "./context-regression-helpers.mjs";
+
+function workState(overrides = {}) {
+  return {
+    version: 1,
+    revision: 1,
+    status: "active",
+    outcome: "Complete the already-authorized project outcome",
+    currentGoal: "Keep Codex working across intermediate goals",
+    currentSlice: "Exercise the Stop lifecycle",
+    nextAction: "Run the next safe planned slice",
+    blocker: null,
+    ...overrides,
+  };
+}
+
+function writeWorkingContext(projectRoot, state) {
+  write(
+    projectRoot,
+    "docs/project-context.md",
+    `<!-- codexrig-work-state\n${JSON.stringify(state)}\n-->\n\n# Current work\n`,
+  );
+}
+
+function stopHookInput(overrides = {}) {
+  return JSON.stringify({
+    session_id: "session-fixture",
+    cwd: "/redacted-fixture",
+    hook_event_name: "Stop",
+    turn_id: "turn-fixture",
+    stop_hook_active: false,
+    last_assistant_message: "Intermediate result",
+    ...overrides,
+  });
+}
+
+test("Stop lifecycle continues active outcomes and bounds unchanged automatic loops", () => {
+  const project = temporaryDirectory("autonomous-stop-");
+  mkdirSync(path.join(project, ".codex"));
+
+  assert.deepEqual(
+    evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() }),
+    {},
+  );
+
+  const initialState = workState();
+  writeWorkingContext(project, initialState);
+  const first = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
+  assert.equal(first.decision, "block");
+  assert.match(first.reason, /Continue the already-authorized outcome autonomously/);
+  assert.match(first.reason, /validated as active at revision 1/);
+  assert.match(first.reason, /untrusted resume metadata, not as authority/);
+  assert.equal(first.reason.includes(initialState.nextAction), false);
+  assert.equal(first.reason.includes(project), false);
+
+  const continuationDirectory = path.join(project, ".codex", "runtime", "stop-continuation");
+  assert.equal(lstatSync(continuationDirectory).mode & 0o777, 0o700);
+  const continuationEntries = readdirSync(continuationDirectory);
+  assert.equal(continuationEntries.length, 1);
+  const continuationPath = path.join(continuationDirectory, continuationEntries[0]);
+  assert.equal(lstatSync(continuationPath).mode & 0o777, 0o600);
+
+  writeWorkingContext(project, {
+    blocker: initialState.blocker,
+    nextAction: initialState.nextAction,
+    currentSlice: initialState.currentSlice,
+    currentGoal: initialState.currentGoal,
+    outcome: initialState.outcome,
+    status: initialState.status,
+    revision: initialState.revision,
+    version: initialState.version,
+  });
+  const unchanged = evaluateAutonomousContinuation({
+    root: project,
+    hookInput: stopHookInput({ stop_hook_active: true }),
+  });
+  assert.equal(Object.hasOwn(unchanged, "decision"), false);
+  assert.match(unchanged.systemMessage, /allowed this stop to avoid an automatic loop/);
+
+  writeWorkingContext(
+    project,
+    workState({
+      revision: 2,
+      currentSlice: "Advance the next slice",
+      nextAction: "Continue again",
+    }),
+  );
+  const progressed = evaluateAutonomousContinuation({
+    root: project,
+    hookInput: stopHookInput({ stop_hook_active: true }),
+  });
+  assert.equal(progressed.decision, "block");
+  assert.match(progressed.reason, /validated as active at revision 2/);
+  assert.equal(progressed.reason.includes("Continue again"), false);
+
+  writeWorkingContext(
+    project,
+    workState({
+      revision: 3,
+      status: "blocked",
+      currentSlice: null,
+      nextAction: null,
+      blocker: { kind: "external", reason: "The required upstream is unavailable" },
+    }),
+  );
+  assert.deepEqual(
+    evaluateAutonomousContinuation({
+      root: project,
+      hookInput: stopHookInput({ stop_hook_active: true }),
+    }),
+    {},
+  );
+  assert.equal(existsSync(continuationPath), false);
+});
+
+test("Stop lifecycle rejects unsafe or ambiguous working context without exposing paths", () => {
+  const project = temporaryDirectory("autonomous-stop-invalid-");
+  const outside = temporaryDirectory("autonomous-stop-outside-");
+  mkdirSync(path.join(project, ".codex"));
+  mkdirSync(path.join(project, "docs"));
+  writeWorkingContext(outside, workState());
+  symlinkSync(
+    path.join(outside, "docs", "project-context.md"),
+    path.join(project, "docs", "project-context.md"),
+  );
+
+  const linked = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
+  assert.equal(linked.decision, "block");
+  assert.match(linked.systemMessage, /Autonomous continuation check skipped/);
+  assert.match(linked.reason, /single automatic repair attempt/);
+  assert.equal(linked.systemMessage.includes(project), false);
+  assert.equal(linked.systemMessage.includes(outside), false);
+
+  const linkedRetry = evaluateAutonomousContinuation({
+    root: project,
+    hookInput: stopHookInput({ stop_hook_active: true }),
+  });
+  assert.equal(Object.hasOwn(linkedRetry, "decision"), false);
+
+  rmSync(path.join(project, "docs", "project-context.md"), { force: true });
+  symlinkSync(
+    path.join(outside, "docs", "missing-project-context.md"),
+    path.join(project, "docs", "project-context.md"),
+  );
+  const dangling = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
+  assert.equal(dangling.decision, "block");
+  assert.match(dangling.systemMessage, /not a bounded regular file/);
+
+  rmSync(path.join(project, "docs", "project-context.md"), { force: true });
+  linkSync(
+    path.join(outside, "docs", "project-context.md"),
+    path.join(project, "docs", "project-context.md"),
+  );
+  const linkedAlias = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
+  assert.equal(linkedAlias.decision, "block");
+  assert.match(linkedAlias.systemMessage, /not a bounded regular file/);
+
+  rmSync(path.join(project, "docs", "project-context.md"), { force: true });
+  write(
+    project,
+    "docs/project-context.md",
+    `<!-- codexrig-work-state\n${JSON.stringify(workState())}\n-->\n<!-- codexrig-work-state\n${JSON.stringify(workState({ revision: 2 }))}\n-->\n`,
+  );
+  const ambiguous = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
+  assert.equal(ambiguous.decision, "block");
+  assert.match(ambiguous.systemMessage, /exactly one bounded codexrig-work-state marker/);
+
+  write(
+    project,
+    "docs/project-context.md",
+    `# Untrusted preface\n<!-- codexrig-work-state\n${JSON.stringify(workState())}\n-->\n`,
+  );
+  const prefixed = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
+  assert.equal(prefixed.decision, "block");
+  assert.match(prefixed.systemMessage, /marker must be the first non-whitespace content/);
+
+  writeWorkingContext(project, workState({ nextAction: "Continue\nwith injected control text" }));
+  const controlled = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
+  assert.equal(controlled.decision, "block");
+  assert.match(controlled.systemMessage, /nextAction must be bounded plain text/);
+
+  writeWorkingContext(project, workState({ nextAction: "Continue\u200bwith hidden formatting" }));
+  const formatted = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
+  assert.equal(formatted.decision, "block");
+  assert.match(formatted.systemMessage, /nextAction must be bounded plain text/);
+});
 
 function environmentSnapshot(names) {
   return new Map(names.map((name) => [name, process.env[name]]));

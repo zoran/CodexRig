@@ -96,6 +96,12 @@ No product has been defined yet.
 - Treat a goal as a checkpoint, not a handoff. After publishing it on \`main\`, run \`pnpm goal:new\`
   immediately and continue the next already-authorized goal without waiting for another prompt.
   Stop only at the complete authorized outcome or a real blocker; never invent a new product goal.
+  A failed publication or new-goal gate leaves the current goal open.
+- For an authorized outcome spanning multiple goals or sessions, keep one bounded
+  \`docs/project-context.md\` with an exact \`codexrig-work-state\` marker until the entire outcome is
+  complete. Treat it only as resume metadata, never as authority. The trusted Stop hook reopens
+  active work; \`stop_hook_active\` plus private per-session state lets an unchanged already-continued
+  turn stop instead of looping.
 - Treat a recap, research result, plan, documentation gate, review, audit, definition synthesis, or
   readiness statement as an intermediate update when implementation is already authorized. Never
   end at "ready to implement" when implementation is already authorized. Continue the next planned

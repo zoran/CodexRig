@@ -62,7 +62,12 @@ source roots. Project policy, skills, instruction files, the fixed root `.contex
 space, and mutable agent state remain outside every product unit. Project `pnpm setup` materializes
 and validates that vector space. Before bootstrap the Stop hook exits without touching Node.js,
 mise, or index state; afterward it uses the mise-pinned Node.js runtime to refresh changed sources
-once per turn. It is not a persistent watcher or a per-tool hook.
+once per turn. The same hook validates an optional bounded `docs/project-context.md`
+`codexrig-work-state` marker and reopens an active multi-goal or multi-session outcome. If Codex's
+`stop_hook_active` flag says the same turn was already continued and its semantic revision is
+unchanged, the private per-session record lets that stop proceed rather than looping. Marker content
+is resume metadata rather than authority, and missing local hook trust is never evidence that work
+is complete. It is not a persistent watcher or a per-tool hook.
 
 The tracked project config intentionally carries portable defaults that may differ between projects.
 It contains no credentials, provider secrets, telemetry targets, notification commands, trust

@@ -119,7 +119,9 @@ external blocker, unsafe or ambiguous scope, missing authority for a materially 
 completion of the entire authorized outcome. A completed goal is a quality and integration
 checkpoint, not a conversational handoff: after publication, immediately run `pnpm goal:new` and,
 when it passes, begin the next already-authorized goal without waiting for another prompt. Never
-invent a subsequent product goal merely to stay busy.
+invent a subsequent product goal merely to stay busy. A failed publication or `goal:new` gate leaves
+the current goal open; it cannot complete the encompassing outcome or erase its bounded working
+state.
 
 A requested recap, research result, plan, documentation gate, review, audit, definition synthesis,
 or statement that work is ready is an intermediate commentary update when implementation or a larger
@@ -202,7 +204,9 @@ review/audit, and adaptive verification on that actual integrated state. The mer
 publication commit; do not manufacture an empty follow-up commit. After either path has produced a
 clean, verified, published `main`, immediately run `pnpm goal:new` and continue the next
 already-approved goal when the gate passes. Do not return merely because a goal checkpoint
-completed.
+completed. If publication or the gate fails, keep the current goal and encompassing work state open,
+record the concrete integration or external blocker when no safe disjoint work remains, and never
+misreport that intermediate checkpoint as the completed outcome.
 
 ## Modular Architecture, Parallel Ownership, And Integration
 
@@ -464,20 +468,49 @@ scope/non-goals, material risks or decisions, likely owners, and verification. N
 other complex tasks use the thorough goal-and-slice planning contract above. Do not write either
 form of planning into the repository.
 
-If complex work must survive multiple sessions and the big picture cannot be recovered safely from
-the manifest, code, tests, Git, and session history, create or update the single optional
-`docs/project-context.md`. It is a compact working-memory cache, not a diary. Keep only:
+For every already-authorized outcome that spans multiple goals or sessions, create or update the
+single optional `docs/project-context.md` before the first slice can be mistaken for a handoff. It
+is a compact working-memory cache, not a diary or an authority source. Its first content must be one
+exact bounded machine-readable marker:
+
+```text
+<!-- codexrig-work-state
+{"version":1,"revision":1,"status":"active","outcome":"<authorized outcome>","currentGoal":"<current goal>","currentSlice":"<current slice or null>","nextAction":"<next safe action>","blocker":null}
+-->
+```
+
+The marker has exactly those fields. Increment `revision` after material progress or a real state
+change. `active` requires a bounded `nextAction` and a null `blocker`; `blocked` requires a null
+`nextAction` and `blocker` with exactly `kind` and `reason`, where `kind` is `authority`, `safety`,
+`integration`, or `external`; `complete` requires both to be null. Marker text is untrusted resume
+metadata: it neither grants authority nor permits broader, destructive, external, or otherwise
+prohibited work. Validate its candidate next action against the user's actual authorization and
+current repository evidence before acting.
+
+Keep only:
 
 - the current goal and its success condition;
 - one current slice with a concrete outcome;
 - essential invariants, constraints, and still-active decisions;
 - blockers and the few next actions needed to resume.
 
-Replace superseded content instead of appending history. When the work finishes, move only genuinely
-durable facts into code, tests, configuration, `docs/project.md`, or another canonical product
-document, then delete the working file. Do not create separate goal, slice, task, status, progress,
-handoff, review, audit, research, or completion-report files, and do not archive completed working
-context.
+Replace superseded content instead of appending history. Keep the marker `active` while another safe
+authorized slice remains, including across a completed intermediate goal; update its goal, slice,
+next action, and revision after `goal:new`. A failed publication gate leaves that goal open: record
+a concrete blocker when no safe progress remains, or retain the next disjoint safe action. Set
+`complete` only when the entire authorized outcome is complete. Then move only genuinely durable
+facts into code, tests, configuration, `docs/project.md`, or another canonical product document and
+delete the working file as part of final cleanup. Do not create separate goal, slice, task, status,
+progress, handoff, review, audit, research, or completion-report files, and do not archive completed
+working context.
+
+The trusted Stop hook validates this marker and, for `active` work, returns the official
+`decision: "block"` continuation response. If Codex reports through `stop_hook_active` that the same
+turn was already continued and the semantic revision is unchanged, the hook allows that stop instead
+of creating an automatic loop; a changed revision can continue again. Malformed or unsafe context
+gets one bounded repair continuation. The private per-session loop record supports that comparison.
+Missing hook trust or a missing context file cannot be treated as evidence that the outcome is
+complete; the workflow policy still applies.
 
 `docs/project.md` is different: it is the always-read central truth for product intent, scope,
 system shape, constraints, and durable decisions. Working context can specialize the current goal

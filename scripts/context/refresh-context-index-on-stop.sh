@@ -29,12 +29,12 @@ if ! output="$(
     -u CONTEXT_INDEX_STALE_LOCK_MS \
     -u CONTEXT_INDEX_TEST_MODE \
     -u CONTEXT_INDEX_TRACKED_ONLY \
-    mise exec --locked -- node scripts/context/refresh-context-index-on-stop.mjs 2>&1
+    mise exec --locked -- node scripts/context/refresh-context-index-on-stop.mjs 2>/dev/null
 )"; then
   printf '%s\n' "$failure_message"
   exit 0
 fi
 if [[ -n "$output" ]]; then
-  printf '%s\n' "$failure_message"
+  printf '%s\n' "$output"
 fi
 exit 0

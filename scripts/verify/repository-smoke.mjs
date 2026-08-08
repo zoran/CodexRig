@@ -293,7 +293,7 @@ requireContent(
 requireContent("scripts/context/context-worker-output.mjs", 'stdio: "pipe"');
 requireContent(
   "scripts/context/refresh-context-index-on-stop.mjs",
-  "runAsSanitizedContextWorker(import.meta.url)",
+  "runAsSanitizedContextWorker(import.meta.url, { input: hookInput })",
 );
 requireContent("scripts/repository/source-inventory.mjs", "isRepositoryCodexHomePath");
 requireContent("scripts/verify/format-project.mjs", "projectFormatFiles");

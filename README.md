@@ -57,11 +57,16 @@ commit, and push commands appear only when the source worktree actually has chan
   narrow public contracts and acyclic dependencies.
 - Local Codex memory isolation is repository-local and root-bound under ignored `.codex/runtime/`.
   Generated projects receive no framework runtime residue. The project-local Codex Stop hook
-  refreshes changed indexed sources after setup.
+  refreshes changed indexed sources after setup and validates the bounded `docs/project-context.md`
+  work-state marker. For an active multi-goal or multi-session outcome, it uses Codex's official
+  continuation response so an intermediate handoff is reopened. If the same turn tries to stop again
+  without a state revision change, `stop_hook_active` and private loop state allow the stop instead
+  of creating an automatic loop.
 - Every new feature or other complex task uses reviewable slices. A slice advances only after
   affected checks and review confirm that no relevant finding remains, followed by a fresh audit.
   Published goals continue through `pnpm goal:new` without waiting for another prompt. Never end at
-  "ready to implement" when implementation is already authorized.
+  "ready to implement" when implementation is already authorized. Failed publication leaves the
+  current goal open and cannot mark the encompassing authorized outcome complete.
 - GitHub and GitLab use equivalent checked-in CI. The framework detects the selected remote or CI
   provider, including configured self-hosts; `platform:configure` applies the matching protected
   branch, review, green-CI, and merge-serialization policy and verifies it by provider read-back.
