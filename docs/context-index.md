@@ -24,7 +24,9 @@ After that bootstrap, `.codex/hooks.json` registers exactly one project-local Co
 runs once at the end of a turn, enters the mise-pinned Node.js runtime, and calls the same lock-,
 transaction-, and repair-safe incremental freshness path used by normal retrieval. It is not a
 persistent watcher and does not run after individual tool calls. Before `.context-index/` exists,
-the shell boundary exits successfully without invoking Node.js, mise, or index code.
+the shell boundary exits successfully without invoking Node.js, mise, or index code. Ephemeral side
+conversations and other Stop events without a durable local `transcript_path` also exit before any
+index or work-state access.
 
 Codex requires project hooks to be reviewed and approved locally by content hash through `/hooks`.
 Hook and native worker output pass through the context worker sanitizer, so failures remain visible

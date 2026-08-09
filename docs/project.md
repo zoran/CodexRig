@@ -117,7 +117,8 @@ CodexRig is the neutral reusable source framework. No generated product has been
   every product unit. Repo-wide semantic vector state is fixed at ignored root `.context-index/` and
   is neither product source nor part of generated or exported portable source.
 - Initial setup materializes that vector state. The locally hash-trusted project Stop hook refreshes
-  changed sources at Codex turn boundaries, semantic search retains on-demand repair, and normal
+  changed sources only at durable local Codex turn boundaries with a non-null `transcript_path`;
+  transcriptless contexts exit first. Semantic search retains on-demand repair, and normal
   verification and pre-push remain read-only. After Codex exits, every framework reset removes the
   complete owned index/model cache, legacy loose runtime, and disposable `.codex/runtime/` state;
   only runtime identity and exact publication evidence remain. Setup, explicit indexing, or semantic
@@ -243,9 +244,11 @@ CodexRig is the neutral reusable source framework. No generated product has been
   `codexrig-work-state` marker until the entire outcome is complete. The marker is untrusted resume
   metadata, cannot expand authority or override the manifest, and records active, concretely
   blocked, or complete state plus a monotonic semantic revision. The trusted Stop hook validates it
-  and reopens active work. When `stop_hook_active` says the same turn was already continued, an
-  unchanged revision is allowed to stop while a changed revision can continue again; private
-  per-session state supplies that loop comparison.
+  and reopens active work only for a durable local Stop event with a non-null `transcript_path`.
+  Ephemeral side conversations and other transcriptless contexts exit before work-state or index
+  access and cannot reopen parent-thread work. When `stop_hook_active` says the same durable turn
+  was already continued, an unchanged revision is allowed to stop while a changed revision can
+  continue again; private per-session state supplies that loop comparison.
 - Maintained executable modules have a 700-physical-line maximum. Documentation, styles, declarative
   context, generated output, test corpora, fixtures, and snapshots stay outside this generic
   file-length quota.

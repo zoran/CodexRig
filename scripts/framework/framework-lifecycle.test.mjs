@@ -618,7 +618,7 @@ test("startup attestation binds nonce, root, lifetime, inputs, and tool versions
     now: () => now + 1,
     controlPolicy,
   });
-  assert.equal(verified.frameworkVersion, "1.2.0");
+  assert.equal(verified.frameworkVersion, "1.2.1");
   const statePath = path.join(root, ".codex/runtime/cache/codexrig/startup-attestation.json");
   assert.equal(statSync(statePath).mode & 0o777, 0o600);
   assert.equal(readFileSync(statePath, "utf8").includes(issued.nonce), false);

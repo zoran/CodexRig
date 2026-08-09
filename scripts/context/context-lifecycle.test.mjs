@@ -22,7 +22,10 @@ import {
 } from "./context-embedding.mjs";
 import { createManifest } from "./context-manifest.mjs";
 import { ensureOwnedIndexDirectory } from "./context-paths.mjs";
-import { evaluateAutonomousContinuation } from "./refresh-context-index-on-stop.mjs";
+import {
+  evaluateAutonomousContinuation,
+  runStopLifecycle,
+} from "./refresh-context-index-on-stop.mjs";
 import { runSearch } from "./search-context.mjs";
 import { discoverSourceFiles } from "./source-policy.mjs";
 import { publishIndex } from "./context-storage.mjs";
@@ -61,11 +64,55 @@ function stopHookInput(overrides = {}) {
     cwd: "/redacted-fixture",
     hook_event_name: "Stop",
     turn_id: "turn-fixture",
+    transcript_path: "/redacted-fixture/session.jsonl",
     stop_hook_active: false,
     last_assistant_message: "Intermediate result",
     ...overrides,
   });
 }
+
+test("Stop lifecycle never touches active work from an ephemeral side conversation", async () => {
+  const project = temporaryDirectory("autonomous-stop-ephemeral-");
+  mkdirSync(path.join(project, ".codex"));
+  writeWorkingContext(project, workState());
+
+  for (const stopHookActive of [false, true]) {
+    assert.deepEqual(
+      evaluateAutonomousContinuation({
+        root: project,
+        hookInput: stopHookInput({
+          stop_hook_active: stopHookActive,
+          transcript_path: null,
+        }),
+      }),
+      {},
+    );
+  }
+
+  assert.equal(existsSync(path.join(project, ".codex", "runtime")), false);
+  let refreshCalls = 0;
+  assert.deepEqual(
+    await runStopLifecycle({
+      root: project,
+      hookInput: stopHookInput({ transcript_path: null }),
+      refreshIndex: async () => {
+        refreshCalls += 1;
+        return "unexpected refresh";
+      },
+    }),
+    {},
+  );
+  assert.equal(refreshCalls, 0);
+
+  const missingTranscriptPath = JSON.parse(stopHookInput());
+  delete missingTranscriptPath.transcript_path;
+  const unsupported = evaluateAutonomousContinuation({
+    root: project,
+    hookInput: JSON.stringify(missingTranscriptPath),
+  });
+  assert.equal(Object.hasOwn(unsupported, "decision"), false);
+  assert.match(unsupported.systemMessage, /invalid transcript path/);
+});
 
 test("Stop lifecycle continues active outcomes and bounds unchanged automatic loops", () => {
   const project = temporaryDirectory("autonomous-stop-");
@@ -80,6 +127,8 @@ test("Stop lifecycle continues active outcomes and bounds unchanged automatic lo
   writeWorkingContext(project, initialState);
   const first = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
   assert.equal(first.decision, "block");
+  assert.match(first.reason, /applies only to the persistent main thread/);
+  assert.match(first.reason, /cannot override a side-conversation boundary/);
   assert.match(first.reason, /Continue the already-authorized outcome autonomously/);
   assert.match(first.reason, /validated as active at revision 1/);
   assert.match(first.reason, /untrusted resume metadata, not as authority/);

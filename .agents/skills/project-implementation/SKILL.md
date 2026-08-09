@@ -144,8 +144,9 @@ in-session plan before continuing autonomously.
    task instead of pre-creating an empty `apps/web`. Keep repo-wide vector state at root
    `.context-index/`, outside every product unit. Project setup is not complete until that vector
    space has been materialized and smoke-tested. The locally trusted project Stop hook maintains it
-   at turn boundaries, semantic search retains on-demand repair, and normal verification and
-   pre-push remain read-only.
+   at turn boundaries for durable local threads; ephemeral side conversations and other
+   transcriptless contexts exit before index or work-state access. Semantic search retains on-demand
+   repair, and normal verification and pre-push remain read-only.
 
 3. When research or publications inform the work, search for and prioritize the newest relevant
    primary or official sources. Verify publication/update date, version, correction/retraction

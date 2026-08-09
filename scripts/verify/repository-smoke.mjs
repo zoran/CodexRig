@@ -524,8 +524,9 @@ if (existsSync(path.join(root, projectCreatorSkill))) {
   const projectCreatorSkillDirectory = projectCreatorSkill.slice(0, -"/SKILL.md".length);
   requireContent(
     projectCreatorSkill,
-    "Stop hook then keeps changed sources current once per Codex turn",
+    "Stop hook then keeps changed sources current once per durable local Codex turn",
   );
+  requireContent(projectCreatorSkill, "ephemeral side conversations");
   requireContent(projectCreatorSkill, "repository-local FSMonitor");
   requireContent(projectCreatorSkill, "root-owned Git metadata");
   requireContent(projectCreatorSkill, "hidden index flags");

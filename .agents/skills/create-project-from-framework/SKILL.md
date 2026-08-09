@@ -81,7 +81,8 @@ instructions, and process state remain outside every product unit. The repositor
 has one fixed, ignored location at root `.context-index/` and is never product source. Generation
 does not copy or download vector state; the generated project's required `pnpm setup` creates it,
 smoke-tests it, and reports its location and statistics. The portable project Stop hook then keeps
-changed sources current once per Codex turn after local hash-bound approval through `/hooks`.
+changed sources current once per durable local Codex turn after local hash-bound approval through
+`/hooks`; ephemeral side conversations and other transcriptless contexts remain inert.
 
 ## Required Result
 
@@ -190,7 +191,8 @@ changed sources current once per Codex turn after local hash-bound approval thro
   early for broad orientation or unclear cross-file ownership, and direct matched-source reads
   before claims or edits;
 - exactly one validated SessionStart attestation hook plus one Stop hook. The Stop hook is inert
-  before bootstrap, uses the mise-pinned runtime afterward, refreshes incrementally through the
+  before bootstrap and for ephemeral side conversations or other transcriptless contexts, uses the
+  mise-pinned runtime afterward for durable local turns, refreshes incrementally through the
   sanitized worker, and keeps local hook trust out of portable source;
 - refusal when the outer project directory already exists and post-copy verification before handoff;
 - refusal when the source has resettable process state or its tracked/portable content changes

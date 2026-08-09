@@ -64,9 +64,11 @@ commit, and push commands appear only when the source worktree actually has chan
   Generated projects receive no framework runtime residue. The project-local Codex Stop hook
   refreshes changed indexed sources after setup and validates the bounded `docs/project-context.md`
   work-state marker. For an active multi-goal or multi-session outcome, it uses Codex's official
-  continuation response so an intermediate handoff is reopened. If the same turn tries to stop again
-  without a state revision change, `stop_hook_active` and private loop state allow the stop instead
-  of creating an automatic loop.
+  continuation response so an intermediate handoff is reopened. Only a durable local Stop event with
+  a non-null `transcript_path` may enter that lifecycle; ephemeral side conversations and other
+  transcriptless contexts do not read work state, write loop state, refresh the index, or reopen
+  parent-thread work. If the same durable turn tries to stop again without a state revision change,
+  `stop_hook_active` and private loop state allow the stop instead of creating an automatic loop.
 - Every new feature or other complex task uses reviewable slices. A slice advances only after
   affected checks and review confirm that no relevant finding remains, followed by a fresh audit.
   Published goals continue through `pnpm goal:new` without waiting for another prompt. Never end at

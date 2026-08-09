@@ -198,6 +198,8 @@ export function assertGeneratedAutonomousContinuationContract({
   for (const content of policyDocuments) {
     assert.match(content, /codexrig-work-state/i);
     assert.match(content, /failed\s+publication.*current\s+goal.*open/is);
+    assert.match(content, /ephemeral\s+side\s+conversations?/i);
+    assert.match(content, /transcript_path/i);
   }
   assert.match(
     instructions,
@@ -205,8 +207,10 @@ export function assertGeneratedAutonomousContinuationContract({
   );
   assert.match(instructions, /stop_hook_active/);
   assert.match(instructions, /untrusted resume metadata/i);
-  assert.match(codexReadme, /same turn was already continued/i);
+  assert.match(codexReadme, /same\s+(?:durable\s+)?turn\s+was\s+already\s+continued/i);
   assert.match(codexReadme, /resume\s+metadata\s+rather\s+than\s+authority/i);
+  assert.match(codexReadme, /ephemeral\s+side\s+conversations?/i);
+  assert.match(codexReadme, /transcript_path/i);
   assert.equal(
     existsSync(path.join(generated, "scripts/context/refresh-context-index-on-stop.mjs")),
     true,

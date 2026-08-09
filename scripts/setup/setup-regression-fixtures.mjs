@@ -25,7 +25,7 @@ export function run(executable, args, options = {}) {
     cwd: options.cwd ?? root,
     encoding: "utf8",
     env: { ...process.env, ...options.env },
-    input: "",
+    input: options.input ?? "",
     stdio: "pipe",
     timeout: 30_000,
   });

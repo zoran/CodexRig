@@ -369,6 +369,17 @@ test("automatic context-index Stop hook skips bootstrap and reports unsafe state
       CONTEXT_INDEX_ROOT: unsafeRoot,
       CONTEXT_INDEX_TEST_MODE: "1",
     },
+    input: JSON.stringify({
+      session_id: "setup-regression-session",
+      turn_id: "setup-regression-turn",
+      transcript_path: path.join(unsafeRoot, ".codex/runtime/sessions/fixture.jsonl"),
+      cwd: unsafeRoot,
+      hook_event_name: "Stop",
+      model: "test-model",
+      permission_mode: "dontAsk",
+      stop_hook_active: false,
+      last_assistant_message: null,
+    }),
   });
   assert.equal(reported.status, 0, reported.stderr);
   const message = JSON.parse(reported.stdout);

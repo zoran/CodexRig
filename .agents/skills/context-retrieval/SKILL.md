@@ -44,8 +44,9 @@ useful work.
 - Chunk by token budget and useful boundaries, not a fixed physical-line rule.
 - Refresh changed files incrementally and remove deleted files. Setup performs the initial build and
   a real smoke search, then becomes an incremental no-op while current. The locally hash-trusted
-  Stop hook owns turn-boundary freshness; semantic search retains repair. Unrelated verification and
-  pre-push remain read-only and must not rebuild or remove the index.
+  Stop hook owns turn-boundary freshness for durable local threads; ephemeral side conversations and
+  other transcriptless contexts exit before index access. Semantic search retains repair. Unrelated
+  verification and pre-push remain read-only and must not rebuild or remove the index.
 - Replace a complete generation at 20 incremental operations or 100,000 affected rows. Reuse vectors
   only after deep validation for threshold replacement; corruption and schema-mismatch repair reuse
   none.

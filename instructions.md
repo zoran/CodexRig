@@ -407,12 +407,14 @@ exports. Portable `.codex/config.toml`, `.codex/hooks.json`, `.codex/agents/*.to
 `.codex/README.md` remain tracked. The repository-wide semantic index has one fixed ignored root
 `.context-index/`; it may index active repository context, but it is never product source and cannot
 be redirected into a product unit. `pnpm setup` materializes and smoke-tests it. Once bootstrapped,
-the locally trusted project Stop hook refreshes changed sources once per Codex turn; semantic search
-retains on-demand repair, while unrelated verification and pre-push stay read-only. Every framework
-reset removes the complete project-owned index and model cache; `pnpm setup`, `pnpm context:index`,
-or the next semantic search rebuilds it. This is neither a watcher nor a per-tool refresh. New or
-changed hook definitions require local hash-bound approval through `/hooks`; no script may approve
-them automatically. Path hygiene enforces these boundaries, including Git-less staged exports.
+the locally trusted project Stop hook refreshes changed sources once per Codex turn only for a
+durable local Stop input with a non-null `transcript_path`; transcriptless contexts exit first.
+Semantic search retains on-demand repair, while unrelated verification and pre-push stay read-only.
+Every framework reset removes the complete project-owned index and model cache; `pnpm setup`,
+`pnpm context:index`, or the next semantic search rebuilds it. This is neither a watcher nor a
+per-tool refresh. New or changed hook definitions require local hash-bound approval through
+`/hooks`; no script may approve them automatically. Path hygiene enforces these boundaries,
+including Git-less staged exports.
 
 Explicit indexing and semantic search also run bounded opportunistic maintenance under the existing
 context lock. It preserves the selected database and model revision and removes only validated stale
@@ -575,12 +577,15 @@ progress, handoff, review, audit, research, or completion-report files, and do n
 working context.
 
 The trusted Stop hook validates this marker and, for `active` work, returns the official
-`decision: "block"` continuation response. If Codex reports through `stop_hook_active` that the same
-turn was already continued and the semantic revision is unchanged, the hook allows that stop instead
-of creating an automatic loop; a changed revision can continue again. Malformed or unsafe context
-gets one bounded repair continuation. The private per-session loop record supports that comparison.
-Missing hook trust or a missing context file cannot be treated as evidence that the outcome is
-complete; the workflow policy still applies.
+`decision: "block"` continuation response only when Codex supplies a non-null `transcript_path` for
+a durable local thread. Ephemeral side conversations and other transcriptless contexts exit the
+entire Stop lifecycle before work-state reads, loop-state writes, index refresh, or continuation, so
+they cannot resume parent-thread work. If Codex reports through `stop_hook_active` that the same
+durable turn was already continued and the semantic revision is unchanged, the hook allows that stop
+instead of creating an automatic loop; a changed revision can continue again. Malformed or unsafe
+durable context gets one bounded repair continuation. The private per-session loop record supports
+that comparison. Missing hook trust or a missing context file cannot be treated as evidence that the
+outcome is complete; the workflow policy still applies.
 
 `docs/project.md` is different: it is the always-read central truth for product intent, scope,
 system shape, constraints, and durable decisions. Working context can specialize the current goal

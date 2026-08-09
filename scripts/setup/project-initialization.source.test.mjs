@@ -94,7 +94,7 @@ test("clean project initialization removes inherited state and source-specific t
     readFileSync(path.join(generated, ".codexrig", "installation.json"), "utf8"),
   );
   assert.equal(frameworkReceipt.frameworkId, "codexrig");
-  assert.equal(frameworkReceipt.frameworkVersion, "1.2.0");
+  assert.equal(frameworkReceipt.frameworkVersion, "1.2.1");
   assert.deepEqual(readdirNames(path.join(generated, ".codex")), [
     "README.md",
     "agents",
@@ -187,7 +187,7 @@ test("clean project initialization removes inherited state and source-specific t
   assert.match(generatedReadme, /`pnpm setup` creates the ignored `\.context-index\/`/);
   assert.match(
     generatedReadme,
-    /project-local Codex Stop hook refreshes\s+changed indexed sources once per turn/,
+    /project-local Codex Stop hook refreshes\s+changed indexed sources and validates[\s\S]{0,300}non-null `transcript_path`/,
   );
   assert.match(
     generatedContextIndex,

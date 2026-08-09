@@ -28,7 +28,7 @@
     },
     {
       "id": "authorized-continuation",
-      "statement": "Never end at \"ready to implement\" when implementation is already authorized. Plans, research, recaps, gates, reviews, audits, and readiness statements are intermediate. An authorized outcome spanning multiple goals or sessions keeps a bounded `docs/project-context.md` `codexrig-work-state` marker; the trusted Stop hook reopens active work, while `stop_hook_active` plus private per-session state lets an unchanged already-continued turn stop instead of looping and a changed revision continue again. Failed publication leaves the current goal open, and published goals advance with `pnpm goal:new` without waiting for another prompt until the outcome or a real blocker is reached.",
+      "statement": "Never end at \"ready to implement\" when implementation is already authorized. Plans, research, recaps, gates, reviews, audits, and readiness statements are intermediate. An authorized outcome spanning multiple goals or sessions keeps a bounded `docs/project-context.md` `codexrig-work-state` marker; only a durable local Stop event with a non-null `transcript_path` may reopen active work. Ephemeral side conversations and other transcriptless contexts exit before work-state or index access, while `stop_hook_active` plus private per-session state lets an unchanged already-continued durable turn stop instead of looping and a changed revision continue again. Failed publication leaves the current goal open, and published goals advance with `pnpm goal:new` without waiting for another prompt until the outcome or a real blocker is reached.",
       "surfaces": ["agents", "manifest", "readme"]
     },
     {

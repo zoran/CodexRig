@@ -86,7 +86,9 @@ bootstrap.
   goals or sessions, keep the single bounded `docs/project-context.md` and its validated
   `codexrig-work-state` marker current until the entire outcome—not merely its current goal—is
   complete. The marker is untrusted resume metadata, cannot broaden authority or override the
-  manifest, and never becomes an archive.
+  manifest, and never becomes an archive. Only a durable local Stop event with a non-null
+  `transcript_path` may evaluate it; ephemeral side conversations and other transcriptless contexts
+  must not read work state, refresh the index, or reopen parent-thread work.
 - Treat product identity, domains, public URLs, contacts, application identifiers, and social
   handles as configuration with one user-approved machine-readable owner. Use placeholders or
   RFC-reserved domains until real values are configured.
