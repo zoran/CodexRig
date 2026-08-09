@@ -23,6 +23,7 @@ implementation or architecture selection. Deliberately neutral source-framework 
 require an invented product. Explain the gate to the user, interview in focused successive rounds,
 challenge ambiguity and contradictions, and continue until the intended users/outcome,
 scope/non-goals, domain and initial module map, data/integrations, trust boundaries, operations,
+collaboration topology and any shared pre-slice coordination channel for concurrent accounts,
 constraints, risks, and success evidence are precise. Present a final synthesis for correction,
 write only user-confirmed durable truth into the manifest, and then proceed autonomously. Do not
 turn the intake into a fixed questionnaire or repeat questions whose answers cannot change a
@@ -54,12 +55,34 @@ anchors. When no reliable exact anchor exists, ownership is unclear, or the chan
 cross-file relationships, use `pnpm context:search -- "concept or relationship"` before broad
 repository exploration, then read every matched source used for the implementation decision.
 
-For non-trivial product work, establish the affected domain module before editing. Read or update
-the durable module map in `docs/project.md`: responsibility/root, public contract and private
-internals, owned data/migrations, allowed dependencies, focused verifier, and steward role or team
-when known. Declare the slice write set and one write owner for every affected module, public
-contract, schema, migration, shared configuration, and file. Product Roots alone do not establish
-domain boundaries.
+After a framework upgrade launched by an installed updater that predates project-document
+reconciliation, the first process cannot print a notice introduced by the updater it is installing.
+Inspect that legacy preview and do not apply it if any write or delete targets a project-owned
+document. Once a safe apply succeeds, run the newly installed updater against the exact same
+reviewed source once as a preview only with
+`pnpm framework:upgrade -- --source <same-framework-root> --allow-same`; do not add `--apply`.
+Reconcile every listed project-owned document before verification. Treat any
+`project-document reconciliation required before verification` finding as a fail-closed request for
+that careful local reconciliation, including user confirmation and dedicated preservation review for
+uncertain critical-document changes.
+
+For non-trivial product work, establish the affected domain module before editing. Read the durable
+module map in `docs/project.md`: responsibility/root, public contract and private internals, owned
+data/migrations, allowed dependencies, focused verifier, and steward role or team when known. If it
+needs an update, include that critical document in the declared slice write set and do not change it
+until the pre-slice coordination and critical-document confirmation rules below are satisfied.
+Declare the slice write set and one write owner for every affected module, public contract, schema,
+migration, shared configuration, and file. Product Roots alone do not establish domain boundaries.
+
+Immediately before every slice begins, and again before its declared scope expands, perform the
+pre-slice coordination check from `instructions.md`. Restate the goal, slice outcome, success
+condition, write set, and owners; inspect all observable live-agent assignments, sessions,
+account-level work, bounded context, and shared team or orchestration channels before relying on
+Git; and compare current goal and slice claims. Only confirmed-disjoint slices may write in
+parallel. Resolve overlap or uncertain shared ownership by rescoping, ordering, or exactly one
+writer before implementation. A local runtime lease, clean worktree, or quiet remote cannot prove
+that another clone, machine, or account is idle; use a shared coordination channel across that
+boundary and fail closed on uncertain shared ownership.
 
 Perform a whole-repository course check after initial planning/discovery and every completed slice,
 at every major milestone and completed goal, at every resume or context-recovery point, whenever
@@ -84,11 +107,17 @@ in-session plan before continuing autonomously.
 - Apply the replacement test: changing a module implementation or adapter should affect only
   composition/configuration, replacement-local work, and an explicit data migration. Scattered
   consumer changes reveal a missing or leaking contract.
+- Treat modules as system components rather than isolated mini-products. Keep each independently
+  improvable or replaceable while its public contract, data semantics, versioning, lifecycle,
+  error/timeout behavior, and operational expectations remain compatible with current consumers.
+  Verify the focused boundary and a realistic assembled flow so the assembled system is verified as
+  one functioning unit; a locally clean component is not done when its consumers no longer work.
 - Keep one central `main` as the only durable integration branch; do not create long-lived module or
   developer branches. A serialized writer may use `main` directly when branch policy permits.
   Parallel read-heavy work may span modules. Different developers/accounts use temporary task
   branches in separate clones and credential contexts; same-account tasks may use worktrees, which
-  are not an authentication boundary. Concurrent writes need disjoint declared write sets and
+  are not an authentication boundary. Before each slice, coordinate goal and slice claims without
+  waiting for Git evidence. Concurrent writes need confirmed-disjoint declared write sets and
   exactly one writer per module or shared contract. Give a shared contract change one integrator and
   land compatibility before consumer migrations. A task branch is only a bounded integration input;
   close the goal after the actual published `main` passes its course check, affected review/audit,
@@ -118,23 +147,30 @@ in-session plan before continuing autonomously.
    at turn boundaries, semantic search retains on-demand repair, and normal verification and
    pre-push remain read-only.
 
-3. Check current official/primary sources only when a material decision depends on unstable or
-   specialized behavior. Record the decision and tradeoff, not a research transcript.
-4. Implement the largest coherent, currently unblocked slice supported by the decision-ready plan.
+3. When research or publications inform the work, search for and prioritize the newest relevant
+   primary or official sources. Verify publication/update date, version, correction/retraction
+   state, and applicability; distinguish evidence from inference and label preliminary evidence. Use
+   older sources primarily for comparison or historical context. Treat an older foundational or
+   controlling source as current authority only with an explicit reason and confirmation that newer
+   evidence has not superseded it. Record the decision and tradeoff, not a research transcript.
+4. Run the pre-slice coordination check against every observable session/account claim and the
+   declared goal, slice, module/contract/data/file write set. Do not begin or expand writes until
+   overlapping or uncertain shared ownership has one explicit owner and order.
+5. Implement the largest coherent, currently unblocked slice supported by the decision-ready plan.
    Stay inside its declared module/write set, preserve unrelated compatible edits, and avoid generic
    catch-all modules or speculative abstractions. Keep planning and review detail tied to decisions,
    risks, findings, and evidence instead of accumulating status prose.
-5. Keep maintained executable modules at or below 700 physical lines. Split an approaching module at
+6. Keep maintained executable modules at or below 700 physical lines. Split an approaching module at
    cohesive ownership boundaries. Do not apply the quota to declarative/context, generated,
    test-corpus, fixture, snapshot, documentation, or style files.
-6. Apply the risk-based Test Strategy in `instructions.md`: a fix or user instruction does not
+7. Apply the risk-based Test Strategy in `instructions.md`: a fix or user instruction does not
    automatically need a test. When coverage is justified, default to extending a broad, realistic
    end-to-end, system, or lifecycle scenario through real boundaries; do not create an isolated
    one-off test or verifier file. Use narrow unit or contract coverage only when the broad flow
    cannot exercise critical deterministic behavior reliably or proportionately. Update documentation
    only when an externally consumed or durable project contract changed. The optional compact
    project-context cache is the sole task-state exception; never create per-task notes or archives.
-7. After every completed slice, run focused owner and consumer evidence, then review correctness,
+8. After every completed slice, run focused owner and consumer evidence, then review correctness,
    acceptance criteria, regressions, maintainability, applicable trust risks, documentation drift,
    and whole-system impact. Fix relevant reproducible findings, rerun affected focused evidence, and
    repeat until no relevant finding remains. From that clean state perform a fresh audit against the
@@ -142,21 +178,32 @@ in-session plan before continuing autonomously.
    review-and-repair loop, and re-audit. From the clean audit, perform the slice-boundary course
    check against current repository and available upstream changes; integrate overlapping module or
    contract work and rerun only affected evidence before continuing.
-8. At each major milestone and completed goal, repeat the whole-repository course check, account for
+9. At each major milestone and completed goal, repeat the whole-repository course check, account for
    every downstream consumer and changed contract, remove obsolete temporary or dead work within
    scope, and reconcile code, tests, configuration, docs, bounded context, and the in-session plan.
-   Continue autonomously with the next planned slice or already-authorized goal when the check is
-   clean and scope remains authorized.
-9. Run focused owner commands during iteration without treating execution scope as a reason to
-   design microscopic tests. Inspect adaptive changed-path admission after the coherent slice and
-   leave publication admission to the single final workflow after the clean goal audit and cleanup;
-   a prior failure never authorizes a broad restart.
+   Any repository edit in this step reopens affected evidence and review before a new audit. At a
+   completed goal, inventory every active documentation surface before the final whole-goal audit.
+   Update only stale material; consolidate or remove superseded duplication instead of appending
+   history; and preserve active directives. Consolidation is not a shortening target. Treat the
+   durable project manifest as critical documentation. Inspect it and every other critical authority
+   read-only first; change one automatically only when the factual correction and full preservation
+   are unambiguous; otherwise obtain explicit user confirmation before writing. Give every
+   authorized critical-document change a dedicated preservation review. Documentation findings
+   reopen affected checks and review before the fresh audit. Continue autonomously with the next
+   planned slice or already-authorized goal when the check is clean and scope remains authorized.
+10. Run focused owner commands during iteration without treating execution scope as a reason to
+    design microscopic tests. Inspect adaptive changed-path admission after the coherent slice and
+    leave publication admission to the single final workflow after repository-mutating cleanup, the
+    goal documentation and critical-document gates, and the clean goal audit; a prior failure never
+    authorizes a broad restart.
 
 ## Completion
 
 Report the outcome, changed boundaries, verification, clean review result, fresh audit, material
 tradeoffs, and residual risks in the final response. Use `$task-quality` at the completion of every
 planned new-feature or complex-task slice and goal, including push preparation and elevated-risk
-closure. A green goal checkpoint is not a handoff while another goal in the same authorized outcome
-remains: publish it, run `pnpm goal:new`, and continue without waiting for another prompt. Trivial
-edits that are not a planned step do not trigger that workflow.
+closure. A goal cannot close until its all-document currency review and any critical-document
+preservation review are clean. A green goal checkpoint is not a handoff while another goal in the
+same authorized outcome remains: publish it, run `pnpm goal:new`, perform the next slice's pre-slice
+coordination check, and continue without waiting for another prompt. Trivial edits that are not a
+planned step do not trigger that workflow.

@@ -42,8 +42,9 @@ change architecture, scope, safety, acceptance, or delivery:
 - identity, authorization, privacy, abuse, regulatory, and other trust boundaries;
 - runtime, delivery, availability, performance, observability, support, and operational constraints;
   and
-- expected developer/orchestrator collaboration, module stewardship, and any known shared-contract
-  integration pressure.
+- expected developer/orchestrator collaboration, module stewardship, the shared pre-slice
+  coordination channel when independent sessions or accounts may work concurrently, and any known
+  shared-contract integration pressure.
 
 Regularly restate the current understanding and distinguish user-confirmed facts from assumptions or
 open decisions. The intake is complete only when the agent can explain the intended product, system
@@ -159,6 +160,41 @@ unless genuinely independent work justifies concurrency. Do not use goal or slic
 unplanned scope, split trivial edits into ceremony, or begin a dependent slice while a material
 decision remains unresolved.
 
+Immediately before every slice begins, and again before its write scope expands, perform a pre-slice
+coordination check before any write:
+
+1. Restate the current goal, slice outcome and success condition, then declare the affected modules,
+   public contracts, schemas, migrations, shared configuration, and files plus exactly one writer
+   for each surface.
+2. Inspect all observable collaboration state before relying on Git: live agents and delegated
+   assignments, available sessions or account-level work, the bounded project context, and any
+   shared team or orchestration channel. Exchange or reconcile current goal and slice claims when
+   another session or account may be working in the repository.
+3. Compare the declared claims. Disjoint slices may proceed concurrently. Any overlap, ambiguous
+   ownership, or newly discovered shared surface must be resolved by rescoping, ordering, or one
+   explicit writer before either slice writes there.
+4. When separate accounts, clones, or machines cannot be observed directly, do not treat absence of
+   evidence as proof that a shared surface is free. Establish a shared coordination channel or
+   obtain an ownership confirmation before shared-boundary work; record only the current bounded
+   decision in conversation or existing working context, never a coordination history document.
+
+This check coordinates goals and slices before implementation so overlapping edits do not become
+merge conflicts. Later worktree, upstream, and provider checks are defense in depth and integration
+evidence, not the primary coordination mechanism.
+
+When research, papers, standards, guidance, or other publications inform the work, search for and
+prioritize the newest relevant primary or official sources. Verify publication or update date,
+version, correction or retraction state, and applicability to the current system; for scientific
+claims, prefer current peer-reviewed primary research and up-to-date high-quality syntheses where
+appropriate, and label preprints or other preliminary evidence. Recency does not override source
+quality, but no claim may be presented as current or latest without a current search.
+
+Use older sources primarily for comparison or historical context. Rely on an older source as current
+authority only when it remains foundational, controlling, or uniquely relevant; explain that reason
+and verify against newer work that it has not been superseded, corrected, or retracted. Distinguish
+source evidence from inference and report material disagreement or uncertainty instead of silently
+choosing the convenient publication.
+
 After every completed slice:
 
 1. Run the focused owner and consumer evidence needed for that slice.
@@ -194,19 +230,24 @@ authorize broad verification.
 Then clean up and update the authorized work: remove obsolete temporary work and dead paths,
 reconcile code/tests/configuration/docs, refresh or delete the bounded project context as
 appropriate, and update the in-session plan to the current truth. After a clean course check,
-continue autonomously with the next planned slice. At a completed-goal boundary, choose the declared
-integration path. A serialized writer may finish audit, cleanup, reset, verification, exact commit,
-and push directly on current `main` only when remote policy permits it. Work from a temporary task
-branch—or any change targeting protected `main`—is first committed and pushed only as a bounded
-integration input; one integrator or the detected provider's merge serializer lands it. Then refresh
-local `main` to the published remote result and repeat the whole-repository course check, affected
-review/audit, and adaptive verification on that actual integrated state. The merge or squash is the
-publication commit; do not manufacture an empty follow-up commit. After either path has produced a
-clean, verified, published `main`, immediately run `pnpm goal:new` and continue the next
-already-approved goal when the gate passes. Do not return merely because a goal checkpoint
-completed. If publication or the gate fails, keep the current goal and encompassing work state open,
-record the concrete integration or external blocker when no safe disjoint work remains, and never
-misreport that intermediate checkpoint as the completed outcome.
+continue autonomously with the next planned slice. At a completed-goal boundary, complete the goal
+documentation review defined below before the final whole-goal audit, admission, or publication.
+Only then choose the declared integration path. A serialized writer may finish the final audit,
+reset, verification, exact commit, and push directly on current `main` only when remote policy
+permits it; any newly required repository cleanup or edit reopens affected checks, the goal
+documentation review, any critical-document confirmation and preservation review, and the fresh
+audit. Work from a temporary task branch—or any change targeting protected `main`—is first committed
+and pushed only as a bounded integration input; one integrator or the detected provider's merge
+serializer lands it. Then refresh local `main` to the published remote result and repeat the
+whole-repository course check, affected review, completed-goal documentation review, any
+critical-document confirmation and preservation review, fresh audit, and adaptive verification on
+that actual integrated state. The merge or squash is the publication commit; do not manufacture an
+empty follow-up commit. After either path has produced a clean, verified, published `main`,
+immediately run `pnpm goal:new` and continue the next already-approved goal when the gate passes. Do
+not return merely because a goal checkpoint completed. If publication or the gate fails, keep the
+current goal and encompassing work state open, record the concrete integration or external blocker
+when no safe disjoint work remains, and never misreport that intermediate checkpoint as the
+completed outcome.
 
 ## Modular Architecture, Parallel Ownership, And Integration
 
@@ -249,18 +290,29 @@ Design every module so consumers depend on its public contract rather than its i
 - once a module structure is stable enough to justify maintenance cost, use the detected ecosystem's
   boundary tooling to enforce public-API-only access, allowed dependencies, and acyclic structure.
 
+Treat these modules as system components, not isolated mini-products. Each component must be
+independently improvable or replaceable behind its contract, while the current components remain
+compatible in domain semantics, contract and schema versions, data ownership, lifecycle, error and
+timeout behavior, and operational expectations. Verify both the focused component boundary and a
+realistic assembled flow through its consumers so the assembled system is verified as one
+functioning unit; local replaceability is not complete when the components no longer work together.
+
 Parallel development follows those same boundaries. Use one central `main` as the only durable
 integration branch; do not create long-lived module, developer, or environment branches. A
-serialized single writer may work directly on `main` only when branch policy permits it. Before
-parallel write work begins, give every slice a declared write set and exactly one write owner for
-each affected module, public contract, schema, migration, or shared configuration surface. Different
-developers or Codex accounts use temporary short-lived task branches in separate clones with
-separate OS or provider credential contexts. Git worktrees are appropriate for parallel tasks under
-the same trusted account, but they are workspace isolation—not an authentication boundary—and may
-share repository configuration and Git credential helpers. Every Codex session still uses its
-worktree or clone's ignored `.codex/runtime/` as `CODEX_HOME`; never copy or share credentials
-between repositories. Read-heavy discovery and review may run more broadly in parallel. Write-heavy
-work runs concurrently only when module and file scopes are disjoint.
+serialized single writer may work directly on `main` only when branch policy permits it. The
+pre-slice coordination check applies even when no branch or commit exists yet: give every slice a
+declared goal, outcome, write set, and exactly one write owner for each affected module, public
+contract, schema, migration, shared configuration surface, or file; inspect observable session and
+account claims; and resolve overlap before writes begin. Different developers or Codex accounts use
+temporary short-lived task branches in separate clones with separate OS or provider credential
+contexts. Git worktrees are appropriate for parallel tasks under the same trusted account, but they
+are workspace isolation—not an authentication boundary—and may share repository configuration and
+Git credential helpers. Every Codex session still uses its worktree or clone's ignored
+`.codex/runtime/` as `CODEX_HOME`; never copy or share credentials between repositories. A
+repository-local runtime lease cannot prove that another clone, machine, or account is idle, so use
+an available shared coordination channel for that boundary. Read-heavy discovery and review may run
+more broadly in parallel. Write-heavy work runs concurrently only when module and file scopes are
+confirmed disjoint before the slice.
 
 Changes to a shared contract are integration work, not an excuse for concurrent edits by every
 consumer. Assign one integrator, land the compatible contract or adapter first, then update
@@ -416,13 +468,14 @@ consumer regression evidence.
 ## Framework Lifecycle, Compatibility, And Git Platforms
 
 `.codexrig/framework.json` is the versioned machine contract. It owns the CodexRig version, managed
-upgrade roots and package fields, startup-attestation lifetime, central integration branch,
-GitHub/GitLab host mapping, required CI job, review count, and merge-serialization preference.
-`.codexrig/policy-projection.json` centrally projects shared generated bootstrap, README, and
-manifest invariants so those surfaces cannot drift independently. `.codexrig/compatibility.json`
-separately owns the reviewed stable Node.js, pnpm, and minimum Codex versions plus non-blocking
-canaries for the next Node LTS line, next pnpm major, and next Codex channel. Stable CI is blocking;
-scheduled and manual canaries expose migration work before a line becomes mandatory.
+upgrade roots and package fields, project-owned document classification, startup-attestation
+lifetime, central integration branch, GitHub/GitLab host mapping, required CI job, review count, and
+merge-serialization preference. `.codexrig/policy-projection.json` centrally projects shared
+generated bootstrap, README, and manifest invariants so those surfaces cannot drift independently.
+`.codexrig/compatibility.json` separately owns the reviewed stable Node.js, pnpm, and minimum Codex
+versions plus non-blocking canaries for the next Node LTS line, next pnpm major, and next Codex
+channel. Stable CI is blocking; scheduled and manual canaries expose migration work before a line
+becomes mandatory.
 
 Run `pnpm framework:doctor` for local contract, receipt, runtime, CI-adapter, and provider checks;
 add `-- --online` when registry freshness must be known. The reusable framework source advances by
@@ -435,14 +488,31 @@ becomes a visible conflict. Apply journals originals, authorizes the planned dep
 replacement, writes the new receipt last, and restores files, lockfile, and installed dependencies
 if the transaction fails. Never resolve an upgrade conflict by silently overwriting project changes.
 
-Project creation is a distinct non-publication workflow. After atomically publishing the target, the
-generator applies the reset boundary's restricted active-session cleanup to reset-owned nonportable
-process/export residue, while preserving local runtime, SQLite/WAL state, and `.context-index/`. It
-revalidates the source baseline before retaining the target, never initializes Git, commits, or
-pushes, and always prints the exact full-reset preview, review, apply, and clean preview sequence
-that the user must run from the source root after all owning Codex/CodexRig sessions end. Optional
-verify, status, stage, commit, and push instructions are printed only when the source Git worktree
-has changes.
+The target repository's currently installed updater runs the transaction. Therefore, an upgrade
+launched by a pre-1.2 updater cannot retroactively print the project-document reconciliation notice
+introduced by the version it is installing. Inspect that legacy preview and do not apply it if any
+write or delete targets a project-owned document. After a safe first apply succeeds, use the newly
+installed updater to preview the exact same reviewed source once with
+`pnpm framework:upgrade -- --source <same-codexrig-root> --allow-same`; never add `--apply` to this
+same-version reconciliation pass. Its fixed path inventory identifies every project-owned document
+that the transaction preserved. Reconcile those documents before verification, following the
+critical-document confirmation and preservation rules. Portable verification fails closed with the
+explicit prefix `project-document reconciliation required before verification` when required local
+policy remains stale.
+
+Project creation is a distinct non-publication workflow. Its complete selected-source transfer
+manifest classifies every inventoried path as either copied or excluded for an explicit source-only
+reason. Every copied reusable file remains byte-identical unless it is a declared project
+identity/configuration transformation; missing, unexpected, or undeclared changed paths fail
+creation. This carries all still-active framework behavior, including capabilities introduced in
+earlier revisions, without resurrecting retired behavior or exporting generator/reset-only
+machinery. After atomically publishing the target, the generator applies the reset boundary's
+restricted active-session cleanup to reset-owned nonportable process/export residue, while
+preserving local runtime, SQLite/WAL state, and `.context-index/`. It revalidates the source
+baseline before retaining the target, never initializes Git, commits, or pushes, and always prints
+the exact full-reset preview, review, apply, and clean preview sequence that the user must run from
+the source root after all owning Codex/CodexRig sessions end. Optional verify, status, stage,
+commit, and push instructions are printed only when the source Git worktree has changes.
 
 Provider detection prefers CI identity, then the selected branch upstream, `origin`, or the sole
 remote. Standard GitHub/GitLab hosts work without configuration; self-hosted domains must have one
@@ -586,6 +656,38 @@ Keep those in the conversation. Do not add empty directory READMEs, speculative 
 or duplicated policy. A code-only change is allowed and expected when no durable contract changed;
 the sole task-state exception is the bounded project-context lifecycle defined above.
 
+At every completed goal, before the final whole-goal audit and publication admission, perform one
+goal documentation review across every active documentation surface, including root and `docs/`
+documents, workflow/bootstrap policy, Codex guidance, and skill instructions. Compare each document
+with the completed behavior, current code and configuration, manifest truth, public contracts,
+operations, and still-active decisions. The review may correctly conclude that a document needs no
+change; it must not manufacture prose merely to prove that the review occurred.
+
+Consolidation is conservative, not a shortening target. When a document is stale, update its
+canonical owner. Consolidate overlapping material, replace superseded text instead of appending
+history, remove obsolete content or an unjustified document, and keep secondary surfaces focused on
+a distinct audience-specific need or canonical link. Never remove useful context merely to shorten a
+document. Preserve every still-active requirement, constraint, rationale needed for safe operation,
+and deliberate audience-specific instruction. Documentation edits reopen affected content checks and
+the normal review loop before a fresh whole-goal audit.
+
+Treat the durable project manifest (`docs/project.md`) as critical documentation. Treat
+`instructions.md` and every other workflow authority, bootstrap, security/trust policy, operations
+or migration authority, and public-contract document the same way. Review a critical document
+read-only first. Change it automatically only when the completed authorized work makes an exact
+factual correction necessary, its source of truth is unambiguous, and every active directive and
+durable manifest decision can be proven preserved. Any normative or interpretive authority change,
+consolidation or removal, ambiguous conflict, uncertain replacement, or other doubt requires
+explicit user confirmation before that critical-document write; pause only the affected write and
+ask rather than guessing, and never let autonomous continuation bypass the confirmation.
+
+After an authorized critical-document change, give it a dedicated preservation review separate from
+the general goal review, preferably with an independent reviewer. Trace each removed or materially
+rewritten directive or durable manifest decision to surviving canonical text or an explicitly
+authorized retirement, check authority order and projected copies for contradictions, and preserve
+the directive or decision when its status is uncertain. Keep the result in the conversation; never
+create a review artifact.
+
 ## Product Identity And Environment Values
 
 Treat product identity and public contact or deployment values as data, not literals scattered
@@ -701,7 +803,8 @@ advances it. Pre-push remains read-only, reruns its security and pushed-object c
 exact-current successful evidence instead of repeating an unchanged product suite.
 
 A goal checkpoint is green only when its requested outcome is published on central `main` and the
-actual integrated state has focused evidence, a review state with no relevant findings, a fresh
+actual integrated state has focused evidence, a review state with no relevant findings, a completed
+goal documentation review, any required dedicated critical-document preservation review, a fresh
 audit, course check, cleanup, applicable reset, and publication admission. In serialized direct-main
 mode, the primary commits exactly the goal-owned changes and pushes `main`. Under parallel delivery
 or protected-main policy, bounded task-branch commits are integration inputs; one integrator or the
@@ -737,7 +840,8 @@ conversation; do not create process documents.
 
 Work is done when the complete authorized outcome—not merely an intermediate goal—exists,
 proportionate evidence addresses its material risks, every required review loop has reached zero
-relevant findings, the fresh audit and publication admission pass, milestone/goal cleanup is
-complete, and required goal-closure publication work has succeeded or is reported as an external
-blocker. Report the result in the final response; do not add a repository handoff document unless
-the user explicitly requested one.
+relevant findings, the goal documentation review and any critical-document preservation review are
+clean, the fresh audit and publication admission pass, milestone/goal cleanup is complete, and
+required goal-closure publication work has succeeded or is reported as an external blocker. Report
+the result in the final response; do not add a repository handoff document unless the user
+explicitly requested one.

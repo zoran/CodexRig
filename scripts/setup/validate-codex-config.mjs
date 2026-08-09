@@ -50,6 +50,8 @@ const requiredAgentInstructionFragments = Object.freeze([
   "whole-repository course check",
   "milestone",
   "fresh audit",
+  "Before every assigned slice begins",
+  "newest relevant primary or official sources",
 ]);
 const contextIndexStopHookPolicy = Object.freeze({
   description: "Keep the bootstrapped local context index current between Codex turns.",

@@ -1,15 +1,161 @@
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { formatContextError } from "../../../../scripts/context/terminal-output.mjs";
 import { listManagedMarkdownFiles } from "../../../../scripts/docs/document-scope.mjs";
+import { listPortableTransferFiles } from "../../../../scripts/repository/source-inventory.mjs";
+import {
+  readStableRepositoryText,
+  scanStableRepositoryFile,
+} from "../../../../scripts/repository/stable-file-snapshot.mjs";
 import { productSourceBoundaryFindings } from "../../../../scripts/verify/path-hygiene.mjs";
 import { fail } from "./project-options.mjs";
 import { generatedProjectDocuments } from "./project-transfer-policy.mjs";
 
+const transformedProjectPaths = new Set([
+  ".codex/README.md",
+  ".codex/config.toml",
+  ...generatedProjectDocuments,
+  "package.json",
+]);
+const requiredGeneratedProjectPaths = new Set([".codexrig/installation.json"]);
+const allowedGeneratedProjectPaths = new Set([...requiredGeneratedProjectPaths, "src/.gitkeep"]);
+
 function posixRelative(root, fullPath) {
   return path.relative(root, fullPath).split(path.sep).join("/");
+}
+
+function stableFileDigest(repositoryRoot, relativePath, expectedIdentity) {
+  const digest = createHash("sha256");
+  scanStableRepositoryFile({
+    repositoryRoot,
+    relativePath,
+    expectedIdentity,
+    onChunk: (chunk) => digest.update(chunk),
+  });
+  return digest.digest("hex");
+}
+
+function validateTransferManifest(transferManifest) {
+  if (
+    !transferManifest ||
+    !Array.isArray(transferManifest.files) ||
+    !Array.isArray(transferManifest.excluded)
+  ) {
+    fail("Generated project transfer manifest is invalid.");
+  }
+  const includedPaths = transferManifest.files.map((entry) => entry?.relativePath);
+  const excludedPaths = transferManifest.excluded.map((entry) => entry?.relativePath);
+  if (
+    transferManifest.files.some(
+      (entry) =>
+        typeof entry?.relativePath !== "string" ||
+        !entry.relativePath ||
+        typeof entry.identity !== "string" ||
+        !entry.identity,
+    ) ||
+    transferManifest.excluded.some(
+      (entry) =>
+        typeof entry?.relativePath !== "string" ||
+        !entry.relativePath ||
+        typeof entry.exclusionReason !== "string" ||
+        !entry.exclusionReason,
+    ) ||
+    new Set([...includedPaths, ...excludedPaths]).size !==
+      includedPaths.length + excludedPaths.length
+  ) {
+    fail("Generated project transfer manifest is invalid.");
+  }
+}
+
+function assertDeclaredConfigurationTransformations({ sourceRoot, targetRoot, transferManifest }) {
+  const entries = new Map(transferManifest.files.map((entry) => [entry.relativePath, entry]));
+  const sourceConfig = readStableRepositoryText({
+    repositoryRoot: sourceRoot,
+    relativePath: ".codex/config.toml",
+    expectedIdentity: entries.get(".codex/config.toml").identity,
+  }).text;
+  const memoryFlagCount = sourceConfig.match(/^memories\s*=\s*false\s*$/gmu)?.length ?? 0;
+  const expectedConfig = sourceConfig.replace(/^memories\s*=\s*false\s*$/mu, "memories = true");
+  const targetConfig = readStableRepositoryText({
+    repositoryRoot: targetRoot,
+    relativePath: ".codex/config.toml",
+  }).text;
+  if (memoryFlagCount !== 1 || targetConfig !== expectedConfig) {
+    fail("Generated project Codex config exceeds the declared memory-enablement transformation.");
+  }
+
+  const sourcePackage = JSON.parse(
+    readStableRepositoryText({
+      repositoryRoot: sourceRoot,
+      relativePath: "package.json",
+      expectedIdentity: entries.get("package.json").identity,
+    }).text,
+  );
+  const targetPackage = JSON.parse(
+    readStableRepositoryText({
+      repositoryRoot: targetRoot,
+      relativePath: "package.json",
+    }).text,
+  );
+  const expectedPackage = structuredClone(sourcePackage);
+  expectedPackage.name = targetPackage.name;
+  expectedPackage.version = "0.1.0";
+  delete expectedPackage.scripts["framework:reset"];
+  if (JSON.stringify(targetPackage) !== JSON.stringify(expectedPackage)) {
+    fail("Generated package exceeds the declared identity and source-reset transformation.");
+  }
+}
+
+export function assertGeneratedProjectParity({ sourceRoot, targetRoot, transferManifest }) {
+  validateTransferManifest(transferManifest);
+  const includedPaths = transferManifest.files.map(({ relativePath }) => relativePath);
+  const includedPathSet = new Set(includedPaths);
+  const missingTransformationInputs = [...transformedProjectPaths].filter(
+    (relativePath) => !includedPathSet.has(relativePath),
+  );
+  if (missingTransformationInputs.length > 0) {
+    fail(
+      `Generated project transfer parity is missing declared transformation inputs: ${missingTransformationInputs.join(
+        ", ",
+      )}.`,
+    );
+  }
+
+  const targetPaths = listPortableTransferFiles({ root: targetRoot, includeUntracked: true });
+  const targetPathSet = new Set(targetPaths);
+  const requiredPaths = new Set([...includedPaths, ...requiredGeneratedProjectPaths]);
+  const allowedPaths = new Set([...requiredPaths, ...allowedGeneratedProjectPaths]);
+  const missingPaths = [...requiredPaths].filter(
+    (relativePath) => !targetPathSet.has(relativePath),
+  );
+  const unexpectedPaths = targetPaths.filter((relativePath) => !allowedPaths.has(relativePath));
+  if (missingPaths.length > 0 || unexpectedPaths.length > 0) {
+    const details = [];
+    if (missingPaths.length > 0) details.push(`missing: ${missingPaths.join(", ")}`);
+    if (unexpectedPaths.length > 0) details.push(`unexpected: ${unexpectedPaths.join(", ")}`);
+    fail(`Generated project transfer parity failed (${details.join("; ")}).`);
+  }
+
+  assertDeclaredConfigurationTransformations({ sourceRoot, targetRoot, transferManifest });
+
+  const changedPaths = transferManifest.files
+    .filter(({ relativePath }) => !transformedProjectPaths.has(relativePath))
+    .filter(
+      ({ identity, relativePath }) =>
+        stableFileDigest(sourceRoot, relativePath, identity) !==
+        stableFileDigest(targetRoot, relativePath),
+    )
+    .map(({ relativePath }) => relativePath);
+  if (changedPaths.length > 0) {
+    fail(
+      `Generated project transfer parity found reusable files changed outside declared project-specific transformations: ${changedPaths.join(
+        ", ",
+      )}.`,
+    );
+  }
 }
 
 export function updateGeneratedPackage(targetRoot, packageName) {

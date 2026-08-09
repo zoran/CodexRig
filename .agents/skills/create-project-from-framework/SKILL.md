@@ -49,6 +49,15 @@ The default transfer uses the source repository's tracked files plus the require
 and ignored state cannot enter the new project. Use `--include-untracked` only when the user
 explicitly asks to transfer a working-tree snapshot.
 
+Before publication, a complete selected-source transfer manifest must classify every inventoried
+path as either copied or excluded for a non-empty source-only reason. Every copied reusable file
+must remain byte-identical unless it is one of the explicit project identity/configuration
+transformations; the generated installation receipt is the only required project-only file, with an
+empty `src/.gitkeep` allowed only when the selected source has no file in its required Product Root.
+A missing, unexpected, or undeclared changed file fails project creation. This invariant carries
+every still-active framework capability, including work introduced in earlier framework revisions,
+without copying retired or source-only generator/reset behavior into a product repository.
+
 After publication, run `mise install --locked`,
 `mise exec --locked -- node scripts/deps/install-compatible.mjs`, and
 `mise exec --locked -- pnpm setup` in the generated project. The compatible installer must resolve
@@ -111,17 +120,30 @@ changed sources current once per Codex turn after local hash-bound approval thro
   implementation, organizes authorized work into goals with success conditions and reviewable
   slices, repeats review/repair/focused verification after each slice until no relevant finding
   remains, then performs a fresh audit;
+- a research-source currency contract that prioritizes the newest relevant primary or official
+  publications, verifies their date/version/correction or retraction state and applicability, uses
+  older sources primarily for comparison or historical context, and explicitly justifies any older
+  foundational or controlling authority against newer evidence;
+- a mandatory pre-slice coordination checkpoint immediately before every slice begins and before
+  every expanded write scope: declare the current goal, slice outcome, modules, contracts,
+  schemas/migrations/shared configuration, repository-relative write set, and one writer; inspect
+  all observable agent, session, account, and team-channel claims before relying on Git; permit only
+  confirmed-disjoint parallel writes; and resolve overlap or uncertain shared ownership before
+  implementation;
 - a mandatory first-prompt Project Definition Intake while the generated manifest is pending: Codex
   explains the gate, asks successive material questions, challenges ambiguity and contradictions,
   presents a precise synthesis for correction, and writes only user-confirmed durable truth before
-  planning and autonomous implementation. The same intake resumes later when material ambiguity or
-  changed intent, scope, module/public contracts, data, integrations, trust, compatibility, or
-  operations could alter the result; only affected writes pause and resolved or irrelevant questions
-  are not repeated;
+  planning and autonomous implementation, including the shared pre-slice coordination channel when
+  independent sessions or accounts may work concurrently. The same intake resumes later when
+  material ambiguity or changed intent, scope, module/public contracts, data, integrations, trust,
+  compatibility, or operations could alter the result; only affected writes pause and resolved or
+  irrelevant questions are not repeated;
 - a durable module map and modular-monolith default for non-trivial product code: cohesive domain
   responsibilities, narrow public contracts, private internals, owned data/migrations, allowed
-  acyclic dependencies, focused verifiers, and replacement-local ports/adapters; strategic DDD only
-  when domain complexity justifies it;
+  acyclic dependencies, focused verifiers, and replacement-local ports/adapters; components remain
+  independently improvable or replaceable while compatible contracts, data/lifecycle/failure
+  semantics, and realistic assembled-flow evidence keep the product functioning as one unit;
+  strategic DDD only when domain complexity justifies it;
 - one central `main` as the only durable integration branch, without long-lived module or developer
   branches. Serialized work may use `main` directly when branch policy permits. Different
   developers/accounts use temporary task branches in separate clones and credential contexts;
@@ -135,6 +157,14 @@ changed sources current once per Codex turn after local hash-bound approval thro
   upstream changes by path, module, public contract, schema, and migration; disjoint work continues,
   overlap is integrated before further writes, and each check is followed by authorized cleanup,
   current-plan updates, and autonomous continuation;
+- an all-document currency review at every completed goal before final audit and publication:
+  compare every active documentation surface with current behavior and durable truth, update only
+  where needed, consolidate or remove superseded duplication instead of appending history, preserve
+  every active directive, state that consolidation is not a shortening target, treat the durable
+  project manifest as critical documentation, inspect critical documents read-only first, change
+  them automatically only when factual correction and full preservation are unambiguous, otherwise
+  obtain explicit user confirmation before writing, and give every authorized critical-document
+  change a dedicated preservation review;
 - a goal-checkpoint autonomy contract that runs `pnpm goal:new` immediately after publication on
   `main` and continues the next already-authorized goal without waiting for another prompt, stopping
   only at the complete outcome or a real authority, safety, integration, or external blocker;

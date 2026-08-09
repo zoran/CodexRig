@@ -10,6 +10,7 @@ export const requiredPortableContractFiles = new Set([
   "scripts/context/portable-context-contract.mjs",
   "scripts/deps/install-compatible.mjs",
   "scripts/deps/dependency-owner-normalization.test.mjs",
+  "scripts/docs/project-document-policy.mjs",
   "scripts/git-hooks/pre-push",
   "scripts/repository/product-roots.mjs",
   "scripts/repository/product-roots.test.mjs",

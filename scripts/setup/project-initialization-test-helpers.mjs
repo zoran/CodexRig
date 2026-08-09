@@ -15,6 +15,8 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { assertGeneratedProjectParity } from "../../.agents/skills/create-project-from-framework/scripts/generated-project-finalization.mjs";
+import { capturePortableProjectTransferManifest } from "../../.agents/skills/create-project-from-framework/scripts/project-copy.mjs";
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const temporaryRoots = [];
@@ -209,6 +211,147 @@ export function assertGeneratedAutonomousContinuationContract({
     existsSync(path.join(generated, "scripts/context/refresh-context-index-on-stop.mjs")),
     true,
   );
+}
+
+export function assertGeneratedWorkflowPolicyContract({
+  generated,
+  agents,
+  readme,
+  codexReadme,
+  instructions,
+  manifest,
+}) {
+  for (const content of [agents, instructions, manifest]) {
+    assert.match(content, /pre-slice\s+coordination\s+check/i);
+    assert.match(content, /before\s+(?:every|the)\s+slice\s+begins?/i);
+    assert.match(content, /observable\s+agent,?\s+session,?\s+account/i);
+    assert.match(content, /before\s+relying\s+on\s+Git/i);
+    assert.match(content, /confirmed-disjoint/i);
+    assert.match(
+      content,
+      /cannot\s+prove\s+that\s+another\s+clone,?\s+machine,?\s+or\s+account\s+is\s+idle/i,
+    );
+    assert.match(
+      content,
+      /(?:all-document\s+currency\s+review|every\s+active\s+documentation\s+surface)/i,
+    );
+    assert.match(
+      content,
+      /critical(?:-document|\s+authority\s+documents?).*preservation\s+review/is,
+    );
+  }
+  assert.match(
+    codexReadme,
+    /cannot\s+prove\s+that\s+another\s+clone,?\s+machine,?\s+or\s+account\s+is\s+idle/i,
+  );
+  for (const content of [agents, readme, instructions, manifest]) {
+    assert.match(content, /independently\s+improvable\s+or\s+replaceable/i);
+    assert.match(content, /assembled\s+system\s+is\s+verified\s+as\s+one\s+functioning\s+unit/i);
+    assert.match(content, /newest\s+relevant\s+primary\s+or\s+official\s+sources/i);
+    assert.match(content, /older\s+sources.*comparison\s+or\s+historical\s+context/is);
+    assert.match(content, /durable\s+project\s+manifest/i);
+    assert.match(content, /explicit\s+user\s+confirmation/i);
+    assert.match(
+      content,
+      /consolidation\s+is(?:\s+conservative,)?\s+not\s+a\s+shortening\s+target/i,
+    );
+  }
+  assert.match(instructions, /shared\s+pre-slice\s+coordination\s+channel/i);
+  assert.match(instructions, /pre-1\.2\s+installed\s+updater/i);
+  assert.match(instructions, /--allow-same/i);
+  assert.match(instructions, /Never\s+add\s+`--apply`/i);
+  assert.match(
+    instructions,
+    /Do\s+not\s+apply\s+its\s+legacy\s+preview.*project-owned\s+document/is,
+  );
+  assert.match(
+    instructions,
+    /After repository-mutating cleanup, the goal-wide documentation review, clean goal audit/i,
+  );
+  assert.match(
+    instructions,
+    /After\s+protected\s+or\s+parallel\s+integration.*completed-goal\s+all-document\s+review.*critical-document\s+confirmation\s+and\s+preservation\s+review/is,
+  );
+  for (const role of ["default", "explorer", "worker"]) {
+    const roleContent = readFileSync(
+      path.join(generated, ".codex", "agents", `${role}.toml`),
+      "utf8",
+    );
+    assert.match(roleContent, /Before every assigned slice begins/, role);
+    assert.match(roleContent, /agent\/session\/account/, role);
+    assert.match(roleContent, /before relying on Git/, role);
+    assert.match(roleContent, /newest relevant primary or official sources/, role);
+    assert.match(roleContent, /older sources primarily for comparison/, role);
+  }
+  assertGeneratedAutonomousContinuationContract({
+    generated,
+    policyDocuments: [agents, readme, instructions, manifest],
+    instructions,
+    codexReadme,
+  });
+}
+
+export function assertGeneratedTransferParityContract(generated) {
+  const transferManifest = capturePortableProjectTransferManifest(root, {
+    includeUntracked: true,
+  });
+  assertGeneratedProjectParity({
+    sourceRoot: root,
+    targetRoot: generated,
+    transferManifest,
+  });
+
+  const reusablePath = "scripts/docs/project-document-policy.mjs";
+  const generatedReusablePath = path.join(generated, reusablePath);
+  const original = readFileSync(generatedReusablePath, "utf8");
+  try {
+    writeFileSync(generatedReusablePath, `${original}\n// undeclared generated mutation\n`, "utf8");
+    assert.throws(
+      () =>
+        assertGeneratedProjectParity({
+          sourceRoot: root,
+          targetRoot: generated,
+          transferManifest,
+        }),
+      /reusable files changed outside declared project-specific transformations/,
+    );
+    rmSync(generatedReusablePath);
+    assert.throws(
+      () =>
+        assertGeneratedProjectParity({
+          sourceRoot: root,
+          targetRoot: generated,
+          transferManifest,
+        }),
+      /transfer parity failed \(missing: scripts\/docs\/project-document-policy\.mjs\)/,
+    );
+  } finally {
+    writeFileSync(generatedReusablePath, original, "utf8");
+  }
+
+  const packagePath = path.join(generated, "package.json");
+  const originalPackage = readFileSync(packagePath, "utf8");
+  try {
+    const changedPackage = JSON.parse(originalPackage);
+    delete changedPackage.scripts["context:search"];
+    writeFileSync(packagePath, `${JSON.stringify(changedPackage, null, 2)}\n`, "utf8");
+    assert.throws(
+      () =>
+        assertGeneratedProjectParity({
+          sourceRoot: root,
+          targetRoot: generated,
+          transferManifest,
+        }),
+      /Generated package exceeds the declared identity and source-reset transformation/,
+    );
+  } finally {
+    writeFileSync(packagePath, originalPackage, "utf8");
+  }
+  assertGeneratedProjectParity({
+    sourceRoot: root,
+    targetRoot: generated,
+    transferManifest,
+  });
 }
 
 export function assertGeneratedProjectQuality(targetRoot) {

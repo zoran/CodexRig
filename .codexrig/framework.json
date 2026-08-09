@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "frameworkId": "codexrig",
-  "frameworkVersion": "1.1.0",
+  "frameworkVersion": "1.2.0",
   "compatibilityFile": ".codexrig/compatibility.json",
   "startup": {
     "attestationMaxAgeSeconds": 1800
@@ -36,6 +36,14 @@
   },
   "upgrade": {
     "receiptFile": ".codexrig/installation.json",
+    "projectOwnedDocuments": [
+      ".codex/README.md",
+      "AGENTS.md",
+      "README.md",
+      "docs/context-index.md",
+      "docs/project.md",
+      "instructions.md"
+    ],
     "managedRoots": [
       ".agents/skills/context-retrieval",
       ".agents/skills/project-implementation",

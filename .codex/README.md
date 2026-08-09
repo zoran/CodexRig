@@ -44,10 +44,15 @@ separate clones with separate OS or provider credential contexts. Git worktrees 
 tasks for the same trusted account, but they are not an authentication boundary: they can share
 repository configuration and Git credential helpers. Each clone or worktree still uses its own
 ignored `.codex/runtime/` for Codex runtime. Tracked `.codex/` policy is the shared behavior contract; mutable
-account state is never copied between collaborators or committed. Parallel coding sessions receive
-disjoint module and file scopes, while shared contracts have one write owner and integrator at a
-time. A temporary branch is only an integration input; the actual published `main` receives the
-final course check, affected review/audit, verification, and `goal:new` gate.
+account state is never copied between collaborators or committed. Before every slice begins, its
+goal, outcome, modules, contracts, data surfaces, and files are compared with all observable agent,
+session, account, and team-channel claims. Parallel coding sessions proceed only with
+confirmed-disjoint scopes, while overlap or uncertainty at a shared boundary is resolved to one writer before
+implementation. The repository-local runtime lease cannot prove that another clone, machine, or
+account is idle; use an available shared coordination channel for that boundary. Git remains later
+integration evidence, not the primary pre-slice coordination mechanism. A temporary branch is only
+an integration input; the actual published `main` receives the final course check, affected
+review/audit, verification, and `goal:new` gate.
 
 `bash scripts/setup/start-codex.sh` is the canonical launcher. It runs the host update with
 `CODEX_HOME` unset, uses mise to install the locked Node.js and pnpm toolchain, refreshes compatible

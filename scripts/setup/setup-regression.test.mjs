@@ -423,6 +423,25 @@ test("project subagent roles fix the second model tier and allow safe bounded ov
       parseProjectAgentConfig(defaultAgent.replace("matched source", "search result"), "default"),
     /retrieval contract marker matched source/,
   );
+  assert.throws(
+    () =>
+      parseProjectAgentConfig(
+        defaultAgent.replace(
+          "Before every assigned slice begins",
+          "After every assigned slice begins",
+        ),
+        "default",
+      ),
+    /retrieval contract marker Before every assigned slice begins/,
+  );
+  assert.throws(
+    () =>
+      parseProjectAgentConfig(
+        defaultAgent.replace("newest relevant primary or official sources", "available sources"),
+        "default",
+      ),
+    /retrieval contract marker newest relevant primary or official sources/,
+  );
 
   const fixture = configFixture();
   rmSync(path.join(fixture, ".codex", "agents", "worker.toml"));

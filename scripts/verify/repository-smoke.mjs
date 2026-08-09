@@ -115,6 +115,7 @@ const requiredFiles = [
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
   "scripts/deps/install-compatible.mjs",
+  "scripts/docs/project-document-policy.mjs",
   "scripts/framework/compatibility-matrix.mjs",
   "scripts/framework/framework-contract.mjs",
   "scripts/framework/framework-doctor.mjs",
@@ -529,6 +530,7 @@ if (existsSync(path.join(root, projectCreatorSkill))) {
   requireContent(projectCreatorSkill, "root-owned Git metadata");
   requireContent(projectCreatorSkill, "hidden index flags");
   requireContent(projectCreatorSkill, "caller-selected stage path");
+  requireContent(projectCreatorSkill, "complete selected-source transfer manifest");
   requireContent(
     `${projectCreatorSkillDirectory}/scripts/source-readiness.mjs`,
     "--portable-source-baseline",
@@ -549,6 +551,14 @@ if (existsSync(path.join(root, projectCreatorSkill))) {
   requireContent(
     `${projectCreatorSkillDirectory}/scripts/create-project-from-framework.mjs`,
     "fresh audit",
+  );
+  requireContent(
+    `${projectCreatorSkillDirectory}/scripts/create-project-from-framework.mjs`,
+    "assertGeneratedProjectParity",
+  );
+  requireContent(
+    `${projectCreatorSkillDirectory}/scripts/generated-project-finalization.mjs`,
+    "changed outside declared project-specific transformations",
   );
   requireContent("scripts/setup/project-creator-contract.source.test.mjs", "Project hooks never");
   requireContent(

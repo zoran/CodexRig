@@ -238,7 +238,10 @@ export function validateFrameworkContract(value) {
     throw new Error("Framework contract must identify codexrig.");
   }
   parseSemver(contract.frameworkVersion, "frameworkVersion");
-  normalizeFrameworkPath(contract.compatibilityFile, "compatibilityFile");
+  contract.compatibilityFile = normalizeFrameworkPath(
+    contract.compatibilityFile,
+    "compatibilityFile",
+  );
 
   const startup = requiredObject(contract.startup, "startup");
   const maxAge = requiredInteger(
@@ -326,9 +329,35 @@ export function validateFrameworkContract(value) {
   }
 
   const upgrade = requiredObject(contract.upgrade, "upgrade");
-  normalizeFrameworkPath(upgrade.receiptFile, "upgrade.receiptFile");
-  stringArray(upgrade.managedRoots, "upgrade.managedRoots", { paths: true });
-  stringArray(upgrade.excludedPaths, "upgrade.excludedPaths", { paths: true });
+  upgrade.receiptFile = normalizeFrameworkPath(upgrade.receiptFile, "upgrade.receiptFile");
+  upgrade.projectOwnedDocuments = stringArray(
+    upgrade.projectOwnedDocuments,
+    "upgrade.projectOwnedDocuments",
+    { paths: true },
+  );
+  const frameworkControlledUpgradeInputs = new Set([
+    frameworkContractPath,
+    contract.compatibilityFile,
+    upgrade.receiptFile,
+    "package.json",
+    "pnpm-lock.yaml",
+  ]);
+  const conflictingUpgradeInputs = upgrade.projectOwnedDocuments.filter((relativePath) =>
+    frameworkControlledUpgradeInputs.has(relativePath),
+  );
+  if (conflictingUpgradeInputs.length > 0) {
+    throw new Error(
+      `upgrade.projectOwnedDocuments cannot classify framework-controlled upgrade inputs as project-owned documents: ${conflictingUpgradeInputs.join(
+        ", ",
+      )}.`,
+    );
+  }
+  upgrade.managedRoots = stringArray(upgrade.managedRoots, "upgrade.managedRoots", {
+    paths: true,
+  });
+  upgrade.excludedPaths = stringArray(upgrade.excludedPaths, "upgrade.excludedPaths", {
+    paths: true,
+  });
   stringArray(upgrade.managedPackageScripts, "upgrade.managedPackageScripts");
   stringArray(upgrade.managedDevDependencies, "upgrade.managedDevDependencies");
   return contract;

@@ -32,6 +32,10 @@ test("the source-only project creator keeps the Stop-hook mutation contract", ()
 test("the source-only project creator derives generated policy surfaces from one owner", () => {
   const projection = readPolicyProjection(root);
   assert.equal(projection.invariants.length, 8);
+  const projectedPolicy = projection.invariants.map(({ statement }) => statement).join("\n");
+  assert.match(projectedPolicy, /Before every slice begins/);
+  assert.match(projectedPolicy, /all-document currency review/);
+  assert.match(projectedPolicy, /newest relevant primary or official sources/);
   assert.deepEqual(generatedFrameworkAgentPolicy, generatedPolicyProjectionLines("agents"));
   assert.deepEqual(generatedFrameworkManifestPolicy, generatedPolicyProjectionLines("manifest"));
   for (const line of generatedPolicyProjectionLines("readme")) {

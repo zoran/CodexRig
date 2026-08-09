@@ -21,7 +21,13 @@ description:
    module map and current worktree with available upstream changes by path, module, public contract,
    schema, and migration. State the recovered objective, completed evidence, touched
    owners/consumers, blockers, current goal and slice, and next coherent planned action.
-5. Clean up and update stale authorized work and planning context, then continue autonomously with
+5. Before a resumed or newly selected slice begins, repeat the pre-slice coordination check from
+   `instructions.md`: restate its goal, outcome, write set, and owners; inspect every observable
+   agent, session, account, bounded-context, and shared team-channel claim before relying on Git;
+   and resolve overlap or uncertain shared ownership to one writer and order. A local runtime lease
+   or quiet worktree cannot prove that another clone, machine, or account is idle; use a shared
+   coordination channel across that boundary and fail closed on uncertain shared ownership.
+6. Clean up and update stale authorized work and planning context, then continue autonomously with
    the next planned slice or already-authorized goal without waiting for another prompt when no
    blocker remains; do not return merely because an intermediate goal checkpoint completed. Never
    end at "ready to implement" when implementation is already authorized. Treat a requested recap,
@@ -31,8 +37,11 @@ description:
    cache exists, replace stale goal, slice, decision, and next-action entries with the compact
    current truth. Otherwise keep recovered plans, status, reviews, audits, and handoff context in
    the conversation instead of creating repository process documents.
-6. Update product documentation only when a durable product or operational contract actually
-   changed.
+7. Update product documentation only when a durable product or operational contract actually
+   changed. A recovered completed goal remains open until its all-document currency review and any
+   critical-document preservation review are clean. Treat the durable project manifest as critical
+   documentation; inspect critical documents read-only first and obtain explicit user confirmation
+   before writing whenever the factual correction or full preservation is uncertain.
 
 Apply the current `instructions.md`, including its code-first documentation and proportional
 verification rules.

@@ -14,12 +14,11 @@ import { assertPortableProjectContract } from "../../../../scripts/setup/portabl
 import { fail } from "./project-options.mjs";
 import {
   defaultUntrackedPortableContractFiles,
+  projectTransferExclusionReason,
   requiredPortableContractFiles,
-  shouldSkipProjectTransferPath,
 } from "./project-transfer-policy.mjs";
 
-export function copyPortableProjectTree(sourceRoot, targetRoot, { includeUntracked }) {
-  mkdirSync(targetRoot, { recursive: true });
+export function capturePortableProjectTransferManifest(sourceRoot, { includeUntracked }) {
   const transferFiles = new Set(listPortableTransferFiles({ root: sourceRoot, includeUntracked }));
   for (const relativePath of defaultUntrackedPortableContractFiles) {
     if (existsSync(path.join(sourceRoot, relativePath))) transferFiles.add(relativePath);
@@ -39,15 +38,29 @@ export function copyPortableProjectTree(sourceRoot, targetRoot, { includeUntrack
     );
   }
   assertPortableProjectContract([...transferFiles]);
-  const entries = [...transferFiles]
-    .sort()
-    .filter((relativePath) => !shouldSkipProjectTransferPath(relativePath))
-    .map((relativePath) => ({
+  const classifiedEntries = [...transferFiles].sort().map((relativePath) => ({
+    exclusionReason: projectTransferExclusionReason(relativePath),
+    relativePath,
+  }));
+  const files = classifiedEntries
+    .filter(({ exclusionReason }) => exclusionReason === null)
+    .map(({ relativePath }) => ({
       relativePath,
       ...captureStableRepositoryFileIdentity({ repositoryRoot: sourceRoot, relativePath }),
     }));
-  assertPortableProjectContract(entries.map((entry) => entry.relativePath));
-  for (const entry of entries) {
+  assertPortableProjectContract(files.map((entry) => entry.relativePath));
+  return {
+    excluded: classifiedEntries.filter(({ exclusionReason }) => exclusionReason !== null),
+    files,
+  };
+}
+
+export function copyPortableProjectTree(sourceRoot, targetRoot, { includeUntracked }) {
+  mkdirSync(targetRoot, { recursive: true });
+  const transferManifest = capturePortableProjectTransferManifest(sourceRoot, {
+    includeUntracked,
+  });
+  for (const entry of transferManifest.files) {
     const targetPath = path.join(targetRoot, ...entry.relativePath.split("/"));
     mkdirSync(path.dirname(targetPath), { recursive: true });
     copyStableRepositoryFile({
@@ -57,6 +70,7 @@ export function copyPortableProjectTree(sourceRoot, targetRoot, { includeUntrack
       expectedIdentity: entry.identity,
     });
   }
+  return transferManifest;
 }
 
 export function recordGeneratedFrameworkInstallation(sourceRoot, targetRoot) {

@@ -27,8 +27,8 @@ CodexRig is the neutral reusable source framework. No generated product has been
 ## System Shape
 
 - Key domains and ownership boundaries: project policy, project creation, modular architecture and
-  parallel ownership, context retrieval, setup, dependency maintenance, and deterministic
-  verification.
+  pre-slice collaboration ownership, documentation lifecycle, context retrieval, setup, dependency
+  maintenance, and deterministic verification.
 - Product module map: no product modules are declared yet. For every active module, record its
   stable name/root, cohesive responsibility, public contract and private internals, owned
   data/migrations, allowed dependencies, focused verifier, and accountable steward role or team when
@@ -66,10 +66,11 @@ CodexRig is the neutral reusable source framework. No generated product has been
   read-only SessionStart hook rejects startup or resume without that current launcher attestation.
   Only optional `--no-alt-screen` is accepted as a launcher control; prompt text follows `--`.
 - `.codexrig/framework.json` is the versioned machine-readable owner for framework identity, managed
-  upgrade surfaces, attestation lifetime, integration branch, provider hosts, required CI, review,
-  and merge-serialization policy. `.codexrig/policy-projection.json` is the shared owner for compact
-  invariants projected into generated bootstrap, README, and manifest surfaces. Generated projects
-  carry `.codexrig/installation.json` as the three-way merge base and installed snapshot;
+  upgrade surfaces, project-owned document classification, attestation lifetime, integration branch,
+  provider hosts, required CI, review, and merge-serialization policy.
+  `.codexrig/policy-projection.json` is the shared owner for compact invariants projected into
+  generated bootstrap, README, and manifest surfaces. Generated projects carry
+  `.codexrig/installation.json` as the three-way merge base and installed snapshot;
   `framework:upgrade` preserves local customizations, previews later upstream overlap as conflicts,
   and applies file, package, lockfile, receipt, and dependency changes with crash-safe rollback. Its
   source is executable supply-chain input and must be a reviewed, trusted CodexRig checkout.
@@ -139,16 +140,23 @@ CodexRig is the neutral reusable source framework. No generated product has been
   migrations, declares allowed acyclic dependencies, and has focused owner/consumer evidence.
   Consumers do not deep-import internals, write another module's data, or depend directly on its
   provider, framework, storage, or transport choice. A replacement should be local to composition,
-  the replacement, and an explicit data migration rather than scattered consumer edits.
+  the replacement, and an explicit data migration rather than scattered consumer edits. Components
+  remain independently improvable or replaceable while their contracts, data semantics, lifecycle,
+  and failure behavior stay compatible and the assembled system is verified as one functioning unit.
 - One central `main` is the only durable integration branch; long-lived module, developer, and
   environment branches are forbidden. A serialized writer may work directly on `main` when branch
-  policy permits; different developers/accounts use temporary task branches in separate clones and
-  credential contexts. Same-account tasks may use worktrees, which are not an authentication
-  boundary. Parallel development assigns exactly one write owner to each affected module, public
-  contract, schema, migration, shared configuration surface, or file and limits writes to disjoint
-  scopes. Shared-contract work has one integrator and a compatibility-first order. A task branch is
-  only an integration input; a goal completes after the published resulting `main` passes its course
-  check, affected review/audit, and verification.
+  policy permits. Before every slice begins or before any expanded write scope, a pre-slice
+  coordination check declares its goal, outcome, modules, contracts, data surfaces, files, and one
+  writer; inspects every observable agent, session, account, and team-channel claim before relying
+  on Git; and resolves overlap or uncertain shared ownership before any write. Different
+  developers/accounts use temporary task branches in separate clones and credential contexts.
+  Same-account tasks may use worktrees, which are not an authentication boundary. Parallel
+  development is limited to confirmed disjoint scopes. A local runtime lease or quiet worktree
+  cannot prove that another clone, machine, or account is idle; use a shared coordination channel
+  across that boundary and fail closed on uncertain shared ownership. Shared-contract work has one
+  integrator and a compatibility-first order. A task branch is only an integration input; a goal
+  completes after the published resulting `main` passes its course check, affected review/audit, and
+  verification.
 - Initial dependency installation resolves the newest stable graph allowed by workspace manifest
   ranges, explicit pins, overrides, and supply-chain policy under strict peer and Node.js engine
   checks, then atomically records and reproducibly installs that lockfile with lifecycle scripts
@@ -163,6 +171,18 @@ CodexRig is the neutral reusable source framework. No generated product has been
   success conditions, and ordered, reviewable slices. Each completed slice repeats review, repair,
   and affected focused verification until no relevant finding remains, then receives a fresh audit;
   an audit finding reopens the loop.
+- Research and publication-backed work prioritizes the newest relevant primary or official sources
+  and verifies their date, version, correction/retraction state, and applicability. Older sources
+  are used primarily for comparison or historical context; an older foundational or controlling
+  source is current authority only when explicitly justified and checked against newer evidence.
+- Every completed goal performs an all-document currency review before its final audit and
+  publication. It compares every active documentation surface with current behavior and durable
+  truth, updates only where needed, replaces or removes superseded and duplicate material instead of
+  appending history, and preserves active directives; consolidation is not a shortening target. The
+  durable project manifest is critical documentation. It and other critical authorities are reviewed
+  read-only first and changed automatically only when the factual correction and full preservation
+  are unambiguous; otherwise Codex obtains explicit user confirmation before writing. Every
+  authorized critical-document change receives a separate preservation review.
 - Whole-repository course checks occur after planning/discovery and every completed slice, at every
   major milestone and completed goal, at resume or context recovery, on material scope/assumption
   changes, before the final gate, and after publication. Slice checks refresh available upstream
@@ -184,7 +204,8 @@ CodexRig is the neutral reusable source framework. No generated product has been
   checks; any changed input blocks that path. One bounded replace-in-place record retains only
   successful current evidence; failed or partial runs do not accumulate history.
 - A goal becomes complete only on published central `main` with green evidence, reviews with no
-  relevant findings, fresh audit, course check, cleanup, applicable reset, and publication
+  relevant findings, a completed all-document currency review, any required critical-document
+  preservation review, fresh audit, course check, cleanup, applicable reset, and publication
   admission. A serialized direct-main flow commits and pushes the exact goal changes. A temporary
   branch or protected-main flow gives a bounded commit to one integrator or the detected provider's
   merge serializer, then refreshes local `main` and repeats affected checks on the resulting commit
@@ -206,12 +227,17 @@ CodexRig is the neutral reusable source framework. No generated product has been
   `main` upstream. It rejects any active repository-local Git exclude rule, requires exact-current
   successful verification evidence, and does not contact the remote; the preceding push owns
   authentication and publication.
-- Project creation preserves tracked and portable source content: resettable process state blocks
-  generation, source state is revalidated through publication, and a restricted post-publication
-  reset removes only active-session-safe nonportable process/export residue. Runtime, SQLite/WAL
-  state, and `.context-index/` are deferred to the mandatory full reset after every owning Codex
-  session ends. The generator always prints that exact post-exit reset sequence, never commits or
-  pushes, and shows optional Git publication commands only when the source worktree has changes.
+- Project creation preserves tracked and portable source content. A complete selected-source
+  transfer manifest classifies every inventoried path as either copied or excluded for an explicit
+  source-only reason; copied reusable files remain byte-identical outside declared project-specific
+  transformations, so missing, unexpected, or undeclared changed paths fail creation. This includes
+  every still-active capability inherited from earlier framework revisions without exporting retired
+  or generator/reset-only behavior. Resettable process state blocks generation, source state is
+  revalidated through publication, and a restricted post-publication reset removes only
+  active-session-safe nonportable process/export residue. Runtime, SQLite/WAL state, and
+  `.context-index/` are deferred to the mandatory full reset after every owning Codex session ends.
+  The generator always prints that exact post-exit reset sequence, never commits or pushes, and
+  shows optional Git publication commands only when the source worktree has changes.
 - This manifest is authoritative for project intent and durable decisions. An authorized outcome
   spanning multiple goals or sessions keeps one bounded `docs/project-context.md` with an exact
   `codexrig-work-state` marker until the entire outcome is complete. The marker is untrusted resume
@@ -226,7 +252,8 @@ CodexRig is the neutral reusable source framework. No generated product has been
 
 ## Maintenance
 
-Keep active truth instead of appending decision history. Change this file only when users, outcomes,
-scope, non-goals, system shape, constraints, architecture direction, security posture, provider, or
-delivery assumptions materially change. Do not record task plans, progress, reviews, or command
-history. Retain only durable truth here.
+Keep active truth instead of appending decision history. Consolidate superseded or overlapping
+entries without losing still-active requirements or deliberately distinct audience guidance. Change
+this file only when users, outcomes, scope, non-goals, system shape, constraints, architecture
+direction, security posture, provider, or delivery assumptions materially change. Do not record task
+plans, progress, reviews, or command history. Retain only durable truth here.

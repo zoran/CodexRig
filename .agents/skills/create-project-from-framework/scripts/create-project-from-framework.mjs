@@ -35,6 +35,7 @@ import {
 } from "./generated-framework-policy.mjs";
 import {
   assertGeneratedProjectClean,
+  assertGeneratedProjectParity,
   formatGeneratedMarkdown,
   runGeneratedNode,
   updateGeneratedPackage,
@@ -100,8 +101,14 @@ function writeIdentityDocs(targetRoot, projectName) {
       "",
       "Central `main` is the only durable integration branch. Different developers use temporary task",
       "branches in separate clones and credential contexts; same-account worktrees are not an",
-      "authentication boundary. Parallel writes require disjoint scopes and one owner per shared",
-      "surface.",
+      "authentication boundary. Before every slice begins, compare its goal, outcome, modules,",
+      "contracts, data surfaces, and files with all observable agent, session, account, and",
+      "team-channel claims before relying on Git. Parallel writes require confirmed-disjoint scopes;",
+      "overlap or uncertain shared ownership is resolved to one writer before implementation.",
+      "A local runtime lease or quiet worktree cannot prove that another clone, machine, or account",
+      "is idle; use a shared coordination channel across that boundary and fail closed on uncertain",
+      "shared ownership.",
+      "Git remains later integration evidence, not the primary pre-slice coordination mechanism.",
       "",
       "The trusted read-only SessionStart hook verifies the launcher proof. After `pnpm setup`, the",
       "trusted Stop hook uses the mise-pinned Node.js runtime to refresh changed",
@@ -169,12 +176,13 @@ function writeIdentityDocs(targetRoot, projectName) {
       "  tests or verifier files. Narrow coverage needs a proportionate reason. Keep maintained",
       "  executable modules at or below 700 physical lines; preserve unrelated work and private",
       "  local state.",
-      "- Inspect `pnpm verify:changed -- --print-plan` while working; invoke `pnpm verify` once on the actual target-`main` state after the clean goal audit and applicable reset. Full coverage requires a named uncovered reason.",
+      "- Inspect `pnpm verify:changed -- --print-plan` while working; invoke `pnpm verify` once on the actual target-`main` state after repository-mutating cleanup, the goal-wide documentation and critical-document gates, the clean goal audit, and applicable reset. A later repository edit reopens those gates. Full coverage requires a named uncovered reason.",
       "- A green goal closes only on the actual published central `main`. In serialized direct-main",
       "  mode, the primary commits and pushes only goal-owned changes. With a temporary branch or",
       "  protected `main`, one integrator or the provider merge serializer publishes the bounded input; refresh local",
-      "  `main` and repeat affected review/audit, course check, and verification on that resulting",
-      "  commit without adding a marker commit. `pnpm goal:new` must then prove a clean worktree with",
+      "  `main` and repeat the goal-wide documentation and critical-document gates, affected",
+      "  review/audit, course check, and verification on that resulting commit without adding a marker",
+      "  commit. `pnpm goal:new` must then prove a clean worktree with",
       "  exact locally recorded remote `main` equality and current successful evidence; failure never",
       "  authorizes force-push.",
       "",
@@ -266,7 +274,7 @@ function writeIdentityDocs(targetRoot, projectName) {
       "at the final repaired state. Reuse a safely advanceable successful basis through focused owners;",
       "otherwise collect the complete fix batch before the remaining broad run.",
       "",
-      "After the clean goal audit, cleanup, and any reset, invoke `pnpm verify` once on the actual target-`main` state. It uses adaptive admission;",
+      "After repository-mutating cleanup, the goal-wide documentation review, clean goal audit, and any reset, invoke `pnpm verify` once on the actual target-`main` state. A later repository edit reopens cleanup, documentation review, and audit. It uses adaptive admission;",
       "full coverage requires a named missing basis, unknown or incomplete scope, unowned path,",
       "broad-only risk, or explicit owner instruction. Force needs a concrete reason; cache bypass is",
       "forbidden. Successful Git-bound evidence advances only after complete focused delta coverage.",
@@ -338,16 +346,18 @@ function writeIdentityDocs(targetRoot, projectName) {
       "5. Local Codex memory isolation is repository-local and root-bound under ignored `.codex/runtime/`. Memories are enabled only inside this project's clean isolated runtime home; no source or sibling memory is inherited. Trust current files and command output. For every new feature and every other complex task, finish the thorough plan before implementation and keep it in the conversation.",
       "6. Organize the plan into goals with success conditions and ordered slices with concrete outcomes, owners, dependencies, risks, focused evidence, review surfaces, and audit criteria.",
       "7. Review the plan until no relevant finding remains, then perform a fresh plan audit; an audit finding reopens the loop.",
-      "8. Implement one coherent planned slice and run focused owner and consumer evidence.",
-      "9. Repeat review, repair, and affected focused checks until no relevant finding remains; then perform a fresh slice audit, reopening the loop for any audit finding.",
-      "10. After every completed slice and at every major milestone or completed goal, run a whole-repository course check against current worktree and available upstream changes; clean up and update code, tests, configuration, docs, bounded context, and the plan, then continue autonomously when unblocked.",
-      "11. Fix the owning invariant, follow the detected stack, and prefer justified broad end-to-end coverage over an isolated test for each instruction.",
-      "12. Use subagents only when at least two substantial independent slices shorten the critical path; concurrency is not a target and shell gates stay primary-owned.",
-      "13. Use the declared integration path. Serialized direct-main work remains on current `main`; a temporary branch or protected-main flow commits and pushes only a bounded input for one integrator or the detected provider's merge serializer.",
-      "14. After protected or parallel integration, refresh local `main` and repeat the course check, automatic review/repair and fresh audit, and affected verification on the actual published commit without creating a marker commit.",
-      "15. On actual target `main`, apply any reset and invoke adaptive final admission once; a prior failure never authorizes broad retry. In direct-main mode, commit and push exact attested changes afterward; under protected integration, the merge or squash is already the publication commit.",
-      "16. Unsafe scoping, missing upstream/authentication, unresolved integration, or rejection blocks closure without force-pushing. Keep the current goal and encompassing work state open; record the blocker or continue a safe disjoint slice.",
-      "17. Run `pnpm goal:new` immediately after publication and verification; when it passes, continue the next already-authorized goal without waiting for another prompt. It requires clean `main`, exact locally recorded remote `main` equality, no active repository-local Git exclude rule, and current successful evidence.",
+      "8. Before the slice begins, restate its goal, outcome, success condition, modules, contracts, schemas/migrations/shared configuration, repository-relative write set, and one writer. Inspect all observable agent, session, account, bounded-context, and shared team-channel claims before relying on Git. Resolve overlap or uncertain shared ownership before implementation.",
+      "9. Implement one coherent planned slice inside that coordinated write set and run focused owner and consumer evidence.",
+      "10. Repeat review, repair, and affected focused checks until no relevant finding remains; then perform a fresh slice audit, reopening the loop for any audit finding.",
+      "11. After every completed slice and at every major milestone or completed goal, run a whole-repository course check against current worktree and available upstream changes; clean up and update code, tests, configuration, docs, bounded context, and the plan, then continue autonomously when unblocked.",
+      "12. At every completed goal, after repository-mutating cleanup and before the final audit and publication, complete the all-document and critical-document gate in the Documentation section. Any resulting or later repository edit reopens affected checks, cleanup, that documentation gate, and the fresh audit; no later mutation may bypass this sequence.",
+      "13. Fix the owning invariant, follow the detected stack, and prefer justified broad end-to-end coverage over an isolated test for each instruction.",
+      "14. Use subagents only when at least two substantial independent slices shorten the critical path; concurrency is not a target and shell gates stay primary-owned.",
+      "15. Use the declared integration path. Serialized direct-main work remains on current `main`; a temporary branch or protected-main flow commits and pushes only a bounded input for one integrator or the detected provider's merge serializer.",
+      "16. After protected or parallel integration, refresh local `main` and repeat the course check, automatic review/repair, completed-goal all-document review, any critical-document confirmation and preservation review, fresh audit, and affected verification on the actual published commit without creating a marker commit.",
+      "17. On actual target `main`, apply any reset and invoke adaptive final admission once; a prior failure never authorizes broad retry. In direct-main mode, commit and push exact attested changes afterward; under protected integration, the merge or squash is already the publication commit.",
+      "18. Unsafe scoping, missing upstream/authentication, unresolved integration, or rejection blocks closure without force-pushing. Keep the current goal and encompassing work state open; record the blocker or continue a safe disjoint slice.",
+      "19. Run `pnpm goal:new` immediately after publication and verification; when it passes, perform the next slice's pre-slice coordination checkpoint before that slice begins and continue the next already-authorized goal without waiting for another prompt. It requires clean `main`, exact locally recorded remote `main` equality, no active repository-local Git exclude rule, and current successful evidence.",
       "",
       "## Compact Project Memory",
       "",
@@ -380,6 +390,25 @@ function writeIdentityDocs(targetRoot, projectName) {
       "changed, or a durable project decision cannot be recovered from code, tests, configuration, or an",
       "existing canonical document. Prefer the README or manifest; never create docs merely to record",
       "agent activity or prove a code change. Documentation has no numeric line or word quota.",
+      "At every completed goal, perform an all-document currency review of every active documentation",
+      "surface before the final audit. Compare each",
+      "with current behavior, code/configuration, manifest truth, public contracts, operations, and",
+      "active decisions. Update only where needed; replace, consolidate, or remove superseded",
+      "duplication instead of appending history; and preserve every active directive and deliberate",
+      "audience-specific requirement. Consolidation is conservative, not a shortening target; a no-change result is",
+      "valid.",
+      "Treat the durable project manifest as critical documentation. Inspect it and every workflow,",
+      "bootstrap, security/trust, operations/migration, or public-contract authority read-only first.",
+      "Change one automatically only when completed authorized work requires an unambiguous factual",
+      "correction and every active directive and durable manifest decision is demonstrably preserved.",
+      "Obtain explicit user confirmation before any normative or interpretive change, consolidation or",
+      "removal, ambiguous conflict, uncertain replacement, or other doubtful write. After an authorized",
+      "critical-document change, perform a dedicated preservation review separate from the general",
+      "review and trace removed or materially",
+      "rewritten directives and manifest decisions to surviving canonical text or explicit retirement.",
+      "Preserve uncertain requirements. Documentation edits reopen affected checks, cleanup, this",
+      "documentation gate, and the fresh audit. Keep review results in conversation rather than creating",
+      "a process document.",
       "",
       "Keep maintained executable modules at or below 700 physical lines and split only at cohesive",
       "ownership boundaries. The quota does not apply to documentation, styles, declarative context,",
@@ -486,7 +515,7 @@ function writeIdentityDocs(targetRoot, projectName) {
       "- Tests are risk-based evidence; do not add one automatically for each fix or user instruction.",
       "  Justified coverage defaults to a broad, realistic end-to-end, system, or lifecycle scenario;",
       "  isolated one-off tests are not the standard, and narrow coverage needs a proportionate reason.",
-      "- A goal completes only on the actual published central `main`. Serialized direct-main work commits and pushes exact goal-owned changes. For a temporary branch or protected `main`, one integrator or the detected provider's merge serializer publishes the bounded input, then local `main` receives the course check, affected review/audit, and verification on the resulting commit without a marker commit.",
+      "- A goal completes only after repository-mutating cleanup, its all-document currency review, any critical-document confirmation and preservation review, fresh audit, and publication on the actual central `main`; a later repository edit reopens those gates. Serialized direct-main work commits and pushes exact goal-owned changes. For a temporary branch or protected `main`, one integrator or the detected provider's merge serializer publishes the bounded input, then local `main` repeats the all-document and critical-document gates, course check, affected review/audit, and verification on the resulting commit without a marker commit.",
       "- It immediately runs `pnpm goal:new` and continues the next already-authorized goal without waiting for another prompt when the gate passes. The gate requires clean `main`, exact locally recorded remote `main` equality, no active repository-local Git exclude rule, and current successful evidence; unsafe publication remains a blocker.",
       "- A failed publication or new-goal gate leaves the current goal and encompassing authorized outcome open; it never marks that outcome complete or discards its bounded work state.",
       "- Give product identity and public contact/deployment values one user-approved machine-readable owner; machine consumers derive from it without literal fallbacks, while docs/examples use placeholders or RFC-reserved domains until configured. Record durable product, architecture, security, integration, and delivery decisions before use.",
@@ -494,7 +523,8 @@ function writeIdentityDocs(targetRoot, projectName) {
       "## Maintenance",
       "",
       "Replace pending entries when the user defines the project. Keep active truth instead of appending",
-      "history. Keep plans, progress, reviews, and implementation detail out.",
+      "history. Consolidate superseded overlap without losing active directives. Keep plans, progress,",
+      "reviews, and implementation detail out.",
     ]),
   );
 }
@@ -527,7 +557,7 @@ function main() {
     mkdirSync(stagingProjectRoot, { mode: 0o700 });
     staged = true;
     mkdirSync(stagingRoot, { mode: 0o700 });
-    copyPortableProjectTree(roots.sourceRoot, stagingRoot, {
+    const transferManifest = copyPortableProjectTree(roots.sourceRoot, stagingRoot, {
       includeUntracked: options.includeUntracked,
     });
     ensureProductSourceBoundary(stagingRoot);
@@ -538,10 +568,15 @@ function main() {
     formatGeneratedMarkdown(roots.sourceRoot, stagingRoot);
     recordGeneratedFrameworkInstallation(roots.sourceRoot, stagingRoot);
     runGeneratedNode(stagingRoot, "scripts/setup/validate-staged-project.mjs");
-    assertGeneratedProjectClean(stagingRoot, packageName);
     if (!options.skipVerify) {
       runGeneratedNode(stagingRoot, "scripts/verify/repository-smoke.mjs");
     }
+    assertGeneratedProjectClean(stagingRoot, packageName);
+    assertGeneratedProjectParity({
+      sourceRoot: roots.sourceRoot,
+      targetRoot: stagingRoot,
+      transferManifest,
+    });
     assertSourceBaselineClean(roots.sourceRoot);
     assertSourceProductBoundaryClean(roots.sourceRoot);
     assertSourceGitStateUnchanged(roots.sourceRoot, sourceGitState);

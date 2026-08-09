@@ -10,8 +10,9 @@ import {
 } from "../repository/source-inventory.mjs";
 import {
   assertGeneratedDependencyFreshnessContract,
-  assertGeneratedAutonomousContinuationContract,
   assertGeneratedTaskBranchIntegration,
+  assertGeneratedTransferParityContract,
+  assertGeneratedWorkflowPolicyContract,
   assertGeneratedWorkflowRuntime,
   cleanupTemporaryRoots,
   gitState,
@@ -93,7 +94,7 @@ test("clean project initialization removes inherited state and source-specific t
     readFileSync(path.join(generated, ".codexrig", "installation.json"), "utf8"),
   );
   assert.equal(frameworkReceipt.frameworkId, "codexrig");
-  assert.equal(frameworkReceipt.frameworkVersion, "1.1.0");
+  assert.equal(frameworkReceipt.frameworkVersion, "1.2.0");
   assert.deepEqual(readdirNames(path.join(generated, ".codex")), [
     "README.md",
     "agents",
@@ -207,6 +208,7 @@ test("clean project initialization removes inherited state and source-specific t
     true,
   );
   assertGeneratedWorkflowRuntime(generated);
+  assertGeneratedTransferParityContract(generated);
   assert.equal(
     existsSync(path.join(generated, "scripts/setup/project-initialization-test-helpers.mjs")),
     false,
@@ -320,11 +322,13 @@ test("clean project initialization removes inherited state and source-specific t
     assert.match(content, /every\s+completed\s+slice/i);
     assert.match(content, /without\s+waiting\s+for\s+another\s+prompt/i);
   }
-  assertGeneratedAutonomousContinuationContract({
+  assertGeneratedWorkflowPolicyContract({
     generated,
-    policyDocuments: [generatedAgents, generatedReadme, generatedInstructions, generatedManifest],
-    instructions: generatedInstructions,
+    agents: generatedAgents,
+    readme: generatedReadme,
     codexReadme: generatedCodexReadme,
+    instructions: generatedInstructions,
+    manifest: generatedManifest,
   });
   assert.match(generatedManifest, /Product module map/i);
   assert.match(generatedManifest, /public contract and private internals/i);

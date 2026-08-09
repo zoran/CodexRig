@@ -64,20 +64,29 @@ No product has been defined yet.
   questions, challenges ambiguity and contradictions, presents its synthesis for correction, and
   writes only user-confirmed truth before planning and autonomous implementation. Resume the intake
   later for material ambiguity or changes to intent, scope, module/public contracts, data,
-  integrations, trust, compatibility, or operations. Pause only affected writes, continue safe
-  disjoint work, and do not repeat resolved or non-decision-relevant questions.
+  integrations, trust, compatibility, operations, collaboration topology, or the shared pre-slice
+  coordination channel for concurrent accounts. Pause only affected writes, continue safe disjoint
+  work, and do not repeat resolved or non-decision-relevant questions.
 - Default non-trivial product code to a modular monolith with cohesive domain responsibilities.
   Use strategic DDD only when domain complexity warrants it. Keep provider, framework, storage, and
   transport choices behind narrow public ports or adapters; reject deep imports, cross-module data
   writes, dependency cycles, and catch-all shared modules. Replacing an implementation should stay
-  local to composition, replacement, and explicit data migration.
+  local to composition, replacement, and explicit data migration. Components remain independently
+  improvable or replaceable while compatible contracts, data/lifecycle/failure semantics, and an
+  assembled-system flow keep the product functioning as one unit.
 - Use one central \`main\` as the only durable integration branch; prohibit long-lived module or
   developer branches. A serialized writer may work directly on \`main\` when branch policy permits.
+  Before every slice begins or before any expanded write scope, perform a pre-slice coordination
+  check: declare its goal, outcome, modules, contracts, data surfaces, files, and one writer; inspect
+  every observable agent, session, account, and team-channel claim before relying on Git; and resolve
+  overlap or uncertain shared ownership before writing.
+  A local runtime lease or quiet worktree cannot prove that another clone, machine, or account is
+  idle; use a shared coordination channel across that boundary and fail closed on uncertain shared
+  ownership.
   Different developers or accounts use temporary task branches in separate clones and credential
   contexts; same-account tasks may use worktrees, which are not an authentication boundary.
-  Parallel writes need disjoint scopes and exactly one write owner per module or shared surface. A
-  temporary branch is only an integration input; one integrator or the detected provider's merge
-  serializer publishes it, then
+  Parallel writes need confirmed-disjoint scopes. A temporary branch is only an integration input;
+  one integrator or the detected provider's merge serializer publishes it, then
   the resulting \`main\` receives its course check, affected review/audit, and verification.
 - Keep both GitHub and GitLab CI adapters portable. Detect the provider from CI or the selected
   remote, and apply provider protection only through explicit previewed configuration. The
@@ -88,11 +97,23 @@ No product has been defined yet.
   and focused verification until no relevant finding remains before performing a fresh audit. Any
   audit finding automatically reopens repair, affected verification, review to zero findings, and a
   new audit.
+- When research or publications inform work, prioritize the newest relevant primary or official
+  sources and verify their date, version, correction/retraction state, and applicability. Use older
+  sources primarily for comparison or historical context; an older foundational or controlling
+  authority needs an explicit reason and confirmation that newer evidence has not superseded it.
 - After every completed slice and at every major milestone or completed goal, run a whole-repository
   course check against the current worktree and available upstream changes by path, module, public
   contract, schema, and migration. Disjoint work continues; overlap is integrated before further
   writes. Clean up and update the authorized work and plan, then continue autonomously when no
   blocker remains.
+- At every completed goal, before the final audit and publication, review all active documentation
+  against current behavior and durable truth. Update only where needed, consolidate or remove
+  superseded duplication instead of appending history, and preserve every active directive.
+  Consolidation is not a shortening target. Treat the durable project manifest as critical
+  documentation; inspect it and every other critical
+  authority read-only first, change one automatically only when the factual correction and full
+  preservation are unambiguous, otherwise obtain explicit user confirmation before writing, and give
+  every authorized critical-document change a dedicated preservation review.
 - Treat a goal as a checkpoint, not a handoff. After publishing it on \`main\`, run \`pnpm goal:new\`
   immediately and continue the next already-authorized goal without waiting for another prompt.
   Stop only at the complete authorized outcome or a real blocker; never invent a new product goal.
@@ -114,7 +135,8 @@ No product has been defined yet.
 ## Maintenance
 
 Update existing entries before implementation depends on changed project intent or constraints.
-Keep active truth only; do not append history or task state.
+Keep active truth only; consolidate superseded overlap without losing active directives, and do not
+append history or task state.
 `;
 
 function hasSections(content, sections) {

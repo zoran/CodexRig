@@ -33,6 +33,7 @@ bootstrap.
   tell the user that the project and manifest must be defined, then ask focused questions in
   successive rounds, challenge ambiguity and contradictions, and continue until users/outcome,
   scope/non-goals, domain and module map, data/integrations, trust boundaries, operations,
+  collaboration topology and any shared pre-slice coordination channel for concurrent accounts,
   constraints, and success evidence are precise. Summarize the result for correction, write only
   user-confirmed durable truth to the manifest, and then plan and continue autonomously. Do not
   invent missing product decisions or ask ceremonial questions. The same focused intake resumes
@@ -46,6 +47,10 @@ bootstrap.
   only trusted successful evidence. A failure or source change recomputes missing coverage; it never
   authorizes a broad restart. Broad work needs a named uncovered risk or explicit owner instruction,
   and cache bypass is forbidden.
+- When research or publications inform work, prioritize the newest relevant primary or official
+  sources and verify their date, version, correction/retraction state, and applicability. Use older
+  sources primarily for comparison or historical context; an older foundational or controlling
+  authority needs an explicit reason and confirmation that newer evidence has not superseded it.
 - Root `src/` is the default Product Root. A real declared pnpm package activates `<unit>/src`; an
   evidenced Android Gradle module activates `<module>/src/main`. Arbitrary folders do not become
   product roots, and a web package is created only when the user requests one.
@@ -54,16 +59,22 @@ bootstrap.
   private internals, owned data/migrations, explicit acyclic dependencies, a focused verifier, and a
   realistic replacement boundary. Start as a modular monolith unless independent deployment has a
   concrete operational reason; use strategic DDD where domain complexity warrants it, not as
-  ceremony.
+  ceremony. Components must stay independently improvable or replaceable while their contracts and
+  behavior remain compatible and the assembled system is verified as one functioning unit.
 - Use one central `main` as the only durable integration branch; do not create long-lived module or
   developer branches. A serialized writer may work directly on `main` when branch policy permits.
-  For parallel development, assign exactly one write owner per affected module, public contract,
-  schema, migration, shared configuration surface, or file. Different developers/accounts use
-  temporary task branches in separate clones and credential contexts; same-account tasks may use
-  worktrees, which are not an authentication boundary. Parallel writes require disjoint module and
-  file scopes. Shared-contract changes have one integrator and land compatibly before consumers
-  move. A task branch is only an integration input; a goal completes after the resulting `main` has
-  been published, course-checked, reviewed/audited, and verified.
+  Before every slice begins and before any expanded write scope, perform a pre-slice coordination
+  check: declare its goal, outcome, modules/contracts/data surfaces/files, and exactly one write
+  owner; inspect all observable agent, session, account, and team-channel claims before relying on
+  Git; and resolve overlap or uncertain shared ownership before writing. Different
+  developers/accounts use temporary task branches in separate clones and credential contexts;
+  same-account tasks may use worktrees, which are not an authentication boundary. Parallel writes
+  require confirmed-disjoint module and file scopes. A local runtime lease or quiet worktree cannot
+  prove that another clone, machine, or account is idle; use a shared coordination channel across
+  that boundary and fail closed on uncertain shared ownership. Shared-contract changes have one
+  integrator and land compatibly before consumers move. A task branch is only an integration input;
+  a goal completes after the resulting `main` has been published, course-checked, reviewed/audited,
+  and verified.
 - Keep Codex tooling and mutable state outside every product unit. Portable config, hooks, roles,
   and documentation remain tracked under `.codex/`; authentication, trust, sessions, logs, caches,
   plugins, runtime skills, and databases remain contained in ignored `.codex/runtime/`. The single
@@ -84,9 +95,10 @@ bootstrap.
   explicit pins under strict peer and Node.js engine checks, then freezes and installs that
   resolution. A frozen install reproduces a reviewed lockfile; it does not establish registry
   freshness. Version-line changes remain explicit dependency-maintenance work.
-- `.codexrig/framework.json` owns the installed framework version, upgrade surface, startup
-  lifetime, and provider policy; `.codexrig/compatibility.json` owns stable and canary toolchain
-  tracks, and `.codexrig/policy-projection.json` owns shared generated-document invariants. Use
+- `.codexrig/framework.json` owns the installed framework version, managed upgrade surface,
+  project-owned document classification, startup lifetime, and provider policy;
+  `.codexrig/compatibility.json` owns stable and canary toolchain tracks, and
+  `.codexrig/policy-projection.json` owns shared generated-document invariants. Use
   `pnpm framework:doctor -- --online` for diagnosis. GitHub/GitLab detection is automatic from CI or
   the selected remote; `pnpm platform:configure` previews and `--apply` explicitly changes remote
   protection. Generated projects update with the receipt-backed three-way `framework:upgrade` path.
@@ -98,6 +110,15 @@ bootstrap.
   more writes. Repeat the deeper course check at every major milestone and completed goal, clean up
   and update the authorized work and current plan, and continue autonomously when no blocker
   remains.
+- At every completed goal, before the final audit and publication, review all active documentation
+  against current behavior and durable truth. Update only where needed; consolidate or remove stale,
+  obsolete, and duplicate material instead of appending history, while preserving every active
+  directive; consolidation is not a shortening target. Treat the durable project manifest and each
+  workflow, bootstrap, security/trust, operations/migration, or public-contract authority as
+  critical documentation: inspect it read-only first, change it automatically only when the factual
+  correction and full preservation are unambiguous, and otherwise obtain explicit user confirmation
+  before writing. Give every authorized critical-document change a separate preservation review;
+  uncertain directives and manifest decisions remain in place.
 - Fix root causes at the owning boundary and preserve compatible unrelated changes. Treat tests as
   risk-based durable evidence; do not add one automatically for each fix or user instruction. When
   coverage is justified, default to extending a broad, realistic end-to-end, system, or lifecycle
@@ -121,16 +142,18 @@ bootstrap.
   prints the exact full reset to run after Codex exits. It never commits or pushes; optional Git
   instructions appear only when the source worktree has changes.
 - A goal is a quality and publication checkpoint, not a conversational stop. In serialized
-  direct-main mode, finish the clean review/audit, course check, cleanup, reset, final gate, exact
-  commit, and push on `main`. With a temporary branch or protected `main`, one integrator or the
-  provider's serializer (GitHub merge queue or GitLab merge train) publishes the bounded input;
-  refresh local `main` and repeat affected review/audit, course check, and verification on the
-  actual integrated commit without manufacturing a marker commit. Then immediately run
-  `mise exec --locked -- pnpm goal:new`; when it passes, continue the next already-authorized goal
-  without waiting for another prompt. Stop only when the complete authorized outcome is done or a
-  real scope, safety, integration, upstream, or authentication blocker remains. A failed publication
-  or `goal:new` gate leaves the current goal and encompassing work state open; record the concrete
-  blocker or continue a safe disjoint slice rather than claiming completion.
+  direct-main mode, finish repository-mutating cleanup, the goal-wide documentation review, and any
+  critical-document confirmation and preservation review before the fresh audit, course check,
+  reset, final gate, exact commit, and push on `main`. A later repository edit reopens that
+  sequence. With a temporary branch or protected `main`, one integrator or the provider's serializer
+  (GitHub merge queue or GitLab merge train) publishes the bounded input; refresh local `main` and
+  repeat the goal-wide documentation and critical-document gates, affected review/audit, course
+  check, and verification on the actual integrated commit without manufacturing a marker commit.
+  Then immediately run `mise exec --locked -- pnpm goal:new`; when it passes, continue the next
+  already-authorized goal without waiting for another prompt. Stop only when the complete authorized
+  outcome is done or a real scope, safety, integration, upstream, or authentication blocker remains.
+  A failed publication or `goal:new` gate leaves the current goal and encompassing work state open;
+  record the concrete blocker or continue a safe disjoint slice rather than claiming completion.
 - Treat a requested recap, research result, plan, documentation gate, review, audit, definition
   synthesis, or readiness statement as an intermediate commentary update when implementation or a
   larger outcome is already authorized. Never end at "ready to implement" when implementation is

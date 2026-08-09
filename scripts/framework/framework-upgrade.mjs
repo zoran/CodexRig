@@ -34,6 +34,10 @@ import {
 } from "./framework-upgrade-journal.mjs";
 import { buildUpgradedReceipt } from "./framework-upgrade-receipt.mjs";
 import { readPolicyProjection } from "./policy-projection.mjs";
+import { projectOwnedUpgradeDocumentPaths } from "../docs/project-document-policy.mjs";
+
+const projectDocumentReconciliationReason =
+  "Project-owned documents are preserved by framework upgrade and require careful local reconciliation before verification; critical documents need explicit user confirmation whenever the factual correction or full preservation is uncertain.";
 
 function equal(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
@@ -160,7 +164,42 @@ export function buildFrameworkUpgradePlan({
   }
 
   const desiredPaths = listManagedFrameworkFiles(source, sourceContract);
-  const allPaths = new Set([...Object.keys(receipt.managedFiles), ...desiredPaths]);
+  const removedProjectDocumentClassifications = projectOwnedUpgradeDocumentPaths.filter(
+    (relativePath) => !sourceContract.upgrade.projectOwnedDocuments.includes(relativePath),
+  );
+  if (removedProjectDocumentClassifications.length > 0) {
+    throw new Error(
+      `Framework upgrade source must preserve installed project-owned document classifications: ${removedProjectDocumentClassifications.join(
+        ", ",
+      )}.`,
+    );
+  }
+  const projectOwnedDocumentPaths = [
+    ...new Set([
+      ...projectOwnedUpgradeDocumentPaths,
+      ...sourceContract.upgrade.projectOwnedDocuments,
+    ]),
+  ].sort();
+  const projectOwnedDocumentPathSet = new Set(projectOwnedDocumentPaths);
+  const sourceManagedProjectDocuments = desiredPaths.filter((relativePath) =>
+    projectOwnedDocumentPathSet.has(relativePath),
+  );
+  if (sourceManagedProjectDocuments.length > 0) {
+    throw new Error(
+      `Framework upgrade source must not manage project-owned documents: ${sourceManagedProjectDocuments.join(
+        ", ",
+      )}.`,
+    );
+  }
+  const previouslyManagedProjectDocuments = Object.keys(receipt.managedFiles)
+    .filter((relativePath) => projectOwnedDocumentPathSet.has(relativePath))
+    .sort();
+  const allPaths = new Set([
+    ...Object.keys(receipt.managedFiles).filter(
+      (relativePath) => !projectOwnedDocumentPathSet.has(relativePath),
+    ),
+    ...desiredPaths,
+  ]);
   const desiredSet = new Set(desiredPaths);
   const operations = [];
   const conflicts = [];
@@ -241,6 +280,12 @@ export function buildFrameworkUpgradePlan({
   const publicOperations = operations
     .map(({ action, path: relativePath }) => ({ action, path: relativePath }))
     .sort((left, right) => left.path.localeCompare(right.path));
+  const projectDocumentReconciliation = {
+    paths: projectOwnedDocumentPaths,
+    previouslyManagedPaths: previouslyManagedProjectDocuments,
+    reason: projectDocumentReconciliationReason,
+    required: true,
+  };
   const digest = sha256(
     JSON.stringify({
       from: receipt.frameworkVersion,
@@ -253,6 +298,7 @@ export function buildFrameworkUpgradePlan({
         path: operation.path,
       })),
       package: sha256(JSON.stringify(sourceManagedPackage)),
+      projectDocumentReconciliation,
       sourceManagedFiles,
       to: sourceContract.frameworkVersion,
     }),
@@ -263,6 +309,7 @@ export function buildFrameworkUpgradePlan({
     fromVersion: receipt.frameworkVersion,
     managedPaths: desiredPaths,
     operations,
+    projectDocumentReconciliation,
     publicOperations,
     sourceContract,
     sourceSnapshot: {
@@ -436,6 +483,11 @@ function parseArgs(argv) {
   }
   if (!parsed.help && !parsed.source)
     throw new Error("Framework upgrade requires --source <path>.");
+  if (parsed.allowSame && parsed.apply) {
+    throw new Error(
+      "--allow-same is a preview-only reconciliation option; do not combine it with --apply.",
+    );
+  }
   return parsed;
 }
 
@@ -445,14 +497,23 @@ function printablePlan(plan) {
     digest: plan.digest,
     fromVersion: plan.fromVersion,
     operations: plan.publicOperations,
+    projectDocumentReconciliation: plan.projectDocumentReconciliation,
     toVersion: plan.toVersion,
   };
+}
+
+export function frameworkUpgradePreviewMessage({ allowSame }) {
+  return allowSame
+    ? "Same-version reconciliation preview only; reconcile the listed project-owned documents before verification. Do not rerun with --apply."
+    : "Preview only; rerun the same source with --apply.";
 }
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log("Usage: pnpm framework:upgrade -- --source <new-codexrig-root> [--apply] [--json]");
+    console.log(
+      "Usage: pnpm framework:upgrade -- --source <new-codexrig-root> [--apply | --allow-same] [--json]",
+    );
     return;
   }
   const recovered = recoverInterruptedFrameworkUpgrade(frameworkRoot);
@@ -470,12 +531,34 @@ function main() {
       console.log(`- ${operation.action} ${operation.path}`);
     }
     for (const conflict of plan.conflicts) console.error(`- conflict ${conflict}`);
+    if (plan.projectDocumentReconciliation.required) {
+      console.log("Project-owned documents remain unchanged and require reconciliation:");
+      for (const relativePath of plan.projectDocumentReconciliation.paths) {
+        console.log(`- review ${relativePath}`);
+      }
+      if (plan.projectDocumentReconciliation.previouslyManagedPaths.length > 0) {
+        console.log(
+          "Legacy receipt ownership is released without changing these project-owned documents:",
+        );
+        for (const relativePath of plan.projectDocumentReconciliation.previouslyManagedPaths) {
+          console.log(`- preserve ${relativePath}`);
+        }
+      }
+      console.log(plan.projectDocumentReconciliation.reason);
+    }
   }
   if (plan.conflicts.length > 0) process.exitCode = 1;
   else if (args.apply) {
     applyFrameworkUpgrade(plan);
-    if (!args.json) console.log("Framework upgrade applied transactionally.");
-  } else if (!args.json) console.log("Preview only; rerun the same source with --apply.");
+    if (!args.json) {
+      console.log("Framework upgrade applied transactionally.");
+      if (plan.projectDocumentReconciliation.required) {
+        console.log(
+          "Project-document reconciliation remains required before verification; no project-owned document was changed automatically.",
+        );
+      }
+    }
+  } else if (!args.json) console.log(frameworkUpgradePreviewMessage(args));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

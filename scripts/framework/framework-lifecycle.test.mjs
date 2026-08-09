@@ -26,6 +26,7 @@ import {
 import {
   applyFrameworkUpgrade,
   buildFrameworkUpgradePlan,
+  frameworkUpgradePreviewMessage,
   recoverInterruptedFrameworkUpgrade,
 } from "./framework-upgrade.mjs";
 import { authorizePlannedLockfile } from "./refresh-upgrade-dependencies.mjs";
@@ -40,6 +41,16 @@ import {
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..", "..");
 const temporaryRoots = [];
+const codexRig11PolicyInvariantIds = Object.freeze([
+  "authorized-continuation",
+  "central-integration",
+  "definition-intake",
+  "framework-lifecycle",
+  "memory-isolation",
+  "modular-boundaries",
+  "provider-parity",
+  "verification-lifecycle",
+]);
 
 after(() => {
   for (const root of temporaryRoots) rmSync(root, { force: true, recursive: true });
@@ -86,6 +97,14 @@ function contract(version) {
     },
     upgrade: {
       receiptFile: ".codexrig/installation.json",
+      projectOwnedDocuments: [
+        ".codex/README.md",
+        "AGENTS.md",
+        "README.md",
+        "docs/context-index.md",
+        "docs/project.md",
+        "instructions.md",
+      ],
       managedRoots: [".codexrig/compatibility.json", ".codexrig/framework.json", "managed"],
       excludedPaths: ["managed/excluded.txt"],
       managedPackageScripts: ["framework:doctor"],
@@ -144,6 +163,37 @@ function frameworkFixture(version, content, { reusable = true } = {}) {
   return root;
 }
 
+function codexRig11PolicyProjectionAccepts(sourceRoot) {
+  const projection = JSON.parse(
+    readFileSync(path.join(sourceRoot, ".codexrig/policy-projection.json"), "utf8"),
+  );
+  if (projection.schemaVersion !== 1 || !Array.isArray(projection.invariants)) return false;
+  const allowedSurfaces = ["agents", "manifest", "readme"];
+  const ids = [];
+  for (const entry of projection.invariants) {
+    if (
+      !entry ||
+      typeof entry !== "object" ||
+      Array.isArray(entry) ||
+      typeof entry.id !== "string" ||
+      !/^[a-z][a-z0-9-]*$/u.test(entry.id) ||
+      typeof entry.statement !== "string" ||
+      !entry.statement.trim() ||
+      /[\0\r\n]/u.test(entry.statement) ||
+      !Array.isArray(entry.surfaces) ||
+      entry.surfaces.join("\n") !== allowedSurfaces.join("\n")
+    ) {
+      return false;
+    }
+    ids.push(entry.id);
+  }
+  ids.sort();
+  return (
+    new Set(ids).size === ids.length &&
+    ids.join("\n") === [...codexRig11PolicyInvariantIds].sort().join("\n")
+  );
+}
+
 function installedFixture() {
   const root = frameworkFixture("1.0.0", "export const value = 'old';\n", {
     reusable: false,
@@ -178,6 +228,172 @@ test("framework upgrade applies a clean three-way change and records the new con
     "export const value = 'new';\n",
   );
   assert.match(readFileSync(path.join(target, "package.json"), "utf8"), /doctor-2\.0\.0/);
+});
+
+test("legacy-compatible upgrade preserves project documents and exposes post-apply reconciliation", () => {
+  const source = frameworkFixture("2.0.0", "export const value = 'new';\n");
+  const target = installedFixture();
+  assert.equal(codexRig11PolicyProjectionAccepts(source), true);
+  const projectDocuments = new Map([
+    [".codex/README.md", "# Local Codex policy\n"],
+    ["AGENTS.md", "# Local bootstrap\n"],
+    ["README.md", "# Local product\n"],
+    ["docs/context-index.md", "# Local context-index operations\n"],
+    ["docs/project.md", "# Local project truth\n"],
+    ["instructions.md", "# Local workflow authority\n"],
+  ]);
+  for (const [relativePath, content] of projectDocuments) write(target, relativePath, content);
+
+  const plan = buildFrameworkUpgradePlan({ sourceRoot: source, targetRoot: target });
+  assert.equal(plan.projectDocumentReconciliation.required, true);
+  assert.deepEqual(plan.projectDocumentReconciliation.paths, [...projectDocuments.keys()]);
+  assert.deepEqual(plan.projectDocumentReconciliation.previouslyManagedPaths, []);
+  assert.match(plan.projectDocumentReconciliation.reason, /careful local reconciliation/i);
+  assert.equal(
+    plan.publicOperations.some(({ path: relativePath }) => projectDocuments.has(relativePath)),
+    false,
+  );
+
+  applyFrameworkUpgrade(plan, {
+    refreshDependencies: () => {},
+    repairDependencies: () => {},
+  });
+  for (const [relativePath, content] of projectDocuments) {
+    assert.equal(readFileSync(path.join(target, relativePath), "utf8"), content, relativePath);
+  }
+
+  const postUpgradeReconciliation = buildFrameworkUpgradePlan({
+    allowSame: true,
+    sourceRoot: source,
+    targetRoot: target,
+  });
+  assert.equal(postUpgradeReconciliation.fromVersion, postUpgradeReconciliation.toVersion);
+  assert.equal(postUpgradeReconciliation.projectDocumentReconciliation.required, true);
+  assert.deepEqual(postUpgradeReconciliation.projectDocumentReconciliation.paths, [
+    ...projectDocuments.keys(),
+  ]);
+  assert.equal(
+    postUpgradeReconciliation.publicOperations.some(({ path: relativePath }) =>
+      projectDocuments.has(relativePath),
+    ),
+    false,
+  );
+  assert.match(
+    frameworkUpgradePreviewMessage({ allowSame: true }),
+    /Same-version reconciliation preview only.*Do not rerun with --apply/,
+  );
+});
+
+test("same-version reconciliation is preview-only at the command boundary", () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.join(repositoryRoot, "scripts/framework/framework-upgrade.mjs"),
+      "--source",
+      repositoryRoot,
+      "--allow-same",
+      "--apply",
+    ],
+    { encoding: "utf8", stdio: "pipe" },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /--allow-same is a preview-only reconciliation option/);
+});
+
+test("framework upgrade rejects source ownership of project policy documents", () => {
+  const source = frameworkFixture("2.0.0", "export const value = 'new';\n");
+  const sourceContract = contract("2.0.0");
+  sourceContract.upgrade.managedRoots.push("./instructions.md");
+  write(source, ".codexrig/framework.json", serializeCanonicalJson(sourceContract));
+  write(source, "instructions.md", "# Framework-owned workflow\n");
+  const target = installedFixture();
+
+  assert.throws(
+    () => buildFrameworkUpgradePlan({ sourceRoot: source, targetRoot: target }),
+    /must not manage project-owned documents: instructions\.md/,
+  );
+
+  const removingSource = frameworkFixture("2.0.0", "export const value = 'new';\n");
+  const removingContract = contract("2.0.0");
+  removingContract.upgrade.projectOwnedDocuments =
+    removingContract.upgrade.projectOwnedDocuments.filter(
+      (relativePath) => relativePath !== "instructions.md",
+    );
+  write(removingSource, ".codexrig/framework.json", serializeCanonicalJson(removingContract));
+  assert.throws(
+    () => buildFrameworkUpgradePlan({ sourceRoot: removingSource, targetRoot: target }),
+    /must preserve installed project-owned document classifications: instructions\.md/,
+  );
+
+  const conflictingSource = frameworkFixture("2.0.0", "export const value = 'new';\n");
+  const conflictingContract = contract("2.0.0");
+  conflictingContract.upgrade.projectOwnedDocuments.push("./pnpm-lock.yaml");
+  write(conflictingSource, ".codexrig/framework.json", serializeCanonicalJson(conflictingContract));
+  assert.throws(
+    () => buildFrameworkUpgradePlan({ sourceRoot: conflictingSource, targetRoot: target }),
+    /cannot classify framework-controlled upgrade inputs as project-owned documents: pnpm-lock\.yaml/,
+  );
+});
+
+test("framework upgrade releases legacy receipt ownership without changing project policy", () => {
+  const source = frameworkFixture("2.0.0", "export const value = 'new';\n");
+  const target = frameworkFixture("1.0.0", "export const value = 'old';\n", {
+    reusable: false,
+  });
+  const legacyContract = contract("1.0.0");
+  legacyContract.upgrade.managedRoots.push("instructions.md");
+  write(target, ".codexrig/framework.json", serializeCanonicalJson(legacyContract));
+  const localInstructions = "# Locally preserved workflow\n";
+  write(target, "instructions.md", localInstructions);
+  writeInstallationReceipt({ root: target });
+
+  const plan = buildFrameworkUpgradePlan({ sourceRoot: source, targetRoot: target });
+  assert.deepEqual(plan.projectDocumentReconciliation.previouslyManagedPaths, ["instructions.md"]);
+  assert.equal(
+    plan.publicOperations.some(({ path: relativePath }) => relativePath === "instructions.md"),
+    false,
+  );
+  applyFrameworkUpgrade(plan, {
+    refreshDependencies: () => {},
+    repairDependencies: () => {},
+  });
+  assert.equal(readFileSync(path.join(target, "instructions.md"), "utf8"), localInstructions);
+  assert.equal("instructions.md" in readInstallationReceipt(target).managedFiles, false);
+});
+
+test("source-declared project documents cannot be deleted by an older installed path policy", () => {
+  const newlyProjectOwnedPath = "docs/new-project-authority.md";
+  const source = frameworkFixture("2.0.0", "export const value = 'new';\n");
+  const sourceContract = contract("2.0.0");
+  sourceContract.upgrade.projectOwnedDocuments.push(`./${newlyProjectOwnedPath}`);
+  write(source, ".codexrig/framework.json", serializeCanonicalJson(sourceContract));
+
+  const target = frameworkFixture("1.0.0", "export const value = 'old';\n", {
+    reusable: false,
+  });
+  const legacyContract = contract("1.0.0");
+  legacyContract.upgrade.managedRoots.push(newlyProjectOwnedPath);
+  write(target, ".codexrig/framework.json", serializeCanonicalJson(legacyContract));
+  const localAuthority = "# Newly project-owned authority\n";
+  write(target, newlyProjectOwnedPath, localAuthority);
+  writeInstallationReceipt({ root: target });
+
+  const plan = buildFrameworkUpgradePlan({ sourceRoot: source, targetRoot: target });
+  assert.equal(plan.projectDocumentReconciliation.paths.includes(newlyProjectOwnedPath), true);
+  assert.equal(
+    plan.projectDocumentReconciliation.previouslyManagedPaths.includes(newlyProjectOwnedPath),
+    true,
+  );
+  assert.equal(
+    plan.publicOperations.some(({ path: relativePath }) => relativePath === newlyProjectOwnedPath),
+    false,
+  );
+  applyFrameworkUpgrade(plan, {
+    refreshDependencies: () => {},
+    repairDependencies: () => {},
+  });
+  assert.equal(readFileSync(path.join(target, newlyProjectOwnedPath), "utf8"), localAuthority);
+  assert.equal(newlyProjectOwnedPath in readInstallationReceipt(target).managedFiles, false);
 });
 
 test("framework upgrade reports divergent edits before writing", () => {
@@ -402,7 +618,7 @@ test("startup attestation binds nonce, root, lifetime, inputs, and tool versions
     now: () => now + 1,
     controlPolicy,
   });
-  assert.equal(verified.frameworkVersion, "1.1.0");
+  assert.equal(verified.frameworkVersion, "1.2.0");
   const statePath = path.join(root, ".codex/runtime/cache/codexrig/startup-attestation.json");
   assert.equal(statSync(statePath).mode & 0o777, 0o600);
   assert.equal(readFileSync(statePath, "utf8").includes(issued.nonce), false);

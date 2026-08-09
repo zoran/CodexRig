@@ -1,5 +1,6 @@
 import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import { isProjectOwnedUpgradeDocumentPath } from "../docs/project-document-policy.mjs";
 import {
   repositoryCodexHomeGitignoreBehaviorFindings,
   repositoryCodexHomeGitignoreFindings,
@@ -56,6 +57,7 @@ export const portableContextContractFiles = Object.freeze([
   "scripts/context/terminal-output.mjs",
   "scripts/context/terminal-output.test.mjs",
   "scripts/docs/document-scope.mjs",
+  "scripts/docs/project-document-policy.mjs",
   "scripts/framework/compatibility-matrix.mjs",
   "scripts/framework/framework-contract.mjs",
   "scripts/framework/framework-doctor.mjs",
@@ -193,6 +195,11 @@ function claimHasQualifiedScope(clause, match) {
   return leadingQualifiedHookScope.test(before) || trailingQualifiedHookScope.test(after);
 }
 
+function projectDocumentFinding(relativePath, detail) {
+  if (!isProjectOwnedUpgradeDocumentPath(relativePath)) return detail;
+  return `project-document reconciliation required before verification: ${detail}`;
+}
+
 export function hasContradictoryStopHookIndexContract(content) {
   const clauses = content.replace(/\s+/g, " ").split(/[.!?;](?:\s+|$)|,?\s+(?:but|however)\s+/iu);
   for (const clause of clauses) {
@@ -210,18 +217,31 @@ export function portableContextContractFindings({ repositoryRoot }) {
   for (const relativePath of portableContextContractFiles) {
     const absolutePath = path.join(repositoryRoot, ...relativePath.split("/"));
     if (!existsSync(absolutePath)) {
-      findings.push(`portable context contract is missing ${relativePath}`);
+      findings.push(
+        projectDocumentFinding(
+          relativePath,
+          `portable context contract is missing ${relativePath}`,
+        ),
+      );
       continue;
     }
     const stats = lstatSync(absolutePath);
     if (stats.isSymbolicLink() || !stats.isFile()) {
-      findings.push(`portable context contract requires a regular file: ${relativePath}`);
+      findings.push(
+        projectDocumentFinding(
+          relativePath,
+          `portable context contract requires a regular file: ${relativePath}`,
+        ),
+      );
       continue;
     }
     const content = readFileSync(absolutePath, "utf8");
     if (exactStartCommandFiles.has(relativePath) && !content.includes(supportedCodexStartCommand)) {
       findings.push(
-        `portable context contract requires ${relativePath} to include the exact supported Codex start command`,
+        projectDocumentFinding(
+          relativePath,
+          `portable context contract requires ${relativePath} to include the exact supported Codex start command`,
+        ),
       );
     }
     const normalizedContent = content.replace(/\s+/g, " ");
@@ -230,12 +250,20 @@ export function portableContextContractFindings({ repositoryRoot }) {
       hasContradictoryStopHookIndexContract(content)
     ) {
       findings.push(
-        `portable context contract rejects a contradictory Stop-hook index contract in ${relativePath}`,
+        projectDocumentFinding(
+          relativePath,
+          `portable context contract rejects a contradictory Stop-hook index contract in ${relativePath}`,
+        ),
       );
     }
     for (const expected of requiredContent.get(relativePath) ?? []) {
       if (!normalizedContent.toLowerCase().includes(expected.replace(/\s+/g, " ").toLowerCase())) {
-        findings.push(`portable context contract requires ${relativePath} to include ${expected}`);
+        findings.push(
+          projectDocumentFinding(
+            relativePath,
+            `portable context contract requires ${relativePath} to include ${expected}`,
+          ),
+        );
       }
     }
   }
