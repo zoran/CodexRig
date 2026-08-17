@@ -36,7 +36,11 @@ Choose the mode from the user's request:
    release/dependency check.
 
 4. Perform a bounded review iteration for regressions, root-cause quality, maintainability, docs
-   drift, acceptance criteria, and whole-system impact. Invoke `$security-review` for affected
+   drift, acceptance criteria, and whole-system impact. In finish/handoff mode, invoke
+   `$system-coherence` for every non-trivial completed implementation, architecture,
+   configuration-boundary, or integration slice before accepting it; require an assembled-flow
+   trace, semantic-duplication search, and repair of material whole-project incoherence. In
+   review-only mode, apply the same criteria without editing. Invoke `$security-review` for affected
    trust, authentication, authorization, secret, personal-data, dependency, shell, CI,
    infrastructure, or runtime surfaces, `$code-pattern-review` for implementation/architecture
    changes, and specialized content/image/search review only when those surfaces changed. Keep
@@ -55,7 +59,33 @@ Choose the mode from the user's request:
    or goal: remove obsolete temporary or dead paths, reconcile code/tests/configuration/non-critical
    docs, update or delete bounded project context as appropriate, and refresh the in-session plan.
    Do not change critical documents through generic cleanup. Any repository edit reopens affected
-   focused checks and steps 4-6 before continuing.
+   focused checks and steps 4-6 before continuing. At a completed goal, the primary then runs its
+   current budget classification first without assuming a billing period. A reliable percentage of
+   the binding allocation is guarded at 10% or less and critical at 5% or less; compare an absolute
+   remaining token or credit amount directly with bounded work envelopes and the primary completion
+   reserve. A host critical/exhaustion signal or inability to cover that reserve is critical too. In
+   critical state admit no subagent, background task, new slice, or expanded follow-up. Gracefully
+   drain only provenance-bound owned agents/processes, record the exact Critical Budget Drain
+   attestation, and run `pnpm handover:create -- --critical` as the final repository action. Once it
+   seals successfully, stop completely without another tool, check, housekeeping step, follow-up,
+   agent contact, or automatic continuation. Never count unavailable or unauthorized redeem/reset
+   capacity. Budget/agent monitoring remains event-driven and every slice already received its
+   lightweight Orchestration Housekeeping gate; guarded/critical state must have a current,
+   revisioned `docs/project-context.md` plus any required shared-channel ownership update before
+   goal closure. Unless a critical seal has already ended the session, the primary then runs its
+   host-session agent housekeeping first: inventory live agents and background tasks, preserve or
+   accept each handoff, actively close completed/unneeded agents, interrupt stale or redundant owned
+   work, and tell affected remaining agents about accepted results, changed contracts/assumptions,
+   remaining work, and released ownership/slots. Confirm every direct peer message and response was
+   mirrored to the primary, then reconcile every reported peer exchange with the primary-owned
+   scope, ownership, contract, and integration plan; peers cannot authorize those changes.
+   Repository scripts cannot perform this conversation lifecycle. The primary then runs
+   `pnpm repo:housekeeping -- --apply`. It reconciles only unambiguous local repository facts and
+   its bounded delivery-manifest projection, formats the result, and runs the consolidated
+   repository health checks—including source/declaration-header and documentation-anchor
+   currency—without deploying, committing, pushing, or mutating external state. Ambiguous
+   environment evidence requires developer classification. Housekeeping changes reopen steps 4-6;
+   continue only after its idempotent rerun is clean.
 7. At every completed-goal boundary, after mutating cleanup and before the final fresh audit,
    inventory every active documentation surface, including root and `docs/` documents,
    workflow/bootstrap authorities, Codex guidance, and skill instructions. Compare each with current
@@ -75,7 +105,9 @@ Choose the mode from the user's request:
    canonical text or explicit authorized retirement and preserve uncertain requirements. Any
    documentation edit reopens affected checks and steps 4-7 before continuing. For a slice-only
    checkpoint, retain the ordinary changed-contract documentation check without manufacturing an
-   all-document pass.
+   all-document pass. Treat touched source and declaration descriptions as part of the same currency
+   review: compare their purpose, owner, public contract, invariants, and trust boundary with
+   current behavior, and repair stale or misleading text as a finding.
 8. Once no relevant finding remains and any goal documentation review is clean, perform a fresh
    audit against the request, plan, goal or slice success condition, manifest, touched
    owners/consumers, verification evidence, docs, and worktree scope. In finish/handoff mode, an
@@ -94,9 +126,10 @@ Choose the mode from the user's request:
     remains on current `main` for final admission. For a temporary task branch or protected `main`,
     commit and push only its bounded integration input under normal pre-push evidence; one
     integrator or the detected provider's merge serializer publishes it. Refresh local `main`, then
-    repeat the course check, affected review/repair and verification, completed-goal all-document
-    review, any critical-document confirmation and preservation review, and fresh audit on the
-    actual resulting commit. Do not create a marker commit.
+    repeat read-only repository housekeeping, the course check, affected review/repair and
+    verification, completed-goal all-document review, any critical-document confirmation and
+    preservation review, and fresh audit on the actual resulting commit. Do not create a marker
+    commit.
 11. On that actual target-`main` state, apply any required reset and invoke adaptive final admission
     once. Full coverage is allowed only when the plan names a concrete admission reason: no trusted
     successful basis, an uncovered risk, or an explicit owner instruction. In direct-main mode,

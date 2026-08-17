@@ -1,3 +1,4 @@
+/** Owns stable file snapshot behavior for the repository inventory and filesystem boundary. */
 import {
   closeSync,
   constants,

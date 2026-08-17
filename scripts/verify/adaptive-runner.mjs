@@ -1,3 +1,4 @@
+/** Owns adaptive runner behavior for the repository verification boundary. */
 import { existsSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -11,13 +12,12 @@ import {
 } from "./verification-admission.mjs";
 import {
   discoverWorkspaceManifests,
-  parsePnpmWorkspaceProjects,
   selectChangedWorkspaceManifests,
   workspaceLifecycleCommands,
 } from "./workspace-verification.mjs";
 
 export { printPlan, runPlan } from "./verification-executor.mjs";
-export { discoverWorkspaceManifests, parsePnpmWorkspaceProjects, workspaceLifecycleCommands };
+export { discoverWorkspaceManifests, workspaceLifecycleCommands };
 const broadRegressionCommandKeys = new Set([
   "context-regressions",
   "dependency-regressions",
@@ -101,6 +101,12 @@ export function completeVerificationCommands() {
       "scripts/verify/docs.mjs",
       "complete verification always checks documentation structure, map, and links",
     ),
+    nodeCommand(
+      "delivery-environments",
+      "delivery environment inventory",
+      "scripts/verify/delivery-environments.mjs",
+      "complete verification keeps declared and repository-detected delivery targets aligned with the current manifest",
+    ),
     bashCommand(
       "scripts",
       "script inventory",
@@ -112,6 +118,36 @@ export function completeVerificationCommands() {
       "repository baseline",
       "scripts/verify/repository-smoke.mjs",
       "complete verification always checks the repository's minimum operational shape",
+    ),
+    nodeCommand(
+      "white-label",
+      "white-label product configuration",
+      "scripts/verify/white-label.mjs",
+      "complete verification keeps product identity, branding, and public settings replaceable and free of framework leakage",
+    ),
+    nodeCommand(
+      "localization",
+      "source and user-facing language configuration",
+      "scripts/verify/localization.mjs",
+      "complete verification keeps English source conventions separate from explicit user-facing locale decisions",
+    ),
+    nodeCommand(
+      "licensing",
+      "license and attribution",
+      "scripts/verify/licensing.mjs",
+      "complete verification keeps CodexRig licensing and attribution in framework and generated-project upgrade contracts",
+    ),
+    nodeCommand(
+      "identity-access",
+      "Identity and Access boundaries",
+      "scripts/verify/identity-access.mjs",
+      "complete verification separates authentication, authorization, identity lifecycle, sessions/tokens, and provider adapters behind public contracts",
+    ),
+    nodeCommand(
+      "tenant-isolation",
+      "tenant-isolation boundaries",
+      "scripts/verify/tenant-isolation.mjs",
+      "complete verification requires trusted tenant context and tenant-scoped authorization, data, cache, files, messages, and jobs",
     ),
     nodeCommand(
       "skills",
@@ -138,6 +174,13 @@ export function completeVerificationCommands() {
       "complete verification checks package identity, scripts, dependencies, and every export registry entry",
     ),
     nodeCommand(
+      "framework-version",
+      "source framework release version",
+      "scripts/framework/framework-version.mjs",
+      "complete verification rejects a reusable framework release whose active changes are not covered by synchronized SemVer metadata",
+      ["--check"],
+    ),
+    nodeCommand(
       "verification-entrypoints",
       "root verification entry points",
       "scripts/verify/verification-entrypoints.mjs",
@@ -150,6 +193,7 @@ export function completeVerificationCommands() {
       args: [
         "--test",
         "--test-reporter=dot",
+        "--test-concurrency=1",
         ...existingTestFiles([
           "scripts/deps/dependency-policy.test.mjs",
           "scripts/deps/dependency-owner-normalization.test.mjs",
@@ -196,7 +240,7 @@ export function completeVerificationCommands() {
         "scripts/context/context-lifecycle.test.mjs",
         "scripts/context/context-lock-query.test.mjs",
         "scripts/context/context-integration.test.mjs",
-        "scripts/context/terminal-output.test.mjs",
+        "scripts/terminal/terminal-output.test.mjs",
       ],
       reason:
         "complete verification exercises retrieval behavior in isolated temporary index roots",
@@ -208,6 +252,8 @@ export function completeVerificationCommands() {
       args: [
         "--test",
         "--test-reporter=dot",
+        "scripts/framework/compatibility-integrity.test.mjs",
+        "scripts/framework/framework-version.test.mjs",
         "scripts/framework/framework-lifecycle.test.mjs",
         "scripts/platform/platform-lifecycle.test.mjs",
       ],
@@ -221,6 +267,7 @@ export function completeVerificationCommands() {
       args: [
         "--test",
         "--test-reporter=dot",
+        "--test-concurrency=1",
         ...existingTestFiles([
           "scripts/setup/codex-launcher.test.mjs",
           "scripts/setup/setup-regression.test.mjs",
@@ -243,8 +290,10 @@ export function completeVerificationCommands() {
         "--test",
         "--test-reporter=dot",
         "scripts/docs/document-scope.test.mjs",
+        "scripts/docs/project-manifest-contract.test.mjs",
+        "scripts/goals/repository-housekeeping.test.mjs",
         "scripts/context/portable-context-contract.test.mjs",
-        "scripts/context/terminal-output.test.mjs",
+        "scripts/terminal/terminal-output.test.mjs",
         "scripts/repository/product-roots.test.mjs",
         "scripts/repository/source-inventory-git-environment.test.mjs",
         "scripts/repository/source-inventory.test.mjs",
@@ -256,7 +305,9 @@ export function completeVerificationCommands() {
         "scripts/verify/patterns.test.mjs",
         "scripts/verify/secrets.test.mjs",
         "scripts/verify/image-assets.test.mjs",
+        "scripts/verify/localization.test.mjs",
         "scripts/verify/surface-quality.test.mjs",
+        "scripts/verify/white-label.test.mjs",
         "scripts/web/update-sitemap-lastmod.test.mjs",
         "scripts/web/web-quality-scan.test.mjs",
       ],
@@ -370,7 +421,10 @@ export function buildPlan(options, dependencies = {}) {
     (injectedPaths || options.simulatedPaths.length > 0
       ? { reason: "injected route fixture", trusted: true }
       : { reason: "successful verification evidence is unavailable", trusted: false });
-  const completeCommands = completeVerificationCommands();
+  const deliveryCommands = dependencies.deliveryBinding?.verificationCommand
+    ? [dependencies.deliveryBinding.verificationCommand]
+    : [];
+  const completeCommands = [...completeVerificationCommands(), ...deliveryCommands];
   const needsWorkspace =
     options.mode !== "pre-push" &&
     (!basis.trusted ||
@@ -423,7 +477,7 @@ export function buildPlan(options, dependencies = {}) {
       ? []
       : admission.mode === "full"
         ? completeCommands
-        : focused.readOnlyCommands;
+        : [...focused.readOnlyCommands, ...deliveryCommands];
   const workspaceCommands =
     options.mode === "pre-push"
       ? []
@@ -434,6 +488,7 @@ export function buildPlan(options, dependencies = {}) {
   return {
     admission,
     options,
+    deliveryBinding: dependencies.deliveryBinding ?? null,
     gitAvailable,
     changed,
     classifiedPaths,

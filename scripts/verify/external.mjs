@@ -1,9 +1,17 @@
+/** Owns external behavior for the repository verification boundary. */
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { trustedPnpmCommand } from "../deps/trusted-pnpm-command.mjs";
+import {
+  assertTrustedPnpmConfiguration,
+  pnpmHooksDisabledEnvironment,
+} from "../repository/pnpm-workspace-manifests.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+assertTrustedPnpmConfiguration({ repositoryRoot: root });
+const pnpm = trustedPnpmCommand({ repositoryRoot: root });
 const commands = [
   {
     label: "dependency freshness",
@@ -12,8 +20,13 @@ const commands = [
   },
   {
     label: "dependency advisory registry",
-    executable: "pnpm",
+    executable: pnpm.executable,
     args: ["audit", "--audit-level", "high"],
+  },
+  {
+    label: "dependency registry signatures",
+    executable: pnpm.executable,
+    args: ["audit", "signatures"],
   },
 ];
 
@@ -22,6 +35,7 @@ for (const command of commands) {
   const result = spawnSync(command.executable, command.args, {
     cwd: root,
     encoding: "utf8",
+    env: pnpmHooksDisabledEnvironment(process.env),
     input: "",
     stdio: "inherit",
     timeout: 180_000,
@@ -37,4 +51,4 @@ for (const command of commands) {
     process.exit(1);
   }
 }
-console.log("External dependency freshness and advisory checks passed.");
+console.log("External dependency freshness, advisory, and registry-signature checks passed.");

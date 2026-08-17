@@ -1,3 +1,4 @@
+/** Owns pushed object scan behavior for the repository verification boundary. */
 import { spawn, spawnSync } from "node:child_process";
 import process from "node:process";
 import { fileURLToPath } from "node:url";

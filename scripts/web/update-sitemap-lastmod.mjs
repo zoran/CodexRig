@@ -1,3 +1,4 @@
+/** Owns update sitemap lastmod behavior for the public web quality boundary. */
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";

@@ -1,3 +1,4 @@
+/** Owns gitlab platform behavior for the Git provider integration boundary. */
 import {
   paginatedPlatformApiRequest,
   PlatformApiError,

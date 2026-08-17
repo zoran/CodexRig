@@ -1,20 +1,25 @@
+/** Owns dependency inputs behavior for the dependency and toolchain maintenance boundary. */
 import { createHash } from "node:crypto";
 import {
   chmodSync,
-  closeSync,
-  constants,
   existsSync,
-  fstatSync,
   lstatSync,
   mkdirSync,
-  openSync,
-  readFileSync,
-  readdirSync,
   realpathSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { readOptionalOwnedFile } from "../filesystem/owned-file-operations.mjs";
+import {
+  closeOwnedDirectoryBinding,
+  listOwnedDirectory,
+  openOwnedDirectoryBinding,
+  ownedDirectoryChildPath,
+  readStableOwnedFile,
+  safeArtifactStats,
+  validateOwnedDirectoryBinding,
+} from "../filesystem/owned-path-safety.mjs";
 
 const dependencySections = [
   "dependencies",
@@ -24,6 +29,7 @@ const dependencySections = [
 ];
 const ignoredLocalDirectoryEntries = new Set([".git", "node_modules"]);
 
+/** Reports an atomic dependency transaction failure with its intended process exit code. */
 export class DependencyTransactionError extends Error {
   constructor(message, exitCode = 1) {
     super(message);
@@ -118,98 +124,90 @@ export function normalizeRelativePath(value) {
 
 export function readOptionalFile(projectRoot, relativePath) {
   const target = safeRepositoryPath(projectRoot, relativePath, { allowMissing: true });
-  if (!existsSync(target)) return { exists: false, content: null, hash: null };
-  const stats = lstatSync(target);
-  if (!stats.isFile()) {
+  let snapshot;
+  try {
+    snapshot = readOptionalOwnedFile(projectRoot, target, `transaction input ${relativePath}`);
+  } catch (error) {
     throw new DependencyTransactionError(
-      `Transaction input must be a regular file: ${relativePath}`,
+      `Could not safely read transaction input ${relativePath}: ${error.message}`,
     );
   }
-  const content = readFileSync(target, "utf8");
+  if (!snapshot.exists) return { exists: false, content: null, hash: null };
+  const content = snapshot.buffer.toString("utf8");
   return { exists: true, content, hash: contentHash(content) };
 }
 
-function stableFileSnapshot(filePath, label) {
-  const before = lstatSync(filePath);
-  if (before.isSymbolicLink() || !before.isFile()) {
-    throw new DependencyTransactionError(`Transaction input must be a regular file: ${label}`);
-  }
-  let descriptor;
+function stableFileSnapshot(projectRoot, filePath, label) {
+  let snapshot;
   try {
-    descriptor = openSync(filePath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    snapshot = readOptionalOwnedFile(projectRoot, filePath, `transaction input ${label}`);
   } catch (error) {
     throw new DependencyTransactionError(
-      `Could not safely open transaction input ${label}: ${error.message}`,
+      `Could not safely read transaction input ${label}: ${error.message}`,
     );
   }
-  try {
-    const opened = fstatSync(descriptor);
-    if (!opened.isFile() || opened.dev !== before.dev || opened.ino !== before.ino) {
-      throw new DependencyTransactionError(`Transaction input changed while opening: ${label}`);
-    }
-    const content = readFileSync(descriptor);
-    const after = fstatSync(descriptor);
-    if (
-      after.dev !== opened.dev ||
-      after.ino !== opened.ino ||
-      after.size !== opened.size ||
-      after.mtimeMs !== opened.mtimeMs
-    ) {
-      throw new DependencyTransactionError(`Transaction input changed while reading: ${label}`);
-    }
-    return {
-      content,
-      mode: opened.mode & 0o777,
-      atime: opened.atime,
-      mtime: opened.mtime,
-    };
-  } finally {
-    closeSync(descriptor);
+  if (!snapshot.exists) {
+    throw new DependencyTransactionError(`Transaction input disappeared while reading: ${label}`);
   }
+  return {
+    content: snapshot.buffer,
+    mode: snapshot.stats.mode & 0o777,
+    atime: snapshot.stats.atime,
+    mtime: snapshot.stats.mtime,
+  };
 }
 
-function directoryFingerprint(directory, label) {
+function directoryFingerprint(projectRoot, directory, label) {
   const records = [];
 
   function visit(current, relativeDirectory) {
-    const before = lstatSync(current);
-    if (before.isSymbolicLink() || !before.isDirectory()) {
-      throw new DependencyTransactionError(
-        `Local dependency input must be a real directory: ${label}`,
-      );
-    }
-    for (const name of readdirSync(current).sort()) {
-      if (ignoredLocalDirectoryEntries.has(name)) continue;
-      const child = path.join(current, name);
-      const relativePath = relativeDirectory ? `${relativeDirectory}/${name}` : name;
-      const stats = lstatSync(child);
-      if (stats.isSymbolicLink()) {
-        throw new DependencyTransactionError(
-          `Local dependency input must not contain symlinks: ${label}/${relativePath}`,
+    let binding;
+    try {
+      binding = openOwnedDirectoryBinding(projectRoot, current, `local dependency ${label}`);
+      for (const name of listOwnedDirectory(binding, `local dependency ${label}`).sort()) {
+        if (ignoredLocalDirectoryEntries.has(name)) continue;
+        const relativePath = relativeDirectory ? `${relativeDirectory}/${name}` : name;
+        const child = ownedDirectoryChildPath(
+          binding,
+          name,
+          `local dependency ${label}/${relativePath}`,
         );
+        const stats = lstatSync(child);
+        if (stats.isSymbolicLink()) {
+          throw new DependencyTransactionError(
+            `Local dependency input must not contain symlinks: ${label}/${relativePath}`,
+          );
+        }
+        if (stats.isDirectory()) {
+          safeArtifactStats(child, "directory", `local dependency ${label}/${relativePath}`);
+          records.push({ path: relativePath, kind: "directory", mode: stats.mode & 0o777 });
+          visit(path.join(current, name), relativePath);
+        } else if (stats.isFile()) {
+          const snapshot = readStableOwnedFile(
+            binding,
+            name,
+            `local dependency ${label}/${relativePath}`,
+          );
+          records.push({
+            path: relativePath,
+            kind: "file",
+            mode: snapshot.stats.mode & 0o777,
+            hash: contentHash(snapshot.buffer),
+          });
+        } else {
+          throw new DependencyTransactionError(
+            `Local dependency input contains a non-file entry: ${label}/${relativePath}`,
+          );
+        }
       }
-      if (stats.isDirectory()) {
-        records.push({ path: relativePath, kind: "directory", mode: stats.mode & 0o777 });
-        visit(child, relativePath);
-      } else if (stats.isFile()) {
-        const snapshot = stableFileSnapshot(child, `${label}/${relativePath}`);
-        records.push({
-          path: relativePath,
-          kind: "file",
-          mode: snapshot.mode,
-          hash: contentHash(snapshot.content),
-        });
-      } else {
-        throw new DependencyTransactionError(
-          `Local dependency input contains a non-file entry: ${label}/${relativePath}`,
-        );
-      }
-    }
-    const after = lstatSync(current);
-    if (after.dev !== before.dev || after.ino !== before.ino || after.mtimeMs !== before.mtimeMs) {
+      validateOwnedDirectoryBinding(binding, `local dependency ${label}`);
+    } catch (error) {
+      if (error instanceof DependencyTransactionError) throw error;
       throw new DependencyTransactionError(
-        `Local dependency input changed while reading: ${label}`,
+        `Could not safely inspect local dependency input ${label}: ${error.message}`,
       );
+    } finally {
+      if (binding) closeOwnedDirectoryBinding(binding);
     }
   }
 
@@ -221,23 +219,57 @@ export function inputRecord(projectRoot, relativePath) {
   const normalized = normalizeRelativePath(relativePath);
   const target = safeRepositoryPath(projectRoot, normalized, { allowMissing: true });
   if (!existsSync(target)) return { path: normalized, exists: false, kind: "missing", hash: null };
-  const stats = lstatSync(target);
-  if (stats.isSymbolicLink()) {
-    throw new DependencyTransactionError(`Transaction path must not be a symlink: ${normalized}`);
+  let parent;
+  try {
+    parent = openOwnedDirectoryBinding(
+      projectRoot,
+      path.dirname(target),
+      `transaction input ${normalized}`,
+    );
+    const boundTarget = ownedDirectoryChildPath(
+      parent,
+      path.basename(target),
+      `transaction input ${normalized}`,
+    );
+    if (!existsSync(boundTarget)) {
+      return { path: normalized, exists: false, kind: "missing", hash: null };
+    }
+    const stats = lstatSync(boundTarget);
+    if (stats.isSymbolicLink()) {
+      throw new DependencyTransactionError(`Transaction path must not be a symlink: ${normalized}`);
+    }
+    if (stats.isFile()) {
+      const snapshot = readStableOwnedFile(
+        parent,
+        path.basename(target),
+        `transaction input ${normalized}`,
+      );
+      return {
+        path: normalized,
+        exists: true,
+        kind: "file",
+        hash: contentHash(snapshot.buffer),
+      };
+    }
+    if (stats.isDirectory()) {
+      validateOwnedDirectoryBinding(parent, `transaction input ${normalized}`);
+    } else {
+      throw new DependencyTransactionError(`Unsupported transaction input type: ${normalized}`);
+    }
+  } catch (error) {
+    if (error instanceof DependencyTransactionError) throw error;
+    throw new DependencyTransactionError(
+      `Could not safely inspect transaction input ${normalized}: ${error.message}`,
+    );
+  } finally {
+    if (parent) closeOwnedDirectoryBinding(parent);
   }
-  if (stats.isFile()) {
-    const snapshot = stableFileSnapshot(target, normalized);
-    return { path: normalized, exists: true, kind: "file", hash: contentHash(snapshot.content) };
-  }
-  if (stats.isDirectory()) {
-    return {
-      path: normalized,
-      exists: true,
-      kind: "directory",
-      hash: directoryFingerprint(target, normalized),
-    };
-  }
-  throw new DependencyTransactionError(`Unsupported transaction input type: ${normalized}`);
+  return {
+    path: normalized,
+    exists: true,
+    kind: "directory",
+    hash: directoryFingerprint(projectRoot, target, normalized),
+  };
 }
 
 export function verifyInputRecords(projectRoot, records) {
@@ -494,49 +526,59 @@ export function discoverLocalInputs(projectRoot, manifests) {
     });
 }
 
-function copyLocalDirectory(source, target, label) {
-  const sourceStats = lstatSync(source);
-  if (sourceStats.isSymbolicLink() || !sourceStats.isDirectory()) {
+function copyLocalDirectory(projectRoot, source, target, label) {
+  let binding;
+  try {
+    binding = openOwnedDirectoryBinding(projectRoot, source, `local dependency ${label}`);
+    mkdirSync(target, { recursive: true, mode: binding.stats.mode & 0o777 });
+    chmodSync(target, binding.stats.mode & 0o777);
+    for (const name of listOwnedDirectory(binding, `local dependency ${label}`).sort()) {
+      if (ignoredLocalDirectoryEntries.has(name)) continue;
+      const sourceChild = ownedDirectoryChildPath(
+        binding,
+        name,
+        `local dependency ${label}/${name}`,
+      );
+      const targetChild = path.join(target, name);
+      const stats = lstatSync(sourceChild);
+      if (stats.isSymbolicLink()) {
+        throw new DependencyTransactionError(
+          `Local dependency input must not contain symlinks: ${label}/${name}`,
+        );
+      }
+      if (stats.isDirectory()) {
+        copyLocalDirectory(projectRoot, path.join(source, name), targetChild, `${label}/${name}`);
+      } else if (stats.isFile()) {
+        const snapshot = readStableOwnedFile(binding, name, `local dependency ${label}/${name}`);
+        mkdirSync(path.dirname(targetChild), { recursive: true });
+        writeFileSync(targetChild, snapshot.buffer, { mode: snapshot.stats.mode & 0o777 });
+        chmodSync(targetChild, snapshot.stats.mode & 0o777);
+        utimesSync(targetChild, snapshot.stats.atime, snapshot.stats.mtime);
+      } else {
+        throw new DependencyTransactionError(
+          `Local dependency input contains a non-file entry: ${label}/${name}`,
+        );
+      }
+    }
+    validateOwnedDirectoryBinding(binding, `local dependency ${label}`);
+    utimesSync(target, binding.stats.atime, binding.stats.mtime);
+  } catch (error) {
+    if (error instanceof DependencyTransactionError) throw error;
     throw new DependencyTransactionError(
-      `Local dependency input must be a real directory: ${label}`,
+      `Could not safely copy local dependency input ${label}: ${error.message}`,
     );
+  } finally {
+    if (binding) closeOwnedDirectoryBinding(binding);
   }
-  mkdirSync(target, { recursive: true, mode: sourceStats.mode & 0o777 });
-  chmodSync(target, sourceStats.mode & 0o777);
-  for (const name of readdirSync(source).sort()) {
-    if (ignoredLocalDirectoryEntries.has(name)) continue;
-    const sourceChild = path.join(source, name);
-    const targetChild = path.join(target, name);
-    const stats = lstatSync(sourceChild);
-    if (stats.isSymbolicLink()) {
-      throw new DependencyTransactionError(
-        `Local dependency input must not contain symlinks: ${label}/${name}`,
-      );
-    }
-    if (stats.isDirectory()) {
-      copyLocalDirectory(sourceChild, targetChild, `${label}/${name}`);
-    } else if (stats.isFile()) {
-      const snapshot = stableFileSnapshot(sourceChild, `${label}/${name}`);
-      mkdirSync(path.dirname(targetChild), { recursive: true });
-      writeFileSync(targetChild, snapshot.content, { mode: snapshot.mode });
-      chmodSync(targetChild, snapshot.mode);
-      utimesSync(targetChild, snapshot.atime, snapshot.mtime);
-    } else {
-      throw new DependencyTransactionError(
-        `Local dependency input contains a non-file entry: ${label}/${name}`,
-      );
-    }
-  }
-  utimesSync(target, sourceStats.atime, sourceStats.mtime);
 }
 
 export function copyLocalInput(projectRoot, temporaryRoot, record) {
   const source = safeRepositoryPath(projectRoot, record.path);
   const target = safeRepositoryPath(temporaryRoot, record.path, { allowMissing: true });
   mkdirSync(path.dirname(target), { recursive: true });
-  if (record.kind === "directory") copyLocalDirectory(source, target, record.path);
+  if (record.kind === "directory") copyLocalDirectory(projectRoot, source, target, record.path);
   else {
-    const snapshot = stableFileSnapshot(source, record.path);
+    const snapshot = stableFileSnapshot(projectRoot, source, record.path);
     writeFileSync(target, snapshot.content, { mode: snapshot.mode });
     chmodSync(target, snapshot.mode);
     utimesSync(target, snapshot.atime, snapshot.mtime);

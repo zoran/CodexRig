@@ -1,3 +1,4 @@
+/** Verifies setup regression behavior for the setup, launch, and portable project boundary. */
 import assert from "node:assert/strict";
 import {
   chmodSync,
@@ -6,22 +7,32 @@ import {
   mkdirSync,
   readFileSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import { after, test } from "node:test";
+import { parsePortableTomlBootstrap } from "../contracts/portable-toml-bootstrap.mjs";
 import {
   CodexConfigError,
   parseProjectHooks,
   parseProjectAgentConfig,
   parsePortableCodexConfig,
-  subagentModelPolicy,
+  sharedAgentIntelligencePolicy,
   validateCodexConfig,
   validateProjectAgentConfigs,
 } from "./validate-codex-config.mjs";
 import { validateModelCatalog } from "./validate-codex-model-policy.mjs";
 import { renderManagedPrePushHook } from "./install-git-hooks.mjs";
+import {
+  issueRuntimeSessionLease,
+  issueStartupAttestation,
+  startupAttestationPath,
+  startupAttestedInputPaths,
+  startupControlPolicies,
+  startupHookDispatcherPath,
+} from "./startup-attestation.mjs";
 import {
   cleanupTemporaryRoots,
   configFixture,
@@ -49,22 +60,64 @@ const clearedHookEnvironmentNames = [
   "CONTEXT_INDEX_TRACKED_ONLY",
 ];
 
+test("preinstall TOML bootstrap parser is strict and supports the portable config subset", () => {
+  assert.deepEqual(
+    parsePortableTomlBootstrap(`
+name = "fixture # value"
+enabled = true
+items = ["one", 'two']
+developer_instructions = """
+bounded line one
+bounded line two
+"""
+
+[sandbox_workspace_write]
+network_access = false
+`),
+    {
+      name: "fixture # value",
+      enabled: true,
+      items: ["one", "two"],
+      developer_instructions: "bounded line one\nbounded line two\n",
+      sandbox_workspace_write: { network_access: false },
+    },
+  );
+  assert.throws(
+    () => parsePortableTomlBootstrap('name = "one"\nname = "two"\n'),
+    /duplicate key name/,
+  );
+  assert.throws(
+    () => parsePortableTomlBootstrap("unsupported = 1.5\n"),
+    /unsupported portable TOML/,
+  );
+  assert.throws(
+    () => parsePortableTomlBootstrap("name = 'not''a-valid-literal'\n"),
+    /unsupported quote in literal string/,
+  );
+});
+
 after(cleanupTemporaryRoots);
 
 test("Codex config parser accepts only the complete typed portable policy", () => {
   assert.deepEqual(validateCodexConfig(configFixture()), {
-    project_doc_max_bytes: 65_536,
+    developer_instructions:
+      "Act as the primary orchestrator. Keep at most four live agents and never pass a model or reasoning override; all use the exact GPT Sol model with ultra reasoning. Register every owned subagent and background task and leave foreign or ambiguous work untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. At 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.\n",
+    project_doc_max_bytes: 32_768,
     project_doc_fallback_filenames: ["instructions.md"],
-    model_reasoning_effort: "max",
+    model_reasoning_effort: "ultra",
     model_verbosity: "medium",
     web_search: "cached",
     model: "gpt-5.6-sol",
     service_tier: "fast",
     approvals_reviewer: "user",
-    approval_policy: "never",
-    sandbox_mode: "danger-full-access",
+    approval_policy: "on-request",
+    sandbox_mode: "workspace-write",
+    "sandbox_workspace_write.network_access": false,
+    "agents.enabled": true,
+    "agents.default_subagent_model": "gpt-5.6-sol",
+    "agents.default_subagent_reasoning_effort": "ultra",
     "agents.max_concurrent_threads_per_session": 4,
-    "agents.max_depth": 1,
+    "agents.interrupt_message": true,
     "features.hooks": true,
     "features.memories": true,
     "features.network_proxy": true,
@@ -148,12 +201,11 @@ test("Codex config parser accepts only the complete typed portable policy", () =
   );
 
   const customizedProjectDefaults = validPortableConfig
-    .replace('model = "gpt-5.6-sol"', 'model = "gpt-5.6-terra"')
-    .replace('model_reasoning_effort = "max"', 'model_reasoning_effort = "ultra"')
+    .replaceAll('model = "gpt-5.6-sol"', 'model = "gpt-6-sol"')
     .replace("memories = true", "memories = false")
     .replace('theme = "catppuccin-mocha"', 'theme = "light"');
   const customizedPolicy = parsePortableCodexConfig(customizedProjectDefaults);
-  assert.equal(customizedPolicy.model, "gpt-5.6-terra");
+  assert.equal(customizedPolicy.model, "gpt-6-sol");
   assert.equal(customizedPolicy.model_reasoning_effort, "ultra");
 
   const standardTierPolicy = parsePortableCodexConfig(
@@ -164,16 +216,19 @@ test("Codex config parser accepts only the complete typed portable policy", () =
   for (const [label, content, expected] of [
     [
       "commented required value",
-      validPortableConfig.replace('approval_policy = "never"', '# approval_policy = "never"'),
+      validPortableConfig.replace(
+        'approval_policy = "on-request"',
+        '# approval_policy = "on-request"',
+      ),
       /Missing portable project policy keys: approval_policy/,
     ],
     [
       "duplicate contradiction",
       validPortableConfig.replace(
-        'approval_policy = "never"',
-        'approval_policy = "never"\napproval_policy = "on-request"',
+        'approval_policy = "on-request"',
+        'approval_policy = "on-request"\napproval_policy = "never"',
       ),
-      /duplicates key approval_policy/,
+      /valid TOML/,
     ],
     [
       "unknown key",
@@ -182,7 +237,10 @@ test("Codex config parser accepts only the complete typed portable policy", () =
     ],
     [
       "unsupported top-level network access",
-      validPortableConfig.replace("\n[agents]", '\nnetwork_access = "enabled"\n\n[agents]'),
+      validPortableConfig.replace(
+        "\n[sandbox_workspace_write]",
+        '\nnetwork_access = "enabled"\n\n[sandbox_workspace_write]',
+      ),
       /unknown key network_access/,
     ],
     [
@@ -190,14 +248,14 @@ test("Codex config parser accepts only the complete typed portable policy", () =
       validPortableConfig.replace("max_concurrent_threads_per_session = 4", "max_threads = 4"),
       /unknown key agents\.max_threads/,
     ],
-    ["unknown table", `${validPortableConfig}[profiles.local]\n`, /unsupported table/],
+    ["unknown table", `${validPortableConfig}[profiles.local]\n`, /unknown key profiles/],
     [
       "wrong type",
       validPortableConfig.replace(
-        "project_doc_max_bytes = 65536",
-        'project_doc_max_bytes = "65536"',
+        "project_doc_max_bytes = 32768",
+        'project_doc_max_bytes = "32768"',
       ),
-      /non-negative decimal integer/,
+      /outside the portable project policy/,
     ],
     [
       "wrong allowed value",
@@ -207,15 +265,28 @@ test("Codex config parser accepts only the complete typed portable policy", () =
     [
       "unsupported reasoning level",
       validPortableConfig.replace(
-        'model_reasoning_effort = "max"',
+        'model_reasoning_effort = "ultra"',
         'model_reasoning_effort = "high"',
       ),
       /outside the portable project policy/,
     ],
     [
+      "unsupported non-Sol primary model",
+      validPortableConfig.replace('model = "gpt-5.6-sol"', 'model = "gpt-5.6-terra"'),
+      /outside the portable project policy/,
+    ],
+    [
+      "mismatched delegated default",
+      validPortableConfig.replace(
+        'default_subagent_model = "gpt-5.6-sol"',
+        'default_subagent_model = "gpt-6-sol"',
+      ),
+      /agent defaults must use exactly the primary model and reasoning effort/,
+    ],
+    [
       "wrong table value type",
       validPortableConfig.replace("hooks = true", 'hooks = "true"'),
-      /TOML boolean/,
+      /outside the portable project policy/,
     ],
     [
       "disabled lifecycle hooks",
@@ -228,6 +299,21 @@ test("Codex config parser accepts only the complete typed portable policy", () =
       (error) => error instanceof CodexConfigError && expected.test(error.message),
       label,
     );
+  }
+});
+
+test("malformed portable TOML diagnostics never echo source values", () => {
+  const token = `sk-proj-${"x".repeat(32)}`;
+  for (const parser of [parsePortableCodexConfig, parsePortableTomlBootstrap]) {
+    let error;
+    try {
+      parser(`bad = ${token} /tmp/private-config\n`);
+      assert.fail("Malformed TOML was accepted.");
+    } catch (caught) {
+      error = caught;
+    }
+    assert.equal(error.message.includes(token), false);
+    assert.equal(error.message.includes("/tmp/private-config"), false);
   }
 });
 
@@ -257,17 +343,18 @@ test("project hooks enforce exact startup attestation and context-index handlers
   }
 });
 
-test("automatic context-index Stop hook skips bootstrap and reports unsafe state", () => {
+test("automatic context-index Stop hook always runs lifecycle handling and reports unsafe state", () => {
   const script = path.join(root, "scripts", "context", "refresh-context-index-on-stop.mjs");
   const beforeSetup = temporaryRoot("context-stop-before-setup-");
   writeProjectHookFiles(beforeSetup);
   const launcher = path.join(beforeSetup, "scripts", "context", "refresh-context-index-on-stop.sh");
   const skippedWithoutRuntime = run("bash", [launcher], {
     cwd: beforeSetup,
-    env: { CODEX_HOME: beforeSetup, PATH: "/usr/bin:/bin" },
+    env: { CODEX_HOME: beforeSetup, CODEXRIG_PROJECT_ROOT: "", PATH: "/usr/bin:/bin" },
   });
   assert.equal(skippedWithoutRuntime.status, 0, skippedWithoutRuntime.stderr);
-  assert.equal(skippedWithoutRuntime.stdout, "");
+  assert.deepEqual(Object.keys(JSON.parse(skippedWithoutRuntime.stdout)), ["systemMessage"]);
+  assert.match(skippedWithoutRuntime.stdout, /Automatic context index refresh failed/);
   assert.equal(existsSync(path.join(beforeSetup, ".context-index")), false);
 
   const binDirectory = path.join(beforeSetup, "bin");
@@ -311,6 +398,7 @@ test("automatic context-index Stop hook skips bootstrap and reports unsafe state
     env: {
       CAPTURE_PATH: capturePath,
       CODEX_HOME: beforeSetup,
+      CODEXRIG_PROJECT_ROOT: "",
       PATH: `${binDirectory}:/usr/bin:/bin`,
       ...Object.fromEntries(
         clearedHookEnvironmentNames.map((name) => [name, `${beforeSetup}/unsafe-${name}`]),
@@ -334,6 +422,7 @@ test("automatic context-index Stop hook skips bootstrap and reports unsafe state
     env: {
       CAPTURE_PATH: capturePath,
       CODEX_HOME: beforeSetup,
+      CODEXRIG_PROJECT_ROOT: "",
       MISE_ERROR_OUTPUT: `${beforeSetup}/sanitized-worker-warning`,
       MISE_OUTPUT: continuedOutput,
       PATH: `${binDirectory}:/usr/bin:/bin`,
@@ -348,6 +437,7 @@ test("automatic context-index Stop hook skips bootstrap and reports unsafe state
     env: {
       CAPTURE_PATH: capturePath,
       CODEX_HOME: beforeSetup,
+      CODEXRIG_PROJECT_ROOT: "",
       MISE_FAIL: "1",
       PATH: `${binDirectory}:/usr/bin:/bin`,
     },
@@ -390,49 +480,162 @@ test("automatic context-index Stop hook skips bootstrap and reports unsafe state
   assert.equal(reported.stdout.includes(externalIndex), false);
 });
 
-test("project subagent roles fix the second model tier and allow safe bounded overrides", () => {
+test("SessionStart resolves its attested root without inherited launcher state", () => {
+  const fixture = temporaryRoot("startup-executable-closure-");
+  for (const relativePath of startupAttestedInputPaths(root)) {
+    const source = path.join(root, ...relativePath.split("/"));
+    const target = path.join(fixture, ...relativePath.split("/"));
+    mkdirSync(path.dirname(target), { recursive: true });
+    copyFileSync(source, target);
+  }
+  const binDirectory = path.join(fixture, "bin");
+  mkdirSync(binDirectory);
+  for (const [name, version] of [
+    ["codex", "0.147.0"],
+    ["pnpm", "11.22.0"],
+  ]) {
+    const executable = path.join(binDirectory, name);
+    writeFileSync(executable, `#!/bin/sh\nprintf '%s\\n' ${JSON.stringify(version)}\n`, "utf8");
+    chmodSync(executable, 0o755);
+  }
+  const miseExecutable = path.join(binDirectory, "mise");
+  writeFileSync(
+    miseExecutable,
+    '#!/bin/sh\nif [ "$1" != "exec" ] || [ "$2" != "--locked" ] || [ "$3" != "--" ]; then exit 64; fi\nshift 3\nexec "$@"\n',
+    "utf8",
+  );
+  chmodSync(miseExecutable, 0o755);
+
+  const previousPath = process.env.PATH;
+  let issued;
+  try {
+    process.env.PATH = `${binDirectory}${path.delimiter}${previousPath ?? ""}`;
+    issueRuntimeSessionLease({ root: fixture, pid: process.pid });
+    issued = issueStartupAttestation({
+      root: fixture,
+      controlPolicy: startupControlPolicies.default,
+      now: Date.now,
+    });
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+  }
+
+  assert.equal(issued.attestation.schemaVersion, 3);
+  for (const relativePath of [
+    "scripts/contracts/framework-contract.mjs",
+    "scripts/context/context-index-lib.mjs",
+    "scripts/repository/source-inventory.mjs",
+    "scripts/security/secret-patterns.mjs",
+    "scripts/setup/startup-hook-dispatcher.mjs",
+  ]) {
+    assert.ok(Object.hasOwn(issued.attestation.inputs, relativePath), relativePath);
+  }
+  const dispatcher = path.join(fixture, ...startupHookDispatcherPath.split("/"));
+  const attestation = path.join(fixture, ...startupAttestationPath.split("/"));
+  assert.equal(statSync(dispatcher).mode & 0o777, 0o500);
+  assert.equal(statSync(attestation).mode & 0o777, 0o600);
+
+  const sessionStartCommand = parseProjectHooks(
+    readFileSync(path.join(fixture, ".codex", "hooks.json"), "utf8"),
+  ).hooks.SessionStart[0].hooks[0].command;
+  const started = run("bash", ["-c", sessionStartCommand], {
+    cwd: fixture,
+    env: {
+      CODEX_HOME: path.join(fixture, ".codex", "runtime"),
+      CODEXRIG_PROJECT_ROOT: "",
+      CODEXRIG_STARTUP_CONTROL_POLICY: startupControlPolicies.default,
+      CODEXRIG_STARTUP_NONCE: issued.nonce,
+      PATH: `${binDirectory}${path.delimiter}${previousPath ?? ""}`,
+    },
+    input: JSON.stringify({
+      cwd: fixture,
+      hook_event_name: "SessionStart",
+      source: "startup",
+    }),
+  });
+  assert.equal(started.status, 0, started.stderr);
+  assert.equal(JSON.parse(started.stdout).continue, true);
+
+  const mismatchedRoot = temporaryRoot("startup-mismatched-root-");
+  const rejectedMismatch = run("bash", ["-c", sessionStartCommand], {
+    cwd: fixture,
+    env: {
+      CODEX_HOME: path.join(fixture, ".codex", "runtime"),
+      CODEXRIG_PROJECT_ROOT: mismatchedRoot,
+      CODEXRIG_STARTUP_CONTROL_POLICY: startupControlPolicies.default,
+      CODEXRIG_STARTUP_NONCE: issued.nonce,
+      PATH: `${binDirectory}${path.delimiter}${previousPath ?? ""}`,
+    },
+    input: JSON.stringify({
+      cwd: fixture,
+      hook_event_name: "SessionStart",
+      source: "startup",
+    }),
+  });
+  assert.equal(rejectedMismatch.status, 0, rejectedMismatch.stderr);
+  assert.equal(JSON.parse(rejectedMismatch.stdout).continue, false);
+
+  const changedHelper = path.join(fixture, "scripts", "contracts", "framework-contract.mjs");
+  writeFileSync(changedHelper, `${readFileSync(changedHelper, "utf8")}\n`, "utf8");
+  const stopped = run(process.execPath, [dispatcher, "stop"], {
+    cwd: fixture,
+    env: {
+      CODEX_HOME: path.join(fixture, ".codex", "runtime"),
+      CODEXRIG_PROJECT_ROOT: fixture,
+      CODEXRIG_STARTUP_NONCE: issued.nonce,
+    },
+    input: "{}",
+  });
+  assert.equal(stopped.status, 0, stopped.stderr);
+  assert.match(JSON.parse(stopped.stdout).systemMessage, /issue-time executable snapshot/u);
+});
+
+test("project roles enforce exact Sol/ultra parity with the primary", () => {
   const defaultAgent = readFileSync(path.join(root, ".codex", "agents", "default.toml"), "utf8");
-  assert.equal(parseProjectAgentConfig(defaultAgent, "default").model, subagentModelPolicy.model);
-  assert.throws(
-    () =>
-      parseProjectAgentConfig(
-        defaultAgent.replace('model = "gpt-5.6-terra"', 'model = "gpt-5.6-sol"'),
-        "default",
-      ),
-    /project agent policy for model/,
+  const parsedDefault = parseProjectAgentConfig(defaultAgent, "default");
+  assert.equal(parsedDefault.model, "gpt-5.6-sol");
+  assert.equal(parsedDefault.model_reasoning_effort, sharedAgentIntelligencePolicy.reasoningEffort);
+  assert.equal(
+    parseProjectAgentConfig(
+      defaultAgent.replace('model = "gpt-5.6-sol"', 'model = "gpt-6-sol"'),
+      "default",
+    ).model,
+    "gpt-6-sol",
   );
   assert.throws(
     () =>
       parseProjectAgentConfig(
-        defaultAgent.replace('model = "gpt-5.6-terra"', 'model = "gpt-5.6-luna"'),
+        defaultAgent.replace('model = "gpt-5.6-sol"', 'model = "gpt-5.6-luna"'),
         "default",
       ),
-    /project agent policy for model/,
-  );
-  const boundedReviewer = parseProjectAgentConfig(
-    `${defaultAgent}model_reasoning_effort = "ultra"\nsandbox_mode = "read-only"\n`,
-    "default",
-  );
-  assert.equal(boundedReviewer.model_reasoning_effort, "ultra");
-  assert.equal(boundedReviewer.sandbox_mode, "read-only");
-  assert.throws(
-    () => parseProjectAgentConfig(`${defaultAgent}model_reasoning_effort = "high"\n`, "default"),
-    /project agent policy for model_reasoning_effort/,
+    /supported GPT Sol model matching the primary intelligence/,
   );
   assert.throws(
     () =>
-      parseProjectAgentConfig(`${defaultAgent}sandbox_mode = "danger-full-access"\n`, "default"),
+      parseProjectAgentConfig(
+        defaultAgent.replace('model_reasoning_effort = "ultra"', 'model_reasoning_effort = "high"'),
+        "default",
+      ),
+    /model_reasoning_effort|reasoning effort/u,
+  );
+  assert.throws(
+    () =>
+      parseProjectAgentConfig(
+        defaultAgent.replace('sandbox_mode = "read-only"', 'sandbox_mode = "danger-full-access"'),
+        "default",
+      ),
     /project agent policy for sandbox_mode/,
   );
   assert.throws(
     () =>
       parseProjectAgentConfig(defaultAgent.replace("context:search", "semantic-search"), "default"),
-    /retrieval contract marker context:search/,
+    /orchestration marker context:search/,
   );
   assert.throws(
     () =>
       parseProjectAgentConfig(defaultAgent.replace("matched source", "search result"), "default"),
-    /retrieval contract marker matched source/,
+    /orchestration marker matched source/,
   );
   assert.throws(
     () =>
@@ -443,7 +646,7 @@ test("project subagent roles fix the second model tier and allow safe bounded ov
         ),
         "default",
       ),
-    /retrieval contract marker Before every assigned slice begins/,
+    /orchestration marker Before every assigned slice begins/,
   );
   assert.throws(
     () =>
@@ -451,7 +654,7 @@ test("project subagent roles fix the second model tier and allow safe bounded ov
         defaultAgent.replace("newest relevant primary or official sources", "available sources"),
         "default",
       ),
-    /retrieval contract marker newest relevant primary or official sources/,
+    /orchestration marker newest relevant primary or official sources/,
   );
 
   const fixture = configFixture();
@@ -460,9 +663,44 @@ test("project subagent roles fix the second model tier and allow safe bounded ov
     () => validateProjectAgentConfigs(path.join(fixture, ".codex")),
     /Missing project agent roles: worker/,
   );
+
+  const mismatchedFixture = configFixture();
+  const mismatchedDefaultPath = path.join(mismatchedFixture, ".codex", "agents", "default.toml");
+  writeFileSync(
+    mismatchedDefaultPath,
+    readFileSync(mismatchedDefaultPath, "utf8").replace(
+      'model = "gpt-5.6-sol"',
+      'model = "gpt-6-sol"',
+    ),
+    "utf8",
+  );
+  assert.throws(
+    () => validateCodexConfig(mismatchedFixture),
+    /Agent default must use exactly the primary intelligence gpt-5\.6-sol with ultra reasoning/,
+  );
+
+  const futureFixture = configFixture();
+  const futureConfigPath = path.join(futureFixture, ".codex", "config.toml");
+  writeFileSync(
+    futureConfigPath,
+    readFileSync(futureConfigPath, "utf8").replaceAll(
+      'model = "gpt-5.6-sol"',
+      'model = "gpt-6-sol"',
+    ),
+    "utf8",
+  );
+  for (const role of ["default", "explorer", "worker"]) {
+    const rolePath = path.join(futureFixture, ".codex", "agents", `${role}.toml`);
+    writeFileSync(
+      rolePath,
+      readFileSync(rolePath, "utf8").replace('model = "gpt-5.6-sol"', 'model = "gpt-6-sol"'),
+      "utf8",
+    );
+  }
+  assert.equal(validateCodexConfig(futureFixture).model, "gpt-6-sol");
 });
 
-test("installed model catalog permits only first-tier or second-tier primaries and Terra subagents", () => {
+test("installed model catalog requires the shared future-compatible Sol/ultra intelligence", () => {
   const catalog = {
     models: [
       {
@@ -475,7 +713,7 @@ test("installed model catalog permits only first-tier or second-tier primaries a
         slug: "gpt-5.6-terra",
         priority: 2,
         visibility: "list",
-        supported_reasoning_levels: [{ effort: "xhigh" }, { effort: "max" }, { effort: "ultra" }],
+        supported_reasoning_levels: [{ effort: "medium" }, { effort: "high" }],
       },
       {
         slug: "gpt-5.6-luna",
@@ -483,37 +721,38 @@ test("installed model catalog permits only first-tier or second-tier primaries a
         visibility: "list",
         supported_reasoning_levels: [{ effort: "xhigh" }, { effort: "max" }, { effort: "ultra" }],
       },
+      {
+        slug: "gpt-6-sol",
+        priority: 4,
+        visibility: "list",
+        supported_reasoning_levels: [{ effort: "max" }, { effort: "ultra" }],
+      },
     ],
   };
-  assert.equal(validateModelCatalog(catalog, "gpt-5.6-sol", "xhigh").secondTier, "gpt-5.6-terra");
-  assert.equal(
-    validateModelCatalog(catalog, "gpt-5.6-terra", "xhigh").primaryModel,
-    "gpt-5.6-terra",
-  );
-  assert.throws(() => validateModelCatalog(catalog, "gpt-5.6-luna", "xhigh"), /below or outside/);
-  const terraMissing = structuredClone(catalog);
-  terraMissing.models[1].slug = "gpt-5.6-luna";
+  assert.equal(validateModelCatalog(catalog, "gpt-5.6-sol", "ultra").delegatedModel, "gpt-5.6-sol");
+  assert.equal(validateModelCatalog(catalog, "gpt-6-sol", "ultra").primaryModel, "gpt-6-sol");
   assert.throws(
-    () => validateModelCatalog(terraMissing, "gpt-5.6-sol", "xhigh"),
-    /no longer.*second tier/,
+    () => validateModelCatalog(catalog, "gpt-5.6-terra", "ultra"),
+    /not a supported GPT Sol model/,
   );
-  const defaultEffortMissing = structuredClone(catalog);
-  defaultEffortMissing.models[1].supported_reasoning_levels = [
+  assert.throws(
+    () => validateModelCatalog(catalog, "gpt-5.6-sol", "xhigh"),
+    /Primary and subagent reasoning must remain ultra/,
+  );
+  const primaryMissing = structuredClone(catalog);
+  primaryMissing.models[0].slug = "gpt-5.5-sol";
+  assert.throws(
+    () => validateModelCatalog(primaryMissing, "gpt-5.6-sol", "ultra"),
+    /Configured primary model gpt-5\.6-sol is unavailable/,
+  );
+  const ultraEffortMissing = structuredClone(catalog);
+  ultraEffortMissing.models[0].supported_reasoning_levels = [
     { effort: "xhigh" },
-    { effort: "ultra" },
-  ];
-  assert.throws(
-    () => validateModelCatalog(defaultEffortMissing, "gpt-5.6-sol", "xhigh"),
-    /required reasoning: max/,
-  );
-  const primaryEffortMissing = structuredClone(catalog);
-  primaryEffortMissing.models[0].supported_reasoning_levels = [
     { effort: "max" },
-    { effort: "ultra" },
   ];
   assert.throws(
-    () => validateModelCatalog(primaryEffortMissing, "gpt-5.6-sol", "xhigh"),
-    /configured reasoning effort xhigh.*gpt-5\.6-sol/i,
+    () => validateModelCatalog(ultraEffortMissing, "gpt-5.6-sol", "ultra"),
+    /configured reasoning effort ultra.*gpt-5\.6-sol/i,
   );
 });
 

@@ -1,3 +1,4 @@
+/** Verifies project generator state behavior for the setup, launch, and portable project boundary. */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";

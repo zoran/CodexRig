@@ -1,6 +1,12 @@
+/** Owns adaptive behavior for the repository verification boundary. */
 import { readFileSync } from "node:fs";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import {
+  formatContextError,
+  sanitizeForTerminal,
+  sanitizeMultilineForTerminal,
+} from "../terminal/terminal-output.mjs";
 import {
   buildPlan,
   completeVerificationCommands,
@@ -23,6 +29,7 @@ import {
   rootManifestChangeIsVerifyOnly,
 } from "./verification-git-basis.mjs";
 import { omitAlreadyCoveredPaths } from "./verification-admission.mjs";
+import { resolveDeliveryArtifactBinding } from "./delivery-artifact.mjs";
 import { verificationBasisProfileRisks } from "./verification-risk-profile.mjs";
 import { withVerificationSessionLock } from "./verification-session-lock.mjs";
 
@@ -31,7 +38,9 @@ export { parseArgs };
 export function broadEvidencePlan(plan) {
   return [...plan.readOnlyCommands, ...plan.workspaceCommands]
     .filter((command) =>
-      ["preflight", "broad", "workspace-build", "workspace-test"].includes(command.phase),
+      ["preflight", "broad", "workspace-build", "workspace-test", "delivery"].includes(
+        command.phase,
+      ),
     )
     .map(({ args, artifactOwners = [], executable, key, phase }) => ({
       args,
@@ -65,9 +74,12 @@ function validatePrePushRefs() {
   console.log(`Pre-push commit scope validated: ${scope}.`);
 }
 
-function completeEvidenceCommandPlan(workspaceManifests) {
+function completeEvidenceCommandPlan(workspaceManifests, deliveryBinding) {
   return broadEvidencePlan({
-    readOnlyCommands: completeVerificationCommands(),
+    readOnlyCommands: [
+      ...completeVerificationCommands(),
+      ...(deliveryBinding.verificationCommand ? [deliveryBinding.verificationCommand] : []),
+    ],
     workspaceCommands: workspaceLifecycleCommands(workspaceManifests),
   });
 }
@@ -100,8 +112,13 @@ async function main() {
   }
   const options = parseArgs(argv);
   const execute = async () => {
+    const deliveryBinding = resolveDeliveryArtifactBinding({
+      root: process.cwd(),
+      artifactManifest: options.artifactManifest,
+      targetEnvironment: options.targetEnvironment,
+    });
     const workspaceManifests = discoverWorkspaceManifests();
-    const evidencePlan = completeEvidenceCommandPlan(workspaceManifests);
+    const evidencePlan = completeEvidenceCommandPlan(workspaceManifests, deliveryBinding);
     if (options.mode === "pre-push") {
       if (options.printPlan) {
         await runPlan(
@@ -112,14 +129,26 @@ async function main() {
         );
         return;
       }
-      validateExactCurrentEvidence({ broadPlan: evidencePlan });
+      validateExactCurrentEvidence({
+        broadPlan: evidencePlan,
+        deliveryEnvironment: options.targetEnvironment,
+        artifactManifest: options.artifactManifest,
+      });
       console.log("Exact-current successful verification evidence passed.");
       return;
     }
 
-    const basis = readSuccessfulVerificationBasis({ broadPlan: evidencePlan });
+    const basis = readSuccessfulVerificationBasis({
+      broadPlan: evidencePlan,
+      deliveryEnvironment: options.targetEnvironment,
+      artifactManifest: options.artifactManifest,
+    });
     const discoveredScope = changedScopeForOptions(options, basis);
-    const expectedInputs = currentVerificationEvidenceInputs({ broadPlan: evidencePlan });
+    const expectedInputs = currentVerificationEvidenceInputs({
+      broadPlan: evidencePlan,
+      deliveryEnvironment: options.targetEnvironment,
+      artifactManifest: options.artifactManifest,
+    });
     const changedScope = omitAlreadyCoveredPaths({
       basis,
       changedScope: discoveredScope,
@@ -136,6 +165,7 @@ async function main() {
           currentContent: expectedInputs.rootManifestContent,
         }),
       workspaceManifests,
+      deliveryBinding,
     };
     const plan = buildRiskBoundPlan(options, planDependencies, expectedInputs);
     if (options.printPlan) {
@@ -151,7 +181,11 @@ async function main() {
         plan.workspaceCommands.length > 0)
     ) {
       throw new Error(
-        "Basis-only refresh requires unchanged successful source, plan, runtime, and risk evidence; run normal verification before push.",
+        "Basis-only refresh requires unchanged successful source, plan, runtime, and risk evidence; " +
+          `current admission is ${plan.admission.mode}, Git scope incomplete is ${String(plan.changed.incomplete)}, ` +
+          `and the plan contains ${plan.changed.paths.length} changed path(s), ${plan.readOnlyCommands.length} read-only command(s), ` +
+          `${plan.workspaceCommands.length} workspace command(s). Admission reason: ${plan.admission.reason}. ` +
+          "Run normal verification before push.",
       );
     }
     const expectedGitBasis = changedScope.basis ?? captureVerificationGitBasis();
@@ -163,6 +197,8 @@ async function main() {
         broadPlan: evidencePlan,
         expectedGitBasis,
         expectedInputs,
+        deliveryEnvironment: options.targetEnvironment,
+        artifactManifest: options.artifactManifest,
         successfulCommandKeys: execution.successfulCommandKeys,
       });
       console.log("Successful full verification basis recorded.");
@@ -184,12 +220,14 @@ async function main() {
       expectedBasisToken: basis.token,
       expectedGitBasis,
       expectedInputs,
+      deliveryEnvironment: options.targetEnvironment,
+      artifactManifest: options.artifactManifest,
       successfulCommandKeys: execution.successfulCommandKeys,
     });
     console.log(
       refresh.refreshed
         ? "Successful verification basis advanced through complete focused delta coverage."
-        : `Successful verification basis was not advanced: ${refresh.reason}.`,
+        : `Successful verification basis was not advanced: ${sanitizeMultilineForTerminal(sanitizeForTerminal(refresh.reason), process.cwd())}.`,
     );
     if (!refresh.refreshed) process.exitCode = 1;
   };
@@ -204,9 +242,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     await main();
   } catch (error) {
-    console.error(`Adaptive verification failed: ${error.message}`);
+    console.error(`Adaptive verification failed: ${formatContextError(error, process.cwd())}`);
     if (Array.isArray(error?.findings)) {
-      for (const finding of error.findings) console.error(`- ${finding}`);
+      for (const finding of error.findings) {
+        console.error(
+          `- ${sanitizeMultilineForTerminal(sanitizeForTerminal(finding), process.cwd())}`,
+        );
+      }
     }
     process.exitCode = 1;
   }

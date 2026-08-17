@@ -1,3 +1,4 @@
+/** Owns resolve git hooks path behavior for the setup, launch, and portable project boundary. */
 import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";

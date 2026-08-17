@@ -1,3 +1,4 @@
+/** Owns web quality scan behavior for the public web quality boundary. */
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import {

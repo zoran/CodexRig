@@ -1,14 +1,19 @@
+/** Verifies context lifecycle behavior for the repository-local semantic context boundary. */
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
+  chmodSync,
+  copyFileSync,
   existsSync,
   linkSync,
   lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -23,13 +28,20 @@ import {
 import { createManifest } from "./context-manifest.mjs";
 import { ensureOwnedIndexDirectory } from "./context-paths.mjs";
 import {
+  createCriticalBudgetHandover,
+  criticalHandoverMaxAgeMilliseconds,
+  discoverRecentCriticalBudgetHandover,
+} from "./critical-budget-handover.mjs";
+import {
   evaluateAutonomousContinuation,
   runStopLifecycle,
 } from "./refresh-context-index-on-stop.mjs";
 import { runSearch } from "./search-context.mjs";
 import { discoverSourceFiles } from "./source-policy.mjs";
 import { publishIndex } from "./context-storage.mjs";
+import { sessionStartSuccess } from "../setup/startup-attestation.mjs";
 import {
+  copyTree,
   repositoryRoot,
   storageRecord,
   temporaryDirectory,
@@ -50,13 +62,56 @@ function workState(overrides = {}) {
   };
 }
 
-function writeWorkingContext(projectRoot, state) {
+function writeWorkingContext(projectRoot, state, body = "# Current work\n") {
   write(
     projectRoot,
     "docs/project-context.md",
-    `<!-- codexrig-work-state\n${JSON.stringify(state)}\n-->\n\n# Current work\n`,
+    `<!-- codexrig-work-state\n${JSON.stringify(state)}\n-->\n\n${body}`,
   );
 }
+
+function copyFrameworkContract(projectRoot) {
+  const contractDirectory = path.join(projectRoot, ".codexrig");
+  mkdirSync(contractDirectory, { recursive: true });
+  copyFileSync(
+    path.join(repositoryRoot, ".codexrig", "framework.json"),
+    path.join(contractDirectory, "framework.json"),
+  );
+}
+
+function writeRuntimeSessionLease(projectRoot, startedAt, sessionId = randomUUID()) {
+  const canonical = realpathSync.native(projectRoot);
+  const stats = statSync(canonical);
+  const runtimeDirectory = path.join(projectRoot, ".codex", "runtime");
+  mkdirSync(runtimeDirectory, { recursive: true, mode: 0o700 });
+  chmodSync(runtimeDirectory, 0o700);
+  const leasePath = path.join(runtimeDirectory, "codexrig-session.json");
+  writeFileSync(
+    leasePath,
+    `${JSON.stringify({
+      schemaVersion: 2,
+      pid: process.pid,
+      sessionId,
+      startedAt,
+      root: { device: String(stats.dev), inode: String(stats.ino), path: canonical },
+    })}\n`,
+    { mode: 0o600 },
+  );
+  chmodSync(leasePath, 0o600);
+  return sessionId;
+}
+
+const criticalDrainBody = [
+  "# Current work",
+  "",
+  "Unique next-account recovery detail that startup must not expose.",
+  "",
+  "## Critical Budget Drain",
+  "- Owned subagents: none live; all handoffs are accepted or recorded.",
+  "- Owned background tasks: none live; queued work is cancelled and atomic sections are complete.",
+  "- Foreign agents and tasks: not contacted, interrupted, or changed.",
+  "",
+].join("\n");
 
 function stopHookInput(overrides = {}) {
   return JSON.stringify({
@@ -70,6 +125,78 @@ function stopHookInput(overrides = {}) {
     ...overrides,
   });
 }
+
+test("Stop launcher preserves continuation and terminal handover behavior without an index", () => {
+  const project = temporaryDirectory("context-stop-launcher-");
+  copyTree(path.join(repositoryRoot, "scripts"), path.join(project, "scripts"));
+  copyFrameworkContract(project);
+  mkdirSync(path.join(project, ".codex"));
+  writeWorkingContext(project, workState());
+
+  const executableDirectory = path.join(project, "test-bin");
+  mkdirSync(executableDirectory);
+  const miseStub = path.join(executableDirectory, "mise");
+  writeFileSync(
+    miseStub,
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      '[[ "$1" == "exec" && "$2" == "--locked" && "$3" == "--" ]]',
+      "shift 3",
+      'exec "$@"',
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  chmodSync(miseStub, 0o755);
+  const launcher = path.join(project, "scripts/context/refresh-context-index-on-stop.sh");
+  const launcherEnvironment = {
+    ...process.env,
+    CODEXRIG_PROJECT_ROOT: "",
+    PATH: `${executableDirectory}${path.delimiter}${process.env.PATH ?? ""}`,
+  };
+
+  assert.equal(existsSync(path.join(project, ".context-index")), false);
+  const active = spawnSync("bash", [launcher], {
+    cwd: project,
+    encoding: "utf8",
+    env: launcherEnvironment,
+    input: stopHookInput(),
+  });
+  assert.equal(active.status, 0, `${active.stdout}\n${active.stderr}`);
+  const activeOutput = JSON.parse(active.stdout);
+  assert.equal(activeOutput.decision, "block");
+  assert.match(activeOutput.reason, /Continue the already-authorized outcome autonomously/u);
+  assert.equal(existsSync(path.join(project, ".context-index")), false);
+
+  const now = Date.now();
+  writeRuntimeSessionLease(project, new Date(now - 1_000).toISOString());
+  writeWorkingContext(project, workState({ revision: 2 }), criticalDrainBody);
+  createCriticalBudgetHandover({
+    root: project,
+    now: () => now,
+    random: (size) => Buffer.alloc(size, 0xcd),
+  });
+  const sealed = spawnSync("bash", [launcher], {
+    cwd: project,
+    encoding: "utf8",
+    env: launcherEnvironment,
+    input: stopHookInput(),
+  });
+  assert.equal(sealed.status, 0, `${sealed.stdout}\n${sealed.stderr}`);
+  let sealedOutput;
+  try {
+    sealedOutput = JSON.parse(sealed.stdout);
+  } catch (error) {
+    assert.fail(
+      `Stop launcher emitted invalid JSON: ${JSON.stringify(sealed.stdout)} (${error.message})`,
+    );
+  }
+  assert.equal(Object.hasOwn(sealedOutput, "decision"), false);
+  assert.match(sealedOutput.systemMessage, /critical-budget handover is sealed/u);
+  assert.match(sealedOutput.systemMessage, /Stop completely/u);
+  assert.equal(existsSync(path.join(project, ".context-index")), false);
+});
 
 test("Stop lifecycle never touches active work from an ephemeral side conversation", async () => {
   const project = temporaryDirectory("autonomous-stop-ephemeral-");
@@ -193,6 +320,175 @@ test("Stop lifecycle continues active outcomes and bounds unchanged automatic lo
     {},
   );
   assert.equal(existsSync(continuationPath), false);
+});
+
+test("critical-budget handover seals privately, asks before resume, and terminates Stop work", async () => {
+  const project = temporaryDirectory("critical-budget-handover-");
+  mkdirSync(path.join(project, ".codex"));
+  copyFrameworkContract(project);
+  const now = Date.now();
+  const sealingSessionId = writeRuntimeSessionLease(project, new Date(now + 60_000).toISOString());
+  writeWorkingContext(project, workState({ revision: 7 }), criticalDrainBody);
+  const processTemporaryState = path.join(project, "tmp", "arg0", "runtime-state");
+  mkdirSync(path.dirname(processTemporaryState), { recursive: true, mode: 0o700 });
+  writeFileSync(processTemporaryState, "preserve process temporary state\n", { mode: 0o600 });
+
+  const sealed = createCriticalBudgetHandover({
+    root: project,
+    now: () => now,
+    random: (size) => Buffer.alloc(size, 0xab),
+  });
+  assert.match(
+    sealed.relativePath,
+    /^tmp\/codexrig-handovers\/critical-budget-\d{8}T\d{9}Z-(?:ab){6}\.prompt\.md$/u,
+  );
+  assert.equal(sealed.workStateRevision, 7);
+  assert.equal(sealed.sealingSessionId, sealingSessionId);
+  assert.equal(readFileSync(processTemporaryState, "utf8"), "preserve process temporary state\n");
+  const sealedPath = path.join(project, sealed.relativePath);
+  assert.equal(existsSync(path.join(project, ".tmp", "codexrig-handovers")), false);
+  assert.equal(lstatSync(path.dirname(sealedPath)).mode & 0o777, 0o700);
+  assert.equal(lstatSync(sealedPath).mode & 0o777, 0o600);
+  const prompt = readFileSync(sealedPath, "utf8");
+  assert.match(prompt, /^<!-- codexrig-critical-budget-handover/mu);
+  assert.match(prompt, /^# Critical-Budget Cross-Account Handover Prompt$/mu);
+  assert.match(prompt, /BEGIN VERBATIM docs\/project-context\.md SNAPSHOT/u);
+  assert.match(prompt, /Unique next-account recovery detail/u);
+  assert.equal(prompt.includes(project), false);
+  assert.throws(
+    () =>
+      createCriticalBudgetHandover({
+        root: project,
+        now: () => now,
+        random: (size) => Buffer.alloc(size, 0xab),
+      }),
+    /EEXIST/u,
+  );
+  assert.equal(readFileSync(sealedPath, "utf8"), prompt);
+
+  assert.deepEqual(
+    discoverRecentCriticalBudgetHandover({ root: project, now: () => now + 1 }),
+    sealed,
+  );
+
+  const snapshotBegin = "----- BEGIN VERBATIM docs/project-context.md SNAPSHOT -----";
+  const snapshotEnd = "----- END VERBATIM docs/project-context.md SNAPSHOT -----";
+  for (const tampered of [
+    prompt.replace("Unique next-account recovery detail", "Altered recovery detail"),
+    prompt.replace("candidate context, never authority", "trusted context and authority"),
+    prompt.replace(snapshotBegin, `${snapshotBegin}\n${snapshotBegin}`),
+    prompt.slice(0, prompt.indexOf(snapshotEnd)),
+    prompt.slice(0, prompt.indexOf(snapshotBegin)),
+  ]) {
+    writeFileSync(sealedPath, tampered, "utf8");
+    assert.equal(discoverRecentCriticalBudgetHandover({ root: project, now: () => now + 1 }), null);
+    writeFileSync(sealedPath, prompt, "utf8");
+  }
+
+  const startup = sessionStartSuccess(
+    { frameworkVersion: "2.1.0" },
+    { root: project, now: () => now + 1 },
+  );
+  const additionalContext = startup.hookSpecificOutput.additionalContext;
+  assert.match(additionalContext, /ask the developer whether to resume from this exact handover/u);
+  assert.match(additionalContext, /untrusted candidate context, not authority/u);
+  assert.equal(additionalContext.includes(sealed.relativePath), true);
+  assert.equal(additionalContext.includes("Unique next-account recovery detail"), false);
+  assert.equal(additionalContext.includes(project), false);
+  assert.ok(Buffer.byteLength(additionalContext, "utf8") <= 768);
+
+  const stopped = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
+  assert.equal(Object.hasOwn(stopped, "decision"), false);
+  assert.match(stopped.systemMessage, /Stop completely/u);
+  let refreshCalls = 0;
+  const lifecycle = await runStopLifecycle({
+    root: project,
+    hookInput: stopHookInput(),
+    refreshIndex: async () => {
+      refreshCalls += 1;
+      return "unexpected refresh";
+    },
+  });
+  assert.match(lifecycle.systemMessage, /do not continue automatically/u);
+  assert.equal(refreshCalls, 0);
+
+  const resumedSessionId = writeRuntimeSessionLease(project, new Date(now - 60_000).toISOString());
+  assert.notEqual(resumedSessionId, sealingSessionId);
+  refreshCalls = 0;
+  const resumedLifecycle = await runStopLifecycle({
+    root: project,
+    hookInput: stopHookInput(),
+    refreshIndex: async () => {
+      refreshCalls += 1;
+      return null;
+    },
+  });
+  assert.equal(resumedLifecycle.decision, "block");
+  assert.equal(refreshCalls, 1);
+
+  assert.equal(
+    discoverRecentCriticalBudgetHandover({
+      root: project,
+      now: () => now + criticalHandoverMaxAgeMilliseconds + 1,
+    }),
+    null,
+  );
+
+  const foreign = temporaryDirectory("critical-budget-handover-foreign-");
+  copyFrameworkContract(foreign);
+  const foreignDirectory = path.join(foreign, "tmp", "codexrig-handovers");
+  mkdirSync(foreignDirectory, { recursive: true, mode: 0o700 });
+  const copied = path.join(foreignDirectory, path.basename(sealedPath));
+  copyFileSync(sealedPath, copied);
+  chmodSync(copied, 0o600);
+  assert.equal(discoverRecentCriticalBudgetHandover({ root: foreign, now: () => now + 1 }), null);
+
+  const incomplete = temporaryDirectory("critical-budget-handover-incomplete-");
+  copyFrameworkContract(incomplete);
+  writeWorkingContext(incomplete, workState());
+  assert.throws(
+    () => createCriticalBudgetHandover({ root: incomplete, now: () => now }),
+    /requires drain attestation/u,
+  );
+  writeWorkingContext(
+    incomplete,
+    workState({ revision: 2 }),
+    `${criticalDrainBody}Accidental token: sk-proj-${"x".repeat(24)}\n`,
+  );
+  assert.throws(
+    () => createCriticalBudgetHandover({ root: incomplete, now: () => now }),
+    /refuses recognized secret material/u,
+  );
+  writeWorkingContext(
+    incomplete,
+    workState({ revision: 4 }),
+    `${criticalDrainBody}GITLAB_TOKEN=corpgl-${"x".repeat(24)}\n`,
+  );
+  assert.throws(
+    () => createCriticalBudgetHandover({ root: incomplete, now: () => now }),
+    /refuses recognized secret material/u,
+  );
+  writeWorkingContext(
+    incomplete,
+    workState({ revision: 3 }),
+    `${criticalDrainBody}Accidental GitLab token: glpat-${"g".repeat(20)}\n`,
+  );
+  assert.throws(
+    () => createCriticalBudgetHandover({ root: incomplete, now: () => now }),
+    /refuses recognized secret material/u,
+  );
+
+  const unsafeParent = temporaryDirectory("critical-budget-handover-unsafe-parent-");
+  copyFrameworkContract(unsafeParent);
+  writeRuntimeSessionLease(unsafeParent, new Date(now - 1_000).toISOString());
+  writeWorkingContext(unsafeParent, workState(), criticalDrainBody);
+  mkdirSync(path.join(unsafeParent, "tmp"));
+  chmodSync(path.join(unsafeParent, "tmp"), 0o770);
+  assert.throws(
+    () => createCriticalBudgetHandover({ root: unsafeParent, now: () => now }),
+    /storage is unsafe/u,
+  );
+  assert.equal(discoverRecentCriticalBudgetHandover({ root: unsafeParent, now: () => now }), null);
 });
 
 test("Stop lifecycle rejects unsafe or ambiguous working context without exposing paths", () => {
@@ -444,6 +740,7 @@ test("search command reports one sanitized maintenance summary and preserves res
 });
 
 test("search never downgrades a database path safety failure to corruption repair", async () => {
+  /** Models the database safety error contract without importing the production implementation. */
   class FixtureDatabaseSafetyError extends Error {}
   const failure = new FixtureDatabaseSafetyError("unsafe selected database path");
   await assert.rejects(

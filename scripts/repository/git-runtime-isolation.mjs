@@ -1,3 +1,4 @@
+/** Owns git runtime isolation behavior for the repository inventory and filesystem boundary. */
 import { spawnSync } from "node:child_process";
 import {
   closeSync,

@@ -1,3 +1,4 @@
+/** Owns context regression helpers behavior for the repository-local semantic context boundary. */
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";

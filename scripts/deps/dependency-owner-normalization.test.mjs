@@ -1,3 +1,4 @@
+/** Verifies dependency owner normalization behavior for the dependency and toolchain maintenance boundary. */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -17,7 +18,12 @@ import {
   prepareDependencyPlan,
   updatedDependencySpec,
 } from "./dependency-transaction.mjs";
-import { formatPlannedDependencyUpdate, selectDependencyEntries } from "./update.mjs";
+import {
+  formatPlannedDependencyUpdate,
+  parseDependencyUpdateArgs,
+  selectDependencyEntries,
+} from "./update.mjs";
+import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
 
 const temporaryRoots = [];
 
@@ -63,21 +69,7 @@ function workspaceFixture() {
   });
   writeFileSync(path.join(root, "dependency-policy.json"), '{"pins":[]}\n', "utf8");
   writeFileSync(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\nold: true\n");
-  const projects = [
-    root,
-    path.join(root, "packages/anonymous"),
-    path.join(root, "packages/domain"),
-    path.join(root, "packages/protocol"),
-  ].map((projectPath) => ({ path: projectPath }));
-  const manifests = packageManifests({
-    repositoryRoot: root,
-    spawnPnpm: (executable, args, options) => {
-      assert.equal(executable, "pnpm");
-      assert.deepEqual(args, ["--recursive", "list", "--depth", "-1", "--json"]);
-      assert.equal(options.cwd, root);
-      return { status: 0, stdout: JSON.stringify(projects), stderr: "" };
-    },
-  });
+  const manifests = packageManifests({ repositoryRoot: root });
   return { root, manifests };
 }
 
@@ -113,6 +105,31 @@ function capturedFailure(action) {
   assert.fail("expected action to fail");
 }
 
+test("documented pnpm argument separator preserves dependency update options", () => {
+  assert.deepEqual(
+    parseDependencyUpdateArgs([
+      "--",
+      "--select",
+      "package.json:devDependencies:@lancedb/lancedb",
+      "--level",
+      "major",
+      "--allow-major",
+      "--yes",
+      "--plan-hash",
+      "a".repeat(64),
+    ]),
+    {
+      level: "major",
+      select: ["package.json:devDependencies:@lancedb/lancedb"],
+      yes: true,
+      allowMajor: true,
+      includePinned: false,
+      planHash: "a".repeat(64),
+    },
+  );
+  assert.throws(() => parseDependencyUpdateArgs(["--yes"]), /--yes requires the exact --plan-hash/);
+});
+
 test("workspace inventory includes only root and declared pnpm workspace manifests", () => {
   const fixture = workspaceFixture();
   assert.deepEqual(
@@ -126,28 +143,43 @@ test("workspace inventory includes only root and declared pnpm workspace manifes
   );
 });
 
-test("workspace graph locations outside the root or through symlinks fail closed", () => {
+test("dependency subprocesses receive an allowlisted environment without ambient selectors", () => {
+  const environment = pnpmHooksDisabledEnvironment({
+    BASH_ENV: "/tmp/attack",
+    HOME: "/safe/home",
+    NODE_AUTH_TOKEN: "registry-token",
+    NODE_OPTIONS: "--require=/tmp/preload.cjs",
+    NPM_CONFIG_FILTER: "hidden",
+    PATH: "/safe/bin",
+    PNPM_CONFIG_FILTER: "hidden",
+    PNPM_HOME: "/unsafe/semantic-input",
+  });
+  assert.equal(environment.BASH_ENV, undefined);
+  assert.equal(environment.NODE_OPTIONS, undefined);
+  assert.equal(environment.NPM_CONFIG_FILTER, undefined);
+  assert.equal(environment.PNPM_CONFIG_FILTER, undefined);
+  assert.equal(environment.PNPM_HOME, undefined);
+  assert.equal(environment.HOME, "/safe/home");
+  assert.equal(environment.NODE_AUTH_TOKEN, "registry-token");
+  assert.equal(environment.PATH, "/safe/bin");
+  assert.equal(environment.PNPM_CONFIG_IGNORE_PNPMFILE, "true");
+});
+
+test("workspace discovery excludes undeclared packages and rejects symlinked manifests", () => {
   const fixture = workspaceFixture();
-  const outside = mkdtempSync(path.join(os.tmpdir(), "dependency-graph-outside-"));
-  temporaryRoots.push(outside);
-  writeJson(outside, "package.json", { name: "outside" });
   const alias = path.join(fixture.root, "packages/domain-alias");
   symlinkSync(path.join(fixture.root, "packages/domain"), alias);
-  const manifestsFor = (projectPath) =>
+  assert.equal(
+    fixture.manifests.some((manifest) => manifest.relativePath === "fixtures/rogue/package.json"),
+    false,
+  );
+  const symlinkFailure = capturedFailure(() =>
     packageManifests({
       repositoryRoot: fixture.root,
-      spawnPnpm: () => ({
-        status: 0,
-        stdout: JSON.stringify([{ path: fixture.root }, { path: projectPath }]),
-        stderr: "",
-      }),
-    });
-
-  const outsideFailure = capturedFailure(() => manifestsFor(outside));
-  assert.match(outsideFailure.message, /outside the repository/);
-  assert.equal(outsideFailure.message.includes(outside), false);
-  const symlinkFailure = capturedFailure(() => manifestsFor(alias));
-  assert.match(symlinkFailure.message, /non-real project location/);
+      relativePaths: ["package.json", "pnpm-workspace.yaml", "packages/domain-alias/package.json"],
+    }),
+  );
+  assert.match(symlinkFailure.message, /symbolic link/);
   assert.equal(symlinkFailure.message.includes(alias), false);
 });
 
@@ -631,14 +663,18 @@ test("a selected transaction changes only its canonical manifest identity", () =
     path.join(fixture.root, "packages/protocol/package.json"),
     "utf8",
   );
-  prepareDependencyPlan({
+  const { plan } = prepareDependencyPlan({
     projectRoot: fixture.root,
     request,
     updates: [update],
     manifestPaths: fixture.manifests.map((manifest) => manifest.relativePath),
     lockfilePlanner: () => "lockfileVersion: '9.0'\nplanned: true\n",
   });
-  const applied = applyStoredDependencyPlan({ projectRoot: fixture.root, request });
+  const applied = applyStoredDependencyPlan({
+    projectRoot: fixture.root,
+    request,
+    planHash: plan.hash,
+  });
 
   assert.deepEqual(applied.changed, ["packages/domain/package.json"]);
   assert.equal(

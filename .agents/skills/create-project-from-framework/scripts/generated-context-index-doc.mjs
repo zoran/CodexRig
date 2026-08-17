@@ -1,3 +1,4 @@
+/** Owns generated context index doc behavior for the portable clean-project generation boundary. */
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 

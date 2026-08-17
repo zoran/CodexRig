@@ -1,6 +1,29 @@
 {
-  "schemaVersion": 1,
-  "reviewedOn": "2026-08-07",
+  "schemaVersion": 2,
+  "reviewedOn": "2026-08-17",
+  "ci": {
+    "codexNpmPackage": "@openai/codex",
+    "codexNpmPackageIntegrity": "sha512-EQLEXecAG2ptxI7UpBMo2TR/ga5596/c/OsYF/0LoUDh5JANZ7IoGqlzBEWbuEVQ76JePIbtTW/ihCkp1a7Z3w==",
+    "codexNpmPlatformIntegrities": {
+      "x64": "sha512-0W9MBxPpWW0cSkNqrTDN2jR7rzzT7oNMhQY5446lT2Lw5cz5yhDTck4Va9rjkQEm+HlFzP/dmEMSZbXfJsINmw==",
+      "arm64": "sha512-SLC1JXw2TYfr/c3HhrJubyyLelq7vTOLWVmiThFA+z0+WgzCPmaseJ/kzDD3Gge/TO7fCnnj7UcPmC0d2c8XAg=="
+    },
+    "codexNpmPlatformPackages": {
+      "x64": "@openai/codex-linux-x64",
+      "arm64": "@openai/codex-linux-arm64"
+    },
+    "codexVersion": "0.147.0",
+    "miseLinuxX64Sha256": "96f6f1f416d868b78addd22746eefc7f4bf7820c6a3afa392a9f653f708c1644",
+    "miseNpmPackageIntegrities": {
+      "x64": "sha512-FNEhITXrJmfmYfGsQTfldJGiqTXr3JEQlFMTPV0XJyFI7FP/3kOssgFgSkMOlNqJCT3qFqETi0kCO3PsYx9qUw==",
+      "arm64": "sha512-MOg3B92G0c1xu2wZX5wuJXSpNagxCu9HAv+tfDn+Rp9UF2sO1CVC7UAPOMcp49UNvcLqH9PeoPsMxIy0dC9FNQ=="
+    },
+    "miseNpmPackages": {
+      "x64": "@jdxcode/mise-linux-x64",
+      "arm64": "@jdxcode/mise-linux-arm64"
+    },
+    "miseVersion": "2026.8.6"
+  },
   "stable": {
     "node": {
       "version": "24.19.0",
@@ -8,8 +31,8 @@
       "channel": "lts"
     },
     "pnpm": {
-      "version": "11.20.0",
-      "range": ">=11.20.0 <12.0.0",
+      "version": "11.22.0",
+      "range": ">=11.22.0 <12.0.0",
       "channel": "latest-11"
     },
     "codex": {
@@ -22,7 +45,7 @@
       "id": "next-node-lts",
       "description": "Node.js 26 before its October 2026 LTS transition",
       "node": "26",
-      "pnpm": "11.20.0",
+      "pnpm": "11.22.0",
       "codex": "latest",
       "required": false
     },
@@ -38,7 +61,7 @@
       "id": "next-codex",
       "description": "The Codex CLI alpha channel on the stable toolchain",
       "node": "24.19.0",
-      "pnpm": "11.20.0",
+      "pnpm": "11.22.0",
       "codex": "alpha",
       "required": false
     }

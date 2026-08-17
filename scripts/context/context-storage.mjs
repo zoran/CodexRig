@@ -1,3 +1,4 @@
+/** Owns context storage behavior for the repository-local semantic context boundary. */
 import { randomUUID } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";

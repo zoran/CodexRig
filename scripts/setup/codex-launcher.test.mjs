@@ -1,3 +1,4 @@
+/** Verifies codex launcher behavior for the setup, launch, and portable project boundary. */
 import assert from "node:assert/strict";
 import {
   chmodSync,
@@ -35,10 +36,20 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
   const setupDirectory = path.join(fixture, "scripts", "setup");
   const dependencyDirectory = path.join(fixture, "scripts", "deps");
   const frameworkDirectory = path.join(fixture, "scripts", "framework");
+  const contractDirectory = path.join(fixture, "scripts", "contracts");
+  const repositoryDirectory = path.join(fixture, "scripts", "repository");
+  const securityDirectory = path.join(fixture, "scripts", "security");
+  const terminalDirectory = path.join(fixture, "scripts", "terminal");
+  const verifyDirectory = path.join(fixture, "scripts", "verify");
   const binDirectory = path.join(fixture, "bin");
   mkdirSync(setupDirectory, { recursive: true });
   mkdirSync(dependencyDirectory, { recursive: true });
   mkdirSync(frameworkDirectory, { recursive: true });
+  mkdirSync(contractDirectory, { recursive: true });
+  mkdirSync(repositoryDirectory, { recursive: true });
+  mkdirSync(securityDirectory, { recursive: true });
+  mkdirSync(terminalDirectory, { recursive: true });
+  mkdirSync(verifyDirectory, { recursive: true });
   mkdirSync(path.join(fixture, ".codex"), { recursive: true });
   writeFileSync(path.join(fixture, ".codex", "config.toml"), validPortableConfig, "utf8");
   writeProjectHookFiles(fixture);
@@ -59,14 +70,43 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     path.join(dependencyDirectory, "install-compatible.mjs"),
   );
   copyFileSync(
+    path.join(root, "scripts/deps/verify-pnpm-execution-policy.mjs"),
+    path.join(dependencyDirectory, "verify-pnpm-execution-policy.mjs"),
+  );
+  copyFileSync(
+    path.join(root, "scripts/verify/licensing.mjs"),
+    path.join(verifyDirectory, "licensing.mjs"),
+  );
+  copyFileSync(
     path.join(root, "scripts/framework/framework-doctor.mjs"),
     path.join(frameworkDirectory, "framework-doctor.mjs"),
   );
   for (const name of [
     "startup-attestation.mjs",
+    "validate-codex-config.mjs",
+    "validate-codex-model-policy.mjs",
     "verify-startup-attestation-on-session-start.sh",
   ]) {
     copyFileSync(path.join(root, "scripts/setup", name), path.join(setupDirectory, name));
+  }
+  copyFileSync(
+    path.join(root, "scripts/contracts/portable-toml-bootstrap.mjs"),
+    path.join(contractDirectory, "portable-toml-bootstrap.mjs"),
+  );
+  copyFileSync(
+    path.join(root, "scripts/security/secret-patterns.mjs"),
+    path.join(securityDirectory, "secret-patterns.mjs"),
+  );
+  copyFileSync(
+    path.join(root, "scripts/terminal/terminal-output.mjs"),
+    path.join(terminalDirectory, "terminal-output.mjs"),
+  );
+  for (const name of [
+    "git-runtime-isolation.mjs",
+    "source-inventory-policy.mjs",
+    "source-inventory.mjs",
+  ]) {
+    copyFileSync(path.join(root, "scripts/repository", name), path.join(repositoryDirectory, name));
   }
   chmodSync(launcher, 0o755);
 
@@ -81,6 +121,14 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     [
       "#!/usr/bin/env bash",
       "set -euo pipefail",
+      '[[ "${NPM_CONFIG_IGNORE_PNPMFILE:-}" == "true" ]] || exit 87',
+      '[[ "${PNPM_CONFIG_IGNORE_PNPMFILE:-}" == "true" ]] || exit 88',
+      '[[ "${npm_config_ignore_pnpmfile:-}" == "true" ]] || exit 89',
+      '[[ "${pnpm_config_ignore_pnpmfile:-}" == "true" ]] || exit 90',
+      'if [[ "$*" == "debug models --bundled" ]]; then',
+      '  printf \'%s\\n\' \'{"models":[{"slug":"gpt-5.6-sol","visibility":"list","priority":1,"supported_reasoning_levels":[{"effort":"ultra"}]}]}\'',
+      "  exit 0",
+      "fi",
       "{",
       "  printf 'CALL\\0'",
       "  printf '%s\\0' \"${CODEX_HOME:-<unset>}\"",
@@ -100,7 +148,7 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
       "  exit 91",
       "fi",
       'case "${CODEXRIG_STARTUP_CONTROL_POLICY:-}" in',
-      "  interactive-v1:none | interactive-v1:no-alt-screen) ;;",
+      "  interactive-v2:safe-defaults | interactive-v2:no-alt-screen | dev-yolo-v1:default-screen | dev-yolo-v1:no-alt-screen) ;;",
       "  *) printf 'missing startup control policy\\n' >&2; exit 92 ;;",
       "esac",
       'exit "${FAKE_CODEX_START_STATUS:-0}"',
@@ -115,6 +163,10 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     [
       "#!/usr/bin/env bash",
       "set -euo pipefail",
+      '[[ "${NPM_CONFIG_IGNORE_PNPMFILE:-}" == "true" ]] || exit 93',
+      '[[ "${PNPM_CONFIG_IGNORE_PNPMFILE:-}" == "true" ]] || exit 94',
+      '[[ "${npm_config_ignore_pnpmfile:-}" == "true" ]] || exit 95',
+      '[[ "${pnpm_config_ignore_pnpmfile:-}" == "true" ]] || exit 96',
       'if [[ -n "${MISE_CAPTURE_PATH:-}" ]]; then',
       "  {",
       "    printf 'CALL\\0'",
@@ -127,6 +179,12 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
       'if [[ "${FAKE_MISE_FAIL_COMMAND:-}" == "$*" ]]; then',
       '  exit "${FAKE_MISE_STATUS:-1}"',
       "fi",
+      'case "$*" in',
+      '  "exec --locked -- node scripts/setup/validate-codex-config.mjs" | "exec --locked -- node scripts/setup/validate-codex-model-policy.mjs")',
+      "    shift 3",
+      '    exec "$@"',
+      "    ;;",
+      "esac",
       'if [[ "$*" == "exec --locked -- node scripts/setup/startup-attestation.mjs issue --session-pid "* ]]; then',
       "  printf '%s\\n' 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'",
       "fi",
@@ -210,8 +268,13 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     },
   ]);
   const successfulMiseCalls = capturedMiseCalls();
-  assert.deepEqual(successfulMiseCalls.slice(0, 4), [
+  assert.deepEqual(successfulMiseCalls.slice(0, 8), [
     { home: "<unset>", cwd: fixture, args: ["install", "--locked"] },
+    {
+      home: "<unset>",
+      cwd: fixture,
+      args: ["exec", "--locked", "--", "node", "scripts/deps/verify-pnpm-execution-policy.mjs"],
+    },
     {
       home: "<unset>",
       cwd: fixture,
@@ -221,6 +284,21 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
       home: "<unset>",
       cwd: fixture,
       args: ["exec", "--locked", "--", "node", "scripts/deps/install-compatible.mjs"],
+    },
+    {
+      home: "<unset>",
+      cwd: fixture,
+      args: ["exec", "--locked", "--", "node", "scripts/setup/validate-codex-config.mjs"],
+    },
+    {
+      home: "<unset>",
+      cwd: fixture,
+      args: ["exec", "--locked", "--", "node", "scripts/setup/validate-codex-model-policy.mjs"],
+    },
+    {
+      home: "<unset>",
+      cwd: fixture,
+      args: ["exec", "--locked", "--", "node", "scripts/verify/licensing.mjs"],
     },
     {
       home: "<unset>",
@@ -235,10 +313,10 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
       ],
     },
   ]);
-  assert.equal(successfulMiseCalls.length, 5);
-  assert.deepEqual(successfulMiseCalls[4].home, "<unset>");
-  assert.deepEqual(successfulMiseCalls[4].cwd, fixture);
-  assert.deepEqual(successfulMiseCalls[4].args.slice(0, -1), [
+  assert.equal(successfulMiseCalls.length, 9);
+  assert.deepEqual(successfulMiseCalls[8].home, "<unset>");
+  assert.deepEqual(successfulMiseCalls[8].cwd, fixture);
+  assert.deepEqual(successfulMiseCalls[8].args.slice(0, -1), [
     "exec",
     "--locked",
     "--",
@@ -247,9 +325,27 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     "issue",
     "--session-pid",
   ]);
-  assert.match(successfulMiseCalls[4].args.at(-1), /^[1-9]\d*$/u);
+  assert.match(successfulMiseCalls[8].args.at(-1), /^[1-9]\d*$/u);
   assert.equal(`${result.stdout}${result.stderr}`.includes(fixture), false);
   assert.equal(`${result.stdout}${result.stderr}`.includes(syntheticSecret), false);
+
+  rmSync(capturePath);
+  const yoloResult = run("bash", [launcher, "--yolo", "--", "--fixture"], {
+    cwd: fixture,
+    env: {
+      CAPTURE_PATH: capturePath,
+      CODEX_HOME: externalCodexHome,
+      PATH: `${binDirectory}:/usr/bin:/bin`,
+    },
+  });
+  assert.equal(yoloResult.status, 0, yoloResult.stderr);
+  assert.deepEqual(capturedCalls(), [
+    { home: "<unset>", args: ["update"] },
+    {
+      home: runtimeCodexHome,
+      args: ["--cd", fixture, "--yolo", "--", "--fixture"],
+    },
+  ]);
 
   rmSync(capturePath);
   const startFailure = run("bash", [launcher], {
@@ -293,7 +389,7 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
   });
   assert.equal(dependencyFailure.status, 74);
   assert.deepEqual(capturedCalls(), [{ home: "<unset>", args: ["update"] }]);
-  assert.equal(capturedMiseCalls().length, 3);
+  assert.equal(capturedMiseCalls().length, 4);
 
   rmSync(capturePath);
   for (const override of [
@@ -332,7 +428,6 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     ["--oss"],
     ["--local-provider", "ollama"],
     ["--image", "/tmp/outside.png"],
-    ["--yolo"],
     ["exec"],
     ["exec", "--ignore-user-config"],
     ["resume"],
@@ -370,6 +465,41 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
   const configPath = path.join(fixture, ".codex", "config.toml");
   writeFileSync(
     configPath,
+    validPortableConfig.replace(
+      "After a successful seal, stop completely and never permit automatic continuation.",
+      "After a successful seal, finish safely.",
+    ),
+    "utf8",
+  );
+  const missingCriticalPolicy = run("bash", [launcher], {
+    cwd: fixture,
+    env: { CAPTURE_PATH: capturePath, PATH: `${binDirectory}:/usr/bin:/bin` },
+  });
+  assert.notEqual(missingCriticalPolicy.status, 0);
+  assert.match(missingCriticalPolicy.stderr, /developer_instructions.*orchestration marker/i);
+  assert.deepEqual(capturedCalls(), [{ home: "<unset>", args: ["update"] }]);
+
+  rmSync(capturePath, { force: true });
+  writeFileSync(configPath, validPortableConfig, "utf8");
+  const defaultRolePath = path.join(fixture, ".codex", "agents", "default.toml");
+  const validDefaultRole = readFileSync(defaultRolePath, "utf8");
+  writeFileSync(
+    defaultRolePath,
+    validDefaultRole.replace('model = "gpt-5.6-sol"', 'model = "gpt-5.6-terra"'),
+    "utf8",
+  );
+  const divergentRole = run("bash", [launcher], {
+    cwd: fixture,
+    env: { CAPTURE_PATH: capturePath, PATH: `${binDirectory}:/usr/bin:/bin` },
+  });
+  assert.notEqual(divergentRole.status, 0);
+  assert.match(divergentRole.stderr, /agent default.*primary intelligence|supported GPT Sol/i);
+  assert.deepEqual(capturedCalls(), [{ home: "<unset>", args: ["update"] }]);
+  writeFileSync(defaultRolePath, validDefaultRole, "utf8");
+
+  rmSync(capturePath, { force: true });
+  writeFileSync(
+    configPath,
     `${validPortableConfig}\n[mcp_servers.fixture]\ncommand = "/bin/false"\n`,
     "utf8",
   );
@@ -379,6 +509,19 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
   });
   assert.notEqual(executableConfig.status, 0);
   assert.match(executableConfig.stderr, /unsupported table/i);
+  assert.equal(existsSync(capturePath), false);
+
+  writeFileSync(
+    configPath,
+    validPortableConfig.replace('\n"""\nproject_doc_max_bytes', "\nproject_doc_max_bytes"),
+    "utf8",
+  );
+  const unterminatedInstructions = run("bash", [launcher], {
+    cwd: fixture,
+    env: { CAPTURE_PATH: capturePath, PATH: `${binDirectory}:/usr/bin:/bin` },
+  });
+  assert.notEqual(unterminatedInstructions.status, 0);
+  assert.match(unterminatedInstructions.stderr, /unterminated developer_instructions/i);
   assert.equal(existsSync(capturePath), false);
 
   writeFileSync(configPath, validPortableConfig.replace("hooks = true", "hooks = false"), "utf8");

@@ -1,8 +1,9 @@
 ---
 name: create-project-from-framework
 description:
-  Create a clean sibling project from the CodexRig Framework when the user supplies a project name.
-  Exclude Git history, local runtime/cache state, framework planning history, provider-specific
+  Create a clean sibling project from the CodexRig Framework after the user supplies a project name
+  and is proactively invited to develop a detailed product/manifest description with Codex. Exclude
+  Git history, local runtime/cache state, framework planning history, provider-specific
   collaboration metadata, and framework-only material while preserving both portable CI adapters,
   project policy, and reusable tooling.
 ---
@@ -10,6 +11,24 @@ description:
 # Create Project From CodexRig Framework
 
 Require a user-provided project name. Do not invent one.
+
+Immediately after receiving the name, ask what the product should actually do; a tagline or one- or
+two-sentence summary is not the full creation intake. Invite a detailed description in the user's
+own words and explain before asking that Codex will proactively structure it into the manifest,
+challenge ambiguities and contradictions, recommend missing decisions, and continue refining it with
+the user inside the generated project. Cover users/outcomes and critical workflows, scope and
+non-goals, likely domains/capabilities, data/integrations/trust, desired surfaces/devices, delivery
+constraints, and user-facing single- versus multi-locale needs without demanding jargon or a
+finished specification. Do not ask again for facts already supplied. Summarize sufficient input for
+correction; pass the confirmed detailed description with `--description`. If material creation input
+is missing, continue small focused questions. Only an explicit user choice to defer the description
+permits generation without it; silence or a short summary is not that choice.
+
+Explain the handoff before generation: the description is stored as a visible intake draft, never as
+active module inventory. On the child's first start, Codex evaluates any draft or filled manifest,
+explains the successive Project Definition Intake, identifies strengths, gaps, and contradictions,
+and asks whether the user wants to refine it or—when decision-ready—begin from the confirmed scope.
+The manifest remains refinable when later learning changes durable truth.
 
 Treat the current prompt and current source tree as the only project-creation inputs. Local Codex
 memories are disabled in the reusable source: never retrieve, use, or preserve historical task,
@@ -21,13 +40,13 @@ source memory file and database.
 
 Run:
 
-`mise exec --locked -- node .agents/skills/create-project-from-framework/scripts/create-project-from-framework.mjs --name "<Project Name>"`
+`mise exec --locked -- node .agents/skills/create-project-from-framework/scripts/create-project-from-framework.mjs --name "<Project Name>" --description "<Confirmed Detailed Product Description>"`
 
 Run `mise install --locked` and then
-`mise exec --locked -- pnpm install --frozen-lockfile --ignore-scripts` in the source workspace
-first. Creation uses the source's locked runtime and pinned formatter to make generated Markdown
-deterministic. This is a source-only tooling hydration step, not the generated project's dependency
-freshness policy.
+`mise exec --locked -- pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile` in the
+source workspace first. Creation uses the source's locked runtime and pinned formatter to make
+generated Markdown deterministic. This is a source-only tooling hydration step, not the generated
+project's dependency freshness policy.
 
 Project creation must never change tracked or portable source-framework content or add the requested
 project name to source tests, documentation, or policy. The generator requires a clean
@@ -92,8 +111,8 @@ changed sources current once per durable local Codex turn after local hash-bound
 - local-memory use and generation disabled in the reusable source, with no memory state transferred;
   normal memories enabled only in the generated project's own clean, isolated `.codex/runtime/`;
 - portable `.codex/config.toml`, `.codex/hooks.json`, `.codex/agents/`, `.codex/README.md`, the
-  project launcher, startup attestation, SessionStart verifier, and both context-index Stop-hook
-  scripts retained;
+  project launcher, startup attestation, SessionStart verifier, context-index Stop-hook scripts, and
+  the critical-budget handover creator/discovery retained; no source handover prompt is copied;
 - each generated project documents `bash scripts/setup/start-codex.sh` exactly: the launcher updates
   the host CLI outside project isolation, installs the locked toolchain, checks prerequisites,
   refreshes the newest stable compatible dependency graph, and only then uses the generated ignored
@@ -132,13 +151,15 @@ changed sources current once per durable local Codex turn after local hash-bound
   confirmed-disjoint parallel writes; and resolve overlap or uncertain shared ownership before
   implementation;
 - a mandatory first-prompt Project Definition Intake while the generated manifest is pending: Codex
-  explains the gate, asks successive material questions, challenges ambiguity and contradictions,
-  presents a precise synthesis for correction, and writes only user-confirmed durable truth before
-  planning and autonomous implementation, including the shared pre-slice coordination channel when
-  independent sessions or accounts may work concurrently. The same intake resumes later when
-  material ambiguity or changed intent, scope, module/public contracts, data, integrations, trust,
-  compatibility, or operations could alter the result; only affected writes pause and resolved or
-  irrelevant questions are not repeated;
+  first evaluates any creation draft or filled definition, explains the interview and its proactive
+  support, names strengths/gaps/contradictions, asks refinement versus starting from a
+  decision-ready confirmed scope, then asks successive material questions, presents a precise
+  synthesis for correction, and writes only user-confirmed durable truth before planning and
+  autonomous implementation, including the shared pre-slice coordination channel when independent
+  sessions or accounts may work concurrently. The same intake resumes later when material ambiguity
+  or changed intent, scope, module/public contracts, data, integrations, trust, compatibility, or
+  operations could alter the result; only affected writes pause and resolved or irrelevant questions
+  are not repeated;
 - a durable module map and modular-monolith default for non-trivial product code: cohesive domain
   responsibilities, narrow public contracts, private internals, owned data/migrations, allowed
   acyclic dependencies, focused verifiers, and replacement-local ports/adapters; components remain
@@ -180,6 +201,9 @@ changed sources current once per durable local Codex turn after local hash-bound
   `docs/project-context.md`, never per-slice files or archives;
 - a small code-first documentation surface with project name, package identity, and core workflow
   rewritten consistently;
+- English-only source code, identifiers, filenames, tests, and technical headers, with early
+  explicit user-facing single-/multi-locale intake and project-owned `config/localization.json` for
+  pending or confirmed default/supported/fallback locale truth;
 - a setup command that materializes the generated project's own root `.context-index/` vector space
   and fails unless the database and smoke search are usable;
 - an initial dependency command that resolves the newest compatible stable workspace graph before
@@ -190,10 +214,13 @@ changed sources current once per durable local Codex turn after local hash-bound
 - an always-read primary-agent workflow that uses exact search for known anchors, semantic retrieval
   early for broad orientation or unclear cross-file ownership, and direct matched-source reads
   before claims or edits;
-- exactly one validated SessionStart attestation hook plus one Stop hook. The Stop hook is inert
-  before bootstrap and for ephemeral side conversations or other transcriptless contexts, uses the
-  mise-pinned runtime afterward for durable local turns, refreshes incrementally through the
-  sanitized worker, and keeps local hook trust out of portable source;
+- exactly one validated SessionStart attestation hook plus one Stop hook. SessionStart exposes only
+  safe metadata for a recent repository-bound sealed handover and asks the developer before its body
+  may be read through `$resume-project`; the Stop hook is inert before bootstrap and for ephemeral
+  side conversations or other transcriptless contexts, uses the mise-pinned runtime afterward for
+  durable local turns, refreshes incrementally through the sanitized worker, suppresses both refresh
+  and continuation only in the runtime session that sealed a terminal handover, lets a later
+  accepted session stop normally, and keeps local hook trust out of portable source;
 - refusal when the outer project directory already exists and post-copy verification before handoff;
 - refusal when the source has resettable process state or its tracked/portable content changes
   during generation;

@@ -1,3 +1,4 @@
+/** Owns verification evidence behavior for the repository verification boundary. */
 import { createHash } from "node:crypto";
 import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
@@ -20,6 +21,7 @@ import {
 } from "./verification-risk-profile.mjs";
 import { normalizedVerificationRuntimeIdentity } from "./verification-runtime-identity.mjs";
 import { assertVerificationSessionLockOwned } from "./verification-session-lock.mjs";
+import { resolveDeliveryArtifactBinding } from "./delivery-artifact.mjs";
 import {
   fullVerificationEvidenceRecord,
   refreshedVerificationEvidenceRecord,
@@ -38,7 +40,37 @@ const defaultRoot = path.resolve(scriptDirectory, "..", "..");
 const maximumSourceFiles = 50_000;
 const maximumSourceFileBytes = 64 * 1024 * 1024;
 const maximumSourceBytes = 512 * 1024 * 1024;
-const allowedPlanPhases = new Set(["preflight", "broad", "workspace-build", "workspace-test"]);
+const allowedPlanPhases = new Set([
+  "preflight",
+  "broad",
+  "workspace-build",
+  "workspace-test",
+  "delivery",
+]);
+const allowedDeliveryEnvironments = new Set(["dev", "staging", "prod"]);
+
+function normalizedDeliveryIdentity(root, deliveryEnvironment = "dev", artifactManifest = "") {
+  if (!allowedDeliveryEnvironments.has(deliveryEnvironment)) {
+    fail("Verification evidence received an invalid delivery environment.");
+  }
+  try {
+    const binding = resolveDeliveryArtifactBinding({
+      root,
+      artifactManifest,
+      targetEnvironment: deliveryEnvironment,
+    });
+    return Object.freeze({
+      artifactDigest: binding.artifactDigest,
+      artifactManifest: binding.artifactManifest,
+      configurationDigest: binding.configurationDigest,
+      deliveryEnvironment: binding.targetEnvironment,
+      deliveryPlanDigest: binding.deliveryPlanDigest,
+      sourceCommit: binding.sourceCommit,
+    });
+  } catch (error) {
+    fail(error.message);
+  }
+}
 
 function normalizedBroadPlan(broadPlan) {
   if (!Array.isArray(broadPlan) || broadPlan.length > 1_000) {
@@ -102,6 +134,7 @@ function normalizedBroadPlan(broadPlan) {
     ...parallel,
     ...normalized.filter((command) => command.phase === "workspace-build"),
     ...normalized.filter((command) => command.phase === "workspace-test"),
+    ...normalized.filter((command) => command.phase === "delivery"),
   ]);
 }
 
@@ -212,13 +245,17 @@ export function currentVerificationEvidenceInputs({
   root = defaultRoot,
   broadPlan,
   runtimeIdentity,
+  deliveryEnvironment = "dev",
+  artifactManifest = "",
 } = {}) {
   const canonicalRoot = realpathSync.native(path.resolve(root));
   const plan = normalizedBroadPlan(broadPlan);
   const runtime = normalizedVerificationRuntimeIdentity(runtimeIdentity, { cwd: canonicalRoot });
   const fingerprints = repositoryFingerprints(canonicalRoot);
+  const delivery = normalizedDeliveryIdentity(canonicalRoot, deliveryEnvironment, artifactManifest);
   return Object.freeze({
     ...fingerprints,
+    ...delivery,
     planDigest: digest(canonicalJson(plan)),
     runtime,
     runtimeDigest: digest(canonicalJson(runtime)),
@@ -229,8 +266,14 @@ function sameInputs(left, right) {
   return (
     left?.broadFingerprint === right?.broadFingerprint &&
     left?.exactFingerprint === right?.exactFingerprint &&
+    left?.artifactDigest === right?.artifactDigest &&
+    left?.artifactManifest === right?.artifactManifest &&
+    left?.configurationDigest === right?.configurationDigest &&
+    left?.deliveryEnvironment === right?.deliveryEnvironment &&
+    left?.deliveryPlanDigest === right?.deliveryPlanDigest &&
     left?.planDigest === right?.planDigest &&
     left?.runtimeDigest === right?.runtimeDigest &&
+    left?.sourceCommit === right?.sourceCommit &&
     canonicalJson(left?.riskFingerprints) === canonicalJson(right?.riskFingerprints)
   );
 }
@@ -243,21 +286,52 @@ function currentBasisToken(record) {
   return digest(canonicalJson(record.current));
 }
 
-function publishEvidence({ root, record, inputs, gitBasis, broadPlan, runtimeIdentity }) {
+function publishEvidence({
+  root,
+  record,
+  inputs,
+  gitBasis,
+  broadPlan,
+  runtimeIdentity,
+  deliveryEnvironment,
+  artifactManifest,
+}) {
   assertVerificationSessionLockOwned({ repositoryRoot: root });
   writeEvidence(root, record);
-  const publishedInputs = currentVerificationEvidenceInputs({ root, broadPlan, runtimeIdentity });
+  const publishedInputs = currentVerificationEvidenceInputs({
+    root,
+    broadPlan,
+    runtimeIdentity,
+    deliveryEnvironment,
+    artifactManifest,
+  });
   const publishedGitBasis = captureVerificationGitBasis({ repositoryRoot: root });
   if (!sameInputs(inputs, publishedInputs) || !sameGitBasis(gitBasis, publishedGitBasis)) {
     fail("Repository, plan, or runtime changed while publishing verification evidence.");
   }
 }
 
-export function readSuccessfulVerificationBasis({ root = defaultRoot, broadPlan } = {}) {
+export function readSuccessfulVerificationBasis({
+  root = defaultRoot,
+  broadPlan,
+  deliveryEnvironment = "dev",
+  artifactManifest = "",
+} = {}) {
   try {
     const record = readEvidence(root);
     if (broadPlan !== undefined && planDigest(broadPlan) !== record.current.planDigest) {
       throw new Error("Successful verification command plan changed.");
+    }
+    const delivery = normalizedDeliveryIdentity(root, deliveryEnvironment, artifactManifest);
+    if (
+      record.current.deliveryEnvironment !== delivery.deliveryEnvironment ||
+      record.current.artifactDigest !== delivery.artifactDigest ||
+      record.current.artifactManifest !== delivery.artifactManifest ||
+      record.current.configurationDigest !== delivery.configurationDigest ||
+      record.current.deliveryPlanDigest !== delivery.deliveryPlanDigest ||
+      record.current.sourceCommit !== delivery.sourceCommit
+    ) {
+      throw new Error("Successful verification delivery target or artifact changed.");
     }
     const gitBasis = normalizedVerificationGitBasis(record.current.gitBasis);
     return Object.freeze({
@@ -279,6 +353,8 @@ export function recordSuccessfulFullEvidence({
   root = defaultRoot,
   broadPlan,
   runtimeIdentity,
+  deliveryEnvironment = "dev",
+  artifactManifest = "",
   expectedInputs,
   expectedGitBasis,
   successfulCommandKeys,
@@ -291,7 +367,13 @@ export function recordSuccessfulFullEvidence({
   if (missing.length > 0) {
     fail(`Full verification evidence is missing successful commands: ${missing.join(", ")}.`);
   }
-  const current = currentVerificationEvidenceInputs({ root, broadPlan, runtimeIdentity });
+  const current = currentVerificationEvidenceInputs({
+    root,
+    broadPlan,
+    runtimeIdentity,
+    deliveryEnvironment,
+    artifactManifest,
+  });
   const gitBasis = captureVerificationGitBasis({ repositoryRoot: root });
   if (!sameInputs(current, expectedInputs) || !sameGitBasis(gitBasis, expectedGitBasis)) {
     fail("Repository, Git basis, plan, or runtime changed during complete verification.");
@@ -303,6 +385,8 @@ export function recordSuccessfulFullEvidence({
     gitBasis,
     broadPlan,
     runtimeIdentity,
+    deliveryEnvironment,
+    artifactManifest,
   });
   return Object.freeze({ gitBasis, recorded: true, inputs: current });
 }
@@ -311,6 +395,8 @@ export function refreshExactAttestationAfterPreflight({
   root = defaultRoot,
   broadPlan,
   runtimeIdentity,
+  deliveryEnvironment = "dev",
+  artifactManifest = "",
   expectedInputs,
   expectedGitBasis,
   expectedBasisToken,
@@ -344,7 +430,13 @@ export function refreshExactAttestationAfterPreflight({
     if (currentBasisToken(record) !== expectedBasisToken) {
       fail("Successful verification basis changed during changed-path preflight.");
     }
-    const current = currentVerificationEvidenceInputs({ root, broadPlan, runtimeIdentity });
+    const current = currentVerificationEvidenceInputs({
+      root,
+      broadPlan,
+      runtimeIdentity,
+      deliveryEnvironment,
+      artifactManifest,
+    });
     const gitBasis = captureVerificationGitBasis({ repositoryRoot: root });
     if (!sameInputs(current, expectedInputs) || !sameGitBasis(gitBasis, expectedGitBasis)) {
       fail("Repository, Git basis, plan, or runtime changed during changed-path preflight.");
@@ -445,6 +537,8 @@ export function refreshExactAttestationAfterPreflight({
       gitBasis,
       broadPlan,
       runtimeIdentity,
+      deliveryEnvironment,
+      artifactManifest,
     });
     return Object.freeze({ gitBasis, inputs: current, refreshed: true });
   } catch (error) {
@@ -456,9 +550,17 @@ export function validateExactCurrentEvidence({
   root = defaultRoot,
   broadPlan,
   runtimeIdentity,
+  deliveryEnvironment = "dev",
+  artifactManifest = "",
 } = {}) {
   const record = readEvidence(root);
-  const current = currentVerificationEvidenceInputs({ root, broadPlan, runtimeIdentity });
+  const current = currentVerificationEvidenceInputs({
+    root,
+    broadPlan,
+    runtimeIdentity,
+    deliveryEnvironment,
+    artifactManifest,
+  });
   const gitBasis = captureVerificationGitBasis({ repositoryRoot: root });
   const findings = [];
   if (record.current.broadFingerprint !== current.broadFingerprint) {
@@ -466,6 +568,16 @@ export function validateExactCurrentEvidence({
   }
   if (record.current.planDigest !== current.planDigest) findings.push("broad command plan changed");
   if (record.current.runtimeDigest !== current.runtimeDigest) findings.push("tool runtime changed");
+  if (
+    record.current.deliveryEnvironment !== current.deliveryEnvironment ||
+    record.current.artifactDigest !== current.artifactDigest ||
+    record.current.artifactManifest !== current.artifactManifest ||
+    record.current.configurationDigest !== current.configurationDigest ||
+    record.current.deliveryPlanDigest !== current.deliveryPlanDigest ||
+    record.current.sourceCommit !== current.sourceCommit
+  ) {
+    findings.push("delivery target or artifact changed");
+  }
   if (record.current.fingerprint !== current.exactFingerprint) {
     findings.push("current repository state is not attested");
   }

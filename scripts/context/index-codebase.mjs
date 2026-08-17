@@ -1,5 +1,6 @@
+/** Owns index codebase behavior for the repository-local semantic context boundary. */
 import { runAsSanitizedContextWorker } from "./context-worker-output.mjs";
-import { formatContextError, sanitizeForTerminal } from "./terminal-output.mjs";
+import { formatContextError, sanitizeForTerminal } from "../terminal/terminal-output.mjs";
 
 runAsSanitizedContextWorker(import.meta.url);
 

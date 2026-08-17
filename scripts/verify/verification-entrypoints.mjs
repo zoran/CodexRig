@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/** Owns verification entrypoints behavior for the repository verification boundary. */
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { packageManifestFindings } from "./package-manifest.mjs";

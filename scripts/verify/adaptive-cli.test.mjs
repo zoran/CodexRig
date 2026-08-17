@@ -1,3 +1,4 @@
+/** Verifies adaptive cli behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import process from "node:process";
@@ -60,6 +61,46 @@ test("cache bypass and incomplete force requests fail before planning", () => {
   assert.throws(
     () => parseArgs(["--force-reason", "authentication upgrade risk"]),
     /requires --force-full/u,
+  );
+});
+
+test("delivery evidence defaults to dev and requires a real manifest for stronger targets", () => {
+  assert.deepEqual(
+    {
+      artifactManifest: parseArgs([]).artifactManifest,
+      targetEnvironment: parseArgs([]).targetEnvironment,
+    },
+    { artifactManifest: "", targetEnvironment: "dev" },
+  );
+  assert.throws(
+    () => parseArgs(["--target-environment", "staging"]),
+    /staging and prod evidence require --mode full/u,
+  );
+  assert.throws(
+    () => parseArgs(["--mode", "full", "--target-environment", "prod"]),
+    /require --artifact-manifest/u,
+  );
+  const production = parseArgs([
+    "--mode",
+    "full",
+    "--target-environment",
+    "prod",
+    "--artifact-manifest",
+    ".delivery/prod/manifest.json",
+  ]);
+  assert.equal(production.targetEnvironment, "prod");
+  assert.equal(production.artifactManifest, ".delivery/prod/manifest.json");
+  assert.throws(
+    () => parseArgs(["--artifact-manifest", "../outside.json"]),
+    /canonical repository-relative path/u,
+  );
+  assert.throws(
+    () => parseArgs(["--artifact-manifest", ".delivery/dev.json"]),
+    /dev verification does not accept/u,
+  );
+  assert.throws(
+    () => parseArgs(["--mode", "full", "--target-environment", "staging", "--print-plan"]),
+    /require --artifact-manifest/u,
   );
 });
 

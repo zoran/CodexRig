@@ -1,9 +1,10 @@
-import { secretPatterns } from "./secret-patterns.mjs";
+/** Owns secret content scan behavior for the repository verification boundary. */
+import { secretPatterns } from "../security/secret-patterns.mjs";
 
 // All repository secret signatures are ASCII. Keeping a bounded byte overlap catches a signature
 // split across stream chunks without buffering an arbitrarily large Git blob in memory.
 const overlapBytes = Math.max(
-  256,
+  4096,
   ...secretPatterns.map(({ label }) => Buffer.byteLength(label, "ascii") * 4),
 );
 

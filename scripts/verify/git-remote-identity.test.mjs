@@ -1,3 +1,4 @@
+/** Verifies git remote identity behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
 import test from "node:test";
 import {

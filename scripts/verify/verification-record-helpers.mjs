@@ -1,3 +1,4 @@
+/** Owns verification record helpers behavior for the repository verification boundary. */
 import { createHash } from "node:crypto";
 
 export function canonicalJson(value) {

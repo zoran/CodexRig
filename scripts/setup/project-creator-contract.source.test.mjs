@@ -1,3 +1,4 @@
+/** Verifies project creator contract behavior for the setup, launch, and portable project boundary. */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -10,10 +11,13 @@ import {
 } from "../framework/policy-projection.mjs";
 import {
   generatedFrameworkAgentPolicy,
-  generatedFrameworkManifestPolicy,
   generatedFrameworkReadmePolicy,
 } from "../../.agents/skills/create-project-from-framework/scripts/generated-framework-policy.mjs";
 import { postProjectCreationGuidance } from "../../.agents/skills/create-project-from-framework/scripts/source-readiness.mjs";
+import {
+  normalizedProjectDescription,
+  parseArgs,
+} from "../../.agents/skills/create-project-from-framework/scripts/project-options.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const projectCreatorSkill = ".agents/skills/create-project-from-framework/SKILL.md";
@@ -31,13 +35,33 @@ test("the source-only project creator keeps the Stop-hook mutation contract", ()
 
 test("the source-only project creator derives generated policy surfaces from one owner", () => {
   const projection = readPolicyProjection(root);
-  assert.equal(projection.invariants.length, 8);
-  const projectedPolicy = projection.invariants.map(({ statement }) => statement).join("\n");
-  assert.match(projectedPolicy, /Before every slice begins/);
-  assert.match(projectedPolicy, /all-document currency review/);
-  assert.match(projectedPolicy, /newest relevant primary or official sources/);
+  assert.equal(projection.policies.length, 32);
+  const projectedPolicy = projection.policies.map(({ statement }) => statement).join("\n");
+  assert.match(projectedPolicy, /current-state inventory, never a roadmap/);
+  assert.match(projectedPolicy, /exact same configured GPT Sol model and `ultra` reasoning/);
+  assert.match(projectedPolicy, /account- or host-wide listings are untrusted discovery/i);
+  assert.match(projectedPolicy, /one stable SemVer owner/);
+  assert.match(projectedPolicy, /Delivery targets are explicit: `dev` is the default/);
+  assert.match(projectedPolicy, /Portable Codex sessions default to on-request approval/);
+  assert.match(projectedPolicy, /Every generated product is white-label/);
+  assert.match(projectedPolicy, /Identity and Access is a dedicated trust and domain boundary/);
+  assert.match(projectedPolicy, /creates a new module in an existing domain/);
+  assert.match(projectedPolicy, /Every generated project is tenant-capable from creation/);
+  assert.match(projectedPolicy, /root Node\.js\/pnpm\/mise toolchain is Codex harness tooling/);
+  assert.match(projectedPolicy, /Every product UI assumes mobile, tablet, and desktop/);
+  assert.match(projectedPolicy, /derive whether the product is web\/PWA/);
+  assert.match(projectedPolicy, /Source code, identifiers, filenames, tests/);
+  assert.match(
+    projectedPolicy,
+    /Every hand-authored textual file in the framework and every generated project/,
+  );
+  assert.match(projectedPolicy, /Every completed non-trivial implementation/);
+  assert.match(projectedPolicy, /AGENTS\.md` is an always-loaded safe-entry bootstrap capped/);
+  assert.match(projectedPolicy, /complete Startup Repository Reconstruction/);
+  assert.match(projectedPolicy, /pnpm handover:create -- --critical/);
+  assert.match(projectedPolicy, /Success is an absolute stop boundary/);
   assert.deepEqual(generatedFrameworkAgentPolicy, generatedPolicyProjectionLines("agents"));
-  assert.deepEqual(generatedFrameworkManifestPolicy, generatedPolicyProjectionLines("manifest"));
+  assert.throws(() => generatedPolicyProjectionLines("manifest"), /Unsupported generated policy/);
   for (const line of generatedPolicyProjectionLines("readme")) {
     assert.ok(generatedFrameworkReadmePolicy.includes(line));
   }
@@ -55,4 +79,18 @@ test("the project creator gives post-exit cleanup guidance and only conditional 
   for (const command of ["git status --short", "git add --", "git commit -m", "git push"]) {
     assert.match(dirtyGuidance, new RegExp(command.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&")));
   }
+});
+
+test("the project creator accepts a bounded detailed manifest seed without making it mandatory", () => {
+  assert.equal(parseArgs(["--name", "Example"]).description, "");
+  assert.equal(
+    parseArgs(["--name", "Example", "--description", "Detailed product intent"]).description,
+    "Detailed product intent",
+  );
+  assert.equal(
+    normalizedProjectDescription("  First line\r\nSecond line  "),
+    "First line\nSecond line",
+  );
+  assert.throws(() => normalizedProjectDescription("unsafe\u0000input"), /control character/u);
+  assert.throws(() => normalizedProjectDescription("x".repeat(24_001)), /24,000-character/u);
 });

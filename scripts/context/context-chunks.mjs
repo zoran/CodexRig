@@ -1,3 +1,4 @@
+/** Owns context chunks behavior for the repository-local semantic context boundary. */
 import { hashContent } from "./context-hashing.mjs";
 import { maxEmbeddingTokens } from "./context-embedding.mjs";
 

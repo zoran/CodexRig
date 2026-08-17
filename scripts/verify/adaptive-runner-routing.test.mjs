@@ -1,3 +1,4 @@
+/** Verifies adaptive runner routing behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -31,6 +32,25 @@ test("successful basis plus a fully owned product delta stays targeted even at t
   );
 });
 
+test("Identity and Access changes select the auth and API trust-boundary owners", () => {
+  const plan = route(["src/identity-access/authorization/policies/can-edit.ts"], {
+    workspaceManifests: [
+      {
+        directory: ".",
+        internalDependencyNames: internalDependencies(),
+        name: "root",
+        scripts: { "test:unit": "unit" },
+      },
+    ],
+  });
+  const categories = plan.classifiedPaths[0].categories;
+  const keys = new Set(plan.readOnlyCommands.map((command) => command.key));
+  assert.ok(categories.includes("identity/access trust boundary"));
+  assert.ok(keys.has("identity-access"));
+  assert.ok(keys.has("api-security"));
+  assert.equal(plan.admission.mode, "targeted");
+});
+
 test("unowned and unknown full-relevant paths receive exact fail-closed admission reasons", () => {
   const unowned = route(["src/unowned.ts"]);
   assert.equal(unowned.admission.mode, "full");
@@ -41,6 +61,18 @@ test("unowned and unknown full-relevant paths receive exact fail-closed admissio
   assert.equal(unknown.admission.mode, "full");
   assert.deepEqual(unknown.admission.unknownPaths, ["unexpected/new-surface.bin"]);
   assert.match(unknown.admission.reason, /unknown changed paths/u);
+});
+
+test("license and required-notice changes route to the licensing owner", () => {
+  const plan = route(["LICENSE", "NOTICE"]);
+  assert.deepEqual(plan.admission.unknownPaths, []);
+  assert.deepEqual(plan.admission.uncoveredFullRelevantPaths, []);
+  assert.ok(
+    plan.classifiedPaths.every((entry) =>
+      entry.categories.includes("licensing and attribution contract"),
+    ),
+  );
+  assert.ok(plan.readOnlyCommands.some((command) => command.key === "licensing"));
 });
 
 test("local runtime markers are ignored instead of becoming unknown paths", () => {
@@ -185,10 +217,10 @@ test("direct verifier and support files route exact smallest consumers", () => {
     false,
   );
 
-  const support = route(["scripts/verify/secret-patterns.mjs"]);
+  const support = route(["scripts/security/secret-patterns.mjs"]);
   const supportArgs = support.readOnlyCommands.flatMap((command) => command.args);
   for (const consumer of [
-    "scripts/context/terminal-output.test.mjs",
+    "scripts/terminal/terminal-output.test.mjs",
     "scripts/verify/git-remote-identity.test.mjs",
     "scripts/verify/pushed-object-scan.test.mjs",
     "scripts/verify/secrets.test.mjs",
@@ -260,6 +292,45 @@ test("direct verifier and support files route exact smallest consumers", () => {
     "scripts/verify/verification-session-lock.test.mjs",
   ]) {
     assert.ok(sessionLockArgs.includes(consumer), consumer);
+  }
+});
+
+test("moved and shared framework boundaries retain focused verifier owners", () => {
+  for (const [owner, expectedConsumer] of [
+    ["scripts/contracts/framework-contract.mjs", "scripts/framework/framework-lifecycle.test.mjs"],
+    ["scripts/contracts/mise-toolchain-configuration.mjs", "scripts/verify/repository-smoke.mjs"],
+    ["scripts/contracts/portable-toml-bootstrap.mjs", "scripts/setup/setup-regression.test.mjs"],
+    ["scripts/docs/document-scope.mjs", "scripts/docs/document-scope.test.mjs"],
+    [
+      "scripts/docs/project-document-policy.mjs",
+      "scripts/context/portable-context-contract.test.mjs",
+    ],
+    ["scripts/repository/runtime-session-lease.mjs", "scripts/context/context-lifecycle.test.mjs"],
+    ["scripts/repository/local-import-resolution.mjs", "scripts/verify/api-security.test.mjs"],
+    ["scripts/repository/local-import-resolution.mjs", "scripts/verify/path-hygiene.test.mjs"],
+    ["scripts/repository/source-import-specifiers.mjs", "scripts/verify/api-security.test.mjs"],
+    ["scripts/repository/source-import-specifiers.mjs", "scripts/verify/path-hygiene.test.mjs"],
+    ["scripts/repository/product-roots.mjs", "scripts/verify/api-security.test.mjs"],
+    [
+      "scripts/repository/runtime-session-lease.mjs",
+      ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
+    ],
+    ["scripts/repository/sensitive-paths.mjs", "scripts/repository/source-inventory.test.mjs"],
+    [
+      "scripts/repository/validate-transfer-source.mjs",
+      "scripts/repository/source-inventory.test.mjs",
+    ],
+    ["scripts/terminal/terminal-output.mjs", "scripts/terminal/terminal-output.test.mjs"],
+    ["scripts/verify/external.mjs", "scripts/verify/repository-smoke.mjs"],
+    ["scripts/verify/image-assets.mjs", "scripts/verify/image-assets.test.mjs"],
+  ]) {
+    const plan = route([owner]);
+    assert.equal(plan.admission.mode, "targeted", owner);
+    assert.equal(plan.admission.uncoveredFullRelevantPaths.length, 0, owner);
+    assert.ok(
+      plan.readOnlyCommands.some((command) => command.args.includes(expectedConsumer)),
+      `${owner} -> ${expectedConsumer}`,
+    );
   }
 });
 

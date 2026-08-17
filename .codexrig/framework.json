@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "frameworkId": "codexrig",
-  "frameworkVersion": "1.2.1",
+  "frameworkVersion": "2.1.0",
   "compatibilityFile": ".codexrig/compatibility.json",
   "startup": {
     "attestationMaxAgeSeconds": 1800
@@ -40,15 +40,17 @@
       ".codex/README.md",
       "AGENTS.md",
       "README.md",
+      "config/delivery.json",
+      "config/localization.json",
+      "config/product.json",
+      "config/tenancy.json",
       "docs/context-index.md",
+      "docs/future-modules.md",
       "docs/project.md",
       "instructions.md"
     ],
     "managedRoots": [
-      ".agents/skills/context-retrieval",
-      ".agents/skills/project-implementation",
-      ".agents/skills/resume-project",
-      ".agents/skills/task-quality",
+      ".agents/skills",
       ".codex/agents",
       ".codex/config.toml",
       ".codex/hooks.json",
@@ -57,22 +59,27 @@
       ".codexrig/policy-projection.json",
       ".github/workflows/ci.yml",
       ".gitlab-ci.yml",
+      "LICENSE",
+      "NOTICE",
       "dependency-policy.json",
       "mise.lock",
       "mise.toml",
       "pnpm-workspace.yaml",
       "scripts"
     ],
-    "excludedPaths": [
-      "scripts/setup/project-initialization-test-helpers.mjs",
-      "scripts/setup/project-initialization-boundaries.source.test.mjs",
-      "scripts/setup/project-initialization.source.test.mjs",
-      "scripts/setup/project-initialization-transfer.source.test.mjs",
-      "scripts/setup/project-creator-contract.source.test.mjs",
-      "scripts/setup/project-generator-state.test.mjs",
-      "scripts/verify/source-baseline.mjs"
-    ],
+    "excludedPathReasons": {
+      ".agents/skills/create-project-from-framework": "project-creation tooling is source-only",
+      ".agents/skills/reset-framework": "reusable-framework reset tooling is source-only",
+      "scripts/setup/project-creator-contract.source.test.mjs": "project-creation regression coverage is source-only",
+      "scripts/setup/project-generator-state.test.mjs": "project-creation regression coverage is source-only",
+      "scripts/setup/project-initialization-boundaries.source.test.mjs": "project-creation regression coverage is source-only",
+      "scripts/setup/project-initialization-test-helpers.mjs": "project-creation regression support is source-only",
+      "scripts/setup/project-initialization-transfer.source.test.mjs": "project-creation regression coverage is source-only",
+      "scripts/setup/project-initialization.source.test.mjs": "project-creation regression coverage is source-only",
+      "scripts/verify/source-baseline.mjs": "reusable-framework reset verification is source-only"
+    },
     "managedPackageScripts": [
+      "auth:check",
       "codex:start",
       "codex:validate",
       "compatibility:matrix",
@@ -83,22 +90,28 @@
       "context:test",
       "context:test:integration",
       "deps:install",
+      "deps:preflight",
       "deps:report",
       "deps:update",
       "deps:update:patch",
-      "deps:update:patch:apply",
       "docs:check",
       "format",
       "format:check",
       "framework:doctor",
       "framework:upgrade",
+      "framework:version",
       "goal:new",
+      "handover:create",
       "hooks:install",
+      "localization:check",
+      "license:check",
       "platform:configure",
       "platform:detect",
       "project:export",
+      "repo:housekeeping",
       "setup",
       "stack:detect",
+      "tenancy:check",
       "verify",
       "verify:changed",
       "verify:external",
@@ -109,7 +122,8 @@
       "@huggingface/transformers",
       "@lancedb/lancedb",
       "onnxruntime-common",
-      "prettier"
+      "prettier",
+      "smol-toml"
     ]
   }
 }

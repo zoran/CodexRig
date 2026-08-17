@@ -1,18 +1,6 @@
 #!/usr/bin/env node
-import { randomUUID } from "node:crypto";
-import {
-  chmodSync,
-  closeSync,
-  constants,
-  fsyncSync,
-  lstatSync,
-  openSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import path from "node:path";
+/** Owns refresh upgrade dependencies behavior for the framework lifecycle and child upgrade boundary. */
+import { lstatSync } from "node:fs";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { installLatestCompatibleDependencies } from "../deps/install-compatible.mjs";
@@ -22,8 +10,9 @@ import {
   resolveFrameworkPath,
   serializeCanonicalJson,
   sha256,
-} from "./framework-contract.mjs";
+} from "../contracts/framework-contract.mjs";
 import { claimDependencyRefresh } from "./framework-upgrade-ownership.mjs";
+import { atomicWriteUpgradeFile } from "./framework-upgrade-io.mjs";
 
 const journalRelativePath = ".project-state/framework-upgrade/journal.json";
 
@@ -69,35 +58,10 @@ function atomicReplaceJournal(root, expected, journal) {
   if (stats.isSymbolicLink() || !stats.isFile() || stats.nlink !== 1) {
     throw new Error("Framework upgrade dependency journal is unsafe.");
   }
-  const temporary = path.join(
-    path.dirname(target),
-    `.journal.codexrig-${process.pid}-${randomUUID()}`,
-  );
-  const descriptor = openSync(temporary, "wx", 0o600);
-  try {
-    writeFileSync(descriptor, serializeCanonicalJson(journal), "utf8");
-    fsyncSync(descriptor);
-  } finally {
-    closeSync(descriptor);
+  if (readRegularFrameworkFile(root, journalRelativePath) !== expected) {
+    throw new Error("Framework upgrade dependency journal changed concurrently.");
   }
-  try {
-    if (readRegularFrameworkFile(root, journalRelativePath) !== expected) {
-      throw new Error("Framework upgrade dependency journal changed concurrently.");
-    }
-    renameSync(temporary, target);
-    chmodSync(target, 0o600);
-    const directory = openSync(
-      path.dirname(target),
-      constants.O_RDONLY | (constants.O_DIRECTORY ?? 0),
-    );
-    try {
-      fsyncSync(directory);
-    } finally {
-      closeSync(directory);
-    }
-  } finally {
-    rmSync(temporary, { force: true });
-  }
+  atomicWriteUpgradeFile(root, journalRelativePath, serializeCanonicalJson(journal), 0o600);
 }
 
 export function authorizePlannedLockfile({ root = frameworkRoot, content }) {
@@ -119,6 +83,7 @@ function main() {
   try {
     const result = installLatestCompatibleDependencies({
       projectRoot: frameworkRoot,
+      lifecycleCapability: claim.lifecycleCapability,
       beforeLockfileWrite: ({ content }) => authorizePlannedLockfile({ content }),
     });
     console.log(

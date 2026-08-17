@@ -1,3 +1,4 @@
+/** Verifies verification evidence integrity behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
@@ -74,6 +75,22 @@ test("runtime identity binds effective verifier limits and resolved tool executa
   }
 });
 
+test("runtime identity ignores wrapper-only PATH prefixes when every tool resolves identically", () => {
+  const root = fixture();
+  const inertBin = path.join(root, "wrapper-bin");
+  mkdirSync(inertBin);
+  const previousPath = process.env.PATH;
+  try {
+    const baseline = normalizedVerificationRuntimeIdentity(undefined, { cwd: root });
+    process.env.PATH = `${inertBin}${path.delimiter}${previousPath ?? ""}`;
+    const wrapped = normalizedVerificationRuntimeIdentity(undefined, { cwd: root });
+    assert.deepEqual(wrapped, baseline);
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+  }
+});
+
 test("runtime identity hashes every forwarded semantic child control", () => {
   const root = fixture();
   const unknownName = "VERIFICATION_UNBOUND_TEST_CONTROL";
@@ -105,15 +122,30 @@ test("runtime identity hashes every forwarded semantic child control", () => {
   }
 });
 
-test("child verification disables npm user and global config through distinct absent paths", () => {
+test("child verification binds npm user and global config to distinct null-device paths", () => {
   const environment = verificationChildEnvironment();
-  assert.notEqual(environment.NPM_CONFIG_GLOBALCONFIG, environment.NPM_CONFIG_USERCONFIG);
-  for (const configPath of [
-    environment.NPM_CONFIG_GLOBALCONFIG,
+  assert.equal(environment.NPM_CONFIG_GLOBALCONFIG, undefined);
+  assert.equal(environment.NPM_CONFIG_PREFIX, process.platform === "win32" ? "NUL" : "/dev/null");
+  assert.equal(
     environment.NPM_CONFIG_USERCONFIG,
-  ]) {
-    assert.throws(() => lstatSync(configPath), { code: "ENOENT" });
+    process.platform === "win32" ? "NUL" : "/dev/null",
+  );
+  if (process.platform !== "win32") {
+    assert.equal(lstatSync(environment.NPM_CONFIG_USERCONFIG).isCharacterDevice(), true);
+    assert.throws(() => lstatSync("/dev/null/etc/npmrc"), { code: "ENOTDIR" });
   }
+  const globalConfig = spawnSync(
+    process.platform === "win32" ? "npm.cmd" : "npm",
+    ["config", "get", "globalconfig"],
+    {
+      encoding: "utf8",
+      env: environment,
+      input: "",
+      stdio: "pipe",
+    },
+  );
+  assert.equal(globalConfig.status, 0, globalConfig.stderr);
+  assert.notEqual(globalConfig.stdout.trim(), environment.NPM_CONFIG_USERCONFIG);
   const npm = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["--version"], {
     encoding: "utf8",
     env: environment,

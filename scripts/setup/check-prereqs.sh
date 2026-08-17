@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
+# Owns check prereqs behavior for the setup, launch, and portable project boundary.
 set -euo pipefail
 
 required_node_version="24.19.0"
-required_pnpm_version="11.20.0"
+required_pnpm_version="11.22.0"
 missing_system=()
 runtime_issues=()
 optional_missing=()

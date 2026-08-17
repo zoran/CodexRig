@@ -1,23 +1,8 @@
-import { spawnSync } from "node:child_process";
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import process from "node:process";
+/** Owns journaled application and recovery of a previously reviewed dependency plan. */
+import { existsSync } from "node:fs";
 import {
   contentHash,
-  copyLocalInput,
   DependencyTransactionError,
-  discoverLocalInputs,
-  inputRecord,
-  normalizeRelativePath,
   projectIdentity,
   readOptionalFile,
   safeRepositoryPath,
@@ -29,8 +14,26 @@ import {
   readJsonFile,
   withDependencyTransactionLock,
 } from "./dependency-transaction-state.mjs";
+import { removeOwnedRegularFile } from "../filesystem/owned-file-operations.mjs";
+import {
+  assertDependencyPlanRederivable,
+  createDependencyPlan,
+  dependencyPlanHash,
+  dependencyTransactionSchemaVersion,
+  normalizeDependencyOutputPath,
+  normalizeDependencyRequest,
+  stableDependencyJson,
+  validateDependencyPlan,
+} from "./dependency-plan.mjs";
 
 export { contentHash, DependencyTransactionError } from "./dependency-inputs.mjs";
+export {
+  createDependencyPlan,
+  dependencyPlanHash,
+  normalizeDependencyRequest,
+  updatedDependencySpec,
+  validateDependencyPlan,
+} from "./dependency-plan.mjs";
 export {
   acquireDependencyTransactionLock,
   dependencyTransactionPaths,
@@ -38,322 +41,7 @@ export {
   withDependencyTransactionLock,
 } from "./dependency-transaction-state.mjs";
 
-const schemaVersion = 2;
-
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.keys(value)
-        .sort()
-        .map((key) => [key, stableValue(value[key])]),
-    );
-  }
-  return value;
-}
-
-function stableJson(value) {
-  return JSON.stringify(stableValue(value));
-}
-
-function planHash(payload) {
-  return contentHash(stableJson(payload));
-}
-
-function manifestPath(value) {
-  const normalized = normalizeRelativePath(value);
-  if (path.posix.basename(normalized) !== "package.json") {
-    throw new DependencyTransactionError(`Dependency manifest must end in package.json: ${value}`);
-  }
-  return normalized;
-}
-
-function outputPath(value) {
-  const normalized = normalizeRelativePath(value);
-  if (normalized !== "pnpm-lock.yaml" && path.posix.basename(normalized) !== "package.json") {
-    throw new DependencyTransactionError(`Unsupported dependency transaction output: ${value}`);
-  }
-  return normalized;
-}
-
-export function normalizeDependencyRequest(request) {
-  return {
-    level: String(request.level ?? "patch"),
-    select: [...new Set((request.select ?? []).map(String))].sort(),
-    allowMajor: Boolean(request.allowMajor),
-    includePinned: Boolean(request.includePinned),
-  };
-}
-
-export function updatedDependencySpec(oldSpec, targetVersion) {
-  const spec = String(oldSpec).trim();
-  if (/^(?:workspace|file|link|portal|catalog):/.test(spec)) return null;
-  const alias = /^(npm:(?:@[^/]+\/[^@]+|[^@]+)@)([\^~]?)(\d+\.\d+\.\d+(?:[-+].*)?)$/.exec(spec);
-  if (alias) return `${alias[1]}${alias[2]}${targetVersion}`;
-  if (/^\^/.test(spec)) return `^${targetVersion}`;
-  if (/^~/.test(spec)) return `~${targetVersion}`;
-  if (/^\d+\.\d+\.\d+(?:[-+].*)?$/.test(spec)) return targetVersion;
-  return null;
-}
-
-function defaultLockfilePlanner({ projectRoot, manifestPaths, manifestOutputs, localInputs }) {
-  for (const pnpmHook of [".pnpmfile.cjs", ".pnpmfile.mjs", "pnpmfile.cjs", "pnpmfile.mjs"]) {
-    if (readOptionalFile(projectRoot, pnpmHook).exists) {
-      throw new DependencyTransactionError(
-        `${pnpmHook} is executable dependency-resolution code; use a reviewed project-specific lockfile workflow.`,
-      );
-    }
-  }
-  const temporaryRoot = mkdtempSync(path.join(os.tmpdir(), "codex-dependency-plan-"));
-  chmodSync(temporaryRoot, 0o700);
-  try {
-    const outputByPath = new Map(manifestOutputs.map((output) => [output.path, output.content]));
-    const sourcePaths = [...manifestPaths, ".npmrc", "pnpm-workspace.yaml", "pnpm-lock.yaml"];
-    for (const record of localInputs) copyLocalInput(projectRoot, temporaryRoot, record);
-    for (const relativePath of [...new Set(sourcePaths)]) {
-      const source = readOptionalFile(projectRoot, relativePath);
-      if (!source.exists && !outputByPath.has(relativePath)) continue;
-      const target = path.join(temporaryRoot, relativePath);
-      mkdirSync(path.dirname(target), { recursive: true });
-      writeFileSync(target, outputByPath.get(relativePath) ?? source.content, "utf8");
-    }
-    for (const output of manifestOutputs) {
-      const target = path.join(temporaryRoot, output.path);
-      mkdirSync(path.dirname(target), { recursive: true });
-      writeFileSync(target, output.content, "utf8");
-    }
-    const result = spawnSync(
-      "pnpm",
-      ["install", "--lockfile-only", "--ignore-scripts", "--ignore-pnpmfile"],
-      {
-        cwd: temporaryRoot,
-        encoding: "utf8",
-        env: { ...process.env, CI: "true" },
-        input: "",
-        stdio: "pipe",
-        timeout: 180_000,
-      },
-    );
-    if (result.error) {
-      throw new DependencyTransactionError(
-        `Planned lockfile generation failed to start: ${result.error.message}`,
-      );
-    }
-    if (result.status !== 0) {
-      const detail = String(result.stderr ?? result.stdout ?? "")
-        .trim()
-        .split(/\r?\n/)
-        .at(-1);
-      throw new DependencyTransactionError(
-        `Planned lockfile generation failed with status ${result.status}${detail ? `: ${detail}` : ""}`,
-      );
-    }
-    const lockfilePath = path.join(temporaryRoot, "pnpm-lock.yaml");
-    if (!existsSync(lockfilePath)) {
-      throw new DependencyTransactionError(
-        "Planned lockfile generation produced no pnpm-lock.yaml.",
-      );
-    }
-    return readFileSync(lockfilePath, "utf8");
-  } finally {
-    rmSync(temporaryRoot, { recursive: true, force: true });
-  }
-}
-
-export function createDependencyPlan(options) {
-  const projectRoot = projectIdentity(options.projectRoot).root;
-  const request = normalizeDependencyRequest(options.request);
-  const manifestPaths = [...new Set(options.manifestPaths.map(manifestPath))].sort();
-  const inputPaths = [
-    ...manifestPaths,
-    ".npmrc",
-    ".pnpmfile.cjs",
-    ".pnpmfile.mjs",
-    "dependency-policy.json",
-    "pnpm-lock.yaml",
-    "pnpmfile.cjs",
-    "pnpmfile.mjs",
-    "pnpm-workspace.yaml",
-  ];
-  const policySource = readOptionalFile(projectRoot, "dependency-policy.json");
-  let pins = [];
-  if (policySource.exists) {
-    try {
-      const policy = JSON.parse(policySource.content);
-      if (!Array.isArray(policy.pins)) throw new Error("pins must be an array");
-      pins = policy.pins;
-    } catch {
-      throw new DependencyTransactionError(
-        "dependency-policy.json changed to an invalid policy before the preview was frozen.",
-      );
-    }
-  }
-  const manifests = new Map();
-  for (const relativePath of manifestPaths) {
-    const source = readOptionalFile(projectRoot, relativePath);
-    if (!source.exists) {
-      throw new DependencyTransactionError(`Dependency manifest disappeared: ${relativePath}`);
-    }
-    let data;
-    try {
-      data = JSON.parse(source.content);
-    } catch {
-      throw new DependencyTransactionError(
-        `Dependency manifest contains invalid JSON: ${relativePath}`,
-      );
-    }
-    manifests.set(relativePath, { data, content: source.content });
-  }
-
-  const changed = new Map();
-  const updateKeys = new Set();
-  const skipped = [];
-  const reviewedUpdates = [];
-  for (const update of options.updates) {
-    if (
-      !["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"].includes(
-        update.section,
-      )
-    ) {
-      throw new DependencyTransactionError(`Unsupported dependency section: ${update.section}`);
-    }
-    const relativePath = manifestPath(update.manifestPath);
-    const canonicalKey = `${relativePath}:${update.section}:${update.name}`;
-    if (String(update.key) !== canonicalKey) {
-      throw new DependencyTransactionError(
-        `Dependency update key does not match its manifest identity: ${canonicalKey}`,
-      );
-    }
-    if (updateKeys.has(canonicalKey)) {
-      throw new DependencyTransactionError(`Dependency update is duplicated: ${canonicalKey}`);
-    }
-    updateKeys.add(canonicalKey);
-    const nowPinned = pins.some(
-      (pin) =>
-        pin?.name === update.name &&
-        (!pin.manifest || pin.manifest === relativePath) &&
-        (!pin.section || pin.section === update.section),
-    );
-    if (nowPinned && !request.includePinned) {
-      throw new DependencyTransactionError(
-        `Dependency became pinned before the preview was frozen: ${update.key}`,
-      );
-    }
-    const source = manifests.get(relativePath);
-    const oldSpec = source?.data?.[update.section]?.[update.name];
-    if (oldSpec === undefined) {
-      throw new DependencyTransactionError(`Dependency target disappeared: ${update.key}`);
-    }
-    if (String(oldSpec) !== String(update.currentSpec)) {
-      throw new DependencyTransactionError(`Dependency source spec changed: ${update.key}`);
-    }
-    const nextSpec = updatedDependencySpec(oldSpec, update.target);
-    if (!nextSpec) {
-      skipped.push(`${update.key}: unsupported spec ${oldSpec}`);
-      continue;
-    }
-    const nextData = changed.get(relativePath) ?? structuredClone(source.data);
-    nextData[update.section][update.name] = nextSpec;
-    changed.set(relativePath, nextData);
-    reviewedUpdates.push({
-      key: String(update.key),
-      manifestPath: relativePath,
-      section: String(update.section),
-      name: String(update.name),
-      current: String(update.current),
-      currentSpec: String(update.currentSpec),
-      target: String(update.target),
-      nextSpec,
-      delta: String(update.delta),
-    });
-  }
-
-  const manifestOutputs = [...changed.entries()]
-    .map(([relativePath, data]) => {
-      const content = `${JSON.stringify(data, null, 2)}\n`;
-      return { path: relativePath, hash: contentHash(content), content };
-    })
-    .sort((left, right) => left.path.localeCompare(right.path));
-  if (manifestOutputs.length === 0) {
-    throw new DependencyTransactionError("No supported dependency manifest updates were planned.");
-  }
-
-  const localInputs = discoverLocalInputs(projectRoot, manifests);
-  const inputsByPath = new Map(
-    [...new Set(inputPaths)]
-      .sort()
-      .map((relativePath) => [relativePath, inputRecord(projectRoot, relativePath)]),
-  );
-  for (const record of localInputs) inputsByPath.set(record.path, record);
-  const inputs = [...inputsByPath.values()].sort((left, right) =>
-    left.path.localeCompare(right.path),
-  );
-  const planLockfile = options.lockfilePlanner ?? defaultLockfilePlanner;
-  const lockfileContent = planLockfile({
-    projectRoot,
-    manifestPaths,
-    manifestOutputs,
-    localInputs,
-  });
-  verifyInputRecords(projectRoot, inputs);
-  const payload = {
-    version: schemaVersion,
-    createdAt: (options.now ?? new Date()).toISOString(),
-    request,
-    updates: reviewedUpdates.sort((left, right) => left.key.localeCompare(right.key)),
-    skipped: skipped.sort(),
-    inputs,
-    outputs: {
-      manifests: manifestOutputs,
-      lockfile: {
-        path: "pnpm-lock.yaml",
-        hash: contentHash(lockfileContent),
-        content: lockfileContent,
-      },
-    },
-  };
-  return { ...payload, hash: planHash(payload) };
-}
-
-export function validateDependencyPlan(plan) {
-  if (!plan || typeof plan !== "object" || Array.isArray(plan)) {
-    throw new DependencyTransactionError("Dependency plan must be an object.");
-  }
-  const { hash, ...payload } = plan;
-  if (plan.version !== schemaVersion || typeof hash !== "string" || hash !== planHash(payload)) {
-    throw new DependencyTransactionError("Dependency plan hash or schema is invalid.");
-  }
-  if (!Array.isArray(plan.inputs) || !Array.isArray(plan.outputs?.manifests)) {
-    throw new DependencyTransactionError("Dependency plan structure is incomplete.");
-  }
-  const inputPaths = new Set();
-  for (const input of plan.inputs) {
-    const relativePath = normalizeRelativePath(input?.path);
-    const validExistingInput =
-      input?.exists === true &&
-      ["file", "directory"].includes(input?.kind) &&
-      /^[a-f0-9]{64}$/.test(input?.hash);
-    const validMissingInput =
-      input?.exists === false && input?.kind === "missing" && input?.hash === null;
-    if (inputPaths.has(relativePath) || (!validExistingInput && !validMissingInput)) {
-      throw new DependencyTransactionError(`Dependency plan input is invalid: ${relativePath}`);
-    }
-    inputPaths.add(relativePath);
-  }
-  for (const output of plan.outputs.manifests) {
-    outputPath(output.path);
-    if (contentHash(String(output.content)) !== output.hash) {
-      throw new DependencyTransactionError(
-        `Dependency plan output hash is invalid: ${output.path}`,
-      );
-    }
-  }
-  outputPath(plan.outputs.lockfile?.path);
-  if (contentHash(String(plan.outputs.lockfile?.content)) !== plan.outputs.lockfile?.hash) {
-    throw new DependencyTransactionError("Dependency plan lockfile hash is invalid.");
-  }
-  return plan;
-}
+const schemaVersion = dependencyTransactionSchemaVersion;
 
 export function storeDependencyPlan(projectRoot, plan) {
   validateDependencyPlan(plan);
@@ -364,12 +52,13 @@ export function storeDependencyPlan(projectRoot, plan) {
       75,
     );
   }
-  atomicWrite(paths.plan, `${JSON.stringify(plan, null, 2)}\n`);
+  atomicWrite(projectRoot, paths.plan, `${JSON.stringify(plan, null, 2)}\n`);
   return paths.plan;
 }
 
 export function loadDependencyPlan(projectRoot) {
   const plan = readJsonFile(
+    projectRoot,
     dependencyTransactionPaths(projectRoot).plan,
     "reviewed dependency plan",
   );
@@ -392,15 +81,15 @@ function journalOriginal(projectRoot, relativePath) {
 }
 
 function writeRepositoryOutput(projectRoot, output) {
-  const relativePath = outputPath(output.path);
+  const relativePath = normalizeDependencyOutputPath(output.path);
   const target = safeRepositoryPath(projectRoot, relativePath, { allowMissing: true });
-  atomicWrite(target, String(output.content), 0o644);
+  atomicWrite(projectRoot, target, String(output.content), 0o644);
 }
 
 function journalRecoveryEntries(journal) {
   const expectedByPath = new Map();
   for (const expected of journal.expectedOutputs) {
-    const relativePath = outputPath(expected.path);
+    const relativePath = normalizeDependencyOutputPath(expected.path);
     if (expectedByPath.has(relativePath) || typeof expected.hash !== "string") {
       throw new DependencyTransactionError(
         "Dependency transaction journal is invalid; manual recovery is required.",
@@ -412,7 +101,7 @@ function journalRecoveryEntries(journal) {
 
   const seenOriginals = new Set();
   const entries = journal.originals.map((original) => {
-    const relativePath = outputPath(original.path);
+    const relativePath = normalizeDependencyOutputPath(original.path);
     const expected = expectedByPath.get(relativePath);
     const validOriginal =
       typeof original.existed === "boolean" &&
@@ -470,8 +159,8 @@ function restoreJournal(projectRoot, journal) {
     if (outputMatchesOriginal(current, original)) continue;
     const relativePath = original.path;
     const target = safeRepositoryPath(projectRoot, relativePath, { allowMissing: true });
-    if (original.existed) atomicWrite(target, String(original.content), 0o644);
-    else rmSync(target, { force: true });
+    if (original.existed) atomicWrite(projectRoot, target, String(original.content), 0o644);
+    else removeOwnedRegularFile(projectRoot, target, `dependency rollback ${relativePath}`);
   }
 }
 
@@ -487,11 +176,15 @@ function verifyJournalRestored(projectRoot, journal) {
   }
 }
 
-function removePlanIfOwned(paths, planHashValue) {
+function removePlanIfOwned(projectRoot, paths, planHashValue) {
   if (!existsSync(paths.plan)) return;
   try {
-    const plan = validateDependencyPlan(readJsonFile(paths.plan, "reviewed dependency plan"));
-    if (plan.hash === planHashValue) rmSync(paths.plan);
+    const plan = validateDependencyPlan(
+      readJsonFile(projectRoot, paths.plan, "reviewed dependency plan"),
+    );
+    if (plan.hash === planHashValue) {
+      removeOwnedRegularFile(projectRoot, paths.plan, "reviewed dependency plan");
+    }
   } catch {
     // Preserve an invalid or unrelated plan for explicit inspection.
   }
@@ -500,11 +193,11 @@ function removePlanIfOwned(paths, planHashValue) {
 function recoverUnderLock(projectRoot) {
   const paths = dependencyTransactionPaths(projectRoot);
   if (!existsSync(paths.journal)) return { recovered: false, result: null };
-  const journal = readJsonFile(paths.journal, "dependency transaction journal");
+  const journal = readJsonFile(projectRoot, paths.journal, "dependency transaction journal");
   const { hash: journalHash, ...journalPayload } = journal ?? {};
   if (
     journal?.version !== schemaVersion ||
-    journalHash !== planHash(journalPayload) ||
+    journalHash !== dependencyPlanHash(journalPayload) ||
     typeof journal?.planHash !== "string" ||
     !Array.isArray(journal?.originals) ||
     !Array.isArray(journal?.expectedOutputs)
@@ -520,8 +213,8 @@ function recoverUnderLock(projectRoot) {
     return outputMatchesExpected(current, expected);
   });
   if (fullyApplied) {
-    rmSync(paths.journal);
-    removePlanIfOwned(paths, journal.planHash);
+    removeOwnedRegularFile(projectRoot, paths.journal, "dependency transaction journal");
+    removePlanIfOwned(projectRoot, paths, journal.planHash);
     return {
       recovered: true,
       result: "finalized",
@@ -533,12 +226,12 @@ function recoverUnderLock(projectRoot) {
   }
   restoreJournal(projectRoot, journal);
   verifyJournalRestored(projectRoot, journal);
-  rmSync(paths.journal);
+  removeOwnedRegularFile(projectRoot, paths.journal, "dependency transaction journal");
   return { recovered: true, result: "rolled-back" };
 }
 
 function journalWithHash(payload) {
-  return { ...payload, hash: planHash(payload) };
+  return { ...payload, hash: dependencyPlanHash(payload) };
 }
 
 export function recoverDependencyTransaction(projectRoot, options = {}) {
@@ -558,13 +251,27 @@ function injectedInterruption(point, requestedPoint) {
 
 export function applyStoredDependencyPlan(options) {
   const projectRoot = projectIdentity(options.projectRoot).root;
+  const reviewedPlanHash = String(options.planHash ?? "");
+  if (!/^[a-f0-9]{64}$/u.test(reviewedPlanHash)) {
+    throw new DependencyTransactionError(
+      "Apply requires the exact --plan-hash printed by the reviewed dependency preview.",
+      64,
+    );
+  }
   return withDependencyTransactionLock(
     projectRoot,
     () => {
       const recovery = recoverUnderLock(projectRoot);
       if (recovery.result === "finalized") {
+        if (recovery.planHash !== reviewedPlanHash) {
+          throw new DependencyTransactionError(
+            "The supplied plan hash does not match the finalized dependency transaction.",
+            64,
+          );
+        }
         if (
-          stableJson(normalizeDependencyRequest(options.request)) !== stableJson(recovery.request)
+          stableDependencyJson(normalizeDependencyRequest(options.request)) !==
+          stableDependencyJson(recovery.request)
         ) {
           throw new DependencyTransactionError(
             "A prior dependency transaction was finalized, but its request differs from this apply command.",
@@ -579,14 +286,21 @@ export function applyStoredDependencyPlan(options) {
         };
       }
       const plan = loadDependencyPlan(projectRoot);
+      if (plan.hash !== reviewedPlanHash) {
+        throw new DependencyTransactionError(
+          "The stored dependency plan differs from the explicitly reviewed plan hash; generate and review a new preview.",
+          64,
+        );
+      }
       const request = normalizeDependencyRequest(options.request);
-      if (stableJson(request) !== stableJson(plan.request)) {
+      if (stableDependencyJson(request) !== stableDependencyJson(plan.request)) {
         throw new DependencyTransactionError(
           "Apply arguments do not match the reviewed dependency preview; use the same options.",
           64,
         );
       }
       verifyInputRecords(projectRoot, plan.inputs);
+      assertDependencyPlanRederivable(projectRoot, plan);
       const outputs = [...plan.outputs.manifests, plan.outputs.lockfile];
       const originals = outputs.map((output) => journalOriginal(projectRoot, output.path));
       const paths = dependencyTransactionPaths(projectRoot);
@@ -601,7 +315,7 @@ export function applyStoredDependencyPlan(options) {
         expectedOutputs: outputs.map((output) => ({ path: output.path, hash: output.hash })),
       };
       const journal = journalWithHash(journalPayload);
-      atomicWrite(paths.journal, `${JSON.stringify(journal, null, 2)}\n`);
+      atomicWrite(projectRoot, paths.journal, `${JSON.stringify(journal, null, 2)}\n`);
 
       try {
         for (const output of plan.outputs.manifests) writeRepositoryOutput(projectRoot, output);
@@ -615,8 +329,8 @@ export function applyStoredDependencyPlan(options) {
             );
           }
         }
-        rmSync(paths.journal);
-        removePlanIfOwned(paths, plan.hash);
+        removeOwnedRegularFile(projectRoot, paths.journal, "dependency transaction journal");
+        removePlanIfOwned(projectRoot, paths, plan.hash);
         return {
           changed: plan.outputs.manifests.map((output) => output.path),
           skipped: plan.skipped,
@@ -628,7 +342,7 @@ export function applyStoredDependencyPlan(options) {
         try {
           restoreJournal(projectRoot, journal);
           verifyJournalRestored(projectRoot, journal);
-          rmSync(paths.journal, { force: true });
+          removeOwnedRegularFile(projectRoot, paths.journal, "dependency transaction journal");
         } catch (rollbackError) {
           throw new DependencyTransactionError(
             `${error.message}; automatic rollback failed: ${rollbackError.message}. Journal preserved at ${paths.journal}`,
@@ -659,6 +373,8 @@ export function clearStoredDependencyPlan(projectRoot) {
   return withDependencyTransactionLock(projectRoot, () => {
     const paths = dependencyTransactionPaths(projectRoot);
     recoverUnderLock(projectRoot);
-    if (existsSync(paths.plan)) rmSync(paths.plan);
+    if (existsSync(paths.plan)) {
+      removeOwnedRegularFile(projectRoot, paths.plan, "reviewed dependency plan");
+    }
   });
 }

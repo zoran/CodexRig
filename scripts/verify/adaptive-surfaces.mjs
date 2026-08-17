@@ -1,3 +1,4 @@
+/** Owns adaptive surfaces behavior for the repository verification boundary. */
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { discoverProductLayout, isProductSurfacePath } from "../repository/product-roots.mjs";

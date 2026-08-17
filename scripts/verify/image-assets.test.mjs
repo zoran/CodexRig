@@ -1,3 +1,4 @@
+/** Verifies image assets behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {

@@ -1,3 +1,4 @@
+/** Verifies stable file snapshot behavior for the repository inventory and filesystem boundary. */
 import assert from "node:assert/strict";
 import {
   existsSync,

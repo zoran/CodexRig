@@ -11,6 +11,12 @@ description:
 Review the target language as original writing for its audience, not as a word-for-word translation.
 Do not edit files unless the owning task explicitly requests replacement copy.
 
+Read `config/localization.json` and the manifest's current language/surface truth when present.
+Treat a pending, unsupported, or mismatched locale as a product-definition finding rather than
+guessing. Source code, identifiers, filenames, tests, and technical source/declaration headers
+remain English; review only user-facing content in its configured native language and preserve
+placeholders and locale-neutral public/domain contracts.
+
 Check meaning, terminology, register, locale conventions, grammar, punctuation, rhythm, inclusive
 language, cultural fit, placeholders, UI constraints, links, numbers, dates, units, and consistency
 with the product voice. Remove generic filler, stock transitions, needless repetition, exaggerated

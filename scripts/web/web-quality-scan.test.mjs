@@ -1,3 +1,4 @@
+/** Verifies web quality scan behavior for the public web quality boundary. */
 import assert from "node:assert/strict";
 import test from "node:test";
 import { collectSitemapLastmodFreshnessFailures } from "../verify/seo.mjs";

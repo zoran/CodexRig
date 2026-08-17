@@ -1,3 +1,4 @@
+/** Verifies product roots behavior for the repository inventory and filesystem boundary. */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";

@@ -1,3 +1,4 @@
+# Portable GitLab CI adapter owned by the framework lifecycle and compatibility boundary.
 workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -9,6 +10,12 @@ stages:
   - verify
   - compatibility
 
+variables:
+  NPM_CONFIG_IGNORE_PNPMFILE: "true"
+  PNPM_CONFIG_IGNORE_PNPMFILE: "true"
+  npm_config_ignore_pnpmfile: "true"
+  pnpm_config_ignore_pnpmfile: "true"
+
 default:
   image: node:24.19.0-bookworm
   interruptible: true
@@ -19,11 +26,42 @@ verify:
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck && rm -rf
       /var/lib/apt/lists/*
-    - npm install --global mise@latest
-    - npm install --global pnpm@11.20.0 --ignore-scripts
-    - npm install --global @openai/codex@latest --ignore-scripts
-    - pnpm install --frozen-lockfile --ignore-scripts
+    - |
+      case "$(uname -m)" in
+        x86_64|amd64) mise_package='@jdxcode/mise-linux-x64'; mise_integrity='sha512-FNEhITXrJmfmYfGsQTfldJGiqTXr3JEQlFMTPV0XJyFI7FP/3kOssgFgSkMOlNqJCT3qFqETi0kCO3PsYx9qUw==' ;;
+        aarch64|arm64) mise_package='@jdxcode/mise-linux-arm64'; mise_integrity='sha512-MOg3B92G0c1xu2wZX5wuJXSpNagxCu9HAv+tfDn+Rp9UF2sO1CVC7UAPOMcp49UNvcLqH9PeoPsMxIy0dC9FNQ==' ;;
+        *) echo "Unsupported GitLab runner architecture: $(uname -m)" >&2; exit 1 ;;
+      esac
+      mise_stage="$(umask 077 && mktemp -d)"
+      npm pack --ignore-scripts --pack-destination "$mise_stage" "${mise_package}@2026.8.6" >/dev/null
+      mise_archive="$(node scripts/framework/compatibility-matrix.mjs --verify-mise-archive "$mise_stage" "$mise_integrity")"
+      npm install --global "$mise_archive" --ignore-scripts --offline
+    - npm install --global pnpm@11.22.0 --ignore-scripts
+    - |
+      case "$(uname -m)" in
+        x86_64|amd64) codex_architecture='x64'; codex_platform_package='@openai/codex-linux-x64'; codex_platform_integrity='sha512-0W9MBxPpWW0cSkNqrTDN2jR7rzzT7oNMhQY5446lT2Lw5cz5yhDTck4Va9rjkQEm+HlFzP/dmEMSZbXfJsINmw==' ;;
+        aarch64|arm64) codex_architecture='arm64'; codex_platform_package='@openai/codex-linux-arm64'; codex_platform_integrity='sha512-SLC1JXw2TYfr/c3HhrJubyyLelq7vTOLWVmiThFA+z0+WgzCPmaseJ/kzDD3Gge/TO7fCnnj7UcPmC0d2c8XAg==' ;;
+        *) echo "Unsupported stable Codex CI architecture: $(uname -m)" >&2; exit 1 ;;
+      esac
+      codex_package='@openai/codex'
+      codex_version='0.147.0'
+      codex_wrapper_integrity='sha512-EQLEXecAG2ptxI7UpBMo2TR/ga5596/c/OsYF/0LoUDh5JANZ7IoGqlzBEWbuEVQ76JePIbtTW/ihCkp1a7Z3w=='
+      codex_install_root="$(umask 077 && mktemp -d)"
+      codex_stage="$codex_install_root/stage"
+      codex_cache="$codex_install_root/cache"
+      mkdir -m 700 "$codex_stage" "$codex_cache"
+      trap 'rm -rf -- "$codex_install_root"' EXIT
+      npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm cache add "${codex_package}@${codex_version}"
+      npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm cache add "${codex_platform_package}@npm:${codex_package}@${codex_version}-linux-${codex_architecture}"
+      npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm pack --ignore-scripts --pack-destination "$codex_stage" "${codex_package}@${codex_version}" "${codex_package}@${codex_version}-linux-${codex_architecture}" >/dev/null
+      node scripts/framework/compatibility-matrix.mjs --verify-codex-archives "$codex_stage" "$codex_wrapper_integrity" "$codex_platform_integrity" >/dev/null
+      npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm install --global "${codex_package}@${codex_version}" --ignore-scripts --offline
+      rm -rf -- "$codex_install_root"
+      trap - EXIT
+    - node scripts/deps/verify-pnpm-execution-policy.mjs
+    - pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile
   script:
+    - if [ "$CI_PIPELINE_SOURCE" = "schedule" ]; then pnpm repo:housekeeping -- --check --online; fi
     - pnpm framework:doctor
     - pnpm verify
 

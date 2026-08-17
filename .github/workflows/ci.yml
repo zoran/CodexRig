@@ -15,6 +15,12 @@ on:
 permissions:
   contents: read
 
+env:
+  NPM_CONFIG_IGNORE_PNPMFILE: "true"
+  PNPM_CONFIG_IGNORE_PNPMFILE: "true"
+  npm_config_ignore_pnpmfile: "true"
+  pnpm_config_ignore_pnpmfile: "true"
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -23,19 +29,47 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
+      - run: node scripts/deps/verify-pnpm-execution-policy.mjs
       - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
         with:
+          version: 2026.8.6
+          sha256: 96f6f1f416d868b78addd22746eefc7f4bf7820c6a3afa392a9f653f708c1644
           install: false
           cache: false
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
-          version: 11.20.0
+          version: 11.22.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24.19.0
           cache: pnpm
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: npm install --global @openai/codex@latest --ignore-scripts
+      - run: pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile
+      - name: Install the reviewed stable Codex CLI
+        shell: bash
+        run: |
+          case "$(uname -m)" in
+            x86_64|amd64) codex_architecture='x64'; codex_platform_package='@openai/codex-linux-x64'; codex_platform_integrity='sha512-0W9MBxPpWW0cSkNqrTDN2jR7rzzT7oNMhQY5446lT2Lw5cz5yhDTck4Va9rjkQEm+HlFzP/dmEMSZbXfJsINmw==' ;;
+            aarch64|arm64) codex_architecture='arm64'; codex_platform_package='@openai/codex-linux-arm64'; codex_platform_integrity='sha512-SLC1JXw2TYfr/c3HhrJubyyLelq7vTOLWVmiThFA+z0+WgzCPmaseJ/kzDD3Gge/TO7fCnnj7UcPmC0d2c8XAg==' ;;
+            *) echo "Unsupported stable Codex CI architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          codex_package='@openai/codex'
+          codex_version='0.147.0'
+          codex_wrapper_integrity='sha512-EQLEXecAG2ptxI7UpBMo2TR/ga5596/c/OsYF/0LoUDh5JANZ7IoGqlzBEWbuEVQ76JePIbtTW/ihCkp1a7Z3w=='
+          codex_install_root="$(umask 077 && mktemp -d)"
+          codex_stage="$codex_install_root/stage"
+          codex_cache="$codex_install_root/cache"
+          mkdir -m 700 "$codex_stage" "$codex_cache"
+          trap 'rm -rf -- "$codex_install_root"' EXIT
+          npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm cache add "${codex_package}@${codex_version}"
+          npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm cache add "${codex_platform_package}@npm:${codex_package}@${codex_version}-linux-${codex_architecture}"
+          npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm pack --ignore-scripts --pack-destination "$codex_stage" "${codex_package}@${codex_version}" "${codex_package}@${codex_version}-linux-${codex_architecture}" >/dev/null
+          node scripts/framework/compatibility-matrix.mjs --verify-codex-archives "$codex_stage" "$codex_wrapper_integrity" "$codex_platform_integrity" >/dev/null
+          npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm install --global "${codex_package}@${codex_version}" --ignore-scripts --offline
+          rm -rf -- "$codex_install_root"
+          trap - EXIT
+      - name: Check scheduled repository housekeeping and freshness
+        if: github.event_name == 'schedule'
+        run: pnpm repo:housekeeping -- --check --online
       - name: Validate framework and detected platform contracts
         run: pnpm framework:doctor
       - name: Run the complete deterministic verification plan
@@ -51,6 +85,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
+      - run: node scripts/deps/verify-pnpm-execution-policy.mjs
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24.19.0
@@ -74,6 +109,8 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
         with:
+          version: 2026.8.6
+          sha256: 96f6f1f416d868b78addd22746eefc7f4bf7820c6a3afa392a9f653f708c1644
           install: false
           cache: false
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -84,6 +121,6 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: pnpm
       - run: npm install --global "@openai/codex@${{ matrix.codex }}" --ignore-scripts
-      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile
       - run: node scripts/framework/compatibility-matrix.mjs --check-track "${{ matrix.id }}"
       - run: pnpm verify

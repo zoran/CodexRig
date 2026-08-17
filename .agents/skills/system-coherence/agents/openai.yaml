@@ -1,0 +1,6 @@
+interface:
+  display_name: "System Coherence"
+  short_description: "Repair slice-level whole-system drift"
+  default_prompt:
+    "Use $system-coherence to inspect this completed slice in whole-project context and repair
+    material duplication, ownership, contract, architecture, or integration drift."

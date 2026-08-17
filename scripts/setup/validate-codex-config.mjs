@@ -1,7 +1,10 @@
+/** Owns validate codex config behavior for the setup, launch, and portable project boundary. */
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { parsePortableTomlBootstrap } from "../contracts/portable-toml-bootstrap.mjs";
+import { formatContextError } from "../terminal/terminal-output.mjs";
 import {
   repositoryCodexHomeGitignoreBehaviorFindings,
   repositoryCodexHomeGitignoreFindings,
@@ -10,19 +13,47 @@ import {
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(scriptDirectory, "..", "..");
 
+let parseToml = parsePortableTomlBootstrap;
+try {
+  ({ parse: parseToml } = await import("smol-toml"));
+} catch (error) {
+  if (error?.code !== "ERR_MODULE_NOT_FOUND" || !String(error.message).includes("smol-toml")) {
+    throw error;
+  }
+}
+
+export const sharedAgentIntelligencePolicy = Object.freeze({
+  modelPattern: /^gpt-[a-z0-9]+(?:[.-][a-z0-9]+)*-sol$/u,
+  reasoningEffort: "ultra",
+});
+
 const portablePolicy = new Map([
-  ["project_doc_max_bytes", { type: "integer", value: 65_536 }],
+  ["developer_instructions", { type: "string" }],
+  ["project_doc_max_bytes", { type: "integer", value: 32_768 }],
   ["project_doc_fallback_filenames", { type: "string-array", value: ["instructions.md"] }],
-  ["model_reasoning_effort", { type: "string", values: ["xhigh", "max", "ultra"] }],
+  [
+    "model_reasoning_effort",
+    { type: "string", value: sharedAgentIntelligencePolicy.reasoningEffort },
+  ],
   ["model_verbosity", { type: "string" }],
   ["web_search", { type: "string", value: "cached" }],
-  ["model", { type: "string" }],
+  ["model", { type: "string", pattern: sharedAgentIntelligencePolicy.modelPattern }],
   ["service_tier", { type: "string", optional: true }],
   ["approvals_reviewer", { type: "string", value: "user" }],
-  ["approval_policy", { type: "string", value: "never" }],
-  ["sandbox_mode", { type: "string", value: "danger-full-access" }],
+  ["approval_policy", { type: "string", value: "on-request" }],
+  ["sandbox_mode", { type: "string", value: "workspace-write" }],
+  ["sandbox_workspace_write.network_access", { type: "boolean", value: false }],
+  ["agents.enabled", { type: "boolean", value: true }],
+  [
+    "agents.default_subagent_model",
+    { type: "string", pattern: sharedAgentIntelligencePolicy.modelPattern },
+  ],
+  [
+    "agents.default_subagent_reasoning_effort",
+    { type: "string", value: sharedAgentIntelligencePolicy.reasoningEffort },
+  ],
   ["agents.max_concurrent_threads_per_session", { type: "integer", value: 4 }],
-  ["agents.max_depth", { type: "integer", value: 1 }],
+  ["agents.interrupt_message", { type: "boolean", value: true }],
   ["features.hooks", { type: "boolean", value: true }],
   ["features.memories", { type: "boolean" }],
   ["features.network_proxy", { type: "boolean" }],
@@ -42,7 +73,7 @@ const portablePolicy = new Map([
   ],
   ["tui.theme", { type: "string" }],
 ]);
-const portableTables = new Set(["agents", "features", "tui"]);
+const portableTables = new Set(["agents", "features", "sandbox_workspace_write", "tui"]);
 const requiredAgentRoles = new Set(["default", "explorer", "worker"]);
 const requiredAgentInstructionFragments = Object.freeze([
   "context:search",
@@ -51,30 +82,52 @@ const requiredAgentInstructionFragments = Object.freeze([
   "milestone",
   "fresh audit",
   "Before every assigned slice begins",
+  "wait only for the primary to close the agent",
+  "5% or less",
+  "without assuming a billing period",
+  "absolute token/credit amount",
+  "Mirror every direct peer message and response to the primary",
+  "unavailable redeem/reset capacity counts as zero",
   "newest relevant primary or official sources",
+  "critical-drain request",
+  "start no further tool or task",
+  "effective runtime sandbox",
+  "live parent override",
+]);
+const requiredPrimaryInstructionFragments = Object.freeze([
+  "primary orchestrator",
+  "at most four live",
+  "never pass a model or reasoning override",
+  "exact GPT Sol model with ultra reasoning",
+  "owned subagent and background task",
+  "foreign or ambiguous work",
+  "5% or less",
+  "Critical Budget Drain",
+  "pnpm handover:create -- --critical",
+  "final repository action",
+  "After a successful seal, stop completely",
+  "permit automatic continuation",
+  "effective runtime permissions",
+  "live parent permission overrides",
+  "already-authorized YOLO override",
+  "exact disjoint repository write set",
 ]);
 const contextIndexStopHookPolicy = Object.freeze({
-  description: "Keep the bootstrapped local context index current between Codex turns.",
+  description: "Coordinate durable Stop continuation, terminal handover, and context refresh.",
   command: "bash scripts/context/refresh-context-index-on-stop.sh",
   timeout: 600,
-  statusMessage: "Refreshing local context index",
+  statusMessage: "Finalizing CodexRig Stop lifecycle",
 });
 const startupAttestationHookPolicy = Object.freeze({
-  additionalContextLimit: 200,
-  command:
-    'bash "$CODEXRIG_PROJECT_ROOT/scripts/setup/verify-startup-attestation-on-session-start.sh"',
+  additionalContextLimit: 768,
+  command: "bash scripts/setup/verify-startup-attestation-on-session-start.sh",
   matcher: "^(startup|resume)$",
   statusMessage: "Verifying CodexRig startup",
   timeout: 30,
 });
 const projectHooksDescription =
-  "Verify canonical startup and keep the local context index current between turns.";
-export const subagentModelPolicy = Object.freeze({
-  model: "gpt-5.6-terra",
-  defaultReasoningEffort: "max",
-  elevatedReasoningEffort: "ultra",
-});
-
+  "Verify canonical startup, announce safe recovery metadata, and coordinate durable Stop continuation, terminal handover, and context refresh.";
+/** Identifies a rejected Codex configuration contract without exposing runtime-local state. */
 export class CodexConfigError extends Error {
   constructor(message) {
     super(message);
@@ -82,97 +135,41 @@ export class CodexConfigError extends Error {
   }
 }
 
-function stripComment(line, lineNumber) {
-  let inString = false;
-  let escaped = false;
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index];
-    if (inString && escaped) {
-      escaped = false;
-      continue;
-    }
-    if (inString && character === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (character === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (!inString && character === "#") return line.slice(0, index);
-  }
-  if (inString) throw new CodexConfigError(`Line ${lineNumber} has an unterminated string.`);
-  return line;
-}
-
-function parseString(raw, lineNumber) {
-  if (!/^"(?:[^"\\]|\\.)*"$/.test(raw)) {
-    throw new CodexConfigError(`Line ${lineNumber} must use one double-quoted string value.`);
-  }
+function parsedToml(content, label) {
   try {
-    const value = JSON.parse(raw);
-    if (typeof value !== "string") throw new Error("not a string");
-    return value;
-  } catch {
-    throw new CodexConfigError(`Line ${lineNumber} contains an invalid quoted string.`);
+    const parsed = parseToml(String(content).replace(/^\uFEFF/u, ""));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("root");
+    return parsed;
+  } catch (error) {
+    throw new CodexConfigError(`${label} must contain valid TOML.`);
   }
 }
 
-function splitArrayItems(raw, lineNumber) {
-  const inner = raw.slice(1, -1).trim();
-  if (!inner) return [];
-  const items = [];
-  let start = 0;
-  let inString = false;
-  let escaped = false;
-  for (let index = 0; index < inner.length; index += 1) {
-    const character = inner[index];
-    if (inString && escaped) {
-      escaped = false;
+function flattenedToml(parsed, tableNames, label) {
+  const flattened = new Map();
+  for (const [key, value] of Object.entries(parsed)) {
+    if (!tableNames.has(key)) {
+      flattened.set(key, value);
       continue;
     }
-    if (inString && character === "\\") {
-      escaped = true;
-      continue;
+    if (!value || typeof value !== "object" || Array.isArray(value) || value instanceof Date) {
+      throw new CodexConfigError(`${label} table ${key} must be a TOML table.`);
     }
-    if (character === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (!inString && character === ",") {
-      items.push(inner.slice(start, index).trim());
-      start = index + 1;
+    for (const [nestedKey, nestedValue] of Object.entries(value)) {
+      if (
+        nestedValue &&
+        typeof nestedValue === "object" &&
+        !Array.isArray(nestedValue) &&
+        !(nestedValue instanceof Date)
+      ) {
+        throw new CodexConfigError(
+          `${label} contains unsupported nested table ${key}.${nestedKey}.`,
+        );
+      }
+      flattened.set(`${key}.${nestedKey}`, nestedValue);
     }
   }
-  if (inString) throw new CodexConfigError(`Line ${lineNumber} has an unterminated array string.`);
-  items.push(inner.slice(start).trim());
-  if (items.some((item) => !item)) {
-    throw new CodexConfigError(`Line ${lineNumber} contains an empty array item.`);
-  }
-  return items;
-}
-
-function parseValue(raw, schema, lineNumber) {
-  if (schema.type === "boolean") {
-    if (raw === "true") return true;
-    if (raw === "false") return false;
-    throw new CodexConfigError(`Line ${lineNumber} must use a TOML boolean.`);
-  }
-  if (schema.type === "integer") {
-    if (!/^(?:0|[1-9]\d*)$/.test(raw)) {
-      throw new CodexConfigError(`Line ${lineNumber} must use a non-negative decimal integer.`);
-    }
-    const value = Number(raw);
-    if (!Number.isSafeInteger(value)) {
-      throw new CodexConfigError(`Line ${lineNumber} exceeds the supported integer range.`);
-    }
-    return value;
-  }
-  if (schema.type === "string") return parseString(raw, lineNumber);
-  if (!raw.startsWith("[") || !raw.endsWith("]")) {
-    throw new CodexConfigError(`Line ${lineNumber} must use a one-line array of quoted strings.`);
-  }
-  return splitArrayItems(raw, lineNumber).map((item) => parseString(item, lineNumber));
+  return flattened;
 }
 
 function valuesMatch(actual, expected) {
@@ -192,48 +189,35 @@ function valuesMatch(actual, expected) {
 }
 
 function valueMatchesSchema(actual, schema) {
-  return valuesMatch(actual, schema.value) && (!schema.values || schema.values.includes(actual));
+  const typeMatches =
+    (schema.type === "boolean" && typeof actual === "boolean") ||
+    (schema.type === "integer" && Number.isSafeInteger(actual) && actual >= 0) ||
+    (schema.type === "string" && typeof actual === "string" && actual.trim().length > 0) ||
+    (schema.type === "string-array" &&
+      Array.isArray(actual) &&
+      actual.every((entry) => typeof entry === "string"));
+  return (
+    typeMatches &&
+    valuesMatch(actual, schema.value) &&
+    (!schema.values || schema.values.includes(actual)) &&
+    (!schema.pattern || (typeof actual === "string" && schema.pattern.test(actual)))
+  );
 }
 
 export function parsePortableCodexConfig(content) {
-  const parsed = new Map();
-  const declaredTables = new Set();
-  let currentTable = "";
-  const lines = String(content)
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n/);
-  for (const [index, originalLine] of lines.entries()) {
-    const lineNumber = index + 1;
-    const line = stripComment(originalLine, lineNumber).trim();
-    if (!line) continue;
-    if (line.startsWith("[")) {
-      const table = line.match(/^\[([A-Za-z_][A-Za-z0-9_-]*)\]$/)?.[1] ?? "";
-      if (!portableTables.has(table)) {
-        throw new CodexConfigError(`Line ${lineNumber} defines an unsupported table.`);
-      }
-      if (declaredTables.has(table)) {
-        throw new CodexConfigError(`Line ${lineNumber} duplicates table ${table}.`);
-      }
-      declaredTables.add(table);
-      currentTable = table;
-      continue;
-    }
-    const assignment = line.match(/^([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*(.+)$/);
-    if (!assignment) {
-      throw new CodexConfigError(`Line ${lineNumber} is not a supported top-level assignment.`);
-    }
-    const [, localKey, rawValue] = assignment;
-    const key = currentTable ? `${currentTable}.${localKey}` : localKey;
+  const parsed = flattenedToml(
+    parsedToml(content, "Project-scoped Codex config"),
+    portableTables,
+    "Project-scoped Codex config",
+  );
+  for (const [key, value] of parsed) {
     const schema = portablePolicy.get(key);
-    if (!schema) throw new CodexConfigError(`Line ${lineNumber} uses unknown key ${key}.`);
-    if (parsed.has(key)) throw new CodexConfigError(`Line ${lineNumber} duplicates key ${key}.`);
-    const value = parseValue(rawValue.trim(), schema, lineNumber);
+    if (!schema) throw new CodexConfigError(`Project-scoped Codex config uses unknown key ${key}.`);
     if (!valueMatchesSchema(value, schema)) {
       throw new CodexConfigError(
-        `Line ${lineNumber} gives ${key} a value outside the portable project policy.`,
+        `Project-scoped Codex config gives ${key} a value outside the portable project policy.`,
       );
     }
-    parsed.set(key, value);
   }
 
   const missing = [...portablePolicy.entries()]
@@ -243,7 +227,26 @@ export function parsePortableCodexConfig(content) {
   if (missing.length > 0) {
     throw new CodexConfigError(`Missing portable project policy keys: ${missing.join(", ")}.`);
   }
-  return Object.fromEntries(parsed);
+  const policy = Object.fromEntries(parsed);
+  if (
+    policy["agents.default_subagent_model"] !== policy.model ||
+    policy["agents.default_subagent_reasoning_effort"] !== policy.model_reasoning_effort
+  ) {
+    throw new CodexConfigError(
+      "Project agent defaults must use exactly the primary model and reasoning effort.",
+    );
+  }
+  const primaryInstructions = policy.developer_instructions.replace(/\s+/gu, " ");
+  for (const fragment of requiredPrimaryInstructionFragments) {
+    if (
+      !primaryInstructions.toLocaleLowerCase("en-US").includes(fragment.toLocaleLowerCase("en-US"))
+    ) {
+      throw new CodexConfigError(
+        `Primary developer_instructions must include orchestration marker ${fragment}.`,
+      );
+    }
+  }
+  return policy;
 }
 
 function requireRegularFile(targetPath, label) {
@@ -360,48 +363,41 @@ export function parseProjectHooks(content) {
 }
 
 export function parseProjectAgentConfig(content, expectedName) {
+  const worker = expectedName === "worker";
   const schemas = new Map([
     ["name", { type: "string", value: expectedName }],
     ["description", { type: "string" }],
-    ["model", { type: "string", value: subagentModelPolicy.model }],
+    ["model", { type: "string", pattern: sharedAgentIntelligencePolicy.modelPattern }],
     [
       "model_reasoning_effort",
-      { type: "string", values: ["xhigh", "max", "ultra"], optional: true },
+      { type: "string", value: sharedAgentIntelligencePolicy.reasoningEffort },
     ],
-    ["sandbox_mode", { type: "string", values: ["read-only", "workspace-write"], optional: true }],
+    ["sandbox_mode", { type: "string", value: worker ? "workspace-write" : "read-only" }],
     ["developer_instructions", { type: "string" }],
+    ...(worker
+      ? [["sandbox_workspace_write.network_access", { type: "boolean", value: false }]]
+      : []),
   ]);
-  const parsed = new Map();
-  const lines = String(content)
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n/);
-  for (const [index, originalLine] of lines.entries()) {
-    const lineNumber = index + 1;
-    const line = stripComment(originalLine, lineNumber).trim();
-    if (!line) continue;
-    const assignment = line.match(/^([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*(.+)$/);
-    if (!assignment) {
-      throw new CodexConfigError(
-        `Agent ${expectedName} line ${lineNumber} is not a supported assignment.`,
-      );
-    }
-    const [, key, rawValue] = assignment;
+  const parsed = flattenedToml(
+    parsedToml(content, `Agent ${expectedName}`),
+    new Set(worker ? ["sandbox_workspace_write"] : []),
+    `Agent ${expectedName}`,
+  );
+  for (const [key, value] of parsed) {
     const schema = schemas.get(key);
     if (!schema) {
-      throw new CodexConfigError(
-        `Agent ${expectedName} line ${lineNumber} uses unknown key ${key}.`,
-      );
+      throw new CodexConfigError(`Agent ${expectedName} uses unsupported key ${key}.`);
     }
-    if (parsed.has(key)) {
-      throw new CodexConfigError(`Agent ${expectedName} line ${lineNumber} duplicates key ${key}.`);
-    }
-    const value = parseValue(rawValue.trim(), schema, lineNumber);
     if (!valueMatchesSchema(value, schema)) {
+      if (key === "model") {
+        throw new CodexConfigError(
+          `Agent ${expectedName} must use a supported GPT Sol model matching the primary intelligence.`,
+        );
+      }
       throw new CodexConfigError(
-        `Agent ${expectedName} line ${lineNumber} violates the portable project agent policy for ${key}.`,
+        `Agent ${expectedName} violates the portable project agent policy for ${key}.`,
       );
     }
-    parsed.set(key, value);
   }
   const missing = [...schemas.entries()]
     .filter(([, schema]) => !schema.optional)
@@ -411,17 +407,39 @@ export function parseProjectAgentConfig(content, expectedName) {
     throw new CodexConfigError(`Agent ${expectedName} is missing keys: ${missing.join(", ")}.`);
   }
   const developerInstructions = parsed.get("developer_instructions");
-  for (const fragment of requiredAgentInstructionFragments) {
-    if (!developerInstructions.includes(fragment)) {
+  const normalizedInstructions = developerInstructions.replace(/\s+/gu, " ");
+  for (const fragment of [
+    ...requiredAgentInstructionFragments,
+    "Never delegate or spawn another agent",
+    "token envelope",
+    "Never",
+    "commit",
+    ...(worker
+      ? ["already-authorized YOLO/danger-full-access override", "strict logical isolation boundary"]
+      : []),
+  ]) {
+    if (
+      !normalizedInstructions
+        .toLocaleLowerCase("en-US")
+        .includes(fragment.toLocaleLowerCase("en-US"))
+    ) {
       throw new CodexConfigError(
-        `Agent ${expectedName} developer_instructions must include retrieval contract marker ${fragment}.`,
+        `Agent ${expectedName} developer_instructions must include orchestration marker ${fragment}.`,
       );
     }
   }
   return Object.fromEntries(parsed);
 }
 
-export function validateProjectAgentConfigs(codexDirectory) {
+export function validateProjectAgentConfigs(
+  codexDirectory,
+  { expectedModel, expectedReasoningEffort } = {},
+) {
+  if ((expectedModel === undefined) !== (expectedReasoningEffort === undefined)) {
+    throw new CodexConfigError(
+      "Primary model and reasoning effort must be supplied together for agent parity validation.",
+    );
+  }
   const agentsDirectory = path.join(codexDirectory, "agents");
   let stats;
   try {
@@ -442,7 +460,16 @@ export function validateProjectAgentConfigs(codexDirectory) {
     names.add(name);
     const agentPath = path.join(agentsDirectory, entry.name);
     requireRegularFile(agentPath, `project agent ${name}`);
-    parseProjectAgentConfig(readFileSync(agentPath, "utf8"), name);
+    const parsedAgent = parseProjectAgentConfig(readFileSync(agentPath, "utf8"), name);
+    if (
+      expectedModel !== undefined &&
+      (parsedAgent.model !== expectedModel ||
+        parsedAgent.model_reasoning_effort !== expectedReasoningEffort)
+    ) {
+      throw new CodexConfigError(
+        `Agent ${name} must use exactly the primary intelligence ${expectedModel} with ${expectedReasoningEffort} reasoning.`,
+      );
+    }
   }
   const missing = [...requiredAgentRoles].filter((name) => !names.has(name));
   if (missing.length > 0) {
@@ -497,7 +524,6 @@ export function validateCodexConfig(projectRoot = defaultRoot) {
       "Project-scoped Codex hooks must remain directly under .codex/hooks.json.",
     );
   }
-  validateProjectAgentConfigs(codexDirectory);
   parseProjectHooks(readFileSync(hooksPath, "utf8"));
   const ignoreFindings = [
     ...repositoryCodexHomeGitignoreFindings(readFileSync(gitignorePath, "utf8")),
@@ -509,6 +535,10 @@ export function validateCodexConfig(projectRoot = defaultRoot) {
     );
   }
   const policy = parsePortableCodexConfig(readFileSync(configPath, "utf8"));
+  validateProjectAgentConfigs(codexDirectory, {
+    expectedModel: policy.model,
+    expectedReasoningEffort: policy.model_reasoning_effort,
+  });
   const sourceCreationSkillPath = path.join(
     root,
     ".agents",
@@ -553,7 +583,7 @@ function main() {
     console.log("Project-scoped Codex config and hooks match the strict portable project policy.");
     console.log("Repository-local CODEX_HOME isolation matches the portable project policy.");
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(formatContextError(error, defaultRoot));
     process.exit(1);
   }
 }

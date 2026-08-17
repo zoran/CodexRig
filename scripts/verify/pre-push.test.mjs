@@ -1,3 +1,4 @@
+/** Verifies pre push behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
@@ -191,13 +192,14 @@ test("the installed hook cannot be skipped through BASH_ENV", () => {
     fakeMise,
     `#!/bin/sh
 set -eu
-if [ "$1" != "exec" ] || [ "$2" != "--locked" ] || [ "$3" != "--" ] ||
-   [ "$4" != "pnpm" ] || [ "$5" != "verify:pre-push" ]; then
-  exit 91
-fi
-shift 5
-if [ "\${1:-}" = "--" ]; then shift; fi
-exec sh "$PWD/scripts/verify/pre-push.sh" "$@"
+case "$*" in
+  "exec --locked -- node scripts/deps/verify-pnpm-execution-policy.mjs") exit 0 ;;
+  "exec --locked -- sh scripts/verify/pre-push.sh"*)
+    shift 5
+    exec sh "$PWD/scripts/verify/pre-push.sh" "$@"
+    ;;
+  *) exit 91 ;;
+esac
 `,
     "utf8",
   );
@@ -239,6 +241,9 @@ exec sh "$PWD/scripts/verify/pre-push.sh" "$@"
       BASH_ENV: startup,
       NODE_OPTIONS: `--require=${nodePreload}`,
       NODE_PATH: path.join(parent, "node-path"),
+      NPM_CONFIG_SCRIPT_SHELL: "/bin/true",
+      PNPM_CONFIG_SCRIPT_SHELL: "/bin/true",
+      PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "false",
       PATH: `${binDirectory}${path.delimiter}${process.env.PATH}`,
     },
     input: "",

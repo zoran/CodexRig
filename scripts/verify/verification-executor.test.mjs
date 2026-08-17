@@ -1,3 +1,4 @@
+/** Verifies verification executor behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -5,8 +6,20 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import test from "node:test";
+import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycle-process.mjs";
 import { runPlan, verificationChildEnvironment } from "./verification-executor.mjs";
 import { verificationChildEnvironment as runtimeChildEnvironment } from "./verification-runtime-identity.mjs";
+import { withVerificationSessionLock } from "./verification-session-lock.mjs";
+
+async function runLockedPlan(planValue, repositoryRoot) {
+  return await withVerificationSessionLock(() => runPlan(planValue, { repositoryRoot }), {
+    repositoryRoot,
+  });
+}
+
+function privateKeyBoundary(kind, phase) {
+  return ["-----", phase, " ", kind, " KEY-----"].join("");
+}
 
 function plan(commands) {
   return {
@@ -63,7 +76,7 @@ test("same artifact owners serialize while disjoint owners run in parallel", asy
 
   const sharedOrder = path.join(fixtureRoot, "shared-order.txt");
   const sharedLock = path.join(fixtureRoot, "shared.lock");
-  await runPlan(
+  await runLockedPlan(
     plan([
       delayedCommand({
         artifactOwner: "workspace:alpha",
@@ -78,6 +91,7 @@ test("same artifact owners serialize while disjoint owners run in parallel", asy
         orderPath: sharedOrder,
       }),
     ]),
+    fixtureRoot,
   );
   assert.deepEqual(readFileSync(sharedOrder, "utf8").trim().split("\n"), [
     "start:shared-a",
@@ -87,7 +101,7 @@ test("same artifact owners serialize while disjoint owners run in parallel", asy
   ]);
 
   const disjointOrder = path.join(fixtureRoot, "disjoint-order.txt");
-  await runPlan(
+  await runLockedPlan(
     plan([
       delayedCommand({
         artifactOwner: "workspace:alpha",
@@ -100,6 +114,7 @@ test("same artifact owners serialize while disjoint owners run in parallel", asy
         orderPath: disjointOrder,
       }),
     ]),
+    fixtureRoot,
   );
   assert.deepEqual(
     new Set(readFileSync(disjointOrder, "utf8").trim().split("\n").slice(0, 2)),
@@ -134,6 +149,90 @@ test("verification children use the runtime-bound environment owner", () => {
   assert.equal(child.IMAGE_ASSET_MAX_BYTES, "9999999");
   assert.equal(child.PATH, "/safe/bin");
   assert.equal(child.PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN, "error");
+});
+
+test("lifecycle supervision strips ambient delegation capabilities from commands", async (t) => {
+  const repositoryRoot = mkdtempSync(path.join(os.tmpdir(), "verification-delegation-env-"));
+  t.after(() => rmSync(repositoryRoot, { force: true, recursive: true }));
+  const delegatedVariables = [
+    "CODEXRIG_LIFECYCLE_DELEGATION_OPERATION",
+    "CODEXRIG_LIFECYCLE_DELEGATION_ROLE",
+    "CODEXRIG_LIFECYCLE_DELEGATION_ROOT",
+    "CODEXRIG_LIFECYCLE_DELEGATION_TOKEN",
+  ];
+  const result = await withVerificationSessionLock(
+    (lock) =>
+      spawnRuntimeLifecycleCommandSync({
+        args: [
+          "--input-type=module",
+          "--eval",
+          `const names = ${JSON.stringify(delegatedVariables)}; process.stdout.write(names.every((name) => process.env[name] === undefined) ? "clean\\n" : "leaked\\n");`,
+        ],
+        command: process.execPath,
+        lifecycleCapability: lock.lifecycleCapability,
+        options: {
+          cwd: repositoryRoot,
+          encoding: "utf8",
+          env: Object.fromEntries(
+            delegatedVariables.map((name) => [name, `ambient-${name.toLowerCase()}`]),
+          ),
+          stdio: "pipe",
+        },
+        repositoryRoot,
+        role: "verification-supervisor",
+      }),
+    { repositoryRoot },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "clean\n");
+});
+
+test("verification plan metadata and commands cross the single-line terminal boundary", () => {
+  const executorUrl = new URL("./verification-executor.mjs", import.meta.url).href;
+  const source = `
+    const { printPlan } = await import(${JSON.stringify(executorUrl)});
+    printPlan({
+      admission: {
+        canAdvanceSuccessfulBasis: false,
+        coveredBroadRisks: [{ riskId: "risk\\nforged", path: "src/\\u001b[31mowned.ts" }],
+        focusedCommandOwners: [{ ownerKeys: ["owner\\nforged"], path: "src/\\u001b[31mowned.ts" }],
+        fullRelevantPaths: ["src/\\u001b[31mowned.ts"],
+        mode: "targeted",
+        reason: "reason\\nforged-line",
+        uncoveredBroadRisks: [],
+        uncoveredFullRelevantPaths: [],
+        unknownPaths: [],
+      },
+      classifiedPaths: [{ categories: ["security\\nforged"], path: "src/\\u001b[31mowned.ts" }],
+      gitAvailable: true,
+      options: { mode: "repo", printPlan: true, simulatedPaths: [] },
+      readOnlyCommands: [{
+        args: ["--to\\u001b[31mken", "opaque-command-secret", "line\\nforged"],
+        executable: "tool",
+        key: "fixture",
+        label: "fixture",
+        phase: "preflight",
+        reason: "command\\nforged",
+      }],
+      verificationScope: "targeted",
+      workspaceCommands: [],
+    });
+  `;
+  const result = spawnSync(process.execPath, ["--input-type=module", "--eval", source], {
+    cwd: path.resolve(new URL("../..", import.meta.url).pathname),
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stdout, /\u001b|opaque-command-secret/u);
+  assert.match(result.stdout, /--token <redacted-secret>/u);
+  assert.equal(
+    result.stdout.split("\n").some((line) => line === "forged-line"),
+    false,
+  );
+  assert.equal(
+    result.stdout.split("\n").some((line) => line === "forged"),
+    false,
+  );
 });
 
 test("sanitized pnpm children cannot inherit ambient preload or script-shell configuration", (t) => {
@@ -222,7 +321,7 @@ test("failed preflight stops broad regressions, builds, and tests", async (t) =>
   t.after(() => rmSync(fixtureRoot, { force: true, recursive: true }));
 
   await assert.rejects(
-    runPlan(
+    runLockedPlan(
       executionPlan(
         [
           markerCommand(markerFile, "preflight-pass", "preflight"),
@@ -234,6 +333,7 @@ test("failed preflight stops broad regressions, builds, and tests", async (t) =>
           markerCommand(markerFile, "test", "workspace-test"),
         ],
       ),
+      fixtureRoot,
     ),
     /Preflight verification checks failed: preflight-fail/u,
   );
@@ -255,7 +355,7 @@ test("a failed command does not schedule the remaining same-phase suffix", async
   });
 
   await assert.rejects(
-    runPlan(
+    runLockedPlan(
       executionPlan(
         [
           markerCommand(markerFile, "first-failure", "preflight", 1),
@@ -263,18 +363,19 @@ test("a failed command does not schedule the remaining same-phase suffix", async
         ],
         [],
       ),
+      fixtureRoot,
     ),
     /Preflight verification checks failed: first-failure/u,
   );
   assert.deepEqual(readFileSync(markerFile, "utf8").trim().split("\n"), ["first-failure"]);
 });
 
-test("successful phases complete in preflight, broad, build, test order", async (t) => {
+test("successful phases complete in preflight, broad, build, test, delivery order", async (t) => {
   const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), "verification-phase-order-"));
   const markerFile = path.join(fixtureRoot, "order.txt");
   t.after(() => rmSync(fixtureRoot, { force: true, recursive: true }));
 
-  await runPlan(
+  await runLockedPlan(
     executionPlan(
       [
         markerCommand(markerFile, "static-preflight", "preflight"),
@@ -284,8 +385,10 @@ test("successful phases complete in preflight, broad, build, test order", async 
         markerCommand(markerFile, "workspace-typecheck", "preflight"),
         markerCommand(markerFile, "build", "workspace-build"),
         markerCommand(markerFile, "test", "workspace-test"),
+        markerCommand(markerFile, "delivery", "delivery"),
       ],
     ),
+    fixtureRoot,
   );
 
   const order = readFileSync(markerFile, "utf8").trim().split("\n");
@@ -293,4 +396,138 @@ test("successful phases complete in preflight, broad, build, test order", async 
   assert.ok(order.indexOf("workspace-typecheck") < order.indexOf("broad"));
   assert.ok(order.indexOf("broad") < order.indexOf("build"));
   assert.ok(order.indexOf("build") < order.indexOf("test"));
+  assert.ok(order.indexOf("test") < order.indexOf("delivery"));
+});
+
+test("a failed target delivery verifier rejects the plan after repository checks", async (t) => {
+  const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), "verification-delivery-failure-"));
+  const markerFile = path.join(fixtureRoot, "order.txt");
+  t.after(() => rmSync(fixtureRoot, { force: true, recursive: true }));
+
+  await assert.rejects(
+    runLockedPlan(
+      executionPlan(
+        [markerCommand(markerFile, "preflight", "preflight")],
+        [
+          markerCommand(markerFile, "test", "workspace-test"),
+          markerCommand(markerFile, "delivery-fail", "delivery", 1),
+        ],
+      ),
+      fixtureRoot,
+    ),
+    /Target delivery verification failed: delivery-fail/u,
+  );
+  assert.deepEqual(readFileSync(markerFile, "utf8").trim().split("\n"), [
+    "preflight",
+    "test",
+    "delivery-fail",
+  ]);
+});
+
+test("captured verifier output crosses the shared terminal-sanitization boundary", async (t) => {
+  const repositoryRoot = mkdtempSync(path.join(os.tmpdir(), "verification-captured-output-"));
+  t.after(() => rmSync(repositoryRoot, { force: true, recursive: true }));
+  const secret = `sk-${"s".repeat(32)}`;
+  const multilineSecrets = [
+    privateKeyBoundary("PRIVATE", "BEGIN"),
+    "opaque-verifier-pem-body",
+    privateKeyBoundary("PRIVATE", "END"),
+    "private_key: |",
+    "  opaque-verifier-yaml-body",
+    'token = """',
+    "opaque-verifier-toml-body",
+    '"""',
+  ].join("\n");
+  const executorUrl = new URL("./verification-executor.mjs", import.meta.url).href;
+  const lockUrl = new URL("./verification-session-lock.mjs", import.meta.url).href;
+  const childSource = `
+    import { runPlan } from ${JSON.stringify(executorUrl)};
+    import { withVerificationSessionLock } from ${JSON.stringify(lockUrl)};
+    const command = {
+      args: ["--input-type=module", "--eval", ${JSON.stringify(
+        `console.log(${JSON.stringify(`stdout ${secret} /tmp/private-verifier [31mred[0m`)}); console.error(${JSON.stringify(`stderr ${secret} /tmp/private-error`)}); console.error(${JSON.stringify(multilineSecrets)}); process.exit(1);`,
+      )}],
+      executable: process.execPath,
+      key: "sanitized-delivery",
+      label: "sanitized-delivery",
+      phase: "delivery",
+      reason: "terminal-boundary fixture",
+    };
+    const plan = {
+      admission: { canAdvanceSuccessfulBasis: false, focusedCommandOwners: [], fullRelevantPaths: [], mode: "full", reason: "fixture", uncoveredFullRelevantPaths: [], unknownPaths: [] },
+      classifiedPaths: [], gitAvailable: true,
+      options: { mode: "full", printPlan: false, simulatedPaths: [] },
+      readOnlyCommands: [], verificationScope: "complete", workspaceCommands: [command],
+    };
+    try {
+      await withVerificationSessionLock(
+        () => runPlan(plan, { repositoryRoot: ${JSON.stringify(repositoryRoot)} }),
+        { repositoryRoot: ${JSON.stringify(repositoryRoot)} },
+      );
+    } catch { process.exitCode = 0; }
+  `;
+  const result = spawnSync(process.execPath, ["--input-type=module", "--eval", childSource], {
+    cwd: path.resolve(new URL("../..", import.meta.url).pathname),
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const output = `${result.stdout}${result.stderr}`;
+  assert.doesNotMatch(
+    output,
+    new RegExp(
+      [
+        "sk-",
+        "private-verifier",
+        "private-error",
+        "opaque-verifier",
+        ["END", "PRIVATE", "KEY"].join(" "),
+        "\\u001b",
+      ].join("|"),
+      "u",
+    ),
+  );
+  assert.match(output, /<redacted-secret>/u);
+  assert.match(output, /<local-path>/u);
+});
+
+test("truncated verifier output drops an incomplete credential line on both streams", (t) => {
+  const repositoryRoot = mkdtempSync(path.join(os.tmpdir(), "verification-truncated-output-"));
+  t.after(() => rmSync(repositoryRoot, { force: true, recursive: true }));
+  const executorUrl = new URL("./verification-executor.mjs", import.meta.url).href;
+  const lockUrl = new URL("./verification-session-lock.mjs", import.meta.url).href;
+  const token = `ghp_${"a".repeat(36)}`;
+  const line = `${"p".repeat(985)}${token}\n`;
+  const childSource = `
+    import { runPlan } from ${JSON.stringify(executorUrl)};
+    import { withVerificationSessionLock } from ${JSON.stringify(lockUrl)};
+    const command = {
+      args: ["--input-type=module", "--eval", ${JSON.stringify(
+        `process.stdout.write(${JSON.stringify(line)}); process.stderr.write(${JSON.stringify(line)}); process.exit(1);`,
+      )}],
+      executable: process.execPath, key: "truncated-delivery", label: "truncated-delivery",
+      phase: "delivery", reason: "truncation fixture",
+    };
+    const plan = {
+      admission: { canAdvanceSuccessfulBasis: false, focusedCommandOwners: [], fullRelevantPaths: [], mode: "full", reason: "fixture", uncoveredFullRelevantPaths: [], unknownPaths: [] },
+      classifiedPaths: [], gitAvailable: true,
+      options: { mode: "full", printPlan: false, simulatedPaths: [] },
+      readOnlyCommands: [], verificationScope: "complete", workspaceCommands: [command],
+    };
+    try {
+      await withVerificationSessionLock(
+        () => runPlan(plan, { repositoryRoot: ${JSON.stringify(repositoryRoot)} }),
+        { repositoryRoot: ${JSON.stringify(repositoryRoot)} },
+      );
+    } catch { process.exitCode = 0; }
+  `;
+  const result = spawnSync(process.execPath, ["--input-type=module", "--eval", childSource], {
+    cwd: path.resolve(new URL("../..", import.meta.url).pathname),
+    encoding: "utf8",
+    env: { ...process.env, VERIFY_MAX_CAPTURE_BYTES: "1024" },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const output = `${result.stdout}${result.stderr}`;
+  assert.equal(output.includes(token), false);
+  assert.doesNotMatch(output, /ghp_|a{30}/u);
+  assert.equal(output.match(/incomplete final line was redacted/gu)?.length, 2);
 });

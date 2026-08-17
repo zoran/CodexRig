@@ -1,7 +1,7 @@
-import { spawnSync } from "node:child_process";
+/** Owns workspace verification behavior for the repository verification boundary. */
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import process from "node:process";
+import { discoverPnpmWorkspaceManifestPaths } from "../repository/pnpm-workspace-manifests.mjs";
 import { normalizePath, root } from "./adaptive-state.mjs";
 
 const dependencyFields = [
@@ -19,6 +19,7 @@ const fullLifecycleOrder = [
   "test:unit",
   "test:integration",
   "test:e2e",
+  "test:tenant-isolation",
 ];
 const changedLifecycleOrder = ["lint", "typecheck", "verify:preflight", "test:unit"];
 const lifecycleRoutingCategories = new Set([
@@ -101,75 +102,14 @@ function retainInternalDependencyNames(manifests) {
   }));
 }
 
-export function parsePnpmWorkspaceProjects(output, { repositoryRoot = root } = {}) {
-  let projects;
-  try {
-    projects = JSON.parse(output);
-  } catch {
-    throw new Error("pnpm workspace graph output is not valid JSON.");
-  }
-  if (!Array.isArray(projects)) throw new Error("pnpm workspace graph output must be an array.");
-
-  const lexicalRoot = path.resolve(repositoryRoot);
-  const realRoot = realpathSync(lexicalRoot);
-  const projectDirectories = new Set([realRoot]);
-  for (const project of projects) {
-    if (!project || typeof project.path !== "string" || !project.path.trim()) {
-      throw new Error("pnpm workspace graph contains a project without a path.");
-    }
-    const lexicalPath = path.resolve(lexicalRoot, project.path);
-    const lexicalRelative = path.relative(lexicalRoot, lexicalPath);
-    if (
-      lexicalRelative === ".." ||
-      lexicalRelative.startsWith(`..${path.sep}`) ||
-      path.isAbsolute(lexicalRelative)
-    ) {
-      throw new Error(`pnpm workspace project escapes the repository: ${project.path}`);
-    }
-    if (!existsSync(lexicalPath) || lstatSync(lexicalPath).isSymbolicLink()) {
-      throw new Error(`pnpm workspace project must be a real directory: ${project.path}`);
-    }
-    let ancestor = lexicalPath;
-    while (ancestor !== lexicalRoot) {
-      if (lstatSync(ancestor).isSymbolicLink()) {
-        throw new Error(`pnpm workspace project has a symlinked path component: ${project.path}`);
-      }
-      const parent = path.dirname(ancestor);
-      if (parent === ancestor) break;
-      ancestor = parent;
-    }
-    const realProject = realpathSync(lexicalPath);
-    const resolvedRelative = path.relative(realRoot, realProject);
-    if (
-      resolvedRelative === ".." ||
-      resolvedRelative.startsWith(`..${path.sep}`) ||
-      path.isAbsolute(resolvedRelative)
-    ) {
-      throw new Error(`pnpm workspace project resolves outside the repository: ${project.path}`);
-    }
-    projectDirectories.add(realProject);
-  }
-
-  const manifests = [...projectDirectories]
-    .map((packageDirectory) => loadWorkspaceManifest(realRoot, packageDirectory))
+export function discoverWorkspaceManifests({ repositoryRoot = root, relativePaths } = {}) {
+  const realRoot = realpathSync(repositoryRoot);
+  const manifests = discoverPnpmWorkspaceManifestPaths({ repositoryRoot: realRoot, relativePaths })
+    .map((relativePath) =>
+      loadWorkspaceManifest(realRoot, path.dirname(path.join(realRoot, relativePath))),
+    )
     .sort((left, right) => left.directory.localeCompare(right.directory));
   return retainInternalDependencyNames(manifests);
-}
-
-export function discoverWorkspaceManifests() {
-  const result = spawnSync("pnpm", ["list", "--recursive", "--depth", "-1", "--json"], {
-    cwd: root,
-    encoding: "utf8",
-    env: { ...process.env, PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "error" },
-    input: "",
-    maxBuffer: 16 * 1024 * 1024,
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  if (result.error || result.status !== 0) {
-    const output = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
-    throw new Error(output || "Unable to read the pnpm workspace graph.");
-  }
-  return parsePnpmWorkspaceProjects(result.stdout);
 }
 
 function recursivelyDelegatesLifecycle(command, scriptName) {

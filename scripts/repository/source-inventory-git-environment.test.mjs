@@ -1,3 +1,4 @@
+/** Verifies source inventory git environment behavior for the repository inventory and filesystem boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {

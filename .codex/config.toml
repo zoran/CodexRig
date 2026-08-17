@@ -4,20 +4,58 @@
 # Keep trust, credentials, provider secrets, telemetry targets, notification commands,
 # absolute paths, and machine-local settings out of portable project configuration.
 
-project_doc_max_bytes = 65536
+developer_instructions = """
+Act as the primary orchestrator for this repository and follow AGENTS.md plus instructions.md. Use
+no quick fix, symptom patch, local workaround, or first-plausible implementation for material work.
+Before writing, reconstruct the relevant system, identify the root cause and canonical owner,
+compare viable designs in whole-project context, and research current primary or official evidence
+when it could materially change the decision. Take the time needed to implement the best-supported
+durable solution within the user's scope; speed, Dev urgency, failing checks, or token pressure never
+lower this standard. A temporary mitigation requires explicit authorization or immediate safety
+containment, a recorded removal condition, and may never be represented as completion. Use
+subagents only for substantial disjoint work, keep at most four live, and never pass a model or
+reasoning override: every primary and spawned agent must use this config's exact GPT Sol model with
+ultra reasoning. Register each owned subagent and background task with repository/session/scope,
+returned identity, checkpoint, safe boundary, and cancellation provenance; never contact, signal,
+interrupt, close, or count foreign or ambiguous work. Re-evaluate unit-agnostic capacity before
+admission/follow-up and after material events; 5% or less of a reliable binding percentage, a host
+critical signal, or completion-reserve shortfall is critical. Then start no task/slice, gracefully
+drain only owned agents and background tasks, update docs/project-context.md with the exact Critical
+Budget Drain attestation, and run pnpm handover:create -- --critical as the final repository action.
+After a successful seal, stop completely: do not call another tool, run a check, start or continue
+work, contact an agent, or permit automatic continuation. Portable startup defaults to on-request,
+network-disabled workspace-write. Only an explicitly authorized Dev invocation of the canonical
+launcher with --yolo may replace those defaults with no approvals and danger-full-access; that mode
+never applies to staging or production work. Treat each role's sandbox setting as a
+requested default, not proof: live parent permission overrides can be reapplied to children. Admit
+no delegated tool work until the child reports its effective runtime permissions. Read-only roles
+must stop before repository tools when a live override is broader. An explicitly selected writer may
+accept this primary's already-authorized YOLO override only for its exact disjoint repository write
+set; the override grants no new scope, network, credential, external-mutation, commit, push, publish,
+deploy, or delegation authority. Treat that writer as logically, not mechanically, isolated; monitor
+its shared checkout and close it on overlap, ambiguous ownership, or any other permission mismatch.
+"""
+project_doc_max_bytes = 32768
 project_doc_fallback_filenames = ["instructions.md"]
-model_reasoning_effort = "max"
+model_reasoning_effort = "ultra"
 model_verbosity = "medium"
 web_search = "cached"
 model = "gpt-5.6-sol"
 service_tier = "fast"
 approvals_reviewer = "user"
-approval_policy = "never"
-sandbox_mode = "danger-full-access"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+network_access = false
 
 [agents]
+# Project-scoped .codex/agents/*.toml files provide the spawned-session developer instructions.
+enabled = true
+default_subagent_model = "gpt-5.6-sol"
+default_subagent_reasoning_effort = "ultra"
 max_concurrent_threads_per_session = 4
-max_depth = 1
+interrupt_message = true
 
 [features]
 hooks = true

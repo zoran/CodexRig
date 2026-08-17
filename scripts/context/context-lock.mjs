@@ -1,3 +1,4 @@
+/** Owns context lock behavior for the repository-local semantic context boundary. */
 import { randomUUID } from "node:crypto";
 import {
   existsSync,

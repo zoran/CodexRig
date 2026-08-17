@@ -1,3 +1,4 @@
+/** Owns context manifest behavior for the repository-local semantic context boundary. */
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";

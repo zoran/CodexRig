@@ -1,3 +1,4 @@
+/** Owns web stack behavior for the repository verification boundary. */
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";

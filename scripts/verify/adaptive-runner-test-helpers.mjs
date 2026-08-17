@@ -1,3 +1,4 @@
+/** Owns adaptive runner test helpers behavior for the repository verification boundary. */
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { buildPlan } from "./adaptive-runner.mjs";

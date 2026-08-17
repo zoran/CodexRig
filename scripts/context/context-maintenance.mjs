@@ -1,3 +1,4 @@
+/** Owns context maintenance behavior for the repository-local semantic context boundary. */
 import { randomUUID } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, renameSync } from "node:fs";
 import path from "node:path";
@@ -346,6 +347,7 @@ function recoverInterruptedFullPublication({
       artifactPath: artifact.path,
       expectedType: artifact.expectedType,
       label: artifact.label,
+      ownedRootPath: path.dirname(databasePath),
       ownerDevice: artifact.ownerDevice,
       testHooks,
     });
@@ -364,6 +366,7 @@ function removeInterruptedClaims(indexDirectory, summary, testHooks) {
       artifactPath: path.join(indexDirectory, entry.name),
       expectedType: match[1],
       label: "interrupted removal claim",
+      ownedRootPath: indexDirectory,
       ownerDevice,
       testHooks,
     });
@@ -484,6 +487,7 @@ function removeUnselectedModelRevisions({
       artifactPath: claim.path,
       expectedType: claim.expectedType,
       label: "interrupted model-cache removal claim",
+      ownedRootPath: modelCachePath,
       ownerDevice: inventory.modelCacheDevice,
       testHooks,
     });
@@ -495,6 +499,7 @@ function removeUnselectedModelRevisions({
       artifactPath: revisionPath,
       expectedType: "directory",
       label: "unselected model revision",
+      ownedRootPath: modelCachePath,
       ownerDevice: inventory.modelCacheDevice,
       testHooks,
     });
@@ -505,6 +510,7 @@ function removeUnselectedModelRevisions({
       artifactPath: temporaryPath,
       expectedType: "file",
       label: "model hash temporary file",
+      ownedRootPath: modelCachePath,
       ownerDevice: inventory.modelCacheDevice,
       testHooks,
     });
@@ -527,6 +533,7 @@ function removeUnselectedModelRevisions({
       artifactPath: inventory.transientConfigPath,
       expectedType: "file",
       label: "validated transient model-download config",
+      ownedRootPath: modelCachePath,
       ownerDevice: inventory.modelCacheDevice,
       testHooks,
     });
@@ -594,6 +601,7 @@ export function maintainContextIndex({
       artifactPath: artifact.path,
       expectedType: artifact.expectedType,
       label: artifact.name,
+      ownedRootPath: indexDirectory,
       ownerDevice: artifact.ownerDevice,
       testHooks,
     });

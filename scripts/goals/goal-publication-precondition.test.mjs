@@ -1,3 +1,4 @@
+/** Verifies goal publication precondition behavior for the goal closure and repository housekeeping boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
@@ -53,17 +54,38 @@ function assertGit(cwd, ...args) {
 
 function copyGoalGateRuntime(repository) {
   const runtimeFiles = [
+    "scripts/contracts/compatibility-contract.mjs",
+    "scripts/contracts/delivery-configuration.mjs",
+    "scripts/contracts/framework-contract.mjs",
+    "scripts/contracts/semver-contract.mjs",
+    "scripts/filesystem/owned-file-operations.mjs",
+    "scripts/filesystem/owned-path-safety.mjs",
     "scripts/goals/goal-publication-precondition.mjs",
     "scripts/repository/git-runtime-isolation.mjs",
+    "scripts/repository/pnpm-workspace-manifests.mjs",
     "scripts/repository/product-roots.mjs",
+    "scripts/repository/runtime-lifecycle-mutex.mjs",
+    "scripts/repository/runtime-lifecycle-process.mjs",
+    "scripts/repository/runtime-lifecycle-schema.mjs",
+    "scripts/repository/runtime-owned-state.mjs",
+    "scripts/repository/runtime-process-identity.mjs",
+    "scripts/repository/runtime-session-lease.mjs",
+    "scripts/repository/runtime-session-state.mjs",
+    "scripts/repository/sensitive-paths.mjs",
     "scripts/repository/source-inventory.mjs",
     "scripts/repository/source-inventory-policy.mjs",
     "scripts/repository/stable-file-snapshot.mjs",
+    "scripts/security/secret-patterns.mjs",
+    "scripts/terminal/terminal-output.mjs",
     "scripts/verify/adaptive.mjs",
     "scripts/verify/adaptive-options.mjs",
     "scripts/verify/adaptive-runner.mjs",
     "scripts/verify/adaptive-state.mjs",
+    "scripts/verify/delivery-artifact.mjs",
+    "scripts/verify/verification-admission-commands.mjs",
     "scripts/verify/verification-admission.mjs",
+    "scripts/verify/verification-admission-decision.mjs",
+    "scripts/verify/verification-admission-registry.mjs",
     "scripts/verify/verification-evidence-error.mjs",
     "scripts/verify/verification-evidence-store.mjs",
     "scripts/verify/verification-evidence.mjs",

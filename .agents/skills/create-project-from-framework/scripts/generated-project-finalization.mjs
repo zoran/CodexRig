@@ -1,9 +1,10 @@
+/** Owns generated project finalization behavior for the portable clean-project generation boundary. */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { formatContextError } from "../../../../scripts/context/terminal-output.mjs";
+import { formatContextError } from "../../../../scripts/terminal/terminal-output.mjs";
 import { listManagedMarkdownFiles } from "../../../../scripts/docs/document-scope.mjs";
 import { listPortableTransferFiles } from "../../../../scripts/repository/source-inventory.mjs";
 import {
@@ -11,6 +12,10 @@ import {
   scanStableRepositoryFile,
 } from "../../../../scripts/repository/stable-file-snapshot.mjs";
 import { productSourceBoundaryFindings } from "../../../../scripts/verify/path-hygiene.mjs";
+import { deliveryConfigurationPath } from "../../../../scripts/contracts/delivery-configuration.mjs";
+import { productConfigurationPath } from "../../../../scripts/contracts/product-configuration.mjs";
+import { tenancyConfigurationPath } from "../../../../scripts/contracts/tenancy-configuration.mjs";
+import { localizationConfigurationPath } from "../../../../scripts/contracts/localization-configuration.mjs";
 import { fail } from "./project-options.mjs";
 import { generatedProjectDocuments } from "./project-transfer-policy.mjs";
 
@@ -20,7 +25,13 @@ const transformedProjectPaths = new Set([
   ...generatedProjectDocuments,
   "package.json",
 ]);
-const requiredGeneratedProjectPaths = new Set([".codexrig/installation.json"]);
+const requiredGeneratedProjectPaths = new Set([
+  ".codexrig/installation.json",
+  deliveryConfigurationPath,
+  localizationConfigurationPath,
+  productConfigurationPath,
+  tenancyConfigurationPath,
+]);
 const allowedGeneratedProjectPaths = new Set([...requiredGeneratedProjectPaths, "src/.gitkeep"]);
 
 function posixRelative(root, fullPath) {
@@ -186,7 +197,7 @@ export function formatGeneratedMarkdown(sourceRoot, targetRoot) {
   const formatterPath = path.join(sourceRoot, "node_modules", "prettier", "bin", "prettier.cjs");
   if (!existsSync(formatterPath)) {
     fail(
-      "Project initialization requires the framework's installed formatter. Run mise install --locked and then mise exec --locked -- pnpm install --frozen-lockfile --ignore-scripts first.",
+      "Project initialization requires the framework's installed formatter. Run mise install --locked and then mise exec --locked -- pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile first.",
     );
   }
   const result = spawnSync(
@@ -197,6 +208,7 @@ export function formatGeneratedMarkdown(sourceRoot, targetRoot) {
       "AGENTS.md",
       "README.md",
       "docs/context-index.md",
+      "docs/future-modules.md",
       "docs/project.md",
       "instructions.md",
     ],

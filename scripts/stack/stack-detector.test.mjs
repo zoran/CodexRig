@@ -1,3 +1,4 @@
+/** Verifies stack detector behavior for the product stack detection boundary. */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -47,10 +48,28 @@ test("stack detection follows declared workspace product roots", () => {
   const result = detectStacks({ root });
   const detected = new Set(result.stacks.map((stack) => stack.id));
   assert.equal(result.failures.length, 0);
-  assert.equal(detected.has("javascript-node"), true);
+  assert.equal(detected.has("javascript-node"), false);
+  assert.equal(detected.has("typescript"), true);
   assert.equal(detected.has("react"), true);
   assert.equal(detected.has("vite"), true);
   assert.equal(detected.has("nextjs"), false);
+});
+
+test("the Node-based harness never becomes product-stack evidence for a Rust component", () => {
+  const root = fixture();
+  write(
+    root,
+    "package.json",
+    JSON.stringify({ packageManager: fixturePackageManager, private: true, type: "module" }),
+  );
+  write(root, "src/realtime/engine.rs", "pub fn tick() -> u64 { 1 }\n");
+
+  const result = detectStacks({ root });
+  const detected = new Set(result.stacks.map((stack) => stack.id));
+  assert.equal(result.failures.length, 0);
+  assert.equal(detected.has("rust"), true);
+  assert.equal(detected.has("javascript-node"), false);
+  assert.equal(detected.has("typescript"), false);
 });
 
 test("large standalone HTML remains a first-class web surface", () => {

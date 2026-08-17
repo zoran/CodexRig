@@ -1,3 +1,4 @@
+/** Owns setup regression fixtures behavior for the setup, launch, and portable project boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -41,20 +42,29 @@ export function bashSingleQuotedArray(source, name) {
 }
 
 export const validPortableConfig = `# Portable policy; assignments in comments do not count.
-project_doc_max_bytes = 65536 # bounded bootstrap context
+developer_instructions = """
+Act as the primary orchestrator. Keep at most four live agents and never pass a model or reasoning override; all use the exact GPT Sol model with ultra reasoning. Register every owned subagent and background task and leave foreign or ambiguous work untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. At 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.
+"""
+project_doc_max_bytes = 32768 # bounded bootstrap context
 project_doc_fallback_filenames = ["instructions.md"]
-model_reasoning_effort = "max"
+model_reasoning_effort = "ultra"
 model_verbosity = "medium"
 web_search = "cached"
 model = "gpt-5.6-sol"
 service_tier = "fast"
 approvals_reviewer = "user"
-approval_policy = "never"
-sandbox_mode = "danger-full-access"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+network_access = false
 
 [agents]
+enabled = true
+default_subagent_model = "gpt-5.6-sol"
+default_subagent_reasoning_effort = "ultra"
 max_concurrent_threads_per_session = 4
-max_depth = 1
+interrupt_message = true
 
 [features]
 hooks = true

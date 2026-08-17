@@ -1,3 +1,4 @@
+/** Owns install git hooks behavior for the setup, launch, and portable project boundary. */
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {

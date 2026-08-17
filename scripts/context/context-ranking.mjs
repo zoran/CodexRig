@@ -1,3 +1,4 @@
+/** Owns context ranking behavior for the repository-local semantic context boundary. */
 const lexicalStopWords = new Set([
   "and",
   "are",
@@ -14,6 +15,32 @@ const lexicalStopWords = new Set([
   "the",
   "this",
   "with",
+]);
+const futureModulePath = "docs/future-modules.md";
+const currentManifestPath = "docs/project.md";
+const futureIntentTerms = new Set([
+  "backlog",
+  "candidate",
+  "candidates",
+  "deferred",
+  "future",
+  "idea",
+  "ideas",
+  "later",
+  "planned",
+  "roadmap",
+  "wish",
+  "wishes",
+  "idee",
+  "ideen",
+  "spaeter",
+  "später",
+  "wunsch",
+  "wuensche",
+  "wünsche",
+  "zukunft",
+  "zukuenftig",
+  "zukünftig",
 ]);
 
 function compareText(left, right) {
@@ -35,6 +62,14 @@ export function tokenize(value) {
   return normalizeSearchText(value)
     .split(" ")
     .filter((token) => token.length > 1 && !lexicalStopWords.has(token));
+}
+
+export function sourceIntentScore(result, query) {
+  const queryTerms = new Set(tokenize(query));
+  const futureIntent = [...futureIntentTerms].some((term) => queryTerms.has(term));
+  if (result.path === futureModulePath) return futureIntent ? 0.04 : -0.06;
+  if (result.path === currentManifestPath && !futureIntent) return 0.01;
+  return 0;
 }
 
 function termCounts(value) {
@@ -136,6 +171,7 @@ export function rankHybridResults({ denseResults, allRows, query, limit = 5 }) {
       const reciprocalVector = vectorRank ? 1 / (40 + vectorRank) : 0;
       const reciprocalLexical = textRank ? 1 / (40 + textRank) : 0;
       const exactBoost = lexicalEntry?.lexical.exactPhrase ? 0.05 : 0;
+      const intentScore = sourceIntentScore(row, query);
       return {
         ...withoutVector(row),
         _distance: dense?._distance ?? null,
@@ -143,7 +179,8 @@ export function rankHybridResults({ denseResults, allRows, query, limit = 5 }) {
         _lexicalRank: textRank ?? null,
         _lexicalScore: lexicalEntry?.lexical.score ?? 0,
         _exactPhrase: lexicalEntry?.lexical.exactPhrase ?? false,
-        _hybridScore: reciprocalVector + reciprocalLexical * 1.15 + exactBoost,
+        _sourceIntentScore: intentScore,
+        _hybridScore: reciprocalVector + reciprocalLexical * 1.15 + exactBoost + intentScore,
       };
     })
     .filter(Boolean)

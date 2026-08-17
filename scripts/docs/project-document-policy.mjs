@@ -1,9 +1,11 @@
-import { frameworkRoot, readFrameworkContract } from "../framework/framework-contract.mjs";
+/** Owns project document policy behavior for the durable documentation contract boundary. */
+import { frameworkRoot, readFrameworkContract } from "../contracts/framework-contract.mjs";
 
 const generatedDocumentPaths = [
   "AGENTS.md",
   "README.md",
   "docs/context-index.md",
+  "docs/future-modules.md",
   "docs/project.md",
   "instructions.md",
 ];

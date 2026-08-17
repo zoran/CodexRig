@@ -1,3 +1,4 @@
+/** Owns goal publication precondition behavior for the goal closure and repository housekeeping boundary. */
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";

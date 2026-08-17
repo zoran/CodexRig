@@ -1,3 +1,4 @@
+/** Owns compatible installation test cases behavior for the dependency and toolchain maintenance boundary. */
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -97,7 +98,7 @@ export function registerCompatibleInstallationTests(transactionFixture) {
         {
           executable: "pnpm",
           args: compatibleInstallArgs,
-          ignorePnpmfile: undefined,
+          ignorePnpmfile: "true",
           scope: "project",
         },
       ],

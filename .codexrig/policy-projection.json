@@ -1,45 +1,304 @@
 {
-  "schemaVersion": 1,
-  "invariants": [
+  "schemaVersion": 3,
+  "policies": [
     {
       "id": "definition-intake",
-      "statement": "A pending manifest makes the first user interaction a focused Project Definition Intake; Codex challenges material ambiguity, gives a final correction opportunity, records only user-confirmed durable truth, and the same focused intake resumes later when a material decision changes.",
-      "surfaces": ["agents", "manifest", "readme"]
+      "version": 2,
+      "statement": "Immediately after receiving a new-project name, ask what the product should actually do and invite a detailed natural-language project/manifest description, explaining that Codex will proactively structure it, challenge gaps, and that the generated project can refine it later. Store a supplied description only as an intake draft, never as active modules. On the generated project's first interaction, inspect and evaluate any draft or filled manifest, explain the successive Project Definition Intake up front, identify strengths, gaps, and contradictions, and ask whether to refine it further or—when decision-ready—begin from the confirmed scope; an empty or materially incomplete definition continues the focused interview before dependent implementation.",
+      "projectionStatement": "A new project asks immediately for a detailed natural-language project/manifest description and explains Codex's guided, refinable Project Definition Intake. A pending or incomplete manifest triggers evaluation and focused questions before dependent implementation; drafts never invent active modules.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md", "docs/project.md"]
+    },
+    {
+      "id": "manifest-reality",
+      "version": 2,
+      "statement": "`docs/project.md` is a current-state inventory, never a roadmap: active modules must exist and be integrated, while confirmed unimplemented candidates live only in `docs/future-modules.md` and move into the manifest in the same change that implements them. A newly voiced idea is not implementation authorization; ambiguous intent must be clarified and remains non-authorizing future intent until the developer explicitly chooses current implementation.",
+      "projectionStatement": "`docs/project.md` is a current-state inventory, never a roadmap; unimplemented candidates live in `docs/future-modules.md` and move in the implementation change. A newly voiced idea is not implementation authorization; clarify ambiguity and treat it as future intent meanwhile.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": [
+        "AGENTS.md",
+        "README.md",
+        "instructions.md",
+        "docs/project.md",
+        "docs/future-modules.md"
+      ]
+    },
+    {
+      "id": "documentation-context-economy",
+      "version": 1,
+      "statement": "Documentation remains fully inspectable but has one canonical owner per concern: root `AGENTS.md` is an always-loaded safe-entry bootstrap capped at 24 KiB, `instructions.md` owns complete workflow policy, the README owns human setup/use, `docs/project.md` owns current implemented reality, `docs/future-modules.md` owns only confirmed deferred candidates, and focused documents require a distinct audience and maintenance owner. Secondary surfaces link and summarize instead of duplicating normative detail, while skills use progressive disclosure and load their full workflow only when relevant. Larger model context windows never justify repeated policy or stale documentation; completed-goal housekeeping and `docs:check` enforce bootstrap size, meaningful unique headings, valid references, and canonical-owner separation without hiding framework elements.",
+      "projectionStatement": "Keep framework elements inspectable with one canonical owner per concern: `AGENTS.md` is the always-loaded safe-entry bootstrap capped at 24 KiB, full policy stays in `instructions.md`, and skills load progressively. Secondary surfaces summarize and link; larger contexts never justify duplicated or stale policy.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": [
+        "AGENTS.md",
+        "README.md",
+        "instructions.md",
+        "docs/context-index.md",
+        "docs/future-modules.md",
+        "docs/project.md"
+      ]
+    },
+    {
+      "id": "best-available-engineering",
+      "version": 1,
+      "statement": "Never implement a material change as a quick fix, symptom patch, local workaround, or first-plausible solution. Before writing, reconstruct the relevant system, identify the root cause and canonical owner, trace contracts and consumers, compare viable designs in whole-project context, and research current primary, official, or peer-reviewed evidence whenever it could materially change the choice. Choose the best-supported durable solution within authorized scope; speed, token pressure, failing checks, and urgent Dev feedback never lower the standard. A temporary mitigation requires explicit user authorization or immediate safety containment, bounded risk and a removal condition, and durable follow-up; Dev stays fast through a sound early artifact and isolated parallel or deferred verification, not structural debt or weakened contracts.",
+      "projectionStatement": "Never use a quick fix, symptom patch, or first-plausible implementation for material work. Establish root cause and owner, compare viable designs in whole-project context, research when evidence could change the choice, and implement the best-supported durable solution. Dev speed comes from parallel or deferred verification, never lower engineering quality.",
+      "projectionSurfaces": ["agents"],
+      "reconcileDocuments": ["AGENTS.md", "instructions.md"]
     },
     {
       "id": "memory-isolation",
+      "version": 2,
       "statement": "Local Codex memory isolation is repository-local and root-bound under ignored `.codex/runtime/`; generated projects receive no framework or sibling runtime or memory state and use memories only inside their own clean runtime home.",
-      "surfaces": ["agents", "manifest", "readme"]
+      "projectionStatement": "Local Codex memory isolation is repository-local and root-bound under ignored `.codex/runtime/`; generated projects receive no source/sibling runtime state and use only their isolated runtime home.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": [".codex/README.md", "AGENTS.md", "README.md", "instructions.md"]
+    },
+    {
+      "id": "startup-reconstruction",
+      "version": 2,
+      "statement": "At every primary Codex startup or resume in a generated project, before intake-dependent implementation or a new slice, perform a complete Startup Repository Reconstruction: read bootstrap/instructions/README, the current manifest and optional bounded work state; inventory active source roots, domains/modules/surfaces, public contracts, owned data, configuration, delivery state, dependencies, tests/verifiers, and documentation; inspect Git status/diff/branch/upstream plus safe repository-owned runtime/evidence state; and use exact search plus the semantic index to trace representative relationships without blindly loading every file. Decide whether an authorized prior outcome/goal/slice is unfinished, whether the worktree contains partial, duplicate, contradictory, obsolete, or generated residue, and whether concurrent ownership is involved. Invoke `$resume-project` for unfinished work, reconcile and remove only unambiguous in-scope residue, use `$system-coherence` for material whole-project drift, rerun affected evidence and the course check, and only then begin a new slice or the pending-manifest intake. Preserve ambiguous, unrelated, user-owned, or concurrent changes and obtain clarification/coordination rather than deleting or overwriting them; memory and a quiet Git state are never proof that no prior work exists.",
+      "projectionStatement": "Startup Repository Reconstruction runs at every primary startup/resume: Codex reconstructs the complete repository state from manifest/work state, roots/modules/surfaces/contracts/config/tests/docs, Git/safe evidence, and exact plus semantic retrieval. Invoke `$resume-project` for unfinished work or safely consolidate unambiguous residue first; preserve ambiguous/user/concurrent changes and finish with a course check.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": [
+        ".codex/README.md",
+        "AGENTS.md",
+        "README.md",
+        "instructions.md",
+        "docs/project.md"
+      ]
     },
     {
       "id": "modular-boundaries",
-      "statement": "Root `src/` is the default Product Root; non-trivial product code starts as a modular monolith with cohesive replaceable components or modules, narrow public contracts, private internals, owned data and migrations, and explicit acyclic dependencies. Components must remain independently improvable or replaceable while their contracts, data semantics, lifecycle, and failure behavior stay compatible and the assembled system is verified as one functioning unit.",
-      "surfaces": ["agents", "manifest", "readme"]
+      "version": 2,
+      "statement": "Root `src/` is the default Product Root; non-trivial product code starts as a modular monolith with cohesive replaceable modules, narrow public contracts, private internals, owned data and migrations, explicit acyclic dependencies, focused verifiers, and assembled-system evidence.",
+      "projectionStatement": "Root `src/` is the default Product Root; non-trivial product code starts as a modular monolith with cohesive replaceable modules, narrow public contracts, private internals, owned data/migrations, acyclic dependencies, focused verifiers, and assembled-system evidence.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md", "docs/project.md"]
+    },
+    {
+      "id": "source-header-contract",
+      "version": 2,
+      "statement": "Every hand-authored textual file in the framework and every generated project starts with a concise format-native description of its current purpose and owning module, surface, or boundary; classes, interfaces, records, structs, enums, and nontrivial public types carry declaration-adjacent responsibility and public-contract or invariant documentation. Preserve shebang, license, and directive order; Markdown documents use meaningful unique referenceable headings, while schemas and comment-free formats use only supported title, description, kind, name, or owner metadata and never invented keys. Renames and ownership or contract changes update these descriptions in the same change, and completed-slice review plus completed-goal and scheduled housekeeping verify their freshness; generated, vendored, lock, and schema-governed artifacts remain generator/schema-owned.",
+      "projectionStatement": "Every hand-authored textual file has a format-native purpose/owner header and public types have adjacent contract/invariant documentation; preserve required preambles/schema rules and update descriptions with ownership changes. Docs use meaningful unique referenceable headings.",
+      "projectionSurfaces": ["readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md", "docs/project.md"]
+    },
+    {
+      "id": "feature-domain-placement",
+      "version": 1,
+      "statement": "Before every authorized feature, automatically decide from implemented domain language and invariants, data/lifecycle ownership, public contracts, actors and trust/operations, change reason, and dependencies whether it extends an existing module, creates a new module in an existing domain, or establishes a new domain and its first module. Every non-trivial behavior has exactly one active module owner; UI/web, Identity and Access, public API, infrastructure/delivery, and composition remain separate adapting surfaces, generic catch-all placement is invalid, and materially ambiguous placement triggers one focused question plus `$architecture-evolution` before dependent writes.",
+      "projectionStatement": "Before each feature, use domain invariants, data/lifecycle, contracts, trust/operations, change reason, and dependencies to extend an owner, create a new module in an existing domain, or establish a domain. Every behavior has one owner; ambiguity invokes `$architecture-evolution` rather than a catch-all.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md"]
+    },
+    {
+      "id": "requirement-driven-technology",
+      "version": 2,
+      "statement": "The root Node.js/pnpm/mise toolchain is Codex harness tooling, never a product-stack default. After confirmed manifest requirements and domain placement, select each module's language/framework/runtime from platform/ecosystem, hard/soft real-time latency and jitter, throughput/resources, safety/FFI, data/trust/tenancy, team/tooling, operations, and maintenance evidence; explicitly evaluate Rust and, when deterministic native/hardware/ABI constraints justify its safety cost, C/C++ for real-time/system components. As soon as comparison is meaningful, give one strong primary recommendation with at most one close alternative and explicitly ask the user to confirm, override, or delegate it before implementation. Polyglot choices need a real module/deployment boundary and narrow contracts; actual source/toolchain truth is recorded in `Runtime and technology`, `pnpm stack:detect` ignores harness-only evidence, and housekeeping rejects drift.",
+      "projectionStatement": "The Node.js/pnpm/mise root is harness tooling, not a product default. After requirements/domain placement, strongly recommend and confirm each module's stack from platform, real-time/resources, safety/FFI, trust/tenancy, team and operations evidence; record actual `Runtime and technology`, and let `pnpm stack:detect` ignore harness-only evidence.",
+      "projectionSurfaces": ["readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md"]
+    },
+    {
+      "id": "product-surface-selection",
+      "version": 3,
+      "statement": "As soon as confirmed users and workflows make it meaningful, derive whether the product is web/PWA, installed mobile, installed desktop, CLI/TUI, API/service, worker, library/SDK, embedded/realtime, or a justified combination. If unclear, promptly ask the developer about usage context, devices, install/offline/distribution, OS/hardware/background capabilities, browser/public-link reach, updates, and cross-device movement without requiring platform jargon. Give one strong recommendation with at most one close alternative and ask the user to confirm, override, or delegate it; manifest System Shape distinguishes selected from actually integrated surfaces before technology selection. Every integrated surface has its own explicit interface directory or declared product package, entry/composition boundary, platform adapters, and exposed public contract/client; surfaces never share a generic app root or deep-import one another, and only explicitly owned genuinely common domain/application contracts, view models, and presentation primitives are shared while platform lifecycle, navigation, screens/routes, adapters, assets, and delivery entrypoints remain surface-local. `scripts/verify/path-hygiene.mjs` enforces physical roots, platform-SDK locality, UI concern separation, and no cross-surface imports.",
+      "projectionStatement": "Derive and confirm web/PWA, mobile, desktop, CLI/TUI, API/service, worker, library/SDK, embedded/realtime, or combined surfaces before stack choice. Each integrated surface has its own interface directory or declared product package and composition/adapters/contracts; `scripts/verify/path-hygiene.mjs` rejects mixed or cross-imported surfaces.",
+      "projectionSurfaces": ["readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md"]
+    },
+    {
+      "id": "multi-device-experience",
+      "version": 2,
+      "statement": "Every product UI assumes mobile, tablet, and desktop unless the user confirms narrower durable scope. Web uses one content-driven responsive architecture across narrow/medium/wide viewports with feature parity, fluid/container reflow, touch/pointer/keyboard/assistive input, zoom/text reflow, orientation/safe-area/dynamic viewport handling, responsive media, and constrained-device performance; user-agent/device-width branches, fixed desktop shells, hover-only tasks, and duplicated device domain flows are invalid. The UI module owns representative experience evidence without delaying the latest Dev deploy, while surface-quality and completed-goal/scheduled housekeeping enforce the portable guard.",
+      "projectionStatement": "Every UI assumes mobile, tablet, and desktop unless scope is narrowed. Web keeps one responsive feature-parity flow across viewport, input, zoom, orientation, media, and constrained-device conditions; evidence never delays the latest Dev deploy.",
+      "projectionSurfaces": ["readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md"]
+    },
+    {
+      "id": "localization-strategy",
+      "version": 2,
+      "statement": "Source code, identifiers, filenames, tests, and technical source/declaration headers are always English. During creation and the first definition intake—before surface and stack choices harden—ask whether user-facing UI, public content/metadata, emails/notifications, support, and legal text are single- or multi-locale, then confirm default, supported, and fallback locales plus locale-sensitive formatting and translation ownership when relevant. Every generated child keeps this decision in project-owned `config/localization.json` and manifest truth; `pending` is valid only before product implementation. User-facing language changes use `$native-language-content-review`, and `pnpm localization:check` runs through setup, completed-goal, and scheduled housekeeping.",
+      "projectionStatement": "Source code and technical headers stay English. Confirm single/multi-locale user content early in project-owned `config/localization.json`; pending ends before product code, and changes use `$native-language-content-review` plus `pnpm localization:check`.",
+      "projectionSurfaces": ["readme"],
+      "reconcileDocuments": [
+        "AGENTS.md",
+        "README.md",
+        "config/localization.json",
+        "instructions.md",
+        "docs/project.md"
+      ]
+    },
+    {
+      "id": "architecture-evolution",
+      "version": 4,
+      "statement": "Material changes to product purpose, domain model, system shape, module boundaries, ownership, UI or web surfaces, Identity and Access, public APIs, or infrastructure invoke `$architecture-evolution` for an architecture and repository-layout reassessment; reshape stale files and keep UI/presentation, Identity and Access, public API contracts and transport, domain code, and infrastructure in explicit separately owned roots and internal code boundaries instead of extending an obsolete or mixed structure.",
+      "projectionStatement": "Material product/domain/system/module/surface changes invoke `$architecture-evolution` and reshape stale files. Keep UI/presentation, Identity and Access, public API contracts/transport, domain code, and infrastructure in explicit separate ownership.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md", "docs/project.md"]
+    },
+    {
+      "id": "system-coherence",
+      "version": 1,
+      "statement": "Every completed non-trivial implementation, architecture, configuration-boundary, or integration slice invokes `$system-coherence` before acceptance: inspect the change through current manifest/module ownership, real consumers, and a representative assembled flow; search for competing sources of truth, semantic duplication, misplaced behavior, leaking contracts, dependency/layout drift, and locally clean code that harms the system; then repair material findings at the canonical owner and remove superseded paths. Intentional duplication must have distinct semantics and ownership, while a material topology or migration finding invokes `$architecture-evolution`. In Dev this work runs in a disjoint parallel lane or after the newest developer deploy, never ahead of that feedback loop, but it must finish before the slice becomes a stable dependency or staging/prod input.",
+      "projectionStatement": "Every non-trivial completed slice invokes `$system-coherence`: inspect a representative assembled flow and real consumers for semantic duplication, competing truth, misplaced ownership, leaking contracts, and structural drift, then repair the canonical owner. Run beside/after the newest developer deploy, but before acceptance or promotion.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md", "docs/project.md"]
+    },
+    {
+      "id": "identity-access-boundary",
+      "version": 1,
+      "statement": "Identity and Access is a dedicated trust and domain boundary: authentication and credentials/authenticators, authorization and server-side policy decisions, principal/account lifecycle and user management, sessions/tokens, audit/persistence, and identity-provider adapters have separate internal owners behind narrow public ports. UI, web, public APIs, product domains, and infrastructure never own or deep-import provider, credential, grant, or session internals; provider settings have one typed environment-aware owner with separate secrets and no product-brand fallback; every material Auth change invokes both `$architecture-evolution` and `$security-review`, with `pnpm auth:check` as its portable structural guard.",
+      "projectionStatement": "Identity and Access separately owns authentication, authorization, user management, sessions/tokens, audit/persistence, and provider adapters behind public ports. UI/web/public APIs/domains/infrastructure do not own its internals; Auth changes invoke `$architecture-evolution`, `$security-review`, and `pnpm auth:check`.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md", "docs/project.md"]
+    },
+    {
+      "id": "tenant-isolation",
+      "version": 1,
+      "statement": "Every generated project is tenant-capable from creation through visible project-owned `config/tenancy.json`; pending resolution is valid only before product implementation. The first product slice establishes trusted tenant-context resolution, deny-by-default isolation policy, and narrow public ports; principal, verified tenant membership, action, and resource are authorized together, while data/uniqueness/migrations, cache/files/search, messages/jobs, quotas, observability, integrations, and lifecycle stay tenant-scoped. Global or cross-tenant control-plane behavior requires a separate explicit audited capability with no default tenant. Every active module records its isolation and owns negative cross-tenant lifecycle evidence; material changes invoke `$architecture-evolution` and `$security-review`, and `pnpm tenancy:check` runs directly and through completed-goal and scheduled housekeeping.",
+      "projectionStatement": "Every child is tenant-capable through `config/tenancy.json`; before product code, add trusted tenant context, deny-by-default isolation, and public ports across Auth, data, caches/files/search, jobs, and operations. No default tenant; modules own negative cross-tenant evidence and `pnpm tenancy:check`.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "config/tenancy.json", "instructions.md"]
+    },
+    {
+      "id": "white-label-products",
+      "version": 1,
+      "statement": "Every generated product is white-label: `config/product.json` begins as the visible replaceable owner for public identity, brand/theme/assets, public endpoints/contacts, and application IDs, deliberately without a public name or repository/package-name fallback; every other setting has one typed owner at its module or composition boundary with checked-in safe defaults, explicit environment overlays, and separate secrets. CodexRig framework metadata remains inspectable for developers but never enters product-facing runtime, UI, public artifacts, metadata, or deployment output.",
+      "projectionStatement": "Every generated product is white-label: `config/product.json` owns replaceable public identity without repository/package-name fallback; other settings have typed owners, overlays, and separate secrets. Framework metadata stays inspectable but never product-facing.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": [
+        "AGENTS.md",
+        "README.md",
+        "config/product.json",
+        "instructions.md",
+        "docs/project.md"
+      ]
+    },
+    {
+      "id": "licensing-attribution",
+      "version": 1,
+      "statement": "CodexRig and every noncommercial generated project retain the unmodified PolyForm Noncommercial License 1.0.0, the exact Required Notice, the Zoran Kikic author credit, and the CodexRig Framework credit as managed portable creation and upgrade inputs. Commercial use requires a separate express written license from Zoran Kikic. CodexRig itself always retains its license and credits; only a separate written commercial license may expressly permit their removal from its specifically licensed generated project, and noncommercial use never permits removal. Developer/source attribution remains separate from white-label product-facing output, and `pnpm license:check` fails closed on drift.",
+      "projectionStatement": "Retain `LICENSE`, `NOTICE`, Zoran Kikic, and CodexRig Framework credits in CodexRig and every noncommercial generated project. Commercial use needs a separate written license; only it may permit credit removal from its specifically licensed generated project, never from CodexRig itself. Keep required source attribution separate from white-label output and run `pnpm license:check`.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md"]
+    },
+    {
+      "id": "codex-runtime-permissions",
+      "version": 1,
+      "statement": "Portable Codex sessions default to on-request approval and network-disabled workspace-write. Only an explicitly authorized Dev session launched through the canonical `--yolo` control may use no approvals and danger-full-access; that mode never applies to staging or production, never broadens authority, and is bound into startup attestation.",
+      "projectionStatement": "Portable Codex sessions default to on-request approval and network-disabled workspace-write; only an explicitly authorized Dev session launched with `--yolo` may use no approvals and danger-full-access, never staging or production.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": [".codex/README.md", "AGENTS.md", "README.md", "instructions.md"]
+    },
+    {
+      "id": "agent-orchestration",
+      "version": 14,
+      "statement": "The primary fully orchestrates delegated work, admits at most four live subagents by default only after a completion-budget check, and requires the global delegated defaults, every role, and every subagent to use the exact same configured GPT Sol model and `ultra` reasoning as the primary; no spawn override may differ, a future Sol-version change updates every intelligence setting atomically, and delegation fails closed if the harness cannot guarantee parity. Tracked root `developer_instructions` in `.codex/config.toml` inject primary orchestration, ownership/provenance, intelligence parity, critical drain, and terminal-handover behavior; its `[agents]` table owns the exact global defaults and ceiling, project-scoped `.codex/agents/*.toml` layers inject bounded role behavior, and validation rejects missing or divergent policy. Role sandbox settings are requested defaults because live parent permission overrides, including YOLO, are reapplied to children. Before any delegated repository tool, every child reports its effective runtime permissions. Read-only roles stop on a broader override. An explicitly selected writer may accept the same primary turn's already-authorized YOLO/danger-full-access override only for its canonical repository root and exact disjoint write set; this grants no new scope, network, credential, external-mutation, commit, push, publication, deployment, or delegation authority. Any other permission mismatch, uncertain provenance, or overlap stops delegated repository work. Every spawn and background process is recorded before use with repository realpath and stable identity, primary session/thread identity, canonical task, scope, returned identity, checkpoint, safe-boundary behavior, and cancellation provenance. Account- or host-wide listings are untrusted discovery only: the primary acts exclusively on complete registry matches and never contacts or changes foreign or ambiguous work. Capacity uses the most constraining current host signal without assuming a billing period or unit: a reliable remaining percentage is guarded at 10% or less and critical at 5% or less, an absolute remaining token/credit amount is compared directly with bounded work and completion reserves, any host critical/exhaustion signal or reserve shortfall is critical, and unavailable or unauthorized redeem/reset capacity counts as zero. Monitoring runs before admission/follow-up and after material results, scope changes, long waits, checkpoints, and host warnings, with no more than ten minutes between heartbeats during active delegation unless a known long-running operation has an explicit checkpoint; every slice has Orchestration Housekeeping and every goal has its deep form. Guarded state stops optional delegation, shortens checkpoints, and keeps the single bounded `docs/project-context.md` current. Critical state starts no subagent, task, or slice; it drains every provenance-bound owned agent and process to a safe boundary, records all handoffs, closes them, confirms none remain, and only then seals a resumable handover. Peers may exchange bounded evidence, status, contract implications, readiness, and risk only when the primary supplies their identities and scopes; every direct exchange is mirrored immediately to the primary and never changes delegation, ownership, write authority, integration, or lifecycle control. Within one primary-owned local run, writers may share a checkout only under exact disjoint file ownership that the primary continuously monitors; across accounts, machines, or independent sessions, every writer uses a dedicated worktree or clone plus confirmed shared coordination. This is logical isolation, never a false sandbox claim. The primary retains integration authority and never permits a subagent to commit, merge, push, publish, deploy, use credentials, or delegate. Every spawn has a task-appropriate checkpoint; the primary audits only its provenance-bound agents at checkpoints, handoffs, new admission, completed-goal housekeeping, and final handoff, accepts or preserves each result, closes completed agents, interrupts idle, blocked, abandoned, or redundant owned agents without a concrete assignment, and informs affected active agents about accepted results, changed contracts or assumptions, remaining work, and released ownership or slots.",
+      "projectionStatement": "The primary admits at most four live subagents after a completion-budget check; root `developer_instructions`, global delegated defaults, every role, and each subagent enforce primary orchestration plus the exact same configured GPT Sol model and `ultra` reasoning, with no spawn override. Role sandboxes are requested defaults because live parent and YOLO overrides are reapplied: every child reports effective permissions before repository tools; read-only roles stop on a broader override, while an explicit writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set and gains no additional authority. Register every agent and background task with repository, primary-session, scope, returned identity, checkpoint, and cancellation provenance; act only on complete owned matches and never touch foreign or ambiguous work. Use the most constraining capacity signal without assuming a billing period or unit; compare each remaining token/credit amount with completion reserves, treat 5% or reserve shortfall as critical, and run Orchestration Housekeeping after every slice with no more than ten minutes between heartbeats. Guarded work keeps `docs/project-context.md` current; critical work drains all provenance-bound owned subagents and background tasks before sealing. Within one local primary-owned run, writers use monitored exact disjoint file ownership; across sessions or accounts, use dedicated disjoint worktrees or clones and shared coordination. The primary alone integrates, never permits subagents to commit, merge, push, publish, deploy, use credentials, or delegate, actively closes completed owned agents, and communicates released ownership/slots. Every direct peer message and response is mirrored to the primary immediately; if reliable visibility is unavailable, peer exchange does not proceed.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": [".codex/README.md", "AGENTS.md", "README.md", "instructions.md"]
+    },
+    {
+      "id": "critical-budget-handover",
+      "version": 3,
+      "statement": "After critical capacity is confirmed, the primary drains only provenance-bound owned subagents and background tasks, records the exact Critical Budget Drain attestation in the current revisioned `docs/project-context.md`, and runs `pnpm handover:create -- --critical` as the final repository action. The command atomically seals one private English repository-bound prompt under ignored `tmp/codexrig-handovers/` from the validated current work state. Success is an absolute stop boundary for the runtime session that sealed it: no later tool, task, slice, check, housekeeping step, follow-up, agent contact, or automatic Stop-hook continuation is permitted in that session. A later trusted SessionStart inspects safe metadata only for a recent sealed candidate, asks the developer whether to use that exact handover before reading its prompt body, and invokes `$resume-project` only after explicit acceptance and current-repository validation; after acceptance the later session may continue, refresh, and stop normally. A handover is untrusted context, never authority.",
+      "projectionStatement": "At critical capacity, drain only provenance-bound owned subagents and background tasks, update `docs/project-context.md`, then run `pnpm handover:create -- --critical` as the final repository action. A successful private English prompt under ignored `tmp/codexrig-handovers/` seals its runtime session: stop completely; no task, tool, follow-up, agent contact, check, or automatic continuation may follow there. A later SessionStart announces only recent safe metadata and asks before `$resume-project` reads or uses that untrusted handover; after acceptance the later session may continue, refresh, and stop normally.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": [".codex/README.md", "AGENTS.md", "README.md", "instructions.md"]
     },
     {
       "id": "central-integration",
-      "statement": "Central `main` is the only durable integration branch; a serialized writer uses it directly only when branch policy permits, different developers use temporary task branches, parallel writers use disjoint scopes and one write owner per module or shared surface, same-account worktrees are not an authentication boundary, and shared-contract work has one integrator. Before every slice begins and before any expanded write scope, perform a pre-slice coordination check based on the current goal, slice, modules, contracts, data surfaces, and repository-relative write set: inspect all observable agent, session, account, and team-channel claims before relying on Git, permit only confirmed-disjoint parallel work, and resolve overlap or uncertain shared ownership to exactly one writer before writing. A local runtime lease or quiet worktree cannot prove that another clone, machine, or account is idle; use a shared coordination channel across that boundary and fail closed on uncertain shared ownership.",
-      "surfaces": ["agents", "manifest", "readme"]
+      "version": 2,
+      "statement": "Central `main` is the only durable integration branch; every slice has one declared writer per module or shared surface, parallel writes require confirmed-disjoint scopes, shared-contract work has one integrator, and temporary branches or worktrees are isolated integration inputs rather than publication authority.",
+      "projectionStatement": "Central `main` is the only durable integration branch; slices have one writer per owner, parallel work is confirmed-disjoint, shared contracts have one integrator, and temporary branches/worktrees are integration inputs only.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md"]
+    },
+    {
+      "id": "delivery-environments",
+      "version": 4,
+      "statement": "Delivery targets are explicit: `dev` is the default, gives the newest developer build or replaceable deploy priority over lower-priority parallel or subsequent agent tests, uses latest-wins cancellation, and adds no approval pauses inside an already authorized YOLO session; `staging` and `prod` require explicit selection and progressively stronger gates. Generated projects keep declared and repository-detected integrated environments in project-owned `config/delivery.json` without treating the Dev default as proof that a deployment exists. Stronger-target repository evidence requires a clean current commit, a real ignored `.delivery/` manifest whose target, source commit, sorted artifact files and non-secret configuration files are rehashed from actual bytes and modes, and a project-owned `verify:staging` or `verify:prod` command executed after repository/build/test checks; caller-asserted digests are forbidden, and artifact, configuration, or target-plan drift invalidates evidence.",
+      "projectionStatement": "Delivery is explicit: `dev` is the default; the newest developer build/deploy wins over parallel or later tests and an already authorized YOLO session adds no approval pauses. Staging/prod require explicit stronger gates; `config/delivery.json` separates selected default from real integrated targets. Stronger evidence uses a clean commit, an actual rehashed `.delivery/` artifact/config manifest, and the project-owned target verifier—never a caller-asserted digest.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": [
+        "AGENTS.md",
+        "README.md",
+        "config/delivery.json",
+        "instructions.md",
+        "docs/project.md"
+      ]
+    },
+    {
+      "id": "repository-housekeeping",
+      "version": 5,
+      "statement": "Housekeeping has two explicit layers: primary-owned Orchestration Housekeeping observes host capacity, provenance-bound owned agents, checkpoints, handoffs, ownership, bounded work state, and shared coordination on material events and after every slice; repository-only `repo:housekeeping` can observe none of that host state. Every completed goal runs the deep orchestration layer and then one primary-owned `repo:housekeeping --apply` reconciliation before its goal-wide documentation review, final audit, verification, and publication. In the reusable source framework the command also queries the configured central remote branch read-only, requires its unique live commit to equal the local tracking ref, classifies active changes against that immutable publication baseline with conservative SemVer impact, and transactionally synchronizes `.codexrig/framework.json`, `package.json`, and the bounded manifest version block through a crash-recoverable journal; generated products retain an independent product/package version and record their installed framework version only in `.codexrig/installation.json`. The command updates only unambiguous repository facts such as detected delivery inventory and its bounded manifest projection, then checks architecture, docs and source headers, tenant/Auth/surface/white-label boundaries, dependencies, secrets, tool/model policy, and framework health without deploying, committing, pushing, or mutating external environments. Ambiguous evidence fails closed for developer classification; scheduled CI runs the read-only online check.",
+      "projectionStatement": "Housekeeping has two explicit layers: primary-owned Orchestration Housekeeping handles budget and provenance-bound owned agents after every slice and deeply at goals; repository-only `repo:housekeeping --apply` reconciles unambiguous local facts and checks health. In CodexRig source it queries the configured central remote branch, requires the live commit to equal the local tracking ref, and transactionally reconciles SemVer from that publication baseline through crash-recoverable state; a generated product keeps its own product version and only receipts the installed framework version. It never deploys, commits, pushes, or mutates external state.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md", "docs/project.md"]
     },
     {
       "id": "verification-lifecycle",
-      "statement": "Every new feature and complex task uses reviewable slices; every completed slice repeats focused verification and review/repair until no relevant finding remains, then receives a fresh audit and whole-repository course check, any audit finding reopens the loop, and the course check repeats at each major milestone. When research or publications inform work, search for and prioritize the newest relevant primary or official sources, verify publication or update date, version, correction or retraction state, and applicability, distinguish evidence from inference, and use older sources primarily for comparison or historical context; rely on an older foundational or controlling source as current authority only with an explicit reason and verification that newer evidence has not superseded it. At every completed goal, before the final audit and publication, perform an all-document currency review of all active documentation against current behavior and durable truth; update only where needed, consolidate or remove obsolete and duplicate material instead of appending history, and preserve every active directive. Consolidation is not a shortening target. Treat the durable project manifest as critical documentation; inspect it and every other critical authority read-only first, change them automatically only when the factual correction and full preservation are unambiguous, otherwise obtain explicit user confirmation before writing, and give every authorized critical-document change a separate preservation review.",
-      "surfaces": ["agents", "manifest", "readme"]
+      "version": 2,
+      "statement": "Complex work uses reviewable slices, focused changed-path evidence, review and repair to zero relevant findings, a fresh audit, whole-repository course checks, and one final verification on the actual integration state; environment-specific evidence never promotes to a stronger target implicitly.",
+      "projectionStatement": "Complex work uses reviewable slices, focused changed-path evidence, review/repair to zero relevant findings, a fresh audit, whole-repository course checks after every slice and goal, and one final verification on actual integration state.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md"]
     },
     {
       "id": "authorized-continuation",
-      "statement": "Never end at \"ready to implement\" when implementation is already authorized. Plans, research, recaps, gates, reviews, audits, and readiness statements are intermediate. An authorized outcome spanning multiple goals or sessions keeps a bounded `docs/project-context.md` `codexrig-work-state` marker; only a durable local Stop event with a non-null `transcript_path` may reopen active work. Ephemeral side conversations and other transcriptless contexts exit before work-state or index access, while `stop_hook_active` plus private per-session state lets an unchanged already-continued durable turn stop instead of looping and a changed revision continue again. Failed publication leaves the current goal open, and published goals advance with `pnpm goal:new` without waiting for another prompt until the outcome or a real blocker is reached.",
-      "surfaces": ["agents", "manifest", "readme"]
+      "version": 2,
+      "statement": "Never end at \"ready to implement\" when implementation is already authorized. Plans, research, recaps, gates, reviews, audits, and readiness statements are intermediate; continue through the complete outcome and published goal checkpoints until a real authority, safety, integration, or external blocker remains.",
+      "projectionStatement": "Never end at \"ready to implement\" when implementation is already authorized. Plans, research, reviews, audits, and goals are intermediate until the complete outcome or a real blocker.",
+      "projectionSurfaces": ["agents", "readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md"]
     },
     {
       "id": "provider-parity",
-      "statement": "GitHub and GitLab keep equivalent portable CI, protected review and green-CI intent, provider-owned API configuration, and read-back verification; GitHub merge queues and GitLab merge trains provide equivalent merge serialization.",
-      "surfaces": ["agents", "manifest", "readme"]
+      "version": 2,
+      "statement": "GitHub and GitLab retain equivalent portable CI, protected-review, green-CI, provider-owned configuration, read-back verification, and serialized-merge intent without environment branches.",
+      "projectionStatement": "GitHub and GitLab keep equivalent portable CI, protected review, green-CI, read-back configuration, and serialized-merge intent without environment branches.",
+      "projectionSurfaces": ["readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md"]
+    },
+    {
+      "id": "semantic-child-upgrades",
+      "version": 3,
+      "statement": "Framework upgrades update managed capabilities transactionally and reconcile versioned policy concepts into each child's local truth; they never copy project-owned documents blindly or invent active product modules. The sole bootstrap from a published 1.2.1 child is initiated by the reviewed current source, validates the exact schema-1 contract, receipt, and policy inventory, migrates them transactionally to version 2, and retains no parallel legacy runtime or old-updater interpretation of a newer major schema.",
+      "projectionStatement": "Framework upgrades transactionally update managed capabilities and reconcile versioned policy IDs into local truth; project-owned documents are never blindly copied and active modules are never invented. A published 1.2.1 child uses one reviewed source-owned schema-1-to-2 bootstrap and retains no legacy runtime afterward.",
+      "projectionSurfaces": ["readme"],
+      "reconcileDocuments": [
+        "AGENTS.md",
+        "README.md",
+        "instructions.md",
+        "docs/project.md",
+        "docs/future-modules.md"
+      ]
     },
     {
       "id": "framework-lifecycle",
-      "statement": "`.codexrig/framework.json` and `.codexrig/` own versioned compatibility, startup, provider, and upgrade policy; `pnpm framework:doctor -- --online` diagnoses health, only a reviewed, trusted CodexRig checkout may be applied, and transactional upgrades preserve unrelated local changes.",
-      "surfaces": ["agents", "manifest", "readme"]
+      "version": 4,
+      "statement": "`.codexrig/` owns versioned framework, compatibility, installation, managed-surface, provider, and upgrade contracts; only reviewed sources may update a child, and every update is previewed, receipt-backed, transactional, and verified after local reconciliation.",
+      "projectionStatement": "`.codexrig/` owns versioned framework/compatibility/upgrade contracts; only reviewed sources update children through previewed, receipt-backed transactions followed by local reconciliation and verification.",
+      "projectionSurfaces": ["readme"],
+      "reconcileDocuments": [".codex/README.md", "AGENTS.md", "README.md", "instructions.md"]
+    },
+    {
+      "id": "framework-versioning",
+      "version": 4,
+      "statement": "The reusable CodexRig source has one stable SemVer owner in `.codexrig/framework.json`, mirrored exactly in root `package.json` and the bounded source-manifest version block. Completed-goal `repo:housekeeping --apply` resolves the configured central-main remote and branch, reads its unique live commit, requires the local remote-tracking ref to match it exactly and remain an ancestor of local `HEAD`, and classifies every unpublished commit plus active tracked and untracked change against that immutable publication baseline: removals or incompatible contract/policy/managed-surface changes require major, behavior/capability/policy changes require minor, and documentation/test-only changes require patch; it selects at least the required next version without downgrading an explicit higher valid release and transactionally writes all mirrors through crash-recoverable state. Missing, stale, or ambiguous remote/upstream identity fails closed. Repeated runs are idempotent, read-only and scheduled checks fail on drift, and a functional source release can never reuse its published version. Generated projects keep their independent product/package version; `.codexrig/installation.json` alone records which framework version they installed, and framework upgrades never overwrite product versioning.",
+      "projectionStatement": "CodexRig source owns one stable SemVer in `.codexrig/framework.json`, transactionally mirrored to root package metadata and its source manifest by completed-goal housekeeping from the unique live configured central-remote commit, which must match the local tracking ref, through crash-recoverable state; breaking/behavior/docs-only changes require major/minor/patch and reruns are idempotent. Generated products keep an independent product version; `.codexrig/installation.json` records their installed framework version.",
+      "projectionSurfaces": ["readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md", "docs/project.md"]
+    },
+    {
+      "id": "framework-transparency",
+      "version": 2,
+      "statement": "Framework behavior is inspectable: portable policy, roles, skills, hooks, managed files, exclusions, and upgrade actions are tracked and documented; only explicitly documented sensitive or disposable runtime state is ignored, never normative project policy.",
+      "projectionStatement": "Framework policy, roles, skills, hooks, managed files, exclusions, receipts, and upgrade actions stay tracked and inspectable; only documented sensitive/disposable runtime state is ignored, never normative policy.",
+      "projectionSurfaces": ["readme"],
+      "reconcileDocuments": ["AGENTS.md", "README.md", "instructions.md"]
     }
   ]
 }

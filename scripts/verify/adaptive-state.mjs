@@ -1,3 +1,4 @@
+/** Owns adaptive state behavior for the repository verification boundary. */
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
@@ -54,6 +55,24 @@ const applicationSourceExtensions = new Set([
   ".svelte",
   ".vue",
 ]);
+const identityAccessBoundaryNames = new Set([
+  "access-control",
+  "auth",
+  "authentication",
+  "authorization",
+  "iam",
+  "identity",
+  "identity-access",
+]);
+const tenancyBoundaryNames = new Set([
+  "multi-tenant",
+  "multitenancy",
+  "tenant",
+  "tenant-context",
+  "tenancy",
+  "tenants",
+]);
+const moduleWrapperNames = new Set(["capabilities", "domains", "features", "modules"]);
 const localSourceClassificationCodes = new Set([
   "backup-file",
   "generated-runtime-directory",
@@ -384,6 +403,28 @@ function isAppRuntimeSource(filePath, productLayout) {
   );
 }
 
+function isIdentityAccessPath(filePath, productLayout) {
+  if (!isProductImplementationPath(filePath, productLayout)) return false;
+  const sourceRoot = [...productLayout.sourceRoots]
+    .sort((left, right) => right.length - left.length)
+    .find((candidate) => filePath === candidate || filePath.startsWith(`${candidate}/`));
+  if (!sourceRoot) return false;
+  const segments = filePath.slice(sourceRoot.length).replace(/^\//u, "").split("/");
+  const boundaryIndex = moduleWrapperNames.has(segments[0]) ? 1 : 0;
+  return identityAccessBoundaryNames.has(segments[boundaryIndex]);
+}
+
+function isTenancyPath(filePath, productLayout) {
+  if (!isProductImplementationPath(filePath, productLayout)) return false;
+  const sourceRoot = [...productLayout.sourceRoots]
+    .sort((left, right) => right.length - left.length)
+    .find((candidate) => filePath === candidate || filePath.startsWith(`${candidate}/`));
+  if (!sourceRoot) return false;
+  const segments = filePath.slice(sourceRoot.length).replace(/^\//u, "").split("/");
+  const boundaryIndex = moduleWrapperNames.has(segments[0]) ? 1 : 0;
+  return tenancyBoundaryNames.has(segments[boundaryIndex]);
+}
+
 function isInfrastructure(filePath) {
   return (
     filePath.startsWith("infra/") ||
@@ -401,6 +442,10 @@ function isInfrastructure(filePath) {
 
 function isRepositorySourcePolicy(filePath) {
   return filePath === ".gitignore" || filePath === ".gitattributes";
+}
+
+function isLicensingContract(filePath) {
+  return filePath === "LICENSE" || filePath === "NOTICE";
 }
 
 export function classifyPath(inputPath, { productLayout } = {}) {
@@ -454,8 +499,13 @@ export function classifyPath(inputPath, { productLayout } = {}) {
   if (filePath.startsWith("scripts/setup/")) categories.push("setup workflow");
   if (filePath === "scripts/README.md") categories.push("script catalog");
   if (isDependencyFile(filePath)) categories.push("dependency/package manager files");
+  if (isLicensingContract(filePath)) categories.push("licensing and attribution contract");
   if (isRepositorySourcePolicy(filePath)) categories.push("repository source-policy surface");
   if (isAppRuntimeSource(filePath, layout)) categories.push("app/package/service/runtime source");
+  if (isIdentityAccessPath(filePath, layout)) {
+    categories.push("identity/access trust boundary");
+  }
+  if (isTenancyPath(filePath, layout)) categories.push("tenant-isolation trust boundary");
   if (isInfrastructure(filePath)) categories.push("infrastructure/runtime config");
   if (isImageAsset(filePath, layout)) categories.push("image asset surface");
   if (categories.length === 0) categories.push("unknown or incomplete change scope");
@@ -470,6 +520,7 @@ export function isFullRelevantPath(filePath, options) {
       "dependency/package manager files",
       "framework scripts",
       "infrastructure/runtime config",
+      "licensing and attribution contract",
       "repository source-policy surface",
       "unknown or incomplete change scope",
     ].includes(category),

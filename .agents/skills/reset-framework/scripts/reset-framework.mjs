@@ -1,15 +1,12 @@
 #!/usr/bin/env node
+/** Owns reset framework behavior for the reusable framework reset boundary. */
 import {
-  chmodSync,
   existsSync,
   lstatSync,
-  mkdirSync,
   readFileSync,
   readlinkSync,
   readdirSync,
   realpathSync,
-  renameSync,
-  rmSync,
   rmdirSync,
   statSync,
 } from "node:fs";
@@ -19,12 +16,27 @@ import { fileURLToPath } from "node:url";
 import { removeOwnedContextIndex } from "../../../../scripts/context/clean-context-index.mjs";
 import { isRepositoryProcessArtifactPath } from "../../../../scripts/docs/document-scope.mjs";
 import {
+  chmodOwnedRegularFile,
+  renameOwnedRegularFile,
+} from "../../../../scripts/filesystem/owned-file-operations.mjs";
+import {
+  claimAndRemove,
+  ensureOwnedPrivateDirectory,
+} from "../../../../scripts/filesystem/owned-path-safety.mjs";
+import {
   isPrivateCodexRuntimePath,
   isRepositoryCodexHomePath,
   repositoryCodexRuntimeCacheDirectory,
   repositoryCodexRuntimeDirectory,
 } from "../../../../scripts/repository/source-inventory.mjs";
+import {
+  acquireRuntimeLifecycleLock,
+  releaseRuntimeLifecycleLock,
+  runtimeLifecycleGuardName,
+  runtimeLifecycleLockName,
+} from "../../../../scripts/repository/runtime-session-lease.mjs";
 import { inspectRuntimeSessionLease } from "../../../../scripts/setup/startup-attestation.mjs";
+import { inspectVerificationSessionLock } from "../../../../scripts/verify/verification-session-lock.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(scriptDirectory, "..", "..", "..", "..");
@@ -68,7 +80,13 @@ const portableCodexEntries = new Set([
   "hooks.json",
   "runtime",
 ]);
-const preservedRuntimeFiles = new Set(["auth.json", "config.toml", "installation_id"]);
+const preservedRuntimeFiles = new Set([
+  "auth.json",
+  "config.toml",
+  "installation_id",
+  runtimeLifecycleGuardName,
+  runtimeLifecycleLockName,
+]);
 // Source order is migration policy: the immediately previous root CODEX_HOME wins over older
 // abandoned `.codex/*` copies when no canonical `.codex/runtime/*` identity exists yet.
 const migrationContracts = Object.freeze([
@@ -212,6 +230,12 @@ function linuxProcessHasOpenRuntime(root, processId) {
       }
       if (!path.isAbsolute(target)) continue;
       const relative = relativePath(root, target);
+      if (
+        relative === `${repositoryCodexRuntimeDirectory}/${runtimeLifecycleGuardName}` ||
+        relative === `${repositoryCodexRuntimeDirectory}/${runtimeLifecycleLockName}`
+      ) {
+        continue;
+      }
       if (!relative.startsWith("../") && isPrivateCodexRuntimePath(relative)) return true;
     }
   } catch (error) {
@@ -274,17 +298,16 @@ function sameFiles(left, right) {
   return leftStats.size === rightStats.size && readFileSync(left).equals(readFileSync(right));
 }
 
-function ensureRuntimeDirectory(root) {
+export function ensureRuntimeDirectory(root, { testHooks } = {}) {
   const runtimePath = absolutePath(root, repositoryCodexRuntimeDirectory);
-  const stats = entryStats(runtimePath);
-  if (stats) {
-    if (stats.isSymbolicLink() || !stats.isDirectory()) {
-      fail("Reset refused: .codex/runtime must be a real directory.");
-    }
-  } else {
-    mkdirSync(runtimePath, { mode: 0o700 });
-  }
-  chmodSync(runtimePath, 0o700);
+  ensureOwnedPrivateDirectory(root, runtimePath, "Codex runtime directory", {
+    testHooks: {
+      beforeDirectoryCreate: ({ parent }) =>
+        testHooks?.beforeRuntimeDirectoryCreate?.({ parentBinding: parent, runtimePath }),
+      beforeDirectoryModeRepair: ({ parent }) =>
+        testHooks?.beforeRuntimeDirectoryChmod?.({ parentBinding: parent, runtimePath }),
+    },
+  });
   return runtimePath;
 }
 
@@ -316,16 +339,27 @@ function planMigrations(root) {
   return migrations;
 }
 
-function applyMigrations(root, migrations) {
+export function applyMigrations(root, migrations, { testHooks } = {}) {
   if (migrations.length === 0) return;
-  ensureRuntimeDirectory(root);
+  ensureRuntimeDirectory(root, { testHooks });
   for (const migration of migrations) {
     const source = absolutePath(root, migration.from);
     const target = absolutePath(root, migration.to);
     requirePreservedFile(source, migration.from);
     if (entryStats(target)) fail(`Migration target appeared during reset: ${migration.to}.`);
-    renameSync(source, target);
-    chmodSync(target, 0o600);
+    const migratedStats = renameOwnedRegularFile(root, source, target, migration.to, {
+      testHooks: {
+        beforeBoundRename: ({ sourceParent, targetParent }) =>
+          testHooks?.beforeMigrationRename?.({
+            migration,
+            source,
+            sourceBinding: sourceParent.parentBinding,
+            target,
+            targetBinding: targetParent.parentBinding,
+          }),
+      },
+    });
+    chmodOwnedRegularFile(root, target, migratedStats, 0o600, migration.to);
   }
 }
 
@@ -364,28 +398,10 @@ function isPreservedEvidence(target) {
   );
 }
 
-function isActiveVerificationLock(target) {
-  const stats = entryStats(target, { bigint: true });
-  if (!stats) return false;
-  if (stats.isSymbolicLink() || !stats.isDirectory() || (stats.mode & 0o022n) !== 0n) return false;
-  const entries = readdirSync(target);
-  if (entries.length !== 1 || entries[0] !== "owner.json") return false;
-  const ownerPath = path.join(target, "owner.json");
-  const ownerStats = lstatSync(ownerPath, { bigint: true });
-  if (
-    ownerStats.isSymbolicLink() ||
-    !ownerStats.isFile() ||
-    ownerStats.nlink !== 1n ||
-    ownerStats.size > 4_096n ||
-    (ownerStats.mode & 0o077n) !== 0n
-  ) {
-    return false;
-  }
+function isActiveVerificationLock(root) {
   try {
-    const owner = JSON.parse(readFileSync(ownerPath, "utf8"));
-    return (
-      Number.isSafeInteger(owner?.pid) && owner.pid > 0 && processStatus(owner.pid) !== "stale"
-    );
+    const lock = inspectVerificationSessionLock({ repositoryRoot: root });
+    return lock.status === "active" || lock.status === "unknown";
   } catch {
     return false;
   }
@@ -426,7 +442,7 @@ function collectRuntimeCacheCandidates(root, candidates) {
       const child = `${relative}/${entry}`;
       const childPath = absolutePath(root, child);
       if (child === verificationEvidencePath && isPreservedEvidence(childPath)) continue;
-      if (child === verificationLockPath && isActiveVerificationLock(childPath)) continue;
+      if (child === verificationLockPath && isActiveVerificationLock(root)) continue;
       candidates.add(child);
     }
   }
@@ -506,6 +522,31 @@ function pruneEmptyParents(root, startDirectory) {
   }
 }
 
+export function removeResetCandidate(root, target, { testHooks } = {}) {
+  const stats = entryStats(target);
+  if (!stats) return;
+  const relative = relativePath(root, target);
+  const expectedType = stats.isSymbolicLink()
+    ? "symlink"
+    : stats.isDirectory()
+      ? "directory"
+      : stats.isFile()
+        ? "file"
+        : null;
+  if (!expectedType) fail(`Reset refused special filesystem content: ${relative}.`);
+  claimAndRemove({
+    // Codex launcher/plugin temp trees intentionally contain executable wrapper links. Other reset
+    // candidates retain the generic fail-closed policy for nested symlinks.
+    allowSymlinkEntries: isPrivateCodexRuntimePath(relative),
+    artifactPath: target,
+    expectedType,
+    label: `reset candidate ${relative}`,
+    ownedRootPath: root,
+    ownerDevice: lstatSync(root).dev,
+    testHooks,
+  });
+}
+
 async function applyReset(root, migrations, candidates) {
   if (candidates.includes(".context-index")) {
     const indexDirectory = path.join(root, ".context-index");
@@ -519,9 +560,7 @@ async function applyReset(root, migrations, candidates) {
           `${repositoryCodexRuntimeCacheDirectory}/context-index-rebuild.lock`,
         ),
       });
-    } else if (indexStats) {
-      rmSync(indexDirectory, { force: true, recursive: true });
-    }
+    } else if (indexStats) removeResetCandidate(root, indexDirectory);
   }
   applyMigrations(root, migrations);
   for (const relative of candidates) {
@@ -532,7 +571,7 @@ async function applyReset(root, migrations, candidates) {
     if (removalParent !== root && !removalParent.startsWith(`${root}${path.sep}`)) {
       fail(`Reset refused a removal path whose parent escapes the framework: ${relative}.`);
     }
-    rmSync(target, { force: true, recursive: true });
+    removeResetCandidate(root, target);
     pruneEmptyParents(root, path.dirname(target));
   }
 }
@@ -552,73 +591,88 @@ function printPreview(migrations, candidates, applyArguments = "--apply") {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const root = requireFrameworkRoot(options.root);
-  if (
-    options.verificationSourceBaseline &&
-    !isActiveVerificationLock(absolutePath(root, verificationLockPath))
-  ) {
+  if (options.verificationSourceBaseline && !isActiveVerificationLock(root)) {
     fail("Verification source baseline requires the active repository verification lock.");
   }
   const reducedSourceBaseline =
     options.portableSourceBaseline || options.verificationSourceBaseline;
   const activeSessionCleanup = options.postProjectCreation;
-  if (!reducedSourceBaseline && !activeSessionCleanup) assertRuntimeInactive(root);
-  const includeLocalRuntime = !reducedSourceBaseline && !activeSessionCleanup;
-  const migrations = includeLocalRuntime ? planMigrations(root) : [];
-  const candidates = collectCandidates(root, {
-    includeLocalRuntime,
-  });
+  const fullReset = !reducedSourceBaseline && !activeSessionCleanup;
+  // Preview is strictly read-only; every mutating reset mode holds the shared capability through
+  // planning, apply, and the residual recheck.
+  const lifecycleOwner =
+    options.apply && !reducedSourceBaseline
+      ? acquireRuntimeLifecycleLock({ root, operation: "framework-reset" })
+      : null;
+  try {
+    if (fullReset) {
+      assertRuntimeInactive(root);
+      if (options.apply && isActiveVerificationLock(root)) {
+        fail("Reset refused while a repository verification session is active.");
+      }
+    }
+    const includeLocalRuntime = fullReset;
+    const migrations = includeLocalRuntime ? planMigrations(root) : [];
+    const candidates = collectCandidates(root, {
+      includeLocalRuntime,
+    });
 
-  if (!options.apply) {
-    if (migrations.length === 0 && candidates.length === 0) {
-      console.log(
-        reducedSourceBaseline
-          ? "Framework portable source baseline is clean."
-          : activeSessionCleanup
-            ? "Framework active-session cleanup is clean; local runtime and .context-index are deferred until Codex exits."
-            : "Framework baseline is clean.",
+    if (!options.apply) {
+      if (migrations.length === 0 && candidates.length === 0) {
+        console.log(
+          reducedSourceBaseline
+            ? "Framework portable source baseline is clean."
+            : activeSessionCleanup
+              ? "Framework active-session cleanup is clean; local runtime and .context-index are deferred until Codex exits."
+              : "Framework baseline is clean.",
+        );
+        return;
+      }
+      printPreview(
+        migrations,
+        candidates,
+        activeSessionCleanup ? "--post-project-creation --apply" : "--apply",
       );
+      process.exitCode = 1;
       return;
     }
-    printPreview(
-      migrations,
-      candidates,
-      activeSessionCleanup ? "--post-project-creation --apply" : "--apply",
-    );
-    process.exitCode = 1;
-    return;
-  }
 
-  await applyReset(root, migrations, candidates);
-  const residualMigrations = includeLocalRuntime ? planMigrations(root) : [];
-  const residual = collectCandidates(root, { includeLocalRuntime });
-  if (residualMigrations.length > 0 || residual.length > 0) {
-    fail(
-      `Reset left removable state: ${[
-        ...residualMigrations.map(({ from }) => from),
-        ...residual,
-      ].join(", ")}`,
-    );
-  }
-  if (activeSessionCleanup) {
-    console.log(
-      `Framework active-session cleanup complete; removed ${candidates.length} safe path(s).`,
-    );
-    console.log(
-      "Local runtime and .context-index were preserved for the mandatory post-exit reset.",
-    );
-  } else {
-    console.log(
-      `Framework reset complete; migrated ${migrations.length} and removed ${candidates.length} path(s).`,
-    );
-    console.log(
-      "Source, portable .codex policy, required runtime identity, and exact verification evidence were preserved.",
-    );
+    await applyReset(root, migrations, candidates);
+    const residualMigrations = includeLocalRuntime ? planMigrations(root) : [];
+    const residual = collectCandidates(root, { includeLocalRuntime });
+    if (residualMigrations.length > 0 || residual.length > 0) {
+      fail(
+        `Reset left removable state: ${[
+          ...residualMigrations.map(({ from }) => from),
+          ...residual,
+        ].join(", ")}`,
+      );
+    }
+    if (activeSessionCleanup) {
+      console.log(
+        `Framework active-session cleanup complete; removed ${candidates.length} safe path(s).`,
+      );
+      console.log(
+        "Local runtime and .context-index were preserved for the mandatory post-exit reset.",
+      );
+    } else {
+      console.log(
+        `Framework reset complete; migrated ${migrations.length} and removed ${candidates.length} path(s).`,
+      );
+      console.log(
+        "Source, portable .codex policy, required runtime identity, and exact verification evidence were preserved.",
+      );
+    }
+  } finally {
+    if (lifecycleOwner) releaseRuntimeLifecycleLock({ root, owner: lifecycleOwner });
   }
 }
 
-try {
-  await main();
-} catch (error) {
-  console.error(`Framework reset failed: ${error.message}`);
-  process.exit(1);
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    await main();
+  } catch (error) {
+    console.error(`Framework reset failed: ${error.message}`);
+    process.exit(1);
+  }
 }

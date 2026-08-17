@@ -1,3 +1,4 @@
+/** Owns context embedding behavior for the repository-local semantic context boundary. */
 import { createRequire } from "node:module";
 import {
   existsSync,
@@ -38,7 +39,7 @@ export const indexedContentImplementationFiles = Object.freeze([
   "source-policy.mjs",
   "../repository/sensitive-paths.mjs",
   "../repository/source-inventory.mjs",
-  "../verify/secret-patterns.mjs",
+  "../security/secret-patterns.mjs",
 ]);
 
 function boundedInteger(value, fallback, maximum) {

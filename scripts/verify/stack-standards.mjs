@@ -1,3 +1,4 @@
+/** Owns stack standards behavior for the repository verification boundary. */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";

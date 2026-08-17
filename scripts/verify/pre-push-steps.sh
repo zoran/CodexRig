@@ -1,4 +1,5 @@
 #!/bin/sh
+# Owns pre push steps behavior for the repository verification boundary.
 set -eu
 
 unset BASH_ENV ENV NODE_OPTIONS NODE_PATH

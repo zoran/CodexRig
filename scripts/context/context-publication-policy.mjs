@@ -1,3 +1,4 @@
+/** Owns context publication policy behavior for the repository-local semantic context boundary. */
 export const databaseReplacementOperationThreshold = 20;
 export const databaseReplacementAffectedRowThreshold = 100_000;
 

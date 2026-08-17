@@ -1,10 +1,13 @@
+/** Owns context worker output behavior for the repository-local semantic context boundary. */
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { sanitizeMultilineForTerminal } from "./terminal-output.mjs";
+import { sanitizeMultilineForTerminal } from "../terminal/terminal-output.mjs";
 
 const workerEnvName = "CONTEXT_INDEX_SANITIZED_WORKER";
+const workerArgumentPrefix = "--codexrig-sanitized-context-worker=";
 const nativeWarningPatterns = [
   /\[[^\]\r\n]+ WARN\s+lance::dataset::write::insert\] No existing dataset at [^\r\n]+, it will be created\r?\n?/g,
 ];
@@ -24,18 +27,37 @@ function redactWorkerPaths(output, scriptUrl) {
 }
 
 export function runAsSanitizedContextWorker(scriptUrl, options = {}) {
-  if (process.env[workerEnvName] === "1") return false;
+  const childNonce = process.env[workerEnvName];
+  const childArgument = process.argv[2];
+  if (
+    typeof childNonce === "string" &&
+    childNonce.length > 0 &&
+    childArgument === `${workerArgumentPrefix}${childNonce}`
+  ) {
+    process.argv.splice(2, 1);
+    delete process.env[workerEnvName];
+    return false;
+  }
 
   const input = typeof options.input === "string" ? options.input : "";
+  const childNonceValue = randomUUID();
 
-  const result = spawnSync(process.execPath, [fileURLToPath(scriptUrl), ...process.argv.slice(2)], {
-    cwd: process.cwd(),
-    encoding: "utf8",
-    env: { ...process.env, [workerEnvName]: "1" },
-    input,
-    stdio: "pipe",
-    maxBuffer: 4 * 1024 * 1024,
-  });
+  const result = spawnSync(
+    process.execPath,
+    [
+      fileURLToPath(scriptUrl),
+      `${workerArgumentPrefix}${childNonceValue}`,
+      ...process.argv.slice(2),
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, [workerEnvName]: childNonceValue },
+      input,
+      stdio: "pipe",
+      maxBuffer: 4 * 1024 * 1024,
+    },
+  );
 
   const stdout = redactWorkerPaths(result.stdout ?? "", scriptUrl);
   if (stdout) process.stdout.write(stdout);

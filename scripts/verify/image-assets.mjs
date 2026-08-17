@@ -1,3 +1,4 @@
+/** Owns image assets behavior for the repository verification boundary. */
 import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -12,7 +13,7 @@ import {
   readStableRepositoryFile,
   readStableRepositoryText,
 } from "../repository/stable-file-snapshot.mjs";
-import { formatContextError, sanitizeMultilineForTerminal } from "../context/terminal-output.mjs";
+import { formatContextError, sanitizeMultilineForTerminal } from "../terminal/terminal-output.mjs";
 
 const imageExtensions = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".svg"]);
 const textExtensions = new Set([

@@ -1,3 +1,4 @@
+/** Owns format project behavior for the repository verification boundary. */
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";

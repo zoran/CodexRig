@@ -1,3 +1,4 @@
+/** Owns generated dependency doc behavior for the portable clean-project generation boundary. */
 export const generatedDependencyAgentPolicy = [
   "- The canonical Codex launcher runs `scripts/deps/install-compatible.mjs` before every session.",
   "  It resolves the newest stable graph allowed by workspace ranges and explicit pins under strict",

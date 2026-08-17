@@ -1,13 +1,17 @@
+/** Owns adaptive options behavior for the repository verification boundary. */
 import process from "node:process";
 import { normalizePath, unique } from "./adaptive-state.mjs";
 
 const modes = new Set(["repo", "full", "pre-push"]);
+const deliveryEnvironments = new Set(["dev", "staging", "prod"]);
 
 function usage() {
   console.log(`Usage: node scripts/verify/adaptive.mjs [options]
 
 Options:
   --mode <repo|full|pre-push>        Verification entry point. Default: repo.
+  --target-environment <target>      Delivery evidence target: dev, staging, or prod. Default: dev.
+  --artifact-manifest <path>         Required for staging/prod; the verifier hashes its bound files.
   --print-plan                       Print selected checks without running them.
   --path <path>                      Simulate a changed path for plan inspection.
   --basis-only                       Refresh only a content-identical committed Git basis.
@@ -20,6 +24,8 @@ Options:
 export function parseArgs(argv) {
   const options = {
     mode: "repo",
+    targetEnvironment: "dev",
+    artifactManifest: "",
     basisOnly: false,
     forceFull: false,
     forceReason: "",
@@ -53,6 +59,14 @@ export function parseArgs(argv) {
       options.mode = argv[++index] ?? "";
     } else if (arg.startsWith("--mode=")) {
       options.mode = arg.slice("--mode=".length);
+    } else if (arg === "--target-environment") {
+      options.targetEnvironment = argv[++index] ?? "";
+    } else if (arg.startsWith("--target-environment=")) {
+      options.targetEnvironment = arg.slice("--target-environment=".length);
+    } else if (arg === "--artifact-manifest") {
+      options.artifactManifest = argv[++index] ?? "";
+    } else if (arg.startsWith("--artifact-manifest=")) {
+      options.artifactManifest = arg.slice("--artifact-manifest=".length);
     } else if (arg === "--path") {
       options.simulatedPaths.push(argv[++index] ?? "");
     } else if (arg.startsWith("--path=")) {
@@ -65,6 +79,38 @@ export function parseArgs(argv) {
   if (!modes.has(options.mode)) {
     throw new Error(`Invalid adaptive verification mode: ${options.mode}`);
   }
+  if (!deliveryEnvironments.has(options.targetEnvironment)) {
+    throw new Error(`Invalid delivery target: ${options.targetEnvironment}`);
+  }
+  options.artifactManifest = options.artifactManifest.trim().replaceAll("\\", "/");
+  if (
+    options.artifactManifest &&
+    (options.artifactManifest.length > 4_096 ||
+      /[\0\r\n]/u.test(options.artifactManifest) ||
+      options.artifactManifest.startsWith("/") ||
+      options.artifactManifest
+        .split("/")
+        .some((segment) => !segment || segment === "." || segment === ".."))
+  ) {
+    throw new Error("--artifact-manifest must be one canonical repository-relative path.");
+  }
+  if (options.targetEnvironment !== "dev" && options.mode !== "full") {
+    throw new Error("staging and prod evidence require --mode full.");
+  }
+  if (options.targetEnvironment !== "dev" && !options.artifactManifest) {
+    throw new Error("staging and prod verification require --artifact-manifest.");
+  }
+  if (options.targetEnvironment === "dev" && options.artifactManifest) {
+    throw new Error("dev verification does not accept --artifact-manifest.");
+  }
+  if (
+    options.mode === "pre-push" &&
+    (options.targetEnvironment !== "dev" || options.artifactManifest)
+  ) {
+    throw new Error(
+      "pre-push validates repository evidence only and uses the dev delivery profile.",
+    );
+  }
   options.simulatedPaths = unique(options.simulatedPaths.map(normalizePath).filter(Boolean));
   if (options.simulatedPaths.length > 0 && !options.printPlan) {
     throw new Error("--path requires --print-plan and cannot execute verification commands.");
@@ -75,7 +121,9 @@ export function parseArgs(argv) {
       options.printPlan ||
       options.simulatedPaths.length > 0 ||
       options.forceFull ||
-      options.forceReason)
+      options.forceReason ||
+      options.targetEnvironment !== "dev" ||
+      options.artifactManifest)
   ) {
     throw new Error(
       "--basis-only is reserved for a commandless content-identical Git-basis refresh.",

@@ -1,14 +1,20 @@
+/** Owns validate staged project behavior for the setup, launch, and portable project boundary. */
 import { spawnSync } from "node:child_process";
 import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { assertPortableContextContract } from "../context/portable-context-contract.mjs";
-import { formatContextError } from "../context/terminal-output.mjs";
+import { formatContextError } from "../terminal/terminal-output.mjs";
 import { listStagedTransferFiles } from "../repository/source-inventory.mjs";
 import { assertSafeTransferSource } from "../repository/validate-transfer-source.mjs";
+import { deliveryEnvironmentFindings } from "../verify/delivery-environments.mjs";
+import { identityAccessProjectFindings } from "../verify/identity-access.mjs";
+import { localizationProjectFindings } from "../verify/localization.mjs";
+import { tenantIsolationProjectFindings } from "../verify/tenant-isolation.mjs";
 import { scanRepositorySecrets } from "../verify/secrets.mjs";
 import { productSourceBoundaryFindings } from "../verify/path-hygiene.mjs";
+import { whiteLabelProjectFindings } from "../verify/white-label.mjs";
 import { assertPortableProjectContract } from "./portable-project-contract.mjs";
 import { validateCodexConfig } from "./validate-codex-config.mjs";
 
@@ -109,12 +115,62 @@ async function validateBoundStagedProject(binding) {
   assertStageRootBinding(binding);
   assertPortableContextContract({ repositoryRoot: binding.root });
   assertStageRootBinding(binding);
+  const whiteLabelFindings = whiteLabelProjectFindings({ root: binding.root });
+  if (whiteLabelFindings.length > 0) {
+    throw new Error(
+      [
+        "Staged project violates the white-label product contract:",
+        ...whiteLabelFindings.map((item) => `- ${item}`),
+      ].join("\n"),
+    );
+  }
+  assertStageRootBinding(binding);
+  const deliveryFindings = deliveryEnvironmentFindings({ root: binding.root });
+  if (deliveryFindings.length > 0) {
+    throw new Error(
+      [
+        "Staged project violates the delivery inventory contract:",
+        ...deliveryFindings.map((item) => `- ${item}`),
+      ].join("\n"),
+    );
+  }
+  assertStageRootBinding(binding);
   const boundaryFindings = productSourceBoundaryFindings({ repositoryRoot: binding.root });
   if (boundaryFindings.length > 0) {
     throw new Error(
       [
         "Staged project violates the Product Roots contract:",
         ...boundaryFindings.map((item) => `- ${item}`),
+      ].join("\n"),
+    );
+  }
+  assertStageRootBinding(binding);
+  const identityAccessFindings = identityAccessProjectFindings({ root: binding.root });
+  if (identityAccessFindings.length > 0) {
+    throw new Error(
+      [
+        "Staged project violates the Identity and Access boundary:",
+        ...identityAccessFindings.map((item) => `- ${item}`),
+      ].join("\n"),
+    );
+  }
+  assertStageRootBinding(binding);
+  const tenantIsolationFindings = tenantIsolationProjectFindings({ root: binding.root });
+  if (tenantIsolationFindings.length > 0) {
+    throw new Error(
+      [
+        "Staged project violates the tenant-isolation boundary:",
+        ...tenantIsolationFindings.map((item) => `- ${item}`),
+      ].join("\n"),
+    );
+  }
+  assertStageRootBinding(binding);
+  const localizationFindings = localizationProjectFindings({ root: binding.root });
+  if (localizationFindings.length > 0) {
+    throw new Error(
+      [
+        "Staged project violates the localization contract:",
+        ...localizationFindings.map((item) => `- ${item}`),
       ].join("\n"),
     );
   }

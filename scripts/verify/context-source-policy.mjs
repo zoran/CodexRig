@@ -1,3 +1,4 @@
+/** Owns context source policy behavior for the repository verification boundary. */
 import { existsSync } from "node:fs";
 import process from "node:process";
 import { discoverSourceFiles, isActiveSourcePath, isIgnored } from "../context/source-policy.mjs";

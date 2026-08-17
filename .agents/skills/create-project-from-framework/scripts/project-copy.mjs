@@ -1,11 +1,12 @@
+/** Owns project copy behavior for the portable clean-project generation boundary. */
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { listPortableTransferFiles } from "../../../../scripts/repository/source-inventory.mjs";
 import {
   listManagedFrameworkFiles,
   readFrameworkContract,
-  writeInstallationReceipt,
-} from "../../../../scripts/framework/framework-contract.mjs";
+} from "../../../../scripts/contracts/framework-contract.mjs";
+import { writeInstallationReceipt } from "../../../../scripts/framework/framework-installation-receipt.mjs";
 import {
   captureStableRepositoryFileIdentity,
   copyStableRepositoryFile,
@@ -19,6 +20,7 @@ import {
 } from "./project-transfer-policy.mjs";
 
 export function capturePortableProjectTransferManifest(sourceRoot, { includeUntracked }) {
+  const frameworkContract = readFrameworkContract(sourceRoot);
   const transferFiles = new Set(listPortableTransferFiles({ root: sourceRoot, includeUntracked }));
   for (const relativePath of defaultUntrackedPortableContractFiles) {
     if (existsSync(path.join(sourceRoot, relativePath))) transferFiles.add(relativePath);
@@ -39,7 +41,7 @@ export function capturePortableProjectTransferManifest(sourceRoot, { includeUntr
   }
   assertPortableProjectContract([...transferFiles]);
   const classifiedEntries = [...transferFiles].sort().map((relativePath) => ({
-    exclusionReason: projectTransferExclusionReason(relativePath),
+    exclusionReason: projectTransferExclusionReason(relativePath, { frameworkContract }),
     relativePath,
   }));
   const files = classifiedEntries

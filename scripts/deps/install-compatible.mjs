@@ -1,10 +1,17 @@
+/** Owns install compatible behavior for the dependency and toolchain maintenance boundary. */
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, lstatSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { formatContextError } from "../context/terminal-output.mjs";
+import { formatContextError } from "../terminal/terminal-output.mjs";
+import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycle-process.mjs";
+import {
+  assertTrustedPnpmConfiguration,
+  pnpmHooksDisabledEnvironment,
+  repositoryPnpmHookPaths,
+} from "../repository/pnpm-workspace-manifests.mjs";
 import {
   copyLocalInput,
   DependencyTransactionError,
@@ -20,17 +27,23 @@ import {
   dependencyTransactionPaths,
   withDependencyTransactionLock,
 } from "./dependency-transaction-state.mjs";
+import { spawnTrustedPnpm, trustedPnpmCommand } from "./trusted-pnpm-command.mjs";
 
 export const compatibleUpdateArgs = [
   "update",
   "--recursive",
   "--no-save",
   "--ignore-scripts",
+  "--ignore-pnpmfile",
   "--lockfile-only",
 ];
-export const compatibleInstallArgs = ["install", "--frozen-lockfile", "--ignore-scripts"];
+export const compatibleInstallArgs = [
+  "install",
+  "--frozen-lockfile",
+  "--ignore-scripts",
+  "--ignore-pnpmfile",
+];
 
-const pnpmHookPaths = [".pnpmfile.cjs", ".pnpmfile.mjs", "pnpmfile.cjs", "pnpmfile.mjs"];
 const portableInputPaths = [
   ".npmrc",
   "dependency-policy.json",
@@ -56,20 +69,8 @@ function requirePortableInput(projectRoot, relativePath) {
   return record;
 }
 
-function pnpmHooksDisabled(spawnPnpm) {
-  return (executable, args, options = {}) =>
-    spawnPnpm(executable, args, {
-      ...options,
-      env: {
-        ...process.env,
-        ...options.env,
-        pnpm_config_ignore_pnpmfile: "true",
-      },
-    });
-}
-
 function pnpmHookInputs(projectRoot) {
-  return pnpmHookPaths.map((hookPath) => {
+  return repositoryPnpmHookPaths.map((hookPath) => {
     const record = inputRecord(projectRoot, hookPath);
     if (record.exists) {
       throw new DependencyTransactionError(
@@ -109,15 +110,52 @@ function dependencyInputs(projectRoot, manifests) {
   return [...records.values()].sort((left, right) => left.path.localeCompare(right.path));
 }
 
-function runPnpm(spawnPnpm, args, cwd) {
-  return spawnPnpm("pnpm", args, {
-    cwd,
-    encoding: "utf8",
-    env: { ...process.env },
-    input: "",
-    maxBuffer: 16 * 1024 * 1024,
-    stdio: "pipe",
-    timeout: 180_000,
+function runPnpm(spawnPnpm, args, cwd, projectRoot, lifecycleCapability) {
+  const environment = pnpmHooksDisabledEnvironment({ ...process.env });
+  if (spawnPnpm !== spawnSync) {
+    return spawnTrustedPnpm({
+      args,
+      repositoryRoot: projectRoot,
+      spawnPnpm,
+      options: {
+        cwd,
+        encoding: "utf8",
+        env: environment,
+        input: "",
+        maxBuffer: 16 * 1024 * 1024,
+        stdio: "pipe",
+        timeout: 180_000,
+      },
+    });
+  }
+  const lifecycleSpawn = (command, commandArgs, options) =>
+    spawnRuntimeLifecycleCommandSync({
+      args: commandArgs,
+      command,
+      lifecycleCapability,
+      options,
+      repositoryRoot: projectRoot,
+      role: "dependency-supervisor",
+    });
+  const command = trustedPnpmCommand({
+    repositoryRoot: projectRoot,
+    environment,
+    spawn: lifecycleSpawn,
+  });
+  return spawnTrustedPnpm({
+    args,
+    command,
+    repositoryRoot: projectRoot,
+    spawnPnpm: lifecycleSpawn,
+    options: {
+      cwd,
+      encoding: "utf8",
+      env: environment,
+      input: "",
+      maxBuffer: 16 * 1024 * 1024,
+      stdio: "pipe",
+      timeout: 180_000,
+    },
   });
 }
 
@@ -159,98 +197,117 @@ function rollbackLockfile(projectRoot, original, expectedHash, mode) {
       75,
     );
   }
-  atomicWrite(safeRepositoryPath(projectRoot, "pnpm-lock.yaml"), original.content, mode);
+  atomicWrite(
+    projectRoot,
+    safeRepositoryPath(projectRoot, "pnpm-lock.yaml"),
+    original.content,
+    mode,
+  );
 }
 
 export function installLatestCompatibleDependencies(options = {}) {
   const projectRoot = path.resolve(options.projectRoot ?? root);
   const spawnPnpm = options.spawnPnpm ?? spawnSync;
-  const spawnResolutionPnpm = pnpmHooksDisabled(spawnPnpm);
 
-  return withDependencyTransactionLock(projectRoot, () => {
-    pnpmHookInputs(projectRoot);
-    const manifests =
-      options.manifests ??
-      packageManifests({ repositoryRoot: projectRoot, spawnPnpm: spawnResolutionPnpm });
-    const transactionPaths = dependencyTransactionPaths(projectRoot);
-    if (existsSync(transactionPaths.plan) || existsSync(transactionPaths.journal)) {
-      throw new DependencyTransactionError(
-        "Finish or clear the reviewed dependency update transaction before compatible installation.",
-        75,
+  return withDependencyTransactionLock(
+    projectRoot,
+    (lock) => {
+      assertTrustedPnpmConfiguration({ repositoryRoot: projectRoot });
+      pnpmHookInputs(projectRoot);
+      const manifests = options.manifests ?? packageManifests({ repositoryRoot: projectRoot });
+      const transactionPaths = dependencyTransactionPaths(projectRoot);
+      if (existsSync(transactionPaths.plan) || existsSync(transactionPaths.journal)) {
+        throw new DependencyTransactionError(
+          "Finish or clear the reviewed dependency update transaction before compatible installation.",
+          75,
+        );
+      }
+
+      const inputs = dependencyInputs(projectRoot, manifests);
+      const original = readOptionalFile(projectRoot, "pnpm-lock.yaml");
+      const lockfilePath = safeRepositoryPath(projectRoot, "pnpm-lock.yaml");
+      const lockfileMode = lstatSync(lockfilePath).mode & 0o777;
+      const stageRoot = mkdtempSync(
+        path.join(options.temporaryParent ?? os.tmpdir(), "deps-compatible-"),
       );
-    }
+      chmodSync(stageRoot, 0o700);
 
-    const inputs = dependencyInputs(projectRoot, manifests);
-    const original = readOptionalFile(projectRoot, "pnpm-lock.yaml");
-    const lockfilePath = safeRepositoryPath(projectRoot, "pnpm-lock.yaml");
-    const lockfileMode = lstatSync(lockfilePath).mode & 0o777;
-    const stageRoot = mkdtempSync(
-      path.join(options.temporaryParent ?? os.tmpdir(), "deps-compatible-"),
-    );
-    chmodSync(stageRoot, 0o700);
-
-    try {
-      copyDependencyStage(projectRoot, stageRoot, inputs);
-      const update = runPnpm(spawnResolutionPnpm, compatibleUpdateArgs, stageRoot);
-      if (update.error || update.status !== 0) {
-        throw new DependencyTransactionError(
-          `${commandFailure(update, "Compatible registry resolution").message} Dependency freshness is indeterminate; durable project inputs were left unchanged.`,
-        );
-      }
-      const refreshed = refreshedLockfile(stageRoot, inputs);
-      verifyInputRecords(projectRoot, inputs);
-      if (refreshed.hash !== original.hash) {
-        options.beforeLockfileWrite?.({ content: refreshed.content, hash: refreshed.hash });
-        atomicWrite(lockfilePath, refreshed.content, lockfileMode);
-      }
-
-      const install = runPnpm(spawnPnpm, compatibleInstallArgs, projectRoot);
-      if (install.error || install.status !== 0) {
-        let rollbackSummary = "The compatible lockfile was unchanged";
-        if (refreshed.hash !== original.hash) {
-          rollbackLockfile(projectRoot, original, refreshed.hash, lockfileMode);
-          rollbackSummary = "The prior lockfile was restored";
-        }
-        throw new DependencyTransactionError(
-          `${commandFailure(install, "Frozen dependency installation").message} ${rollbackSummary}; installation is incomplete.`,
-        );
-      }
       try {
-        verifyInputRecords(
+        copyDependencyStage(projectRoot, stageRoot, inputs);
+        const update = runPnpm(
+          spawnPnpm,
+          compatibleUpdateArgs,
+          stageRoot,
           projectRoot,
-          inputs.filter((record) => record.path !== "pnpm-lock.yaml"),
+          lock.lifecycleCapability,
         );
-        const installedLockfile = readOptionalFile(projectRoot, "pnpm-lock.yaml");
-        if (!installedLockfile.exists || installedLockfile.hash !== refreshed.hash) {
+        if (update.error || update.status !== 0) {
           throw new DependencyTransactionError(
-            "Frozen dependency installation did not preserve the reviewed compatible lockfile.",
+            `${commandFailure(update, "Compatible registry resolution").message} Dependency freshness is indeterminate; durable project inputs were left unchanged.`,
           );
         }
-      } catch (error) {
+        const refreshed = refreshedLockfile(stageRoot, inputs);
+        verifyInputRecords(projectRoot, inputs);
         if (refreshed.hash !== original.hash) {
-          try {
+          options.beforeLockfileWrite?.({ content: refreshed.content, hash: refreshed.hash });
+          atomicWrite(projectRoot, lockfilePath, refreshed.content, lockfileMode);
+        }
+
+        const install = runPnpm(
+          spawnPnpm,
+          compatibleInstallArgs,
+          projectRoot,
+          projectRoot,
+          lock.lifecycleCapability,
+        );
+        if (install.error || install.status !== 0) {
+          let rollbackSummary = "The compatible lockfile was unchanged";
+          if (refreshed.hash !== original.hash) {
             rollbackLockfile(projectRoot, original, refreshed.hash, lockfileMode);
-          } catch (rollbackError) {
+            rollbackSummary = "The prior lockfile was restored";
+          }
+          throw new DependencyTransactionError(
+            `${commandFailure(install, "Frozen dependency installation").message} ${rollbackSummary}; installation is incomplete.`,
+          );
+        }
+        try {
+          verifyInputRecords(
+            projectRoot,
+            inputs.filter((record) => record.path !== "pnpm-lock.yaml"),
+          );
+          const installedLockfile = readOptionalFile(projectRoot, "pnpm-lock.yaml");
+          if (!installedLockfile.exists || installedLockfile.hash !== refreshed.hash) {
             throw new DependencyTransactionError(
-              `${error.message} Automatic lockfile rollback stopped safely: ${rollbackError.message}`,
+              "Frozen dependency installation did not preserve the reviewed compatible lockfile.",
+            );
+          }
+        } catch (error) {
+          if (refreshed.hash !== original.hash) {
+            try {
+              rollbackLockfile(projectRoot, original, refreshed.hash, lockfileMode);
+            } catch (rollbackError) {
+              throw new DependencyTransactionError(
+                `${error.message} Automatic lockfile rollback stopped safely: ${rollbackError.message}`,
+                75,
+              );
+            }
+            throw new DependencyTransactionError(
+              `${error.message} The prior lockfile was restored; installation is incomplete.`,
               75,
             );
           }
-          throw new DependencyTransactionError(
-            `${error.message} The prior lockfile was restored; installation is incomplete.`,
-            75,
-          );
+          throw error;
         }
-        throw error;
+        return {
+          lockfileUpdated: refreshed.hash !== original.hash,
+          manifestCount: manifests.length,
+        };
+      } finally {
+        rmSync(stageRoot, { recursive: true, force: true });
       }
-      return {
-        lockfileUpdated: refreshed.hash !== original.hash,
-        manifestCount: manifests.length,
-      };
-    } finally {
-      rmSync(stageRoot, { recursive: true, force: true });
-    }
-  });
+    },
+    options.lifecycleCapability ? { lifecycleCapability: options.lifecycleCapability } : {},
+  );
 }
 
 function main() {

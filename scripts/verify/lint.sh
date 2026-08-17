@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Owns lint behavior for the repository verification boundary.
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"

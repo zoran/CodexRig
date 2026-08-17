@@ -41,6 +41,10 @@ useful work.
 - Index only active, Git-aware project sources, combining code, tests, configuration, skills,
   durable docs, and the optional bounded project-context cache. Skip process history, ignored
   output, runtime state, secrets, symlinks, generated caches, and the index itself.
+- Include tracked portable `.codex` config/hooks/docs/agent roles and semantic `.codexrig` policy,
+  but exclude private `.codex/runtime/` state and generated installation checksum receipts. Keep
+  `docs/future-modules.md` searchable while down-ranking it for queries that do not explicitly ask
+  for future/backlog/idea candidates; the current manifest and read source remain authoritative.
 - Chunk by token budget and useful boundaries, not a fixed physical-line rule.
 - Refresh changed files incrementally and remove deleted files. Setup performs the initial build and
   a real smoke search, then becomes an incremental no-op while current. The locally hash-trusted

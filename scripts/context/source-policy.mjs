@@ -1,3 +1,4 @@
+/** Owns source policy behavior for the repository-local semantic context boundary. */
 import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,7 +23,6 @@ export const defaultMaxSourceFiles = 20_000;
 
 const generatedOrRuntimeDirectories = new Set([
   ".cache",
-  ".codex",
   ".context-index",
   ".git",
   ".next",
@@ -240,6 +240,9 @@ export function sourcePathExclusionReason(
   const basename = segments.at(-1) ?? "";
   const extension = path.extname(basename).toLowerCase();
   if (isConfiguredIndexPath(normalized, repositoryRoot)) return "context index generated state";
+  if (normalized === ".codexrig/installation.json") {
+    return "generated framework installation receipt";
+  }
   const activeReason = activeSourcePathExclusionReason(normalized);
   if (activeReason) return activeReason;
   if (segments.some((segment) => generatedOrRuntimeDirectories.has(segment))) {

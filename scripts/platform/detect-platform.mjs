@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/** Owns detect platform behavior for the Git provider integration boundary. */
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { detectGitProvider } from "./git-provider.mjs";

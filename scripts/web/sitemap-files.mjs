@@ -1,3 +1,4 @@
+/** Owns sitemap files behavior for the public web quality boundary. */
 import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 

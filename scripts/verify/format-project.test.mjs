@@ -1,3 +1,4 @@
+/** Verifies format project behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";

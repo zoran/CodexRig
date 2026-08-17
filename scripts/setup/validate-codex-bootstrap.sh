@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Owns validate codex bootstrap behavior for the setup, launch, and portable project boundary.
 set -euo pipefail
 
 root="${1:-}"
@@ -22,10 +23,9 @@ if [[ -L "$hooks_path" || ! -f "$hooks_path" ]]; then
   echo "Project .codex/hooks.json must be a real file before Codex can start." >&2
   exit 1
 fi
-# The literal project-hook command must retain $CODEXRIG_PROJECT_ROOT for Codex to expand at runtime.
-# shellcheck disable=SC2016
+# The canonical launcher pins Codex's working directory to this root before project hooks run.
 expected_hooks_json='{
-  "description": "Verify canonical startup and keep the local context index current between turns.",
+  "description": "Verify canonical startup, announce safe recovery metadata, and coordinate durable Stop continuation, terminal handover, and context refresh.",
   "hooks": {
     "SessionStart": [
       {
@@ -33,10 +33,10 @@ expected_hooks_json='{
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CODEXRIG_PROJECT_ROOT/scripts/setup/verify-startup-attestation-on-session-start.sh\"",
+            "command": "bash scripts/setup/verify-startup-attestation-on-session-start.sh",
             "timeout": 30,
             "statusMessage": "Verifying CodexRig startup",
-            "additionalContextLimit": 200
+            "additionalContextLimit": 768
           }
         ]
       }
@@ -48,7 +48,7 @@ expected_hooks_json='{
             "type": "command",
             "command": "bash scripts/context/refresh-context-index-on-stop.sh",
             "timeout": 600,
-            "statusMessage": "Refreshing local context index"
+            "statusMessage": "Finalizing CodexRig Stop lifecycle"
           }
         ]
       }
@@ -96,6 +96,7 @@ required_codex_ignore_patterns=(
   '/logs'
   '/memories'
   '/plugins'
+  '/rules'
   '/sessions'
   '/shell_snapshots'
   '/skills'
@@ -143,6 +144,8 @@ runtime_probe_paths=(
   'memories/runtime-state'
   'plugins'
   'plugins/runtime-state'
+  'rules'
+  'rules/runtime-state'
   'sessions'
   'sessions/runtime-state'
   'shell_snapshots'
@@ -178,6 +181,7 @@ runtime_probe_paths=(
   'thread_history_1.sqlite'
   'thread_history_1.sqlite-shm'
   'thread_history_1.sqlite-wal'
+  'rules/default.rules'
   '.codex/auth.json'
   '.codex/cache/runtime-state'
   '.codex/sessions/runtime-state'
@@ -231,6 +235,7 @@ for portable_probe in "${portable_probe_paths[@]}"; do
 done
 
 allowed=(
+  developer_instructions
   project_doc_max_bytes
   project_doc_fallback_filenames
   model_reasoning_effort
@@ -241,8 +246,12 @@ allowed=(
   approvals_reviewer
   approval_policy
   sandbox_mode
+  sandbox_workspace_write.network_access
+  agents.enabled
+  agents.default_subagent_model
+  agents.default_subagent_reasoning_effort
   agents.max_concurrent_threads_per_session
-  agents.max_depth
+  agents.interrupt_message
   features.hooks
   features.memories
   features.network_proxy
@@ -280,16 +289,23 @@ trim() {
 }
 
 table=""
+multiline_key=""
 line_number=0
 while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
   line_number=$((line_number + 1))
+  if [[ -n "$multiline_key" ]]; then
+    if [[ "$(trim "$raw_line")" == '"""' ]]; then
+      multiline_key=""
+    fi
+    continue
+  fi
   line="$(trim "${raw_line%%#*}")"
   [[ -n "$line" ]] || continue
 
   if [[ "$line" =~ ^\[([A-Za-z_][A-Za-z0-9_-]*)\]$ ]]; then
     table="${BASH_REMATCH[1]}"
     case "$table" in
-      agents | features | tui) ;;
+      agents | features | sandbox_workspace_write | tui) ;;
       *)
         echo "Project Codex config line $line_number defines an unsupported table." >&2
         exit 1
@@ -326,12 +342,30 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
     echo "Project Codex config line $line_number duplicates key $full_key." >&2
     exit 1
   fi
+  if [[ "$value" == '"""' ]]; then
+    if [[ "$full_key" != "developer_instructions" ]]; then
+      echo "Project Codex config line $line_number uses an unsupported multiline value." >&2
+      exit 1
+    fi
+    seen[${#seen[@]}]="$full_key"
+    multiline_key="$full_key"
+    continue
+  fi
+  if [[ "$full_key" == "developer_instructions" ]]; then
+    echo "Project Codex config developer_instructions must use a multiline basic string." >&2
+    exit 1
+  fi
   if [[ "$full_key" == "features.hooks" && "$value" != "true" ]]; then
     echo "Project Codex config must enable lifecycle hooks." >&2
     exit 1
   fi
   seen[${#seen[@]}]="$full_key"
 done < "$config_path"
+
+if [[ -n "$multiline_key" ]]; then
+  echo "Project Codex config has unterminated developer_instructions." >&2
+  exit 1
+fi
 
 for key in "${required[@]}"; do
   if ! contains_value "$key" "${seen[@]}"; then

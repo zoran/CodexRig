@@ -1,3 +1,4 @@
+/** Verifies context chunks build behavior for the repository-local semantic context boundary. */
 import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
@@ -184,6 +185,41 @@ test("independent lexical candidates recover exact phrases and diversify paths",
   assert.ok(
     [...new Set(results.map((result) => result.path))].length >= 5,
     "expected diversified result paths",
+  );
+});
+
+test("current truth outranks deferred ideas unless the query explicitly asks for them", () => {
+  const active = {
+    ...row("active", "docs/project.md", 10, 18, "Billing owns current invoice settlement."),
+    _distance: 0.02,
+  };
+  const deferred = {
+    ...row(
+      "deferred",
+      "docs/future-modules.md",
+      10,
+      18,
+      "Billing may later add invoice settlement experiments.",
+    ),
+    _distance: 0.01,
+  };
+  assert.equal(
+    rankHybridResults({
+      denseResults: [deferred, active],
+      allRows: [deferred, active],
+      query: "billing invoice settlement",
+      limit: 2,
+    })[0].path,
+    "docs/project.md",
+  );
+  assert.equal(
+    rankHybridResults({
+      denseResults: [active, deferred],
+      allRows: [active, deferred],
+      query: "future billing idea",
+      limit: 2,
+    })[0].path,
+    "docs/future-modules.md",
   );
 });
 

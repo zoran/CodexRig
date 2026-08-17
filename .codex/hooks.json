@@ -1,5 +1,5 @@
 {
-  "description": "Verify canonical startup and keep the local context index current between turns.",
+  "description": "Verify canonical startup, announce safe recovery metadata, and coordinate durable Stop continuation, terminal handover, and context refresh.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,10 +7,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CODEXRIG_PROJECT_ROOT/scripts/setup/verify-startup-attestation-on-session-start.sh\"",
+            "command": "bash scripts/setup/verify-startup-attestation-on-session-start.sh",
             "timeout": 30,
             "statusMessage": "Verifying CodexRig startup",
-            "additionalContextLimit": 200
+            "additionalContextLimit": 768
           }
         ]
       }
@@ -22,7 +22,7 @@
             "type": "command",
             "command": "bash scripts/context/refresh-context-index-on-stop.sh",
             "timeout": 600,
-            "statusMessage": "Refreshing local context index"
+            "statusMessage": "Finalizing CodexRig Stop lifecycle"
           }
         ]
       }

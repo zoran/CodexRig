@@ -1,3 +1,4 @@
+/** Verifies platform lifecycle behavior for the Git provider integration boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -7,7 +8,7 @@ import { after, test } from "node:test";
 import {
   readFrameworkContract,
   validateFrameworkContract,
-} from "../framework/framework-contract.mjs";
+} from "../contracts/framework-contract.mjs";
 import { configurePlatform, githubRulesetPayload } from "./configure-platform.mjs";
 import { detectGitProvider, parseGitRemoteUrl } from "./git-provider.mjs";
 import { gitlabApprovalRuleName } from "./gitlab-platform.mjs";

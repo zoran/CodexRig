@@ -1,3 +1,4 @@
+/** Owns platform configuration state behavior for the Git provider integration boundary. */
 import { createHash, randomUUID } from "node:crypto";
 import {
   chmodSync,
@@ -14,7 +15,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { resolveFrameworkPath, serializeCanonicalJson } from "../framework/framework-contract.mjs";
+import { resolveFrameworkPath, serializeCanonicalJson } from "../contracts/framework-contract.mjs";
 
 const stateRelativePath = ".project-state/platform-configuration.json";
 const lockRelativePath = ".project-state/platform-configuration.lock";

@@ -1,3 +1,4 @@
+/** Verifies project initialization boundaries behavior for the setup, launch, and portable project boundary. */
 import assert from "node:assert/strict";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -6,6 +7,7 @@ import { stageProjectExport } from "./stage-project-export.mjs";
 import {
   cleanupTemporaryRoots,
   initializeTrackedSource,
+  isolatedTrackedFrameworkSource,
   readdirNames,
   root,
   runProjectGenerator,
@@ -36,7 +38,7 @@ test("clean project initialization preserves additional validated agent roles", 
     "scripts/context/context-publication-policy.mjs",
     "scripts/context/refresh-context-index-on-stop.mjs",
     "scripts/context/refresh-context-index-on-stop.sh",
-    "scripts/context/terminal-output.test.mjs",
+    "scripts/terminal/terminal-output.test.mjs",
     "scripts/deps/dependency-owner-normalization.test.mjs",
     "scripts/goals/goal-publication-precondition.mjs",
     "scripts/goals/goal-publication-precondition.test.mjs",
@@ -77,10 +79,9 @@ test("clean project initialization preserves additional validated agent roles", 
   const reviewer = readFileSync(path.join(source, ".codex", "agents", "default.toml"), "utf8")
     .replace('name = "default"', 'name = "reviewer"')
     .replace(
-      'description = "General delegated work that does not require a narrower built-in role."',
+      'description = "General read-only delegated analysis that does not require a narrower role."',
       'description = "Bounded read-only review of a completed implementation slice."',
-    )
-    .concat('model_reasoning_effort = "ultra"\nsandbox_mode = "read-only"\n');
+    );
   writeFileSync(reviewerPath, reviewer, "utf8");
   initializeTrackedSource(source);
 
@@ -108,12 +109,13 @@ test("clean project initialization preserves additional validated agent roles", 
 });
 
 test("clean project initialization preserves a safe project folder and ends at code", () => {
+  const source = isolatedTrackedFrameworkSource("named-project-source-");
   const outputParent = temporaryRoot("named-project-output-");
   const projectArgs = [
     "--name",
     "NamedProjectFixture",
     "--source",
-    root,
+    source,
     "--output-parent",
     outputParent,
     "--include-untracked",

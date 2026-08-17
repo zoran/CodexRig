@@ -1,3 +1,4 @@
+/** Owns surface quality behavior for the repository verification boundary. */
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
@@ -9,7 +10,7 @@ import {
 } from "../repository/stable-file-snapshot.mjs";
 import { detectStacks, formatStackReport } from "../stack/stack-detector.mjs";
 import { webSurfaceSummary } from "../web/web-quality-scan.mjs";
-import { formatContextError, sanitizeMultilineForTerminal } from "../context/terminal-output.mjs";
+import { formatContextError, sanitizeMultilineForTerminal } from "../terminal/terminal-output.mjs";
 import { accessibilityFailures } from "./a11y.mjs";
 import { hasImageSurfaceInFiles } from "./adaptive-surfaces.mjs";
 import { analyzeImageAssets } from "./image-assets.mjs";

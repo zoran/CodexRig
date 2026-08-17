@@ -1,3 +1,4 @@
+/** Owns context paths behavior for the repository-local semantic context boundary. */
 import {
   existsSync,
   lstatSync,

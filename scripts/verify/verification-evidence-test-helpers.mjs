@@ -1,6 +1,8 @@
+/** Owns verification evidence test helpers behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -53,7 +55,15 @@ export function fixture() {
   for (const [relativePath, content] of [
     [
       ".gitignore",
-      ["/.codex/runtime/", "/.context-index", "/node_modules", "/tmp", "/logs", ""].join("\n"),
+      [
+        "/.codex/runtime/",
+        "/.context-index",
+        "/.delivery/",
+        "/node_modules",
+        "/tmp",
+        "/logs",
+        "",
+      ].join("\n"),
     ],
     ["AGENTS.md", "# Agent bootstrap\n"],
     ["README.md", "# Fixture\n"],
@@ -89,6 +99,8 @@ export function inputs(root, options = {}) {
     root,
     broadPlan: options.broadPlan ?? broadPlan,
     runtimeIdentity: options.runtimeIdentity ?? runtimeIdentity,
+    deliveryEnvironment: options.deliveryEnvironment ?? "dev",
+    artifactManifest: options.artifactManifest ?? "",
   });
 }
 
@@ -145,7 +157,81 @@ export function validate(root, options = {}) {
     root,
     broadPlan: options.broadPlan ?? broadPlan,
     runtimeIdentity: options.runtimeIdentity ?? runtimeIdentity,
+    deliveryEnvironment: options.deliveryEnvironment ?? "dev",
+    artifactManifest: options.artifactManifest ?? "",
   });
+}
+
+function fileDigest(content) {
+  return createHash("sha256").update(content).digest("hex");
+}
+
+export function configureDeliveryFixture(root, targetEnvironment) {
+  assert.ok(["staging", "prod"].includes(targetEnvironment));
+  const deliveryContent = `${JSON.stringify(
+    {
+      schemaVersion: 1,
+      defaultTarget: "dev",
+      declaredTargets: [targetEnvironment],
+      detectedTargets: [],
+    },
+    null,
+    2,
+  )}\n`;
+  const targetConfigurationPath = `deploy/${targetEnvironment}.json`;
+  const targetConfigurationContent = `${JSON.stringify({ target: targetEnvironment })}\n`;
+  const packagePath = path.join(root, "package.json");
+  const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
+  packageJson.scripts = {
+    ...(packageJson.scripts ?? {}),
+    [`verify:${targetEnvironment}`]: 'node --eval "process.exit(0)"',
+  };
+  for (const [relativePath, content] of [
+    ["config/delivery.json", deliveryContent],
+    [targetConfigurationPath, targetConfigurationContent],
+    ["package.json", `${JSON.stringify(packageJson)}\n`],
+  ]) {
+    const absolutePath = path.join(root, ...relativePath.split("/"));
+    mkdirSync(path.dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, content, "utf8");
+  }
+  for (const args of [
+    ["add", "."],
+    ["commit", "-qm", `configure ${targetEnvironment}`],
+  ]) {
+    const result = spawnSync("git", args, { cwd: root, encoding: "utf8", stdio: "pipe" });
+    assert.equal(result.status, 0, result.stderr);
+  }
+  const revision = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: "pipe",
+  }).stdout.trim();
+  const artifactPath = `.delivery/${targetEnvironment}/application.bin`;
+  const artifactContent = Buffer.from(`immutable ${targetEnvironment} artifact\n`);
+  const artifactManifest = `.delivery/${targetEnvironment}/manifest.json`;
+  const artifactAbsolute = path.join(root, ...artifactPath.split("/"));
+  mkdirSync(path.dirname(artifactAbsolute), { recursive: true });
+  writeFileSync(artifactAbsolute, artifactContent);
+  writeFileSync(
+    path.join(root, ...artifactManifest.split("/")),
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        targetEnvironment,
+        sourceCommit: revision,
+        artifactFiles: [{ path: artifactPath, sha256: fileDigest(artifactContent) }],
+        configurationFiles: [
+          { path: "config/delivery.json", sha256: fileDigest(deliveryContent) },
+          { path: targetConfigurationPath, sha256: fileDigest(targetConfigurationContent) },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+  return { artifactManifest, artifactPath, targetConfigurationPath };
 }
 
 export function overwriteEvidence(root, content) {

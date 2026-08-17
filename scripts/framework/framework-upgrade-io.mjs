@@ -1,25 +1,16 @@
-import { randomUUID } from "node:crypto";
-import {
-  chmodSync,
-  closeSync,
-  existsSync,
-  fsyncSync,
-  lstatSync,
-  mkdirSync,
-  openSync,
-  realpathSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+/** Owns framework upgrade io behavior for the framework lifecycle and child upgrade boundary. */
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
-import process from "node:process";
 import {
-  desiredManagedFileContent,
-  readRegularFrameworkFile,
+  desiredManagedFileContentFromRaw,
   resolveFrameworkPath,
   sha256,
-} from "./framework-contract.mjs";
+} from "../contracts/framework-contract.mjs";
+import {
+  atomicWriteOwnedFile,
+  ensureOwnedDirectoryChain,
+  readOptionalOwnedFile,
+} from "../filesystem/owned-file-operations.mjs";
 
 export function realUpgradeDirectory(value, label) {
   const resolved = path.resolve(value);
@@ -33,70 +24,49 @@ export function realUpgradeDirectory(value, label) {
 
 export function targetUpgradeFileState(root, relativePath) {
   const absolutePath = resolveFrameworkPath(root, relativePath);
-  if (!existsSync(absolutePath)) return { exists: false, mode: null, sha256: null };
-  const stats = lstatSync(absolutePath);
-  if (stats.isSymbolicLink() || !stats.isFile() || stats.nlink !== 1) {
-    throw new Error(`Upgrade target must be a single-link regular file: ${relativePath}.`);
-  }
-  const content = readRegularFrameworkFile(root, relativePath);
-  return { content, exists: true, mode: stats.mode & 0o777, sha256: sha256(content) };
+  const snapshot = readOptionalOwnedFile(
+    root,
+    absolutePath,
+    `framework upgrade target ${relativePath}`,
+  );
+  if (!snapshot.exists) return { exists: false, mode: null, sha256: null };
+  const content = snapshot.buffer.toString("utf8");
+  return {
+    content,
+    exists: true,
+    mode: snapshot.stats.mode & 0o777,
+    sha256: sha256(content),
+  };
 }
 
 export function managedUpgradeSourceState(sourceRoot, relativePath) {
   const absolutePath = resolveFrameworkPath(sourceRoot, relativePath);
-  const stats = lstatSync(absolutePath);
-  if (stats.isSymbolicLink() || !stats.isFile() || stats.nlink !== 1) {
-    throw new Error(`Upgrade source must be a single-link regular file: ${relativePath}.`);
-  }
+  const snapshot = readOptionalOwnedFile(
+    sourceRoot,
+    absolutePath,
+    `framework upgrade source ${relativePath}`,
+  );
+  if (!snapshot.exists) throw new Error(`Missing framework upgrade source: ${relativePath}.`);
   return {
-    content: desiredManagedFileContent({ sourceRoot, relativePath }),
-    mode: stats.mode & 0o777,
+    content: desiredManagedFileContentFromRaw(relativePath, snapshot.buffer.toString("utf8")),
+    mode: snapshot.stats.mode & 0o777,
   };
 }
 
 export function ensureUpgradeDirectoryChain(root, relativeDirectory) {
   const ownedRoot = realUpgradeDirectory(root, "framework upgrade target");
-  let cursor = ownedRoot;
-  for (const segment of relativeDirectory.split("/").filter(Boolean)) {
-    cursor = path.join(cursor, segment);
-    if (existsSync(cursor)) {
-      const stats = lstatSync(cursor);
-      if (stats.isSymbolicLink() || !stats.isDirectory()) {
-        throw new Error("Framework upgrade output parent is not a real directory.");
-      }
-    } else {
-      mkdirSync(cursor, { mode: 0o700 });
-    }
-  }
+  return ensureOwnedDirectoryChain(
+    ownedRoot,
+    relativeDirectory,
+    "framework upgrade output directory",
+  );
 }
 
-export function atomicWriteUpgradeFile(root, relativePath, content, mode) {
+export function atomicWriteUpgradeFile(root, relativePath, content, mode, { testHooks } = {}) {
   ensureUpgradeDirectoryChain(root, path.posix.dirname(relativePath));
   const target = resolveFrameworkPath(root, relativePath);
-  if (existsSync(target) && lstatSync(target).isSymbolicLink()) {
-    throw new Error(`Refusing symlinked framework upgrade output: ${relativePath}.`);
-  }
-  const temporary = path.join(
-    path.dirname(target),
-    `.${path.basename(target)}.codexrig-${process.pid}-${randomUUID()}`,
-  );
-  const descriptor = openSync(temporary, "wx", mode);
-  try {
-    writeFileSync(descriptor, content, "utf8");
-    fsyncSync(descriptor);
-  } finally {
-    closeSync(descriptor);
-  }
-  try {
-    renameSync(temporary, target);
-    chmodSync(target, mode);
-    const directoryDescriptor = openSync(path.dirname(target), "r");
-    try {
-      fsyncSync(directoryDescriptor);
-    } finally {
-      closeSync(directoryDescriptor);
-    }
-  } finally {
-    rmSync(temporary, { force: true });
-  }
+  return atomicWriteOwnedFile(root, target, content, mode, {
+    label: `framework upgrade output ${relativePath}`,
+    testHooks,
+  });
 }

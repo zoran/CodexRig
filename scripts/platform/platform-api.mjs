@@ -1,3 +1,5 @@
+/** Owns platform api behavior for the Git provider integration boundary. */
+/** Carries a bounded provider API failure together with its HTTP status when available. */
 export class PlatformApiError extends Error {
   constructor(message, status) {
     super(message);

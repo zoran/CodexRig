@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/** Owns framework doctor behavior for the framework lifecycle and child upgrade boundary. */
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -18,8 +19,13 @@ import {
   resolveFrameworkPath,
   sha256,
   versionSatisfiesSimpleRange,
-} from "./framework-contract.mjs";
+} from "../contracts/framework-contract.mjs";
 import { detectGitProvider, platformCiPath } from "../platform/git-provider.mjs";
+import {
+  githubStableCodexInstallStep,
+  gitlabMiseInstallBeforeScript,
+  gitlabStableCodexInstallBeforeScript,
+} from "./compatibility-matrix.mjs";
 import { readPolicyProjection } from "./policy-projection.mjs";
 
 function pushFinding(collection, code, message) {
@@ -141,7 +147,46 @@ function validateRuntimeVersions({ matrix, root, errors, versions }) {
   }
 }
 
-function validateCiAdapters({ root, errors }) {
+/** Returns CI adapter contract violation ids for deterministic doctor evidence. */
+export function ciAdapterContractViolations(provider, content, matrix) {
+  if (!new Set(["github", "gitlab"]).has(provider)) {
+    throw new Error(`Unsupported CI adapter provider: ${provider}.`);
+  }
+  const requirements =
+    provider === "github"
+      ? [
+          ["merge-group", "merge_group:"],
+          ["compatibility-matrix", "scripts/framework/compatibility-matrix.mjs --github-matrix"],
+          ["pinned-mise-action", "jdx/mise-action@"],
+          ["mise-version", `version: ${matrix.ci.miseVersion}`],
+          ["mise-sha256", `sha256: ${matrix.ci.miseLinuxX64Sha256}`],
+          ["deferred-mise-install", "install: false"],
+          ["reviewed-stable-codex", githubStableCodexInstallStep(matrix).join("\n")],
+        ]
+      : [
+          ["merge-request", "merge_request_event"],
+          ["compatibility-child", "scripts/framework/compatibility-matrix.mjs --gitlab-child"],
+          ["verified-mise-install", gitlabMiseInstallBeforeScript(matrix).join("\n")],
+          ["reviewed-stable-codex", gitlabStableCodexInstallBeforeScript(matrix).join("\n")],
+          ["frozen-install", "--ignore-pnpmfile"],
+          ["shellcheck", "shellcheck"],
+        ];
+  const violations = requirements
+    .filter(([, marker]) => !content.includes(marker))
+    .map(([id]) => id);
+  if (
+    provider === "gitlab" &&
+    /npm\s+install\s+--global[^\n]*(?:mise@latest|\$\{mise_package\}@)/u.test(content)
+  ) {
+    violations.push("unverified-mise-install");
+  }
+  if (/npm\s+install\s+--global[^\n]*@openai\/codex@latest\b/u.test(content)) {
+    violations.push("moving-codex-in-blocking-ci");
+  }
+  return violations;
+}
+
+function validateCiAdapters({ root, matrix, errors }) {
   for (const provider of ["github", "gitlab"]) {
     const relativePath = platformCiPath(provider);
     if (!regularFileExists(root, relativePath)) {
@@ -149,28 +194,23 @@ function validateCiAdapters({ root, errors }) {
       continue;
     }
     const content = readRegularFrameworkFile(root, relativePath);
-    const markers =
-      provider === "github"
-        ? [
-            "merge_group:",
-            "scripts/framework/compatibility-matrix.mjs --github-matrix",
-            "jdx/mise-action@",
-            "install: false",
-          ]
-        : [
-            "merge_request_event",
-            "scripts/framework/compatibility-matrix.mjs --gitlab-child",
-            "mise@latest",
-            "shellcheck",
-          ];
-    for (const marker of markers) {
-      if (!content.includes(marker)) {
-        pushFinding(
-          errors,
-          `platform.${provider}.ci-contract`,
-          `${provider} CI adapter is missing ${marker}.`,
-        );
-      }
+    let violations;
+    try {
+      violations = ciAdapterContractViolations(provider, content, matrix);
+    } catch (error) {
+      pushFinding(
+        errors,
+        `platform.${provider}.ci-contract`,
+        `${provider} CI compatibility truth is invalid: ${error.message}`,
+      );
+      continue;
+    }
+    for (const violation of violations) {
+      pushFinding(
+        errors,
+        `platform.${provider}.ci-contract`,
+        `${provider} CI adapter violates the ${violation} requirement.`,
+      );
     }
   }
 }
@@ -302,11 +342,11 @@ async function onlineFindings({ fetchImpl, matrix, errors, warnings }) {
       `A newer stable pnpm is available (${latest.pnpm}); review the stable compatibility line.`,
     );
   }
-  if (compareSemver(matrix.stable.codex.minimumVersion, latest.codex) < 0) {
+  if (compareSemver(matrix.ci.codexVersion, latest.codex) < 0) {
     pushFinding(
       warnings,
       "online.codex.newer",
-      `Codex stable is newer than the recorded minimum (${latest.codex}); the launcher update path remains authoritative.`,
+      `Codex stable is newer than the reviewed blocking-CI version (${latest.codex}); review and repin the exact CI archives while the launcher update path remains authoritative.`,
     );
   }
   return latest;
@@ -333,7 +373,7 @@ export async function diagnoseFramework({
   }
   validateToolchainOwners({ contract, matrix, root, errors });
   validateRuntimeVersions({ matrix, root, errors, versions });
-  validateCiAdapters({ root, errors });
+  validateCiAdapters({ root, matrix, errors });
   const mode = validateInstallation({ contract, root, errors, warnings });
   let platform = null;
   try {

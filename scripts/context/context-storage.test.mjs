@@ -1,3 +1,4 @@
+/** Verifies context storage behavior for the repository-local semantic context boundary. */
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync } from "node:fs";
 import path from "node:path";

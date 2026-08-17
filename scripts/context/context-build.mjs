@@ -1,3 +1,4 @@
+/** Owns context build behavior for the repository-local semantic context boundary. */
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
@@ -16,7 +17,7 @@ import { hashContent } from "./context-hashing.mjs";
 import { createManifest, sourceChanges } from "./context-manifest.mjs";
 import { loadReusableRows, publishIndex } from "./context-storage.mjs";
 import { discoverSourceFiles } from "./source-policy.mjs";
-import { findSecretMatches } from "../verify/secret-patterns.mjs";
+import { findSecretMatches } from "../security/secret-patterns.mjs";
 
 function vectorIsValid(vector, dimensions) {
   return (

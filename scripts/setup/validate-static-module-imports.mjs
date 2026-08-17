@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/** Owns validate static module imports behavior for the setup, launch, and portable project boundary. */
 import { lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";

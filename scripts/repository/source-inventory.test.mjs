@@ -1,3 +1,4 @@
+/** Verifies source inventory behavior for the repository inventory and filesystem boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
@@ -17,6 +18,16 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { portableContextContractFiles } from "../context/portable-context-contract.mjs";
+import { initialDeliveryConfiguration } from "../contracts/delivery-configuration.mjs";
+import { initialLocalizationConfiguration } from "../contracts/localization-configuration.mjs";
+import { initialProductConfiguration } from "../contracts/product-configuration.mjs";
+import { initialTenancyConfiguration } from "../contracts/tenancy-configuration.mjs";
+import { renderDeliveryManifestProjection } from "../docs/delivery-manifest.mjs";
+import {
+  activeModuleInventoryHeading,
+  manifestAuthorityPreamble,
+  noActiveModulesStatement,
+} from "../docs/project-manifest-contract.mjs";
 import {
   gitlessPreDescentExcludePatterns,
   isRepositoryCodexHomePath,
@@ -89,6 +100,58 @@ function writePortableCodexFiles(targetRoot) {
     readFileSync(configPath, "utf8").replace(/^memories\s*=\s*false\s*$/mu, "memories = true"),
   );
   write(targetRoot, "src/.gitkeep", "");
+  write(targetRoot, "config/delivery.json", initialDeliveryConfiguration());
+  write(targetRoot, "config/localization.json", initialLocalizationConfiguration());
+  write(targetRoot, "config/product.json", initialProductConfiguration("portable-fixture"));
+  write(targetRoot, "config/tenancy.json", initialTenancyConfiguration());
+  write(
+    targetRoot,
+    "docs/project.md",
+    `# Project Manifest
+
+This is a generated-product fixture with current durable truth only.
+
+${manifestAuthorityPreamble}
+
+## Definition
+
+Product definition: pending fixture intake.
+
+## Users And Outcome
+
+- Target users: pending.
+- Problem and desired outcome: pending.
+- Success evidence: the staged-project lifecycle validator passes.
+
+## Scope
+
+- In scope: portable framework contract validation.
+- Non-goals: no product behavior is implemented by this fixture.
+
+## System Shape
+
+- Runtime and delivery shape: no product runtime or deployment is integrated.
+- Product languages and localization: pending.
+- Source code, identifiers, filenames, and technical source documentation use English.
+
+${renderDeliveryManifestProjection({
+  configuration: JSON.parse(initialDeliveryConfiguration()),
+})}
+
+${activeModuleInventoryHeading}
+
+${noActiveModulesStatement}
+
+## Constraints And Decisions
+
+- Future candidates belong in \`docs/future-modules.md\`.
+- Workflow authority remains in \`instructions.md\`.
+
+## Maintenance
+
+Replace pending facts only after developer confirmation and keep current truth concise.
+`,
+  );
 }
 
 function git(root, args) {
@@ -381,7 +444,7 @@ test("Codex runtime names are reserved only at root and remain valid inside prod
   const root = temporaryRoot("source-profile-inventory-");
   write(root, ".gitignore", readFileSync(path.join(repositoryRoot, ".gitignore"), "utf8"));
   write(root, "README.md", "portable\n");
-  for (const name of ["cache", "plugins", "sessions", "skills"]) {
+  for (const name of ["cache", "plugins", "rules", "sessions", "skills"]) {
     write(root, `src/${name}/index.ts`, `export const ${name}ProductPath = true;\n`);
   }
   initializeGit(root);
@@ -389,7 +452,7 @@ test("Codex runtime names are reserved only at root and remain valid inside prod
   assert.equal(added.status, 0, added.stderr);
   const active = listActiveFiles({ root });
   const portable = listPortableTransferFiles({ root });
-  for (const name of ["cache", "plugins", "sessions", "skills"]) {
+  for (const name of ["cache", "plugins", "rules", "sessions", "skills"]) {
     const relativePath = `src/${name}/index.ts`;
     assert.equal(isRepositoryCodexHomePath(relativePath), false, relativePath);
     assert.equal(active.includes(relativePath), true, relativePath);
@@ -577,13 +640,13 @@ test("stage validation requires the portable primary retrieval contract", async 
     weakenedPrimary,
     "instructions.md",
     readFileSync(path.join(repositoryRoot, "instructions.md"), "utf8").replaceAll(
-      "no reliable exact",
-      "after exhaustive exact search",
+      "Startup Repository Reconstruction",
+      "Repository Startup",
     ),
   );
   await assert.rejects(
     () => validateStagedProject(weakenedPrimary),
-    /instructions\.md to include no reliable exact/,
+    /instructions\.md to include Startup Repository Reconstruction/,
   );
 
   const weakenedRole = temporaryRoot("export-context-contract-role-");
@@ -598,7 +661,7 @@ test("stage validation requires the portable primary retrieval contract", async 
   );
   await assert.rejects(
     () => validateStagedProject(weakenedRole),
-    /retrieval contract marker context:search/,
+    /orchestration marker context:search/,
   );
 
   const missingCommand = temporaryRoot("export-context-contract-command-");
@@ -627,7 +690,7 @@ test("stage validation requires the portable primary retrieval contract", async 
     readFileSync(
       path.join(repositoryRoot, "scripts/context/context-worker-output.mjs"),
       "utf8",
-    ).replace("sanitizeMultilineForTerminal(output, repositoryRoot)", "String(output)"),
+    ).replaceAll("sanitizeMultilineForTerminal", "unsafeMultiline"),
   );
   await assert.rejects(
     () => validateStagedProject(weakenedWorker),

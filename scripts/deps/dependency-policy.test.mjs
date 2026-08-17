@@ -1,6 +1,15 @@
+/** Verifies dependency policy behavior for the dependency and toolchain maintenance boundary. */
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
@@ -15,13 +24,54 @@ import {
 import {
   acquireDependencyTransactionLock,
   applyStoredDependencyPlan,
+  contentHash,
+  dependencyPlanHash,
   dependencyTransactionPaths,
   prepareDependencyPlan,
   releaseDependencyTransactionLock,
 } from "./dependency-transaction.mjs";
 import { registerCompatibleInstallationTests } from "./compatible-installation-test-cases.mjs";
+import {
+  assertTrustedPnpmConfiguration,
+  trustedPnpmConfigurationFindings,
+} from "../repository/pnpm-workspace-manifests.mjs";
+import { trustedPnpmCommand } from "./trusted-pnpm-command.mjs";
+import { inspectRuntimeLifecycleLock } from "../repository/runtime-session-lease.mjs";
 
 const transactionRoots = [];
+const sourceCompatibility = readFileSync(
+  path.resolve(import.meta.dirname, "..", "..", ".codexrig", "compatibility.json"),
+  "utf8",
+);
+
+function writeCompatibility(root) {
+  mkdirSync(path.join(root, ".codexrig"), { recursive: true });
+  writeFileSync(path.join(root, ".codexrig", "compatibility.json"), sourceCompatibility, "utf8");
+}
+
+async function waitForLifecycle(predicate, label, timeoutMilliseconds = 5_000) {
+  const deadline = Date.now() + timeoutMilliseconds;
+  let lastError;
+  while (Date.now() <= deadline) {
+    try {
+      const result = predicate();
+      if (result) return result;
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error(`Timed out waiting for ${label}.`, { cause: lastError });
+}
+
+function terminateIfAlive(pid, signal = "SIGKILL") {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return;
+  try {
+    process.kill(pid, signal);
+  } catch (error) {
+    if (error?.code !== "ESRCH") throw error;
+  }
+}
 
 after(() => {
   for (const root of transactionRoots) rmSync(root, { recursive: true, force: true });
@@ -31,6 +81,7 @@ function transactionFixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "dependency-transaction-"));
   transactionRoots.push(root);
   mkdirSync(path.join(root, ".codex"));
+  writeCompatibility(root);
   writeFileSync(
     path.join(root, "package.json"),
     `${JSON.stringify(
@@ -55,6 +106,84 @@ function transactionFixture() {
 
 registerCompatibleInstallationTests(transactionFixture);
 
+test("trusted dependency paths reject executable pnpm configuration before pnpm can run", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "dependency-pnpmfile-boundary-"));
+  transactionRoots.push(root);
+  const sentinel = path.join(root, "pnpmfile-executed");
+  mkdirSync(path.join(root, "scripts"), { recursive: true });
+  writeFileSync(path.join(root, "package.json"), '{"name":"pnpmfile-boundary","private":true}\n');
+  writeFileSync(
+    path.join(root, "pnpm-workspace.yaml"),
+    "packages: []\npnpmfile:\n  - scripts/alternate-pnpmfile.cjs\n",
+  );
+  writeFileSync(
+    path.join(root, "scripts", "alternate-pnpmfile.cjs"),
+    `require("node:fs").writeFileSync(${JSON.stringify(sentinel)}, "executed\\n");\nmodule.exports = { hooks: {} };\n`,
+  );
+
+  assert.throws(
+    () => assertTrustedPnpmConfiguration({ repositoryRoot: root }),
+    /pnpm-workspace\.yaml pnpmfile can load repository-controlled executable configuration/u,
+  );
+  assert.equal(existsSync(sentinel), false);
+
+  assert.deepEqual(
+    trustedPnpmConfigurationFindings({
+      repositoryRoot: root,
+      workspaceContent: "packages: []\nignorePnpmfile: true\npnpmfile: []\n",
+    }),
+    [],
+  );
+
+  writeFileSync(path.join(root, ".pnpmfile.cjs"), "module.exports = {};\n");
+  writeFileSync(path.join(root, "pnpm-workspace.yaml"), "packages: []\nconfigDependencies: {}\n");
+  assert.deepEqual(trustedPnpmConfigurationFindings({ repositoryRoot: root }), [
+    ".pnpmfile.cjs is executable pnpm configuration and is forbidden on trusted framework paths",
+    "pnpm-workspace.yaml configDependencies can load repository-controlled executable configuration",
+  ]);
+  assert.equal(existsSync(sentinel), false);
+});
+
+test("trusted pnpm resolution rejects repository-local command shadowing", () => {
+  const root = transactionFixture();
+  const decoy = path.join(root, "node_modules", ".bin", "pnpm");
+  const toolRoot = mkdtempSync(path.join(os.tmpdir(), "trusted-pnpm-tool-"));
+  transactionRoots.push(toolRoot);
+  const nodeExecutable = path.join(toolRoot, "installs", "node", "24.19.0", "bin", "node");
+  const trusted = path.join(toolRoot, "installs", "pnpm", "11.22.0", "pnpm");
+  const magicPathDecoy = path.join(toolRoot, "external", "installs", "pnpm", "11.22.0", "pnpm");
+  mkdirSync(path.dirname(decoy), { recursive: true });
+  mkdirSync(path.dirname(nodeExecutable), { recursive: true });
+  mkdirSync(path.dirname(trusted), { recursive: true });
+  mkdirSync(path.dirname(magicPathDecoy), { recursive: true });
+  writeFileSync(decoy, "decoy\n");
+  writeFileSync(nodeExecutable, "node\n");
+  writeFileSync(trusted, "trusted\n");
+  writeFileSync(magicPathDecoy, "magic path decoy\n");
+  chmodSync(decoy, 0o755);
+  chmodSync(nodeExecutable, 0o755);
+  chmodSync(trusted, 0o755);
+  chmodSync(magicPathDecoy, 0o755);
+  const calls = [];
+  const command = trustedPnpmCommand({
+    repositoryRoot: root,
+    environment: {
+      PATH: `${path.dirname(decoy)}${path.delimiter}${path.dirname(magicPathDecoy)}`,
+      npm_execpath: decoy,
+      COREPACK_HOME: path.join(root, "untrusted-corepack"),
+    },
+    nodeExecutable,
+    spawn(executable, args, options) {
+      calls.push({ executable, args, environment: options.env });
+      return { status: 0, stdout: "11.22.0\n", stderr: "" };
+    },
+  });
+  assert.equal(command.executable, trusted);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].executable, trusted);
+  assert.equal(calls[0].environment.COREPACK_HOME, undefined);
+});
+
 function localInputTransactionFixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "dependency-local-input-"));
   transactionRoots.push(root);
@@ -67,6 +196,7 @@ function localInputTransactionFixture() {
   ]) {
     mkdirSync(path.join(root, directory), { recursive: true });
   }
+  writeCompatibility(root);
   writeFileSync(
     path.join(root, "package.json"),
     `${JSON.stringify(
@@ -139,14 +269,18 @@ function localInputTransactionFixture() {
     ].join("\n"),
     "utf8",
   );
-  const install = spawnSync("pnpm", ["install", "--lockfile-only", "--ignore-scripts"], {
-    cwd: root,
-    encoding: "utf8",
-    env: { ...process.env, CI: "true" },
-    input: "",
-    stdio: "pipe",
-    timeout: 30_000,
-  });
+  const install = spawnSync(
+    "pnpm",
+    ["install", "--lockfile-only", "--ignore-scripts", "--ignore-pnpmfile"],
+    {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, CI: "true" },
+      input: "",
+      stdio: "pipe",
+      timeout: 30_000,
+    },
+  );
   assert.equal(
     install.status,
     0,
@@ -188,6 +322,15 @@ function prepareFixturePlan(root, target = "1.2.1") {
     manifestPaths: ["package.json"],
     now: new Date("2026-07-10T12:00:00.000Z"),
     lockfilePlanner: () => "lockfileVersion: '9.0'\nfixture: planned\n",
+  });
+}
+
+function applyReviewedFixturePlan(root, planHash, options = {}) {
+  return applyStoredDependencyPlan({
+    projectRoot: root,
+    request,
+    planHash,
+    ...options,
   });
 }
 
@@ -443,7 +586,7 @@ test("dependency preview freezes outputs and apply uses the exact reviewed plan"
   assert.equal(readFileSync(path.join(root, "package.json"), "utf8"), originalManifest);
   assert.match(readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8"), /fixture: old/);
 
-  const applied = applyStoredDependencyPlan({ projectRoot: root, request });
+  const applied = applyReviewedFixturePlan(root, plan.hash);
   assert.deepEqual(applied.changed, ["package.json"]);
   assert.equal(
     JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).dependencies.example,
@@ -453,6 +596,67 @@ test("dependency preview freezes outputs and apply uses the exact reviewed plan"
   const paths = dependencyTransactionPaths(root);
   assert.equal(existsSync(paths.plan), false);
   assert.equal(existsSync(paths.journal), false);
+});
+
+test("dependency apply binds stored bytes to the separately reviewed preview hash", () => {
+  const root = transactionFixture();
+  const { plan, planPath } = prepareFixturePlan(root);
+  const forged = JSON.parse(readFileSync(planPath, "utf8"));
+  forged.inputs = [];
+  forged.outputs.manifests[0].content = `${JSON.stringify(
+    {
+      name: "transaction-fixture",
+      private: true,
+      scripts: { postinstall: "node attacker.mjs" },
+      dependencies: { example: "^1.2.1" },
+    },
+    null,
+    2,
+  )}\n`;
+  forged.outputs.manifests[0].hash = contentHash(forged.outputs.manifests[0].content);
+  const { hash: priorHash, ...payload } = forged;
+  assert.match(priorHash, /^[a-f0-9]{64}$/u);
+  forged.hash = dependencyPlanHash(payload);
+  writeFileSync(planPath, `${JSON.stringify(forged, null, 2)}\n`, "utf8");
+
+  assert.throws(
+    () => applyReviewedFixturePlan(root, plan.hash),
+    /Dependency plan structure is incomplete|stored dependency plan differs from the explicitly reviewed plan hash/u,
+  );
+  assert.equal(
+    JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).scripts,
+    undefined,
+  );
+  assert.match(readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8"), /fixture: old/);
+
+  forged.hash = dependencyPlanHash(payload);
+  assert.throws(
+    () => applyReviewedFixturePlan(root, forged.hash),
+    /plan structure is incomplete|omits required repository inputs|cannot be derived exactly/iu,
+  );
+  assert.equal(
+    JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).scripts,
+    undefined,
+  );
+});
+
+test("dependency plans reject hash-valid output destinations outside the discovered inventory", () => {
+  const root = transactionFixture();
+  const { plan, planPath } = prepareFixturePlan(root);
+  const forged = JSON.parse(readFileSync(planPath, "utf8"));
+  forged.outputs.manifests[0].path = ".codex/agents/package.json";
+  forged.outputs.lockfile.path = "package.json";
+  const { hash: priorHash, ...payload } = forged;
+  assert.equal(priorHash, plan.hash);
+  forged.hash = dependencyPlanHash(payload);
+  writeFileSync(planPath, `${JSON.stringify(forged, null, 2)}\n`, "utf8");
+
+  assert.throws(
+    () => applyReviewedFixturePlan(root, forged.hash),
+    /output hash is invalid|lockfile hash is invalid/u,
+  );
+  assert.equal(existsSync(path.join(root, ".codex", "agents", "package.json")), false);
+  assert.match(readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8"), /fixture: old/);
 });
 
 test("dependency preview isolates and freezes repository-local pnpm inputs", () => {
@@ -501,13 +705,13 @@ test("dependency preview isolates and freezes repository-local pnpm inputs", () 
 
   writeFileSync(patchPath, `${patchContent}# changed after preview\n`, "utf8");
   assert.throws(
-    () => applyStoredDependencyPlan({ projectRoot: root, request }),
+    () => applyReviewedFixturePlan(root, plan.hash),
     /plan is stale because patches\/local-source\.patch changed/,
   );
   writeFileSync(patchPath, patchContent, "utf8");
   writeFileSync(tarballPath, Buffer.concat([originalTarball, Buffer.from("changed")]));
   assert.throws(
-    () => applyStoredDependencyPlan({ projectRoot: root, request }),
+    () => applyReviewedFixturePlan(root, plan.hash),
     /plan is stale because vendor\/local-source-1\.0\.0\.tgz changed/,
   );
   assert.deepEqual(readFileSync(manifestPath), originalManifest);
@@ -516,13 +720,13 @@ test("dependency preview isolates and freezes repository-local pnpm inputs", () 
 
 test("dependency apply rejects source or version changes after preview", () => {
   const root = transactionFixture();
-  prepareFixturePlan(root);
+  const { plan } = prepareFixturePlan(root);
   const manifestPath = path.join(root, "package.json");
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   manifest.dependencies.example = "^1.2.5";
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
   assert.throws(
-    () => applyStoredDependencyPlan({ projectRoot: root, request }),
+    () => applyReviewedFixturePlan(root, plan.hash),
     /plan is stale because package.json changed/,
   );
   assert.equal(JSON.parse(readFileSync(manifestPath, "utf8")).dependencies.example, "^1.2.5");
@@ -532,11 +736,10 @@ test("dependency apply rejects source or version changes after preview", () => {
 
 test("dependency apply arguments must match the reviewed preview", () => {
   const root = transactionFixture();
-  prepareFixturePlan(root);
+  const { plan } = prepareFixturePlan(root);
   assert.throws(
     () =>
-      applyStoredDependencyPlan({
-        projectRoot: root,
+      applyReviewedFixturePlan(root, plan.hash, {
         request: { ...request, level: "minor" },
       }),
     /arguments do not match the reviewed dependency preview/,
@@ -573,7 +776,10 @@ test("dependency preview rejects inputs changed while outputs are being planned"
 test("dependency transaction lock enforces process ownership", () => {
   const root = transactionFixture();
   const lock = acquireDependencyTransactionLock(root, { token: "first-owner" });
-  assert.throws(() => acquireDependencyTransactionLock(root), /locked by process/);
+  assert.throws(
+    () => acquireDependencyTransactionLock(root),
+    /cannot overlap another repository mutation/,
+  );
   assert.throws(
     () =>
       releaseDependencyTransactionLock({
@@ -586,14 +792,89 @@ test("dependency transaction lock enforces process ownership", () => {
   releaseDependencyTransactionLock(lock);
 });
 
+test(
+  "a killed dependency coordinator remains excluded until its registered child exits",
+  { skip: process.platform !== "linux" },
+  async (t) => {
+    const root = transactionFixture();
+    const readyPath = path.join(root, "dependency-child-ready.json");
+    const transactionUrl = new URL("./dependency-transaction.mjs", import.meta.url).href;
+    const supervisorUrl = new URL("../repository/runtime-lifecycle-process.mjs", import.meta.url)
+      .href;
+    const targetSource = `
+      import { writeFileSync } from "node:fs";
+      writeFileSync(${JSON.stringify(readyPath)}, JSON.stringify({ pid: process.pid }));
+      setInterval(() => {}, 1000);
+    `;
+    const coordinatorSource = `
+      const { acquireDependencyTransactionLock, releaseDependencyTransactionLock } = await import(${JSON.stringify(transactionUrl)});
+      const { spawnRuntimeLifecycleCommandSync } = await import(${JSON.stringify(supervisorUrl)});
+      const lock = acquireDependencyTransactionLock(${JSON.stringify(root)});
+      spawnRuntimeLifecycleCommandSync({
+        args: ["--input-type=module", "--eval", ${JSON.stringify(targetSource)}],
+        command: process.execPath,
+        lifecycleCapability: lock.lifecycleCapability,
+        options: { cwd: ${JSON.stringify(root)}, stdio: "ignore" },
+        repositoryRoot: ${JSON.stringify(root)},
+        role: "dependency-test-supervisor",
+      });
+      releaseDependencyTransactionLock(lock);
+    `;
+    const coordinator = spawn(
+      process.execPath,
+      ["--input-type=module", "--eval", coordinatorSource],
+      { cwd: root, stdio: "ignore" },
+    );
+    let targetPid;
+    t.after(() => {
+      terminateIfAlive(targetPid);
+      terminateIfAlive(coordinator.pid);
+    });
+
+    await waitForLifecycle(() => existsSync(readyPath), "dependency child readiness");
+    targetPid = JSON.parse(readFileSync(readyPath, "utf8")).pid;
+    await waitForLifecycle(
+      () =>
+        inspectRuntimeLifecycleLock({ root }).owner?.descendants?.some(
+          (entry) =>
+            entry.identity.pid === targetPid &&
+            /^linux:[a-f0-9-]{36}:\d+$/u.test(entry.identity.startIdentity),
+        ),
+      "dependency child identity registration",
+    );
+
+    terminateIfAlive(coordinator.pid, "SIGKILL");
+    await new Promise((resolve) => coordinator.once("exit", resolve));
+    const orphaned = inspectRuntimeLifecycleLock({ root });
+    assert.equal(orphaned.owner.coordinator.pid, coordinator.pid);
+    assert.equal(orphaned.status, "active");
+    assert.throws(
+      () => acquireDependencyTransactionLock(root),
+      /cannot overlap another repository mutation/,
+    );
+
+    terminateIfAlive(targetPid, "SIGTERM");
+    let reclaimed;
+    await waitForLifecycle(() => {
+      try {
+        reclaimed = acquireDependencyTransactionLock(root);
+        return true;
+      } catch (error) {
+        if (/cannot overlap another repository mutation/u.test(error?.message ?? "")) return false;
+        throw error;
+      }
+    }, "dependency lifecycle reclaim after child exit");
+    releaseDependencyTransactionLock(reclaimed);
+    assert.equal(inspectRuntimeLifecycleLock({ root }).status, "absent");
+  },
+);
+
 test("interrupted dependency transaction is journaled, rolled back, and retried", () => {
   const root = transactionFixture();
-  prepareFixturePlan(root);
+  const { plan } = prepareFixturePlan(root);
   assert.throws(
     () =>
-      applyStoredDependencyPlan({
-        projectRoot: root,
-        request,
+      applyReviewedFixturePlan(root, plan.hash, {
         injectedFailure: "after-manifests",
       }),
     /Injected dependency interruption/,
@@ -606,7 +887,7 @@ test("interrupted dependency transaction is journaled, rolled back, and retried"
   );
   assert.match(readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8"), /fixture: old/);
 
-  const applied = applyStoredDependencyPlan({ projectRoot: root, request });
+  const applied = applyReviewedFixturePlan(root, plan.hash);
   assert.equal(applied.recovered, "rolled-back");
   assert.equal(
     JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).dependencies.example,
@@ -618,12 +899,10 @@ test("interrupted dependency transaction is journaled, rolled back, and retried"
 
 test("dependency recovery preserves unrelated manual output changes and its journal", () => {
   const root = transactionFixture();
-  prepareFixturePlan(root);
+  const { plan } = prepareFixturePlan(root);
   assert.throws(
     () =>
-      applyStoredDependencyPlan({
-        projectRoot: root,
-        request,
+      applyReviewedFixturePlan(root, plan.hash, {
         injectedFailure: "after-manifests",
       }),
     /Injected dependency interruption/,
@@ -644,7 +923,7 @@ test("dependency recovery preserves unrelated manual output changes and its jour
   const paths = dependencyTransactionPaths(root);
 
   assert.throws(
-    () => applyStoredDependencyPlan({ projectRoot: root, request }),
+    () => applyReviewedFixturePlan(root, plan.hash),
     /recovery refused to overwrite package\.json.*unrelated change.*journal preserved/i,
   );
   assert.equal(readFileSync(manifestPath, "utf8"), manualContent);
@@ -660,11 +939,12 @@ test("fully written interrupted dependency transaction is finalized idempotently
       applyStoredDependencyPlan({
         projectRoot: root,
         request,
+        planHash: plan.hash,
         injectedFailure: "after-lockfile",
       }),
     /Injected dependency interruption/,
   );
-  const recovered = applyStoredDependencyPlan({ projectRoot: root, request });
+  const recovered = applyReviewedFixturePlan(root, plan.hash);
   assert.equal(recovered.recovered, "finalized");
   assert.equal(recovered.planHash, plan.hash);
   assert.equal(existsSync(dependencyTransactionPaths(root).journal), false);
@@ -672,12 +952,10 @@ test("fully written interrupted dependency transaction is finalized idempotently
 
 test("corrupt dependency recovery journal is detected and preserved", () => {
   const root = transactionFixture();
-  prepareFixturePlan(root);
+  const { plan } = prepareFixturePlan(root);
   assert.throws(
     () =>
-      applyStoredDependencyPlan({
-        projectRoot: root,
-        request,
+      applyReviewedFixturePlan(root, plan.hash, {
         injectedFailure: "after-manifests",
       }),
     /Injected dependency interruption/,
@@ -687,7 +965,7 @@ test("corrupt dependency recovery journal is detected and preserved", () => {
   journal.originals[0].content = "tampered\n";
   writeFileSync(journalPath, `${JSON.stringify(journal, null, 2)}\n`, "utf8");
   assert.throws(
-    () => applyStoredDependencyPlan({ projectRoot: root, request }),
+    () => applyReviewedFixturePlan(root, plan.hash),
     /journal is invalid; manual recovery is required/,
   );
   assert.equal(existsSync(journalPath), true);

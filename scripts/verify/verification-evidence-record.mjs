@@ -1,3 +1,4 @@
+/** Owns verification evidence record behavior for the repository verification boundary. */
 import { normalizedVerificationGitBasis } from "./verification-git-basis.mjs";
 import { normalizedVerificationRiskFingerprints } from "./verification-risk-profile.mjs";
 import { canonicalJson, digest, exactKeys, validDigest } from "./verification-record-helpers.mjs";
@@ -7,7 +8,12 @@ const evidenceKind = "project-verification-evidence";
 
 function stateFrom(inputs, gitBasis, refreshedAt) {
   return {
+    artifactDigest: inputs.artifactDigest,
+    artifactManifest: inputs.artifactManifest,
     broadFingerprint: inputs.broadFingerprint,
+    configurationDigest: inputs.configurationDigest,
+    deliveryEnvironment: inputs.deliveryEnvironment,
+    deliveryPlanDigest: inputs.deliveryPlanDigest,
     fingerprint: inputs.exactFingerprint,
     gitBasis: normalizedVerificationGitBasis(gitBasis),
     planDigest: inputs.planDigest,
@@ -15,6 +21,7 @@ function stateFrom(inputs, gitBasis, refreshedAt) {
     riskFingerprints: inputs.riskFingerprints,
     runtime: inputs.runtime,
     runtimeDigest: inputs.runtimeDigest,
+    sourceCommit: inputs.sourceCommit,
   };
 }
 
@@ -34,7 +41,12 @@ function validTimestamp(value) {
 function validateState(state) {
   if (
     !exactKeys(state, [
+      "artifactDigest",
+      "artifactManifest",
       "broadFingerprint",
+      "configurationDigest",
+      "deliveryEnvironment",
+      "deliveryPlanDigest",
       "fingerprint",
       "gitBasis",
       "planDigest",
@@ -42,11 +54,30 @@ function validateState(state) {
       "riskFingerprints",
       "runtime",
       "runtimeDigest",
+      "sourceCommit",
     ]) ||
     !validDigest(state.broadFingerprint) ||
     !validDigest(state.fingerprint) ||
     !validDigest(state.planDigest) ||
     !validDigest(state.runtimeDigest) ||
+    !["dev", "staging", "prod"].includes(state.deliveryEnvironment) ||
+    (state.artifactDigest !== "" && !/^sha256:[a-f0-9]{64}$/u.test(state.artifactDigest)) ||
+    typeof state.artifactManifest !== "string" ||
+    (state.configurationDigest !== "" && !validDigest(state.configurationDigest)) ||
+    (state.deliveryPlanDigest !== "" && !validDigest(state.deliveryPlanDigest)) ||
+    typeof state.sourceCommit !== "string" ||
+    (state.deliveryEnvironment === "dev" &&
+      (state.artifactDigest ||
+        state.artifactManifest ||
+        state.configurationDigest ||
+        state.deliveryPlanDigest ||
+        state.sourceCommit)) ||
+    (state.deliveryEnvironment !== "dev" &&
+      (!state.artifactDigest ||
+        !state.artifactManifest ||
+        !state.configurationDigest ||
+        !state.deliveryPlanDigest ||
+        !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(state.sourceCommit))) ||
     !validTimestamp(state.refreshedAt)
   ) {
     throw new Error("Verification evidence state is invalid.");
@@ -68,7 +99,7 @@ export function fullVerificationEvidenceRecord(inputs, gitBasis, now = new Date(
     },
     kind: evidenceKind,
     recordedAt: now,
-    schemaVersion: 1,
+    schemaVersion: 3,
     transitionCount: 0,
   });
 }
@@ -99,7 +130,7 @@ export function validateVerificationEvidenceRecord(record) {
       "transitionCount",
     ]) ||
     record.kind !== evidenceKind ||
-    record.schemaVersion !== 1 ||
+    record.schemaVersion !== 3 ||
     !validDigest(record.recordDigest) ||
     !validTimestamp(record.recordedAt) ||
     !Number.isSafeInteger(record.transitionCount) ||

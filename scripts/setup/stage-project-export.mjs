@@ -1,3 +1,4 @@
+/** Owns stage project export behavior for the setup, launch, and portable project boundary. */
 import { existsSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -7,7 +8,7 @@ import {
   captureStableRepositoryFileIdentity,
   copyStableRepositoryFile,
 } from "../repository/stable-file-snapshot.mjs";
-import { formatContextError } from "../context/terminal-output.mjs";
+import { formatContextError } from "../terminal/terminal-output.mjs";
 import { assertPortableProjectPaths } from "./portable-project-contract.mjs";
 
 function fail(message) {

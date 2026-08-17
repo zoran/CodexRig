@@ -1,3 +1,4 @@
+/** Owns verification evidence store behavior for the repository verification boundary. */
 import {
   closeSync,
   constants,

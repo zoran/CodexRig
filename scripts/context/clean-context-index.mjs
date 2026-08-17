@@ -1,4 +1,5 @@
-import { rmSync } from "node:fs";
+/** Owns clean context index behavior for the repository-local semantic context boundary. */
+import { lstatSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -10,7 +11,8 @@ import {
   resolveOwnedDirectory,
   resolveRepositoryRoot,
 } from "./context-paths.mjs";
-import { formatContextError } from "./terminal-output.mjs";
+import { formatContextError } from "../terminal/terminal-output.mjs";
+import { claimAndRemove } from "./context-maintenance-safety.mjs";
 
 export async function removeOwnedContextIndex({ repositoryRoot, indexDirectory, rebuildLockPath }) {
   const root = resolveRepositoryRoot(repositoryRoot);
@@ -35,7 +37,13 @@ export async function removeOwnedContextIndex({ repositoryRoot, indexDirectory, 
         repositoryRoot: root,
         indexDirectory: ownedIndexDirectory,
       });
-      rmSync(ownedIndexDirectory, { recursive: true, force: true });
+      claimAndRemove({
+        artifactPath: ownedIndexDirectory,
+        expectedType: "directory",
+        label: "owned context index",
+        ownedRootPath: root,
+        ownerDevice: lstatSync(root).dev,
+      });
     },
   );
 }

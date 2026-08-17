@@ -1,3 +1,4 @@
+/** Owns context database behavior for the repository-local semantic context boundary. */
 import { existsSync, lstatSync } from "node:fs";
 import { createChunkFingerprintAccumulator } from "./context-manifest.mjs";
 
@@ -5,6 +6,7 @@ if (!process.env.RUST_LOG) process.env.RUST_LOG = "error";
 
 let lancedbPromise;
 
+/** Signals that a context database path or operation violates the local safety boundary. */
 export class ContextDatabaseSafetyError extends Error {
   constructor(message) {
     super(message);

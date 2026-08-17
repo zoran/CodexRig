@@ -1,10 +1,11 @@
 #!/usr/bin/env node
+/** Owns configure platform behavior for the Git provider integration boundary. */
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
   readFrameworkContract,
   validateFrameworkContract,
-} from "../framework/framework-contract.mjs";
+} from "../contracts/framework-contract.mjs";
 import { detectGitProvider, platformRoot } from "./git-provider.mjs";
 import { applyGithubPlatform, githubRulesetPayload } from "./github-platform.mjs";
 import { applyGitlabPlatform } from "./gitlab-platform.mjs";

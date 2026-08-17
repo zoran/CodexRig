@@ -1,3 +1,4 @@
+/** Owns verification risk profile behavior for the repository verification boundary. */
 import { createHash } from "node:crypto";
 
 const digestPattern = /^[a-f0-9]{64}$/u;

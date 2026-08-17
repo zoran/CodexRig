@@ -1,3 +1,4 @@
+/** Owns context hashing behavior for the repository-local semantic context boundary. */
 import { createHash } from "node:crypto";
 import { closeSync, existsSync, lstatSync, openSync, readSync } from "node:fs";
 import path from "node:path";

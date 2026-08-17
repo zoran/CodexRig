@@ -1,3 +1,4 @@
+/** Owns sitemap metadata behavior for the public web quality boundary. */
 export function parseSitemapEntries(sitemap) {
   return [...sitemap.matchAll(/<url\b[^>]*>([\s\S]*?)<\/url>/gi)].map((match, index) => {
     const block = match[0];

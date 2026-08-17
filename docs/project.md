@@ -1,262 +1,397 @@
 # Project Manifest
 
-This is the always-read, concise central source of truth for product intent, scope, system shape,
-and durable decisions.
+This is the always-read, concise source of truth for the framework that exists in this repository.
+It records integrated capabilities and current operating facts, not workflow policy or a roadmap.
 
-Agent workflow authority: `instructions.md`. Replace pending manifest entries before implementation
-relies on them.
+Agent workflow authority: `instructions.md`. Optional project context cannot override this manifest.
 
 ## Definition
 
-Framework name: CodexRig.
-
-CodexRig is the neutral reusable source framework. No generated product has been defined yet.
+CodexRig is a neutral, code-first Codex framework and reusable source base. It generates isolated,
+upgradeable product repositories while deliberately defining no child product or product stack.
 
 ## Users And Outcome
 
-- Target users: pending.
-- Problem and desired outcome: pending.
-- Success evidence: pending.
+- Target users: developers and teams operating Codex on production-oriented software repositories.
+- Problem and desired outcome: provide inspectable project policy, deterministic setup, bounded
+  orchestration, semantic retrieval, modular delivery, child updates, and risk-based verification
+  without imposing an application architecture before a product is defined.
+- Success evidence: the framework doctor, project-generation lifecycle, managed-upgrade lifecycle,
+  portable-source contracts, focused capability verifiers, and repository verification pass on the
+  exact reviewed source state.
 
 ## Scope
 
-- In scope: pending.
-- Non-goals: do not infer a runtime, framework, provider, deployment target, data model, or trust
-  boundary before requirements justify it.
+- In scope: the reusable Codex harness, clean sibling-project generation, receipt-backed child
+  updates, portable GitHub/GitLab adapters, dependency and toolchain policy, semantic retrieval,
+  architecture evolution, environment-bound delivery policy, and deterministic verification.
+- Non-goals: this source repository does not supply a child product, application runtime, public
+  service, product data model, deployment destination, domain roadmap, or provider identity.
 
 ## System Shape
 
-- Key domains and ownership boundaries: project policy, project creation, modular architecture and
-  pre-slice collaboration ownership, documentation lifecycle, context retrieval, setup, dependency
-  maintenance, and deterministic verification.
-- Product module map: no product modules are declared yet. For every active module, record its
-  stable name/root, cohesive responsibility, public contract and private internals, owned
-  data/migrations, allowed dependencies, focused verifier, and accountable steward role or team when
-  known.
-- Primary flow: create or open a project, load the compact project truth, inspect relevant source,
-  implement at the owning boundary, and verify proportionally.
-- Durable state: source, tests, configuration, and this manifest. Generated indexes, caches,
-  sessions, and temporary project context are not durable product truth.
+- Runtime shape: Node.js ECMAScript modules and shell entrypoints, managed by pnpm and mise.
+- Primary flow: the launcher validates and isolates a Codex session; SessionStart injects the
+  repository-reconstruction gate; tracked roles, skills, policy, and scripts guide resumed or new
+  work; generated projects receive the portable surface and an installation receipt; verification
+  selects evidence from current repository risk and delivery identity.
+- Durable state: tracked source, configuration, contracts, documentation, tests, and lockfiles.
+  `.codex/runtime/`, `.context-index/`, and `.project-state/` are disposable local state.
+- Delivery state: no product deployment is integrated in this neutral source.
+- Product delivery state is maintained by the bounded inventory below; no deploy operation is part
+  of repository housekeeping.
+- Product interface and trust state: no product UI, web application, public runtime API, or product
+  Identity and Access or tenancy capability is integrated. Framework command contracts and the
+  portable Auth, tenant-isolation, responsive-experience, and physical-surface verifiers remain
+  inside their owning capability roots rather than a mixed application tree. Framework source,
+  identifiers, tests, and technical headers are English; no child-facing locale set exists here.
+- Infrastructure state: portable CI lives in `.github/workflows/ci.yml` and `.gitlab-ci.yml`,
+  toolchain declarations live in `mise.toml`, `mise.lock`, and workspace manifests, and provider or
+  delivery orchestration lives under `scripts/platform` and `scripts/setup`, while goal housekeeping
+  lives under `scripts/goals`; none is mixed into a product runtime root.
+
+<!-- codexrig:delivery-inventory:start -->
+
+- Product delivery inventory: this neutral framework source has no integrated product environment.
+
+<!-- codexrig:delivery-inventory:end -->
+
+### Active Module Inventory
+
+#### Workflow Skills
+
+- Root: `.agents/skills`
+- Responsibility: Defines discoverable, reusable workflows for implementation, architecture,
+  slice-level whole-system coherence repair, retrieval, maintenance, generation, reset, and
+  specialist review.
+- Runtime and technology: Markdown/YAML skill contracts with Node.js ESM for referenced automation.
+- Public contract: Each skill's `SKILL.md`, optional `agents/openai.yaml`, and referenced scripts,
+  references, or assets.
+- Private internals: Skill-specific implementation detail not named by its `SKILL.md`.
+- Owned data and migrations: Tracked skill definitions only; no mutable data or migrations.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/docs`,
+  `scripts/filesystem`, `scripts/framework`, `scripts/repository`, `scripts/setup`,
+  `scripts/terminal`, `scripts/verify`.
+- Focused verifier: `node scripts/verify/repository-smoke.mjs`
+- Steward: Primary framework maintainer.
+
+#### Codex Session And Agent Policy
+
+- Root: `.codex`
+- Responsibility: Injects the primary orchestration contract, exact global agent defaults, reviewed
+  lifecycle hooks, least-privilege discovery/worker role requests, and effective-permission
+  admission that fails closed when parent runtime overrides defeat a role sandbox.
+- Runtime and technology: Declarative TOML, JSON, and Markdown consumed by Codex, with lifecycle
+  entrypoints implemented in the framework's Node.js/Bash harness.
+- Public contract: Root `developer_instructions` and `[agents]` defaults in `.codex/config.toml`,
+  standalone role configuration layers under `.codex/agents/`, `.codex/hooks.json`, and the visible
+  operator guide `.codex/README.md`.
+- Private internals: Session-local ownership registries, role prompt wording, and sandbox-specific
+  settings.
+- Owned data and migrations: Tracked role configuration only; no mutable data or migrations.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/context`, `scripts/setup`.
+- Focused verifier: `pnpm codex:validate`
+- Steward: Primary framework maintainer.
+
+#### Context Retrieval
+
+- Root: `scripts/context`
+- Responsibility: Builds, checks, searches, refreshes, and safely cleans the repository semantic
+  index, owns bounded continuation state, and seals/discovers private critical-budget handovers used
+  for explicit cross-session recovery.
+- Runtime and technology: Node.js ESM and Bash on the framework's mise-pinned toolchain.
+- Public contract: `context:index`, `context:check`, `context:search`, `context:clean`,
+  `handover:create`, and the Stop hook entrypoint.
+- Private internals: Source classification, token-aware chunking, hybrid lexical/vector ranking,
+  implemented-versus-deferred intent weighting, embedding, locking, storage, and generation
+  maintenance.
+- Owned data and migrations: Disposable `.context-index/` generations, bounded
+  `.codex/runtime/stop-continuation/` state, and private transient prompts under ignored
+  `tmp/codexrig-handovers/`.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/contracts`, `scripts/docs`, `scripts/filesystem`,
+  `scripts/repository`, `scripts/security`, `scripts/terminal`.
+- Focused verifier: `pnpm context:test`
+- Steward: Context capability maintainer.
+
+#### Framework Contracts
+
+- Root: `scripts/contracts`
+- Responsibility: Parses and validates versioned framework, compatibility, startup, platform,
+  managed-surface, generated white-label product-configuration, delivery-inventory, localization,
+  and tenant-isolation contracts.
+- Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
+- Public contract: Exported contract readers, product/delivery/localization/tenancy-configuration
+  renderers, normalizers, path guards, and canonical serializers.
+- Private internals: Validation helpers and schema-specific normalization.
+- Owned data and migrations: No mutable data; schemas govern tracked `.codexrig/` documents.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/filesystem`.
+- Focused verifier:
+  `node --test scripts/framework/framework-lifecycle.test.mjs scripts/verify/api-security.test.mjs scripts/verify/localization.test.mjs scripts/verify/white-label.test.mjs`
+- Steward: Framework lifecycle maintainer.
+
+#### Owned Filesystem Safety
+
+- Root: `scripts/filesystem`
+- Responsibility: Provides identity-bound, held-directory filesystem operations for repository-owned
+  state without belonging to any consuming workflow or data domain.
+- Runtime and technology: Node.js ESM over operating-system file descriptors, filesystem identity,
+  mount-boundary, mode, and durability primitives.
+- Public contract: Exported owned-root bindings, stable reads, atomic file replacement, bounded tree
+  validation/removal, and identity-checked directory/file mutation helpers.
+- Private internals: Descriptor namespace discovery, mount-info parsing, object-identity comparison,
+  temporary claim naming, and syscall ordering.
+- Owned data and migrations: No data; callers retain ownership of every state tree they pass in.
+- Tenant isolation: Not applicable; source-framework safety capability with no child product data
+  plane.
+- Allowed dependencies: None.
+- Focused verifier:
+  `node --test scripts/context/context-maintenance.test.mjs scripts/framework/framework-lifecycle.test.mjs scripts/deps/dependency-policy.test.mjs`
+- Steward: Framework filesystem safety maintainer.
+
+#### Dependency Management
+
+- Root: `scripts/deps`
+- Responsibility: Resolves, installs, reports, and updates the newest compatible dependency graph
+  allowed by tracked ranges, pins, engines, peers, and supply-chain policy.
+- Runtime and technology: Node.js ESM orchestrating the pnpm and mise toolchain.
+- Public contract: `deps:install`, `deps:report`, and `deps:update*` commands.
+- Private internals: Resolution transactions, input normalization, and rollback state.
+- Owned data and migrations: Managed changes to `package.json`, `pnpm-lock.yaml`, and approved
+  dependency policy inputs; transient transaction state is disposable.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/filesystem`, `scripts/repository`, `scripts/terminal`.
+- Focused verifier: `node --test scripts/deps/dependency-policy.test.mjs`
+- Steward: Dependency capability maintainer.
+
+#### Documentation Contracts
+
+- Root: `scripts/docs`
+- Responsibility: Enforces document scope, current-state manifest ownership, the separate deferred
+  module inventory, delivery-inventory projection, and project-document reconciliation requirements.
+- Runtime and technology: Node.js ESM with deterministic Markdown parsing.
+- Public contract: `docs:check`, manifest and delivery-projection parsers, document classification,
+  and initialization.
+- Private internals: Markdown section parsing and repository-to-manifest discovery.
+- Owned data and migrations: No mutable data; validates tracked documentation.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/contracts`, `scripts/repository`.
+- Focused verifier: `node --test scripts/docs/document-scope.test.mjs`
+- Steward: Documentation contract maintainer.
+
+#### Framework Lifecycle
+
+- Root: `scripts/framework`
+- Responsibility: Diagnoses framework health, derives the source release version from every change
+  since the unique live configured central-remote commit that matches the local tracking ref, and
+  performs receipt-backed, transactional, policy-aware child updates and compatibility reporting.
+- Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
+- Public contract: `framework:doctor`, `framework:version`, `framework:upgrade`, and
+  `compatibility:matrix` commands.
+- Private internals: Conservative SemVer classification, three-way planning, the bounded published
+  schema-1-to-2 child bootstrap, journals, ownership locks, rollback, receipt publication,
+  dependency refresh, and policy reconciliation plans.
+- Owned data and migrations: Child `.codexrig/installation.json` receipts and disposable
+  `.project-state/framework-upgrade/` transaction state.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/contracts`, `scripts/deps`, `scripts/docs`, `scripts/filesystem`,
+  `scripts/platform`, `scripts/repository`, `scripts/terminal`.
+- Focused verifier:
+  `node --test scripts/framework/framework-version.test.mjs scripts/framework/framework-lifecycle.test.mjs`
+- Steward: Framework lifecycle maintainer.
+
+#### Git Hook Adapter
+
+- Root: `scripts/git-hooks`
+- Responsibility: Provides the tracked, root-bound pre-push adapter installed into local Git.
+- Runtime and technology: Bash adapter delegating to the Node.js ESM verification boundary.
+- Public contract: `scripts/git-hooks/pre-push`.
+- Private internals: Git environment sanitization and delegation to the verification entrypoint.
+- Owned data and migrations: The installed local pre-push hook; no product data or migrations.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/verify`.
+- Focused verifier: `node --test scripts/verify/pre-push.test.mjs`
+- Steward: Verification capability maintainer.
+
+#### Goal Lifecycle
+
+- Root: `scripts/goals`
+- Responsibility: Reconciles bounded repository housekeeping after completed goals and proves that a
+  goal is clean, published on central `main`, and covered by exact-current successful evidence
+  before a new goal begins. Its consolidated health pass also checks delivery, manifest/module,
+  white-label, localization, Identity and Access, tenancy, physical-surface,
+  source/declaration-header, stack, dependency, secret, model, and framework drift.
+- Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
+- Public contract: `repo:housekeeping` and `goal:new`.
+- Private internals: Atomic local reconciliation, health-check orchestration, Git publication,
+  source identity, and evidence admission checks.
+- Owned data and migrations: Project-owned `config/delivery.json` detected evidence and its bounded
+  `docs/project.md` projection; in reusable source only, synchronized framework/package/manifest
+  release metadata; no external environment or product data.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/contracts`, `scripts/docs`, `scripts/filesystem`,
+  `scripts/framework`, `scripts/repository`, `scripts/terminal`, `scripts/verify`.
+- Focused verifier:
+  `node --test scripts/goals/repository-housekeeping.test.mjs scripts/goals/goal-publication-precondition.test.mjs`
+- Steward: Goal lifecycle maintainer.
+
+#### Git Platform Adapters
+
+- Root: `scripts/platform`
+- Responsibility: Detects GitHub or GitLab and previews or reconciles equivalent protected-branch,
+  review, CI, and merge-serialization policy with provider read-back.
+- Runtime and technology: Node.js ESM using credential-free contract parsing and HTTPS adapters.
+- Public contract: `platform:detect` and `platform:configure`.
+- Private internals: Provider API clients, pagination, host allowlists, and reconciliation state.
+- Owned data and migrations: Disposable local reconciliation state; remote changes occur only on an
+  explicit primary-owned apply.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/contracts`, `scripts/repository`.
+- Focused verifier: `node --test scripts/platform/platform-lifecycle.test.mjs`
+- Steward: Platform integration maintainer.
+
+#### Repository Boundaries
+
+- Root: `scripts/repository`
+- Responsibility: Owns canonical source inventory, Product Root discovery, sensitive-path masking,
+  Git runtime isolation, repository-bound session leases, stable snapshots, delivery-environment
+  evidence discovery, and transfer-source validation.
+- Runtime and technology: Node.js ESM over filesystem and isolated Git process boundaries.
+- Public contract: Exported inventory, path-policy, Product Root, runtime-lease, delivery-discovery,
+  and snapshot APIs.
+- Private internals: Repository inventory, process-identity, session-lifecycle, and Git/Git-less
+  traversal detail.
+- Owned data and migrations: No mutable data or migrations.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/contracts`, `scripts/filesystem`.
+- Focused verifier:
+  `node --test scripts/repository/source-inventory.test.mjs scripts/framework/framework-lifecycle.test.mjs scripts/context/context-lifecycle.test.mjs`
+- Steward: Repository boundary maintainer.
+
+#### Secret Classification
+
+- Root: `scripts/security`
+- Responsibility: Owns reusable secret-pattern classification shared by indexing, terminal output,
+  and repository verification.
+- Runtime and technology: Node.js ESM deterministic pattern contracts.
+- Public contract: Exported secret patterns and match helpers.
+- Private internals: Pattern ordering and false-positive guards.
+- Owned data and migrations: No mutable data or migrations.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: None.
+- Focused verifier: `node --test scripts/verify/secrets.test.mjs`
+- Steward: Security boundary maintainer.
+
+#### Setup And Project Portability
+
+- Root: `scripts/setup`
+- Responsibility: Launches isolated Codex sessions, attests startup, announces safe recent handover
+  metadata for developer-controlled resume, validates portable configuration and staged white-label
+  tenant-capable projects, installs hooks, initializes repositories, and exports the portable
+  surface.
+- Runtime and technology: Node.js ESM and Bash on the mise-pinned framework toolchain.
+- Public contract: `codex:start`, `codex:validate`, `setup`, `hooks:install`, and `project:export`.
+- Private internals: Startup attestations, staged identity binding, bootstrap checks, and transfer
+  fixtures.
+- Owned data and migrations: Disposable `.codex/runtime/codexrig-session.json` and startup
+  attestation state plus the installed local Git hook.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/docs`,
+  `scripts/filesystem`, `scripts/repository`, `scripts/terminal`, `scripts/verify`.
+- Focused verifier: `node --test scripts/setup/setup-regression.test.mjs`
+- Steward: Setup capability maintainer.
+
+#### Stack Detection
+
+- Root: `scripts/stack`
+- Responsibility: Detects evidenced product stacks and their applicable verification surfaces while
+  excluding the repository-root Node.js/pnpm/mise harness from product-stack evidence.
+- Runtime and technology: Node.js ESM with stack-neutral product-source discovery.
+- Public contract: `stack:detect` and exported stack classification APIs.
+- Private internals: Product Root, declared package, source-extension, and toolchain heuristics.
+- Owned data and migrations: No mutable data or migrations.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/repository`.
+- Focused verifier: `node --test scripts/stack/stack-detector.test.mjs`
+- Steward: Verification capability maintainer.
+
+#### Safe Terminal Output
+
+- Root: `scripts/terminal`
+- Responsibility: Sanitizes paths, secrets, and multiline errors before diagnostics reach terminals.
+- Runtime and technology: Node.js ESM deterministic output sanitization.
+- Public contract: Exported terminal sanitization and context-error formatting helpers.
+- Private internals: Replacement ordering and output bounds.
+- Owned data and migrations: No mutable data or migrations.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/security`.
+- Focused verifier: `node --test scripts/terminal/terminal-output.test.mjs`
+- Steward: Security boundary maintainer.
+
+#### Adaptive Verification
+
+- Root: `scripts/verify`
+- Responsibility: Routes changed-path and full checks, binds successful evidence to source, runtime,
+  Git basis, delivery environment, verified artifact/configuration bytes and a target-specific plan,
+  rejects product identity/framework-brand leakage, checks delivery-inventory drift, enforces
+  Identity and Access/provider/public-contract and tenant-isolation boundaries, enforces physical
+  surface and cross-surface import separation, checks responsive multi-device hazards,
+  localization/source-language truth, product-stack drift, and source/declaration-header currency,
+  and performs repository quality gates.
+- Runtime and technology: Node.js ESM orchestration plus bounded Bash verifier adapters.
+- Public contract: `verify`, `verify:changed`, `verify:pre-push`, `verify:external`, `docs:check`,
+  `auth:check`, `localization:check`, `tenancy:check`, and `format*` commands.
+- Private internals: Risk profiles, command admission, schema-three evidence records, immutable
+  delivery manifests, session locks, scanners, and stack-specific check selection.
+- Owned data and migrations: One replace-in-place evidence record and verification lock under
+  ignored `.codex/runtime/`; no product data or migrations.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/deps`, `scripts/docs`,
+  `scripts/filesystem`, `scripts/repository`, `scripts/security`, `scripts/stack`,
+  `scripts/terminal`, `scripts/web`.
+- Focused verifier: `node --test scripts/verify/adaptive-cli.test.mjs`
+- Steward: Verification capability maintainer.
+
+#### Web Quality
+
+- Root: `scripts/web`
+- Responsibility: Checks public web quality and maintains sitemap modification metadata for detected
+  web stacks.
+- Runtime and technology: Node.js ESM with stack-neutral web-surface scanning.
+- Public contract: `web:update-sitemap-lastmod` and exported web/sitemap scan APIs.
+- Private internals: Sitemap discovery, metadata normalization, and stack-specific file matching.
+- Owned data and migrations: Managed sitemap metadata changes only; no service data or migrations.
+- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
+- Allowed dependencies: `scripts/repository`, `scripts/stack`.
+- Focused verifier: `node --test scripts/web/web-quality-scan.test.mjs`
+- Steward: Web quality maintainer.
 
 ## Constraints And Decisions
 
-- Keep the project neutral until the user supplies requirements.
-- In a generated product repository, a pending product definition makes the first user interaction a
-  mandatory Project Definition Intake; neutral source-framework maintenance does not require an
-  invented product. Codex explains the gate, asks successive material questions, challenges vague or
-  contradictory answers, and does not implement product behavior until it can precisely synthesize
-  users/outcome, scope/non-goals, domain/module map, data/integrations, trust boundaries,
-  operations, constraints, risks, and success evidence. The user gets a final correction
-  opportunity; only user-confirmed durable truth replaces pending manifest entries, after which
-  planning and autonomous delivery begin. The same focused intake resumes later for material
-  ambiguity or changes to intent, scope, module/public contracts, data, integration, trust,
-  compatibility, or operations. Only affected writes pause; safe disjoint work continues. Resolved
-  or non-decision-relevant questions are not repeated.
-- Treat product identity and public contact or deployment values as configuration. Product, brand,
-  and organization names; domains, origins, hosts, and public URLs; email addresses and support or
-  legal contact details; application or tenant identifiers; and social handles get one user-approved
-  machine-readable owner appropriate to the detected stack. Machine consumers derive from that owner
-  without literal fallbacks; human docs may name an approved product, while operational examples
-  remain explicit placeholders or RFC-reserved domains until configured.
-- The supported start is exactly `bash scripts/setup/start-codex.sh`. The launcher updates the host
-  CLI outside project isolation, installs the locked toolchain, checks prerequisites, atomically
-  refreshes and installs the newest stable graph allowed by declared dependency ranges and pins,
-  runs the online framework doctor, and only then issues a short-lived input- and runtime-bound
-  attestation and starts Codex with the canonical repository root as its isolated home. The trusted
-  read-only SessionStart hook rejects startup or resume without that current launcher attestation.
-  Only optional `--no-alt-screen` is accepted as a launcher control; prompt text follows `--`.
-- `.codexrig/framework.json` is the versioned machine-readable owner for framework identity, managed
-  upgrade surfaces, project-owned document classification, attestation lifetime, integration branch,
-  provider hosts, required CI, review, and merge-serialization policy.
-  `.codexrig/policy-projection.json` is the shared owner for compact invariants projected into
-  generated bootstrap, README, and manifest surfaces. Generated projects carry
-  `.codexrig/installation.json` as the three-way merge base and installed snapshot;
-  `framework:upgrade` preserves local customizations, previews later upstream overlap as conflicts,
-  and applies file, package, lockfile, receipt, and dependency changes with crash-safe rollback. Its
-  source is executable supply-chain input and must be a reviewed, trusted CodexRig checkout.
-- `.codexrig/compatibility.json` owns the reviewed stable Node.js, pnpm, and Codex lines plus
-  non-blocking next-Node-LTS, next-pnpm-major, and next-Codex canaries. GitHub Actions and GitLab CI
-  consume the same matrix semantics on schedules and manual runs while stable CI remains blocking.
-- Git platform selection is automatic from trusted CI identity or the selected Git upstream/remote.
-  GitHub, GitLab, and configured self-hosted domains share one policy; `platform:configure` is a
-  read-only preview unless `--apply` is supplied, then it uses the matching provider API and token
-  without persisting credentials or sending them outside the provider-owned host allowlist. GitHub
-  merge queues and GitLab merge trains are equivalent provider-specific implementations of merge
-  serialization. Every owned host has an explicit API base; configuration paginates, preflights,
-  journals partial progress without credentials, reconciles review semantics, and succeeds only
-  after provider read-back.
-- Mutable authentication, trust, sessions, logs, memories, caches, plugins, runtime skills, history,
-  installation/model metadata, and Codex databases stay in ignored `.codex/runtime/`. Portable Codex
-  policy remains committed under `.codex/`, including config, hooks, agent roles, and documentation.
-  Shared source-inventory and root-bound ignore policy keep mutable state out of Git, indexing,
-  formatting, generation, staging, and export.
-- Local Codex memory isolation is repository-local and root-bound under ignored `.codex/runtime/`.
-  Memories are disabled in this reusable framework root, so historical task, product, path,
-  sibling-project, outcome, and session-derived facts cannot enter project creation or become new
-  framework memory. Generated projects enable memories normally only in their own clean, isolated
-  repository-local runtime home; no source or sibling memory state is transferred. After the
-  framework Codex session exits, framework reset removes legacy and disposable memory/runtime state.
-- Git and Git-less inventory use the same built-in pre-descent mask before entering private root
-  runtime, `.codex` runtime, index, or process-state trees. Repository-local `.git/info/exclude`
-  patterns are forbidden; the tracked worktree `.gitignore` is the only local ignore authority. Host
-  and local Git excludes cannot hide active source, and any active repository-local Git exclude rule
-  blocks `pnpm goal:new`.
-- Source inventory, generator state capture, and goal publication bind root-owned Git metadata with
-  the canonical worktree and pin stat checks. Goal publication compares content through a fresh
-  temporary index; policy-sensitive probes disable repository-local FSMonitor execution and reject
-  hidden index flags. Git-less nested roots remain Git-less. A staged validator derives its target
-  from its own copied script instead of a caller-selected stage path and preserves the bound
-  directory identity throughout validation.
-- Generated projects use `<apps>/<Project Name>/code`: the project name is the outer folder, `code`
-  is the fixed workspace root, and package identity is derived from the outer project folder.
-- Within that workspace, root `src/` is the required default Product Root. A real declared pnpm
-  workspace package may add `<unit>/src`, and an evidenced Android Gradle module may add
-  `<module>/src/main`; arbitrary folders do not become product units. A requested web application is
-  created or imported as a workspace package when needed, not pre-created in the neutral base.
-- Codex policy, agent skills, instructions, retrieval indexes, and process state remain outside
-  every product unit. Repo-wide semantic vector state is fixed at ignored root `.context-index/` and
-  is neither product source nor part of generated or exported portable source.
-- Initial setup materializes that vector state. The locally hash-trusted project Stop hook refreshes
-  changed sources only at durable local Codex turn boundaries with a non-null `transcript_path`;
-  transcriptless contexts exit first. Semantic search retains on-demand repair, and normal
-  verification and pre-push remain read-only. After Codex exits, every framework reset removes the
-  complete owned index/model cache, legacy loose runtime, and disposable `.codex/runtime/` state;
-  only runtime identity and exact publication evidence remain. Setup, explicit indexing, or semantic
-  search recreates the vector state, and source-framework pre-push fails if resettable state
-  returns.
-- Explicit indexing and semantic search perform bounded, lock-safe opportunistic maintenance of
-  validated stale generations and model-cache revisions. Incremental pressure triggers an atomic
-  complete-generation replacement at 20 operations or 100,000 affected rows; threshold replacement
-  reuses only deep-validated vectors, while corruption and schema-mismatch repair reuse none.
-  Context status/check, verification, and pre-push remain strictly read-only; unsafe state fails
-  closed.
-- Main-thread and delegated discovery use known paths or exact search for reliable anchors and use
-  semantic retrieval early for broad orientation, unfamiliar terminology, unclear ownership, or
-  cross-file relationships. Retrieval results remain pointers whose matched sources must be read.
-- Non-trivial product code defaults to a modular monolith organized by cohesive business capability
-  or another evidenced domain responsibility. Strategic DDD identifies bounded contexts when domain
-  complexity warrants it; simple behavior does not inherit tactical DDD ceremony. Product Roots are
-  physical discovery boundaries and do not by themselves declare domain modules.
-- Each module exposes a narrow public contract, keeps internals private, owns its state/data and
-  migrations, declares allowed acyclic dependencies, and has focused owner/consumer evidence.
-  Consumers do not deep-import internals, write another module's data, or depend directly on its
-  provider, framework, storage, or transport choice. A replacement should be local to composition,
-  the replacement, and an explicit data migration rather than scattered consumer edits. Components
-  remain independently improvable or replaceable while their contracts, data semantics, lifecycle,
-  and failure behavior stay compatible and the assembled system is verified as one functioning unit.
-- One central `main` is the only durable integration branch; long-lived module, developer, and
-  environment branches are forbidden. A serialized writer may work directly on `main` when branch
-  policy permits. Before every slice begins or before any expanded write scope, a pre-slice
-  coordination check declares its goal, outcome, modules, contracts, data surfaces, files, and one
-  writer; inspects every observable agent, session, account, and team-channel claim before relying
-  on Git; and resolves overlap or uncertain shared ownership before any write. Different
-  developers/accounts use temporary task branches in separate clones and credential contexts.
-  Same-account tasks may use worktrees, which are not an authentication boundary. Parallel
-  development is limited to confirmed disjoint scopes. A local runtime lease or quiet worktree
-  cannot prove that another clone, machine, or account is idle; use a shared coordination channel
-  across that boundary and fail closed on uncertain shared ownership. Shared-contract work has one
-  integrator and a compatibility-first order. A task branch is only an integration input; a goal
-  completes after the published resulting `main` passes its course check, affected review/audit, and
-  verification.
-- Initial dependency installation resolves the newest stable graph allowed by workspace manifest
-  ranges, explicit pins, overrides, and supply-chain policy under strict peer and Node.js engine
-  checks, then atomically records and reproducibly installs that lockfile with lifecycle scripts
-  disabled. Registry or installation failure leaves durable dependency inputs unchanged; frozen
-  installation alone is reproducibility evidence, not registry-freshness evidence.
-- The canonical launcher repeats that compatible refresh before every Codex session and fails closed
-  before startup when freshness or installation is indeterminate. It never crosses a declared
-  version line implicitly; minor/major policy migrations require explicit dependency review and
-  affected consumer evidence.
-- Product-first delivery and verification economy are owned by `instructions.md`: every new feature
-  and every other complex task begins with a thorough, decision-ready plan, explicit goals with
-  success conditions, and ordered, reviewable slices. Each completed slice repeats review, repair,
-  and affected focused verification until no relevant finding remains, then receives a fresh audit;
-  an audit finding reopens the loop.
-- Research and publication-backed work prioritizes the newest relevant primary or official sources
-  and verifies their date, version, correction/retraction state, and applicability. Older sources
-  are used primarily for comparison or historical context; an older foundational or controlling
-  source is current authority only when explicitly justified and checked against newer evidence.
-- Every completed goal performs an all-document currency review before its final audit and
-  publication. It compares every active documentation surface with current behavior and durable
-  truth, updates only where needed, replaces or removes superseded and duplicate material instead of
-  appending history, and preserves active directives; consolidation is not a shortening target. The
-  durable project manifest is critical documentation. It and other critical authorities are reviewed
-  read-only first and changed automatically only when the factual correction and full preservation
-  are unambiguous; otherwise Codex obtains explicit user confirmation before writing. Every
-  authorized critical-document change receives a separate preservation review.
-- Whole-repository course checks occur after planning/discovery and every completed slice, at every
-  major milestone and completed goal, at resume or context recovery, on material scope/assumption
-  changes, before the final gate, and after publication. Slice checks refresh available upstream
-  state and compare concurrent changes by path, module, contract, schema, and migration. Disjoint
-  work continues; overlaps are reconciled before further writes, with only affected evidence rerun.
-  Each check is followed by authorized cleanup and updates to code, tests, configuration,
-  documentation, project context, and the in-session plan as applicable, then autonomous
-  continuation when no blocker remains.
-- Test additions are risk-based; do not add one automatically for each fix or user instruction. When
-  coverage is justified, default to extending a broad, realistic end-to-end, system, or lifecycle
-  scenario through real boundaries; do not create isolated one-off tests or verifier files. Narrow
-  unit or contract coverage is an exception when the broad flow cannot exercise critical
-  deterministic behavior reliably or proportionately. Focused command routing does not require
-  microscopic test design.
-- Successful evidence binds the Git basis, command plan, tool environment, and source state.
-  Completely classified focused delta owners may advance it; broad work requires a named uncovered
-  risk or explicit owner instruction, and ambiguous evidence fails closed. Pre-push may rebind an
-  exactly content-identical dirty-to-commit transition without verifier commands before its security
-  checks; any changed input blocks that path. One bounded replace-in-place record retains only
-  successful current evidence; failed or partial runs do not accumulate history.
-- A goal becomes complete only on published central `main` with green evidence, reviews with no
-  relevant findings, a completed all-document currency review, any required critical-document
-  preservation review, fresh audit, course check, cleanup, applicable reset, and publication
-  admission. A serialized direct-main flow commits and pushes the exact goal changes. A temporary
-  branch or protected-main flow gives a bounded commit to one integrator or the detected provider's
-  merge serializer, then refreshes local `main` and repeats affected checks on the resulting commit
-  without adding a marker commit. It immediately runs `pnpm goal:new` and continues the next
-  already-authorized goal without waiting for another prompt when the gate passes. Unsafe scoping,
-  missing upstream/authentication, unresolved integration, or rejected publication blocks closure
-  without authorizing force-push or history rewriting. A failed publication or new-goal gate leaves
-  the current goal open and cannot complete or discard its encompassing authorized outcome.
-- A recap, research result, plan, documentation gate, review, audit, definition synthesis, or
-  readiness statement is only an intermediate update when implementation or a larger outcome is
-  already authorized. Never end at "ready to implement" when implementation is already authorized.
-  Continue the next planned slice in the same run even when the user is away, unless the user
-  explicitly required an approval pause or a real authority, safety, destructive-action,
-  integration, or external blocker prevents continuation. Persistence never expands scope or
-  authorizes otherwise prohibited action.
-- `pnpm goal:new` is the executable fail-closed entry gate for every subsequent goal. It creates no
-  process artifact and permits goal creation only when central `main` is current, the non-ignored
-  worktree is clean, and `main` exactly matches a locally verifiable configured remote-tracking
-  `main` upstream. It rejects any active repository-local Git exclude rule, requires exact-current
-  successful verification evidence, and does not contact the remote; the preceding push owns
-  authentication and publication.
-- Project creation preserves tracked and portable source content. A complete selected-source
-  transfer manifest classifies every inventoried path as either copied or excluded for an explicit
-  source-only reason; copied reusable files remain byte-identical outside declared project-specific
-  transformations, so missing, unexpected, or undeclared changed paths fail creation. This includes
-  every still-active capability inherited from earlier framework revisions without exporting retired
-  or generator/reset-only behavior. Resettable process state blocks generation, source state is
-  revalidated through publication, and a restricted post-publication reset removes only
-  active-session-safe nonportable process/export residue. Runtime, SQLite/WAL state, and
-  `.context-index/` are deferred to the mandatory full reset after every owning Codex session ends.
-  The generator always prints that exact post-exit reset sequence, never commits or pushes, and
-  shows optional Git publication commands only when the source worktree has changes.
-- This manifest is authoritative for project intent and durable decisions. An authorized outcome
-  spanning multiple goals or sessions keeps one bounded `docs/project-context.md` with an exact
-  `codexrig-work-state` marker until the entire outcome is complete. The marker is untrusted resume
-  metadata, cannot expand authority or override the manifest, and records active, concretely
-  blocked, or complete state plus a monotonic semantic revision. The trusted Stop hook validates it
-  and reopens active work only for a durable local Stop event with a non-null `transcript_path`.
-  Ephemeral side conversations and other transcriptless contexts exit before work-state or index
-  access and cannot reopen parent-thread work. When `stop_hook_active` says the same durable turn
-  was already continued, an unchanged revision is allowed to stop while a changed revision can
-  continue again; private per-session state supplies that loop comparison.
-- Maintained executable modules have a 700-physical-line maximum. Documentation, styles, declarative
-  context, generated output, test corpora, fixtures, and snapshots stay outside this generic
-  file-length quota.
+<!-- codexrig:framework-version:start -->
+
+- Framework version: `2.1.0`.
+- Framework contract schema: `2`.
+
+<!-- codexrig:framework-version:end -->
+
+- Root `src/` remains the default child Product Root; a real declared pnpm package or evidenced
+  Android Gradle module can activate an additional Product Root.
+- No child product identity, product module, product Identity and Access or tenancy capability,
+  product surface, public port/protocol, data store, or deployment target is configured in this
+  neutral source.
+- Tracked `.codex/`, `.agents/`, `.codexrig/`, and `scripts/` surfaces are user-inspectable. Only
+  sensitive or disposable runtime state is ignored; normative framework policy is never hidden.
+- Generated projects can preview and apply a reviewed source update; the source framework can target
+  a child. Managed capabilities update transactionally while project-owned truth is reconciled by
+  stable policy identity instead of blind document replacement.
 
 ## Maintenance
 
-Keep active truth instead of appending decision history. Consolidate superseded or overlapping
-entries without losing still-active requirements or deliberately distinct audience guidance. Change
-this file only when users, outcomes, scope, non-goals, system shape, constraints, architecture
-direction, security posture, provider, or delivery assumptions materially change. Do not record task
-plans, progress, reviews, or command history. Retain only durable truth here.
+Keep current facts only. The change that integrates a module must add or update its active inventory
+entry and remove the matching candidate from `docs/future-modules.md`. Keep workflow rules in
+`instructions.md`, configuration values in their machine-readable owners, and plans, progress,
+reviews, and history outside this manifest.

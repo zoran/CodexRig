@@ -1,0 +1,33 @@
+/** Owns generated Markdown and file-writing primitives for clean-project identity documents. */
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
+export const markdownFence = String.fromCharCode(96).repeat(3);
+
+export function markdown(lines) {
+  return `${lines.join("\n")}\n`;
+}
+
+export function escapeMarkdownText(value) {
+  return String(value).replace(/[\\`*_{}\[\]<>()#+!|]/gu, "\\$&");
+}
+
+export function initialDescriptionLines(description) {
+  if (!description) return [];
+  return [
+    "",
+    "## Initial Project Description",
+    "",
+    "This user-provided creation brief is input to the first-start Project Definition Intake. Codex",
+    "evaluates it with the user before converting it into confirmed durable manifest facts; it does",
+    "not activate a module or authorize implementation by itself.",
+    "",
+    ...description.split("\n").map((line) => `> ${escapeMarkdownText(line)}`),
+  ];
+}
+
+export function writeRelative(targetRoot, relativePath, content) {
+  const targetPath = path.join(targetRoot, ...relativePath.split("/"));
+  mkdirSync(path.dirname(targetPath), { recursive: true });
+  writeFileSync(targetPath, content, "utf8");
+}

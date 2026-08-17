@@ -1,3 +1,4 @@
+/** Verifies context maintenance behavior for the repository-local semantic context boundary. */
 import assert from "node:assert/strict";
 import {
   existsSync,
@@ -17,6 +18,11 @@ import {
   maintenanceChanged,
   validateContextMaintenanceState,
 } from "./context-maintenance.mjs";
+import {
+  claimAndRemove,
+  linuxMountPointsFrom,
+  validateRemovalTree,
+} from "./context-maintenance-safety.mjs";
 import { temporaryDirectory, write } from "./context-regression-helpers.mjs";
 
 const selectedRevision = "7".repeat(40);
@@ -312,4 +318,74 @@ test("maintenance never removes a replacement with a changed identity", () => {
   );
   assert.equal(readFileSync(path.join(candidate, "replacement"), "utf8"), "replacement\n");
   assert.equal(readFileSync(path.join(displaced, "original"), "utf8"), "original\n");
+});
+
+test("removal rejects same-device nested mount boundaries before claiming a tree", () => {
+  const root = temporaryDirectory("context-maintenance-bind-mount-");
+  const candidate = path.join(root, "candidate");
+  const nestedMount = path.join(candidate, "nested-bind");
+  write(candidate, "local", "local\n");
+  write(nestedMount, "sentinel", "foreign bind content\n");
+  const mountPointReader = () => [nestedMount];
+
+  assert.throws(
+    () =>
+      validateRemovalTree(candidate, "directory", "bind fixture", undefined, {
+        mountPointReader,
+      }),
+    /refused mounted content/u,
+  );
+  assert.throws(
+    () =>
+      claimAndRemove({
+        artifactPath: candidate,
+        expectedType: "directory",
+        label: "bind fixture",
+        mountPointReader,
+      }),
+    /refused mounted content/u,
+  );
+  assert.equal(readFileSync(path.join(nestedMount, "sentinel"), "utf8"), "foreign bind content\n");
+  assert.equal(existsSync(candidate), true);
+});
+
+test("removal refuses a swapped nested parent and preserves both owned and outside content", (t) => {
+  const root = temporaryDirectory("context-maintenance-parent-binding-");
+  const outside = temporaryDirectory("context-maintenance-parent-outside-");
+  const parent = path.join(root, "nested");
+  const parkedParent = path.join(root, "nested-owned");
+  const candidate = path.join(parent, "candidate");
+  write(candidate, "owned", "owned\n");
+  write(path.join(outside, "candidate"), "sentinel", "outside\n");
+  t.after(() => {
+    rmSync(parent, { force: true });
+    rmSync(root, { force: true, recursive: true });
+    rmSync(outside, { force: true, recursive: true });
+  });
+
+  assert.throws(
+    () =>
+      claimAndRemove({
+        artifactPath: candidate,
+        expectedType: "directory",
+        label: "parent-swap fixture",
+        ownedRootPath: root,
+        testHooks: {
+          afterParentBindingCapture() {
+            renameSync(parent, parkedParent);
+            symlinkSync(outside, parent, "dir");
+          },
+        },
+      }),
+    /unsafe parent|parent identity change/u,
+  );
+  assert.equal(readFileSync(path.join(outside, "candidate", "sentinel"), "utf8"), "outside\n");
+  assert.equal(readFileSync(path.join(parkedParent, "candidate", "owned"), "utf8"), "owned\n");
+});
+
+test("Linux mountinfo parsing preserves escaped mount-point identities", () => {
+  assert.deepEqual(
+    linuxMountPointsFrom("42 31 0:37 / /tmp/bind\\040mount rw,relatime - ext4 /dev/root rw\n"),
+    [path.resolve("/tmp/bind mount")],
+  );
 });

@@ -1,3 +1,4 @@
+/** Owns verification git basis behavior for the repository verification boundary. */
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import os from "node:os";

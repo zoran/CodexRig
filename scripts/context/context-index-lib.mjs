@@ -1,3 +1,4 @@
+/** Owns context index lib behavior for the repository-local semantic context boundary. */
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { buildIndexUnlocked } from "./context-build.mjs";

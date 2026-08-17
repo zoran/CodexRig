@@ -1,3 +1,4 @@
+/** Owns search context behavior for the repository-local semantic context boundary. */
 import { runAsSanitizedContextWorker } from "./context-worker-output.mjs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -5,7 +6,7 @@ import {
   formatContextError,
   sanitizeForTerminal,
   truncateForTerminal,
-} from "./terminal-output.mjs";
+} from "../terminal/terminal-output.mjs";
 
 function usage() {
   throw new Error('Usage: pnpm context:search -- "query text" [--limit=5]');

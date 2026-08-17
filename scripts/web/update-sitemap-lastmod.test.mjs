@@ -1,3 +1,4 @@
+/** Verifies update sitemap lastmod behavior for the public web quality boundary. */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";

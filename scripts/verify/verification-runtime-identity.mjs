@@ -1,7 +1,7 @@
+/** Owns verification runtime identity behavior for the repository verification boundary. */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { accessSync, constants, lstatSync, realpathSync, statSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
@@ -15,10 +15,15 @@ const forbiddenChildEnvironmentKeys = new Set([
   "PNPM_CONFIG_NODE_OPTIONS",
   "PNPM_CONFIG_SCRIPT_SHELL",
 ]);
-const disabledNpmConfigDirectory = path.join(os.tmpdir(), "codexrig-npm-config-disabled");
+const disabledNpmConfigRoot = process.platform === "win32" ? "NUL" : "/dev/null";
 const forcedChildEnvironment = Object.freeze({
-  NPM_CONFIG_GLOBALCONFIG: path.join(disabledNpmConfigDirectory, "global.npmrc"),
-  NPM_CONFIG_USERCONFIG: path.join(disabledNpmConfigDirectory, "user.npmrc"),
+  NPM_CONFIG_IGNORE_PNPMFILE: "true",
+  // npm derives its global configuration from <prefix>/etc/npmrc. Binding both the
+  // explicit user configuration and that prefix to the OS null device produces two
+  // distinct, non-creatable inputs without a shared predictable temporary path.
+  NPM_CONFIG_PREFIX: disabledNpmConfigRoot,
+  NPM_CONFIG_USERCONFIG: disabledNpmConfigRoot,
+  PNPM_CONFIG_IGNORE_PNPMFILE: "true",
   PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "error",
 });
 const identityKeys = Object.freeze([
@@ -33,15 +38,12 @@ const identityKeys = Object.freeze([
 const versionProbeCache = new Map();
 
 export function verificationChildEnvironment(environment = process.env) {
-  for (const configPath of [
-    forcedChildEnvironment.NPM_CONFIG_GLOBALCONFIG,
-    forcedChildEnvironment.NPM_CONFIG_USERCONFIG,
-  ]) {
-    try {
-      lstatSync(configPath);
-      throw new Error(`Disabled npm config path unexpectedly exists: ${configPath}`);
-    } catch (error) {
-      if (error?.code !== "ENOENT") throw error;
+  if (process.platform !== "win32") {
+    const sink = lstatSync(disabledNpmConfigRoot);
+    if (!sink.isCharacterDevice() || realpathSync.native(disabledNpmConfigRoot) !== "/dev/null") {
+      throw new Error(
+        "Verification could not bind npm configuration to the operating-system null device.",
+      );
     }
   }
   const childEnvironment = {};
@@ -95,7 +97,9 @@ function commandVersionDigest(command, args, cwd, executable, environment, envir
 
 function environmentDigest(environment) {
   const hash = createHash("sha256").update("verification-environment-v1\0");
-  for (const key of Object.keys(environment).sort()) {
+  for (const key of Object.keys(environment)
+    .filter((key) => !["PATH", "PATHEXT"].includes(key.toUpperCase()))
+    .sort()) {
     hash.update(key).update("\0").update(String(environment[key])).update("\0");
   }
   return hash.digest("hex");

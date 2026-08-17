@@ -1,3 +1,4 @@
+/** Owns validate transfer source behavior for the repository inventory and filesystem boundary. */
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { listPortableTransferFiles, repositoryRoot } from "./source-inventory.mjs";

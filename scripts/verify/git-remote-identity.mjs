@@ -1,7 +1,8 @@
+/** Owns git remote identity behavior for the repository verification boundary. */
 import { execFileSync } from "node:child_process";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { findSecretMatches } from "./secret-patterns.mjs";
+import { findSecretMatches } from "../security/secret-patterns.mjs";
 
 function parseArgs(argv) {
   const parsed = {

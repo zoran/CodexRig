@@ -1,3 +1,4 @@
+/** Owns language behavior for the repository verification boundary. */
 import { closeSync, openSync, readSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";

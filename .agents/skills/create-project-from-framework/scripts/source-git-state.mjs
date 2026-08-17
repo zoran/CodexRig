@@ -1,3 +1,4 @@
+/** Owns source git state behavior for the portable clean-project generation boundary. */
 import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { listPortableTransferFiles } from "../../../../scripts/repository/source-inventory.mjs";

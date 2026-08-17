@@ -19,6 +19,15 @@ Repository process artifacts are overhead unless the user explicitly requests on
 
 ## First-Prompt Project Definition Intake
 
+When creating a child project, a name and short description are not a sufficient product definition.
+Immediately after receiving the name, ask what the product should actually do and invite the user to
+describe it in detail in ordinary language. Explain that Codex will proactively structure the
+description into a manifest, challenge gaps and contradictions, make recommendations, and that the
+generated project can refine the manifest later. If the user supplies enough detail, synthesize it
+for correction and pass it to the generator as an intake draft; do not treat mentioned modules as
+active. If the user explicitly defers the description, generation may continue with a visibly
+pending manifest, but silence or a short tagline is not a decision to skip this invitation.
+
 In a generated product repository, when `docs/project.md` still contains a pending product
 definition, the first user interaction is a definition intake, not an implementation prompt. Begin
 the first response by telling the user that the project must be understood and its durable manifest
@@ -26,6 +35,15 @@ established before product implementation. The deliberately neutral source frame
 maintained without inventing a product definition; the intake starts when work is intended to define
 or implement a product. Do not infer a product, stack, users, domain model, data policy, provider,
 deployment shape, or trust boundary from the framework or from a vague request.
+
+Read and evaluate the entire current manifest before asking questions. If it contains a creation
+brief or filled definition, begin by explaining the successive interview and Codex's active support,
+then summarize what is already usable, what remains ambiguous or contradictory, and which
+recommendations follow. Ask whether the user wants to refine it further or—only when it is
+decision-ready—start from the confirmed scope. An empty or materially incomplete definition still
+requires focused questions before dependent implementation; in that case, “start” means begin the
+interview or safe disjoint work, not guess the missing decisions. Remind the user that later
+material learning can reopen and improve the manifest through the same process.
 
 Interview the user iteratively in small, decision-focused batches. Challenge vague terms,
 contradictions, implicit scope, and premature solution choices, and follow each answer with the next
@@ -41,18 +59,23 @@ change architecture, scope, safety, acceptance, or delivery:
   integration failure behavior;
 - identity, authorization, privacy, abuse, regulatory, and other trust boundaries;
 - runtime, delivery, availability, performance, observability, support, and operational constraints;
-  and
+- user-facing default/supported/fallback locales and localization ownership when language can affect
+  surfaces, content, metadata, notifications, support, legal obligations, or search; and
 - expected developer/orchestrator collaboration, module stewardship, the shared pre-slice
   coordination channel when independent sessions or accounts may work concurrently, and any known
   shared-contract integration pressure.
 
 Regularly restate the current understanding and distinguish user-confirmed facts from assumptions or
 open decisions. The intake is complete only when the agent can explain the intended product, system
-shape, initial module map, constraints, non-goals, risks, and acceptance evidence precisely enough
-to produce a decision-ready plan, and the user has had a final opportunity to correct that
-synthesis. Then replace the pending entries in `docs/project.md` with concise user-confirmed durable
-truth and proceed to planning and autonomous delivery. Ask no ceremonial question whose answer
-cannot affect a decision, and do not repeat resolved questions.
+shape, candidate capability and module topology, constraints, non-goals, risks, and acceptance
+evidence precisely enough to produce a decision-ready plan, and the user has had a final opportunity
+to correct that synthesis. Then replace the pending product entries in `docs/project.md` with
+concise user-confirmed durable truth and proceed to planning and autonomous delivery. Do not present
+a candidate as active: the manifest's Active Module Inventory remains limited to implemented,
+integrated roots. Record user-confirmed but unimplemented module candidates only in
+`docs/future-modules.md`; activate and remove each candidate in the same change that implements it.
+Ask no ceremonial question whose answer cannot affect a decision, and do not repeat resolved
+questions.
 
 Resume the same focused intake later whenever a request, discovery, or concurrent change creates a
 material ambiguity, contradiction, or possible change to product intent, scope, acceptance, module
@@ -168,8 +191,10 @@ coordination check before any write:
    for each surface.
 2. Inspect all observable collaboration state before relying on Git: live agents and delegated
    assignments, available sessions or account-level work, the bounded project context, and any
-   shared team or orchestration channel. Exchange or reconcile current goal and slice claims when
-   another session or account may be working in the repository.
+   shared team or orchestration channel. Account-wide agent visibility is discovery evidence, not
+   ownership: classify foreign project/session agents separately and never contact or control them.
+   Exchange or reconcile current goal and slice claims when another session or account may be
+   working in this repository.
 3. Compare the declared claims. Disjoint slices may proceed concurrently. Any overlap, ambiguous
    ownership, or newly discovered shared surface must be resolved by rescoping, ordering, or one
    explicit writer before either slice writes there.
@@ -195,18 +220,48 @@ and verify against newer work that it has not been superseded, corrected, or ret
 source evidence from inference and report material disagreement or uncertainty instead of silently
 choosing the convenient publication.
 
+## Best-Available Engineering, Not Quick Fixes
+
+Never implement a material change as a quick fix, symptom patch, local workaround, or merely the
+first plausible solution. Speed, token pressure, a failing check, an urgent Dev feedback loop, or an
+apparently small diff does not lower this standard. Before writing, reconstruct the relevant system,
+identify the root cause and canonical owner, trace affected contracts and consumers, and compare the
+viable solutions against the complete project architecture, durability, security, operations,
+maintainability, and migration cost. Search current primary, official, or peer-reviewed evidence
+whenever it could materially change the design; do not research ceremonially when local evidence is
+already decisive.
+
+Choose and implement the best-supported durable solution within the user's actual scope, even when
+it requires more thought or a broader owning-boundary correction than the nearest patch. State and
+reject materially inferior shortcuts when the tradeoff is not obvious. A temporary mitigation is
+allowed only when the user explicitly authorizes it or a safety incident requires immediate
+containment; label it as temporary, bound its risk and removal condition, record the durable
+follow-up in the current authorized work state, and do not represent it as completion. Dev remains
+fast by shipping the newest sound implementation early and running isolated tests in parallel or
+afterward, not by accepting structural debt, bypassing evidence, weakening contracts, or leaving an
+undocumented workaround.
+
 After every completed slice:
 
 1. Run the focused owner and consumer evidence needed for that slice.
-2. Review the result for correctness, acceptance criteria, regressions, root-cause quality,
+2. For every non-trivial implementation, architecture, configuration-boundary, or integration slice,
+   invoke `$system-coherence` against the complete implemented project before accepting the slice.
+   Trace a representative assembled flow, compare the change with the manifest/module map and
+   current consumers, search for semantically duplicated rules/types/configuration/adapters and
+   competing sources of truth, and repair material ownership, dependency, layout, contract, and
+   integration drift at the owning boundary. A trivial isolated change still receives an explicit
+   applicability decision; do not manufacture a broad rewrite. In Dev, run this lane in parallel
+   with or after the latest developer deploy, but complete it before the slice becomes a stable
+   dependency or promotion input.
+3. Review the result for correctness, acceptance criteria, regressions, root-cause quality,
    maintainability, security/privacy where applicable, documentation drift, and whole-system impact.
-3. Fix every relevant, reproducible finding within the authorized scope, batch same-root-cause
+4. Fix every relevant, reproducible finding within the authorized scope, batch same-root-cause
    corrections, and rerun only affected focused evidence.
-4. Repeat review, repair, and focused verification until no relevant finding remains.
-5. Only from that clean reviewed state, perform a fresh audit against the plan, current goal,
+5. Repeat review, repair, and focused verification until no relevant finding remains.
+6. Only from that clean reviewed state, perform a fresh audit against the plan, current goal,
    manifest, touched boundaries, and repository state. An audit finding reopens the slice: fix it,
    repeat the review loop to zero relevant findings, and audit again.
-6. Perform the slice-boundary course check defined below against the complete current repository and
+7. Perform the slice-boundary course check defined below against the complete current repository and
    available upstream state. Reconcile concurrent changes before beginning the next dependent slice.
 
 A finding is relevant when it is reproducible and affects the authorized outcome, acceptance
@@ -230,24 +285,66 @@ authorize broad verification.
 Then clean up and update the authorized work: remove obsolete temporary work and dead paths,
 reconcile code/tests/configuration/docs, refresh or delete the bounded project context as
 appropriate, and update the in-session plan to the current truth. After a clean course check,
-continue autonomously with the next planned slice. At a completed-goal boundary, complete the goal
-documentation review defined below before the final whole-goal audit, admission, or publication.
-Only then choose the declared integration path. A serialized writer may finish the final audit,
-reset, verification, exact commit, and push directly on current `main` only when remote policy
-permits it; any newly required repository cleanup or edit reopens affected checks, the goal
-documentation review, any critical-document confirmation and preservation review, and the fresh
-audit. Work from a temporary task branch—or any change targeting protected `main`—is first committed
-and pushed only as a bounded integration input; one integrator or the detected provider's merge
-serializer lands it. Then refresh local `main` to the published remote result and repeat the
-whole-repository course check, affected review, completed-goal documentation review, any
-critical-document confirmation and preservation review, fresh audit, and adaptive verification on
-that actual integrated state. The merge or squash is the publication commit; do not manufacture an
-empty follow-up commit. After either path has produced a clean, verified, published `main`,
-immediately run `pnpm goal:new` and continue the next already-approved goal when the gate passes. Do
-not return merely because a goal checkpoint completed. If publication or the gate fails, keep the
-current goal and encompassing work state open, record the concrete integration or external blocker
-when no safe disjoint work remains, and never misreport that intermediate checkpoint as the
-completed outcome.
+continue autonomously with the next planned slice. At a completed-goal boundary, use the single
+closure sequence below; do not distribute, reorder, or silently omit its gates.
+
+### Completed-Goal Closure And Repository Housekeeping
+
+Housekeeping has two explicit layers. Primary-owned Orchestration Housekeeping observes host budget,
+live agents, checkpoints, handoffs, ownership, bounded work state, and any shared coordination
+channel; it runs on the event triggers above, as a hard gate after every slice, and deeply at every
+goal. Repository Housekeeping is the `repo:housekeeping` command; it observes only repository facts
+and therefore never claims to inspect or close conversations or read host usage. One primary-owned
+sequence runs both layers and closes every completed goal:
+
+1. Finish all goal-owned implementation, integration preparation, dead-path removal, configuration
+   cleanup, bounded context maintenance, and other repository-mutating work. First perform the deep
+   Orchestration Housekeeping the repository command cannot perform: classify current capacity,
+   refresh the bounded work state, inventory provenance-bound agents owned by this primary,
+   preserve/accept their handoffs, actively close completed or unneeded owned agents, interrupt
+   stale or redundant owned agents, and notify affected remaining agents or the shared coordination
+   channel of integrated results, changed contracts/assumptions, remaining work, and released
+   ownership/slots. Then run Repository Housekeeping with
+   `mise exec --locked -- pnpm repo:housekeeping -- --apply`. The command may reconcile only
+   mechanically provable local repository facts, format the result, and run its bounded health
+   checks. It never deploys, commits, pushes, changes a provider, mutates an external environment,
+   or treats the configured Dev default as evidence that a deployment exists.
+2. Housekeeping keeps the project-owned `config/delivery.json` inventory synchronized with
+   unambiguous tracked delivery evidence and projects its current effective targets into the bounded
+   delivery block in `docs/project.md`. It also checks manifest/module truth, documentation and
+   heading anchors, current source/declaration headers, localization, physical product, Identity and
+   Access, and white-label boundaries, secrets and path hygiene, dependency/lock consistency, skill
+   and Sol/ultra model policy, framework health, and formatting. Explicit declarations preserve real
+   external environments that have no tracked adapter. A possible `staging` or `prod` hint outside a
+   recognized typed boundary is never guessed: ask the developer whether it is real, then declare it
+   or move the adapter to its owning boundary. In the reusable source framework, the same atomic
+   apply also reconciles the release version from active changes since the unique live commit of the
+   configured central integration branch, which must match its local remote-tracking ref, as defined
+   under
+   [Framework Lifecycle, Compatibility, And Git Platforms](#framework-lifecycle-compatibility-and-git-platforms).
+3. Perform the goal-wide documentation review and any required critical-document confirmation and
+   dedicated preservation review. Repeat affected focused checks, root-cause review and repair, the
+   whole-repository course check, and a fresh whole-goal audit until no relevant finding remains. A
+   repository edit at any point reopens housekeeping, affected checks, documentation gates, and the
+   fresh audit.
+4. Choose the declared integration path. A serialized writer may continue on current `main` when
+   policy permits. A temporary task branch or protected-`main` change is only a bounded integration
+   input; one integrator or the detected provider serializer lands it. Refresh local `main` to the
+   actual integrated result and rerun read-only housekeeping plus every affected review,
+   documentation, course-check, audit, and verification gate. Any new drift reopens the owning
+   change; never manufacture an empty marker commit.
+5. On the stable actual target-`main` state, invoke adaptive final verification once. Complete the
+   required post-exit reset, exact commit and push only in the authorized publication path. After a
+   clean, verified, published central `main`, immediately run `pnpm goal:new`; it proves the clean
+   publication and exact-current successful evidence before another goal opens. Continue the next
+   already-approved goal without returning merely because a checkpoint completed.
+
+The checked-in GitHub and GitLab schedules run `repo:housekeeping --check --online` read-only so
+environment inventory, tool compatibility and other bounded repository health do not depend only on
+an active goal. A scheduled finding opens maintenance work; CI never applies or publishes a repair.
+If housekeeping, publication, or `goal:new` fails, keep the current goal and encompassing work state
+open, continue safe disjoint work, and report the concrete authority, integration, safety, or
+external blocker when no such work remains.
 
 ## Modular Architecture, Parallel Ownership, And Integration
 
@@ -260,17 +357,361 @@ patterns, layers, aggregates, events, or service extraction on simple behavior w
 not justify them.
 
 Product Roots are physical discovery and verification boundaries; they are not automatically domain
-modules. Before implementation depends on a new or changed module, keep the active module map in the
-`System Shape` section of `docs/project.md`. For each module record only durable facts:
+modules. `docs/project.md` is an executable current-state inventory, never a target architecture or
+roadmap. A module becomes active only in the same change that creates its real implementation root,
+integrates its public contract, and provides its verifier. That change adds the entry under
+`### Active Module Inventory` and removes any matching candidate from `docs/future-modules.md`.
+Verification remains read-only and fails when an active implementation file has no single inventory
+owner, when roots overlap, or when an active and future entry coexist; it never manufactures a
+manifest entry. For each active module record only current durable facts:
 
 - a stable name and source root plus one cohesive domain responsibility or change reason;
+- its actual language, runtime, framework, and toolchain boundary after implementation;
 - its public entry points, ports, commands, events, or schemas and the internals consumers must not
   import;
 - the state, data, migrations, invariants, and operational responsibilities it owns;
+- its implemented tenant-isolation model and every explicit global/control-plane exception;
 - explicitly allowed module dependencies and integration direction;
 - its focused owner/consumer verification command or package boundary; and
 - the accountable steward role or team when one exists, without turning the manifest into a live
   task-assignment board.
+
+`docs/future-modules.md` is the single non-authoritative candidate inventory and exists from project
+creation with its header, boundary, activation rule, and an explicit empty state. Candidates are not
+scope, commitments, authorization, Product Roots, dependencies, or deployable modules. Do not place
+unimplemented module ideas in the manifest or scatter module roadmaps across other documents.
+
+Treat every newly voiced idea, wish, possibility, question, or exploratory suggestion as an intent
+classification boundary. It authorizes current implementation only when the developer clearly asks
+to build, change, or activate it now in the authorized outcome. A clearly deferred wish becomes a
+future candidate. If current-versus-future intent is materially ambiguous, ask one focused
+clarifying question before dependent planning or writes; until answered, classify it as
+non-authorizing future intent, leave `docs/project.md` unchanged, and do not implement it. Record it
+in `docs/future-modules.md` only after future intent is explicit or confirmed. YOLO autonomy and an
+existing broad development objective never convert an ambiguous idea into implementation authority.
+
+### Feature-To-Domain Placement
+
+Before implementing every authorized feature, automatically classify its architectural owner from
+the implemented system rather than from the requested filename or delivery surface. Compare the
+feature's domain language and invariants, owned data and lifecycle, public contracts, trust and
+operational boundary, change reason, and dependencies. Make exactly one explicit placement decision:
+
+1. extend an existing module when the behavior has the same cohesive responsibility, invariants,
+   data owner, lifecycle, and change reason;
+2. create a new module inside an existing domain when the domain remains the same but the behavior
+   needs an independently improvable responsibility, contract, data/lifecycle owner, or dependency
+   boundary; or
+3. establish a new domain and its first module when the language, invariants, data ownership, trust
+   boundary, actors, or change reason are materially distinct from every active domain.
+
+Do not put behavior directly in a Product Root or in generic `app`, `service`, `shared`, `common`,
+`utils`, `platform`, or `core` files merely because no current module fits. UI/presentation, web,
+Identity and Access, public API transport/contracts, infrastructure/delivery, and composition remain
+separate cross-cutting surfaces: they may adapt or compose a domain module but do not become the
+owner of its business behavior. Every non-trivial product behavior must have exactly one active
+module owner, and the implementation change must make that owner truthful in the Active Module
+Inventory. If current source and confirmed product truth do not resolve a materially consequential
+placement, ask one focused question before dependent writes and invoke `$architecture-evolution`; do
+not guess a catch-all home. Re-run this classification when later evidence changes the domain model
+or shows that an existing boundary has become incohesive.
+
+### Product Surface Selection
+
+As soon as the intake establishes the users, environment, and critical workflows well enough, derive
+the intended product surfaces from manifest truth: browser/web or PWA, installed mobile, installed
+desktop, CLI/TUI, public or private API/service, background worker, library/SDK, embedded/native or
+real-time component, or a justified combination. Never infer a web app from the harness, a
+repository name, or familiarity, and do not postpone the surface question until after framework
+selection.
+
+If surface intent is materially unclear, ask the developer promptly in outcome language rather than
+requiring platform jargon: where and on which devices the work happens; whether installation,
+offline use, app-store distribution, deep OS/hardware integration, files, notifications, background
+execution, public URLs/sharing, browser reach, or centrally controlled updates matter; and how users
+move between devices. The developer may describe the intended experience without naming a platform.
+Use that evidence to give one strong surface-topology recommendation, explain its fit, limitations,
+delivery/operations cost, and at most one genuinely close alternative, then explicitly ask the user
+to confirm, override, or delegate it.
+
+Record the confirmed surface topology and controlling constraints in the manifest's System Shape,
+clearly distinguishing a selected but not-yet-integrated decision from real interface roots and
+deployed surfaces. If no surface is needed, record the relevant service/library/embedded shape
+instead. The Active Module Inventory and public/deployed inventory change only when implementation
+exists. UI/web/mobile/desktop/runtime technology selection follows this checkpoint; a later change
+to user context or platform capabilities invokes `$architecture-evolution` and reshapes modules,
+files, delivery, and verification together.
+
+### Requirement-Driven Technology Selection
+
+The Node.js/pnpm/mise stack at repository root is the visible Codex harness, not a default product
+stack and never evidence that product code should use TypeScript or Node.js. After the Project
+Definition Intake and feature-to-domain placement, interpret the confirmed manifest outcome and
+constraints before creating the first implementation root or changing a module's runtime. For each
+independently owned module or deployable component compare:
+
+- execution platform and integration ecosystem, protocol/library maturity, data and consistency
+  needs, security/safety model, supply-chain and support horizon;
+- hard versus soft real-time deadlines, acceptable tail latency and jitter, throughput/concurrency,
+  startup, memory/CPU/energy limits, failure containment, FFI/hardware/OS access, and portability;
+- team competence, debugging/profile tooling, testability, observability, deployment/rollback,
+  upgrade cadence, hiring/operations cost, and long-term maintainability; and
+- compatibility with the module's public contract, tenant-isolation model, delivery environments,
+  and existing consumers.
+
+Ask about material platform constraints and developer/operator competence during the definition
+intake, but do not ask the user to choose from unexplained technology names before the product
+forces are understood. As soon as those facts make comparison meaningful—and before
+implementation—check current primary/official ecosystem evidence, present one strong primary
+recommendation per materially different runtime component, explain why it fits the confirmed
+manifest facts and what costs or risks it introduces, and name at most one close alternative when
+the tradeoff is genuinely material. Explicitly ask the user to confirm or override the
+recommendation. A user may expressly delegate the final selection, but silence, YOLO, or a broad
+implementation request is not confirmation of an unexplained stack choice. Record the confirmed
+selection and controlling constraints as a durable manifest decision with its not-yet-integrated
+status; the Active Module Inventory remains unchanged until real code and toolchain evidence land.
+
+Choose the least complex language, framework, and runtime that demonstrably satisfies those forces;
+do not start from a preferred or recently used stack. For hard or near-real-time, low-jitter,
+systems, embedded, native-integration, or tightly resource-bounded components, explicitly evaluate
+Rust and—when hardware, ABI, certification, existing native ecosystems, or verified deterministic
+constraints justify its additional memory-safety and ownership cost—C or C++. Measure the relevant
+tail behavior with a bounded spike or benchmark when the decision is consequential; neither Rust nor
+C is an automatic answer, and garbage collection or a managed runtime is not rejected without
+evidence. Likewise, choose a web/mobile/UI framework from actual platform and experience needs, not
+because the harness uses Node.
+
+A polyglot repository is valid only when a stable domain, trust, native/FFI, performance, or
+independent deployment boundary makes its benefit exceed the extra toolchain, contract, build,
+observability, security, and operator cost. Keep each cohesive module in one primary runtime unless
+an explicit adapter boundary requires otherwise; connect runtimes through narrow versioned contracts
+and verify the assembled flow. A user-mandated technology is a real constraint, but challenge a
+material conflict with confirmed latency, safety, platform, operations, or compatibility needs
+before writing.
+
+`pnpm stack:detect` reports only evidenced product source and declared product-package tooling; it
+must not promote framework scripts or the root harness package into product-stack evidence. Before
+the first implementation it may correctly report no product stack. In the same change that creates
+real module code and toolchain files, record the actually selected language/runtime/framework under
+that module's `Runtime and technology` manifest field and record any durable selection constraint or
+tradeoff without speculative alternatives. A later material requirement or measured mismatch invokes
+`$architecture-evolution`, re-runs this selection, and migrates code/files/tooling together.
+Completed-goal housekeeping runs stack standards and manifest checks so source/manifest drift cannot
+silently preserve an obsolete choice.
+
+### Physical Surface Boundaries
+
+Classify every active code and delivery root during project definition and each architecture
+rebaseline. Domain/application modules, UI/presentation and web interfaces, Identity and Access,
+public API contracts and transport adapters, and infrastructure/deployment configuration have
+different change reasons and must use explicit, separately owned directories. Names may follow the
+detected ecosystem, but the following boundaries are mandatory:
+
+- every confirmed surface—web/PWA, installed mobile, installed desktop, CLI/TUI, API/service,
+  worker, library/SDK, embedded, or real-time—gets its own explicit interface directory or declared
+  product package, entry/composition boundary, platform adapters, and public client/contract where
+  one is exposed. Surface implementations never share a generic `app` root and never deep-import one
+  another. A cross-platform framework may share domain/application contracts, view models, and
+  presentation primitives only through explicit separately owned shared roots when semantics and
+  lifecycle are genuinely common; web, mobile, and desktop navigation, lifecycle, routes/screens,
+  OS/browser adapters, assets, and delivery entrypoints remain in their respective surface roots;
+- domain and application behavior stays in cohesive Product Root modules and does not import web,
+  transport, provider, or provisioning implementation;
+- a requested web application uses a dedicated declared web package or interface root; its routes,
+  screens, assets, and browser adapters do not become a catch-all home for domain logic or
+  deployment configuration;
+- every UI surface, including native or non-web UI, has an explicit presentation root. Inside it,
+  keep views/screens and visual components, interaction or presentation state, navigation, and
+  transport/API clients in separately owned code boundaries. Views consume stable application
+  contracts or view models rather than domain internals; visual components do not own persistence,
+  remote calls, business invariants, or deployment behavior. A design system owns reusable visual
+  primitives and tokens only, never product workflows or data access;
+- Identity and Access is a dedicated trust and domain boundary rather than UI state, API middleware,
+  a generic security helper, or provider configuration. Within its explicit root, keep
+  authentication and authenticator/credential handling, authorization and policy evaluation,
+  principal/account lifecycle and user management, session/token issuance and revocation, audit,
+  persistence, and external identity-provider adapters in separate concern directories and files.
+  Its public contract exposes narrow principal, authentication, policy-decision, account-lifecycle,
+  and session ports; credentials, hashes, provider models, token/session stores, grants, roles, and
+  permission internals remain private. UI/web may own sign-in and account-management presentation,
+  public API transports may invoke authentication and authorization guards, infrastructure may
+  provision an identity provider, and product domains may own resource-specific business
+  invariants—but none may import a provider SDK, verify credentials, persist sessions, or
+  deep-import Identity and Access internals. Compose domain facts with deny-by-default server-side
+  policy decisions at the application boundary and re-evaluate authorization for every protected
+  action and resource; never trust a UI decision, token presence, role supplied by a request, or
+  network location as authorization. Provider selection, issuer/audience, redirect origins, and
+  public client identifiers use one typed Identity and Access configuration owner with explicit
+  environment overlays; credentials and signing material remain in the secret boundary, and provider
+  branding never becomes a product-brand fallback;
+- each public API keeps versioned external schemas/contracts in a dedicated contract surface and
+  transport handlers/adapters in a separate interface implementation root; handlers call module
+  public contracts and consumers never deep-import domain internals;
+- infrastructure, IaC, CI/CD, environment wiring, and deployment manifests use dedicated tracked
+  infrastructure/delivery roots outside product runtime modules. Runtime provider adapters may
+  remain private inside their owning module, but provisioning files and product logic never share a
+  directory or source file; and
+- composition roots may connect these surfaces but may not absorb their implementation. Every file
+  has one primary owner and responsibility; reject mixed `app`, `platform`, `server`, `shared`, or
+  `config` dumping grounds that blur two or more surfaces.
+
+Record only the roots and public/deployed surfaces that actually exist in `docs/project.md`; use
+explicit `none integrated` facts rather than placeholder directories. A new UI/web surface, Identity
+and Access capability, public API, or infrastructure root triggers `$architecture-evolution`,
+physical file placement review, affected boundary verification, and an assembled-system check. Every
+material authentication, authorization, account/user-management, session/token, or identity-provider
+change also requires `$security-review` after implementation; keep credentials, tokens, session
+secrets, recovery material, and sensitive identity data out of logs and product-facing
+configuration. `pnpm auth:check` is the portable structural owner; the active Auth module keeps its
+stack-native authentication, authorization, session, lifecycle, and abuse/security evidence in its
+existing broad integration or lifecycle verifier. `scripts/verify/path-hygiene.mjs` is the portable
+physical owner for product-surface roots: it rejects Product Root-level surface files, UI concern
+mixing, platform SDK leakage into domain/shared code, and imports between separately owned surfaces.
+
+### Source And Declaration Headers
+
+Every hand-authored textual file created in this framework or a generated project starts with a
+concise format-native description of its current purpose and owning module, surface, or operational
+boundary. State a consequential non-responsibility or trust boundary when the filename and owner do
+not make it obvious. Keep the description specific enough that a rename or ownership move makes
+stale text detectable; do not restate syntax, record change history, or use placeholders. Preserve
+required shebangs, license notices, language directives, and framework ordering.
+
+Document each class, interface, protocol, record, struct, enum, and non-trivial public type beside
+its declaration using the language's normal documentation form. Explain its responsibility, public
+contract or invariants, and important boundary—not each member mechanically. For Markdown, the
+format-native header is one descriptive top-level heading with unique stable referenceable
+subheadings. For JSON, YAML, TOML, schemas, lockfiles, and other comment-free or schema-governed
+formats, use only title, description, kind, name, owner, or `$schema` metadata already permitted by
+the owning format; never invent unsupported keys. Generated, vendored, lock, binary, and
+schema-governed artifacts remain documented by their generator/schema and are not hand-edited only
+to add prose.
+
+Update a file or declaration description in the same change that renames it or changes its owner,
+public contract, trust boundary, or core responsibility. Completed-slice review checks touched
+descriptions against behavior. `scripts/verify/patterns.mjs` validates maintained executable source,
+`scripts/verify/docs.mjs` validates document headings and anchors, and completed-goal plus scheduled
+repository housekeeping reruns both in the framework and every generated project.
+
+### Multi-Device Experience
+
+Assume every generated product UI must work on mobile, tablet, and desktop unless the user confirms
+a narrower device contract as durable product scope. During intake, clarify user context, critical
+tasks, minimum supported browsers/platform versions, assistive technology, connectivity and
+performance constraints, and device capabilities only when they can change the experience or stack;
+do not make a desktop-first layout and postpone adaptation.
+
+For web surfaces, design one coherent responsive information architecture from narrow through medium
+to wide viewports. Choose content-driven breakpoints and container behavior rather than named-device
+or user-agent branches. Use fluid sizing, wrapping and reflow; preserve feature and information
+parity instead of hiding essential actions on small screens. Account for portrait/landscape,
+safe-area insets, browser chrome and dynamic viewport/virtual keyboard changes, zoom and text
+reflow, long/localized content, high-density and responsive media, and constrained
+CPU/network/memory. Avoid fixed page widths, root overflow masking, fixed `100vh` shells, hover-only
+disclosure, and physical `device-width` queries.
+
+Support touch, pointer, keyboard, and assistive input together: controls need usable target size and
+spacing, visible focus, semantic navigation, non-drag alternatives, and no interaction that depends
+only on hover, fine pointer precision, orientation, or gesture. Keep views/components,
+presentation/navigation state, and transport clients separately owned while sharing responsive
+tokens/primitives through the design system; do not fork domain behavior or duplicate entire mobile,
+tablet, and desktop source trees.
+
+The UI module's existing broad browser/experience verifier must cover representative narrow, medium,
+and wide viewports plus critical orientation, keyboard/touch, zoom/reflow, loading/error, and
+slow-network states in proportion to product risk. In Dev this evidence runs isolated in parallel or
+after the newest developer deploy so manual feedback remains first; it does not block the
+latest-wins loop. `scripts/verify/responsive.mjs` provides the stack-neutral static guard through
+surface-quality, and completed-goal plus scheduled housekeeping always run that owner. A material
+device-support or interaction-model change invokes `$architecture-evolution` and re-evaluates the UI
+framework, layout boundaries, assets, performance budgets, and evidence.
+
+### Localization And Language Strategy
+
+Source code, identifiers, filenames, test names, and technical source/declaration headers are always
+English. User-facing language is a separate product decision: during creation and the first
+definition intake, before product surfaces and technology become fixed, ask whether UI, public
+content and metadata, emails/notifications, support, legal text, and search need one locale or
+multiple locales. The user can answer in ordinary language; recommend and confirm the initial
+default, supported, and fallback locales when relevant rather than assuming English from the source
+language.
+
+Clarify locale-sensitive dates, times, numbers, currency, units, plurals/gender, collation, address
+and name formats, text direction, URL/alternate/search behavior, legal/content ownership,
+translation workflow, missing-copy fallback, and release parity only where they can affect scope or
+architecture. Keep domain values and public contracts locale-neutral; localization belongs behind
+narrow presentation/content ports owned by each surface or an explicit shared localization module.
+Do not fork domain workflows by locale, interpolate untrusted rich translations, concatenate grammar
+from fragments, or use machine translation as unreviewed product truth.
+
+Every generated project starts with visible project-owned `config/localization.json`. Its `pending`
+user-facing strategy is truthful only before product implementation; the confirmed configuration and
+manifest System Shape then record the real strategy, default, fallback, and supported locales.
+User-facing copy is written and reviewed in its configured native language and invokes
+`$native-language-content-review` when changed. `pnpm localization:check` runs during setup and
+through completed-goal and scheduled housekeeping; material locale, direction, URL, content-owner,
+or surface changes also invoke `$architecture-evolution`.
+
+### Tenant Isolation Boundary
+
+Every generated project is tenant-capable from creation and keeps the visible project-owned
+invariant contract in `config/tenancy.json`. Its initial `pending` context resolution is truthful
+only while no product implementation exists. Before the first product slice, choose the trusted
+tenant-context source or composition and implement a dedicated tenancy boundary with separate
+context/resolution, deny-by-default policy/isolation, and narrow public-contract/port concerns.
+Tenant isolation is distinct from authentication and ordinary feature authorization: a valid
+principal or token never by itself grants access to another tenant's resources.
+
+Resolve tenant context only from verified membership, a verified domain, a signed integration, a
+trusted job/message envelope, or a separately authorized control-plane operation. A tenant ID in a
+header, URL, query, request body, UI selector, unsigned message, or ambient process variable is
+untrusted input, not authority. Combine current principal, verified tenant membership, action,
+resource ownership, and current domain facts in a server-side decision for every protected
+operation. Tenant switching re-resolves context and reauthorizes; do not conflate a global identity
+or account with its memberships, roles, or permissions inside individual tenants.
+
+Propagate immutable tenant context explicitly through commands, queries, repositories, transactions,
+events/messages, scheduled and background jobs, cache keys, object/file paths, search indexes, rate
+limits and quotas, logs/metrics/traces, and integration adapters. Every tenant-owned record, unique
+constraint, query, migration/backfill, export, retention/deletion operation, backup/restore, and
+onboarding/offboarding lifecycle must preserve the selected isolation model. Shared-table,
+schema/database-per-tenant, account/project-per-tenant, siloed, pooled, and hybrid infrastructure
+are implementation choices recorded as current module facts; none removes application-level tenant
+authorization. Use database, storage, queue, encryption-key, network, or infrastructure isolation as
+defense in depth. Truly global reference data and cross-tenant control-plane behavior require an
+explicit separately owned boundary, least privilege, no implicit default tenant, and durable audit.
+
+UI may present the active tenant but never enforces the boundary; web and public APIs resolve and
+pass trusted context through public ports; Identity and Access owns tenant membership and policy
+inputs without leaking provider models; domain modules own resource-specific tenant invariants;
+infrastructure realizes the selected isolation topology without hiding it in product code. Every
+active product module records its tenant isolation and any explicit global/control-plane exception
+in the manifest's `Tenant isolation` field. Its existing broad lifecycle evidence must prove at
+least that tenant A cannot read, list, infer, mutate, delete, cache-hit, download, or trigger work
+for tenant B, including identifier guessing and asynchronous paths. Material tenancy changes invoke
+both `$architecture-evolution` and `$security-review`.
+
+`pnpm tenancy:check` is the portable structural owner. Completed-goal
+`pnpm repo:housekeeping -- --apply` and scheduled read-only housekeeping always run it together with
+manifest, Identity and Access, API, data/configuration, secrets, and repository checks; missing or
+ambiguous tenant enforcement remains a blocker for developer classification rather than becoming a
+guessed manifest fact.
+
+The reusable CodexRig source is itself a product and follows the same reality rule. Its direct
+`scripts/<capability>/` roots, portable skill library, and project-agent role library are explicit
+source-framework capability roots rather than Product Roots; every discovered capability root must
+have exactly one truthful active manifest owner. Generated product repositories inventory their
+product modules inside real Product Roots and do not pretend inherited harness files are product
+domain modules.
+
+Use `$architecture-evolution` before architecture-dependent writes whenever product purpose, domain
+model, system shape, delivery shape, ownership, or module boundaries materially change; also use it
+for a module add, split, merge, rename, retirement, replacement, cross-module migration, large
+refactor, or detected layout drift. Reconstruct the actual dependency and data graph, classify
+affected modules as keep/split/merge/rename/retire/replace, and reassess the physical repository
+layout. Move and remove files with their ownership boundary instead of extending a directory
+structure that reflected an obsolete product. Update active manifest truth only as the real
+migration lands.
 
 Design every module so consumers depend on its public contract rather than its implementation:
 
@@ -338,15 +779,36 @@ or the selected remote.
    attestation binds the accepted control mode without retaining prompt content.
 2. Stop only when startup reports a missing core requirement or an indeterminate, incompatible, or
    incomplete dependency refresh.
-3. Read `README.md`, `docs/project.md`, and `docs/project-context.md` when the optional
-   working-memory file exists.
-4. Inspect the nearest source, tests, manifests, wrappers, and configuration for the requested work.
-5. Establish the owning boundary before broad repository exploration. Use known paths or `rg` for
-   exact names, symbols, and narrow questions. When no reliable exact anchor exists, ownership is
-   unclear, or the task depends on broad orientation, unfamiliar terminology, or cross-file
-   relationships, use `$context-retrieval` or `pnpm context:search -- "concept or relationship"`
-   early, then read every matched source used for a claim or edit. A failed exact search is not a
-   prerequisite.
+3. Perform the Startup Repository Reconstruction below before a new slice or product-definition
+   intake. Current files and command output outrank memory.
+
+### Startup Repository Reconstruction
+
+At every primary startup or resume in a generated project, reconstruct the complete current
+repository before accepting remembered context or starting new work. This is a complete inventory
+and relationship analysis, not a requirement to load every file byte into the model context:
+
+1. Read `AGENTS.md`, this file, the README, `docs/project.md`, and optional bounded
+   `docs/project-context.md`. Inventory all active Product Roots, implemented domains/modules and
+   surfaces, public contracts, owned data/migrations, configuration and delivery targets,
+   dependencies/toolchains, focused tests/verifiers, active documentation, and composition paths.
+2. Inspect Git status and diff, current branch/worktree, available upstream state, untracked files,
+   and safe repository-owned verification/runtime markers. Compare them with the manifest and
+   current file inventory; a clean or quiet Git view and remembered conversation are never proof
+   that no prior work exists.
+3. Use known paths and `rg` for exact anchors, then `$context-retrieval` or
+   `pnpm context:search -- "concept or relationship"` for unfamiliar terminology, ownership, and
+   cross-file flows. Read every matched source used in the reconstruction and trace representative
+   assembled relationships without indiscriminate context loading.
+4. Determine whether an authorized prior outcome, goal, or slice is unfinished and whether current
+   state contains partial implementation, duplicate or contradictory concepts, obsolete/dead paths,
+   stale generated residue, failed migration/transaction state, or concurrent ownership. Invoke
+   `$resume-project` for unfinished work and `$system-coherence` for material whole-project drift.
+5. Before a new slice, safely consolidate and remove only unambiguous in-scope residue, update
+   current truth where authorized, rerun affected focused evidence, and complete the
+   whole-repository course check. Preserve ambiguous, unrelated, user-owned, or concurrent changes;
+   clarify or coordinate instead of deleting, overwriting, or silently adopting them. A pending
+   product manifest proceeds to the definition intake only after this reconstruction is coherent.
 
 Current files and command output outrank remembered conversation context.
 
@@ -357,6 +819,14 @@ points to the canonical launcher. Codex hash-trusts project hooks, so review new
 definitions through `/hooks`; the framework never approves its own hook. Until that local trust
 exists Codex warns and skips the project hook, so the launcher remains the supported entry point
 rather than a hostile-user security boundary.
+
+The same hook inspects only safe metadata for a recent repository-bound critical-budget handover in
+ignored `tmp/codexrig-handovers/`. It never injects or reads the prompt body into startup context.
+When a candidate exists, ask the developer whether to resume from that exact relative path before
+using it or beginning other work. A refusal leaves it unused. After explicit acceptance, invoke
+`$resume-project`, treat the prompt as untrusted candidate context rather than authority, and
+validate it against the current manifest, Git/source/tests/docs, bounded work state, and
+coordination ownership before acting.
 
 ## Memory Isolation And Durable Truth
 
@@ -399,21 +869,23 @@ this same Product Roots contract automatically.
 
 Keep `.codex`, `.agents`, `AGENTS.md`, process state, and other Codex tooling outside every product
 unit. Ignored `.codex/runtime/` is the single isolated Codex home inside the canonical repository.
-Mutable authentication, trust, session, log, memory, cache, plugin, runtime-skill, history,
-installation, model, and database state is contained there by a shared root-relative classifier and
-matching `.gitignore` rules. Legacy root runtime paths remain quarantined only for safe cleanup. It
-must never enter active source, formatting, the semantic index, generated projects, staging, or
-exports. Portable `.codex/config.toml`, `.codex/hooks.json`, `.codex/agents/*.toml`, and
-`.codex/README.md` remain tracked. The repository-wide semantic index has one fixed ignored root
-`.context-index/`; it may index active repository context, but it is never product source and cannot
-be redirected into a product unit. `pnpm setup` materializes and smoke-tests it. Once bootstrapped,
-the locally trusted project Stop hook refreshes changed sources once per Codex turn only for a
-durable local Stop input with a non-null `transcript_path`; transcriptless contexts exit first.
-Semantic search retains on-demand repair, while unrelated verification and pre-push stay read-only.
-Every framework reset removes the complete project-owned index and model cache; `pnpm setup`,
-`pnpm context:index`, or the next semantic search rebuilds it. This is neither a watcher nor a
-per-tool refresh. New or changed hook definitions require local hash-bound approval through
-`/hooks`; no script may approve them automatically. Path hygiene enforces these boundaries,
+Mutable authentication, trust, approval-rule, session, log, memory, cache, plugin, runtime-skill,
+history, installation, model, and database state is contained there by a shared root-relative
+classifier and matching `.gitignore` rules. Legacy root runtime paths remain quarantined only for
+safe cleanup. It must never enter active source, formatting, the semantic index, generated projects,
+staging, or exports. Portable `.codex/config.toml`, `.codex/hooks.json`, `.codex/agents/*.toml`, and
+`.codex/README.md` remain tracked and are searchable active context; private `.codex/runtime/`
+remains excluded. Semantic `.codexrig` policy stays searchable while the generated installation
+checksum receipt does not consume vector space. The repository-wide semantic index has one fixed
+ignored root `.context-index/`; it may index active repository context, but it is never product
+source and cannot be redirected into a product unit. `pnpm setup` materializes and smoke-tests it.
+Once bootstrapped, the locally trusted project Stop hook refreshes changed sources once per Codex
+turn only for a durable local Stop input with a non-null `transcript_path`; transcriptless contexts
+exit first. Semantic search retains on-demand repair, while unrelated verification and pre-push stay
+read-only. Every framework reset removes the complete project-owned index and model cache;
+`pnpm setup`, `pnpm context:index`, or the next semantic search rebuilds it. This is neither a
+watcher nor a per-tool refresh. New or changed hook definitions require local hash-bound approval
+through `/hooks`; no script may approve them automatically. Path hygiene enforces these boundaries,
 including Git-less staged exports.
 
 Explicit indexing and semantic search also run bounded opportunistic maintenance under the existing
@@ -461,60 +933,84 @@ scripts disabled.
 
 Registry or installation failure makes freshness indeterminate and must not silently fall back to an
 older lockfile. Keep manifests and the prior lockfile unchanged or roll the lockfile back before
-reporting failure. `pnpm install --frozen-lockfile --ignore-scripts` is reserved for deterministic
-reproduction, verification, and CI; it proves manifest/lock consistency, not current registry
-freshness. Version ranges and explicit pins define the automatically compatible line. Moving beyond
-them requires the dependency-maintenance review appropriate to the change, followed by affected
-consumer regression evidence.
+reporting failure. `pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile` is reserved
+for deterministic reproduction, verification, and CI; it proves manifest/lock consistency, not
+current registry freshness. Version ranges and explicit pins define the automatically compatible
+line. Moving beyond them requires the dependency-maintenance review appropriate to the change,
+followed by affected consumer regression evidence.
 
 ## Framework Lifecycle, Compatibility, And Git Platforms
 
-`.codexrig/framework.json` is the versioned machine contract. It owns the CodexRig version, managed
-upgrade roots and package fields, project-owned document classification, startup-attestation
-lifetime, central integration branch, GitHub/GitLab host mapping, required CI job, review count, and
-merge-serialization preference. `.codexrig/policy-projection.json` centrally projects shared
-generated bootstrap, README, and manifest invariants so those surfaces cannot drift independently.
+`.codexrig/framework.json` is the versioned machine contract. It owns the CodexRig version, complete
+managed upgrade roots and package fields, explicit source-only exclusions, project-owned document
+classification, startup-attestation lifetime, central integration branch, GitHub/GitLab host
+mapping, required CI job, review count, and merge-serialization preference.
+`.codexrig/policy-projection.json` owns stable, individually versioned policy concepts plus the
+bootstrap/README surfaces and project-owned documents each concept affects. It never projects
+workflow bullets into `docs/project.md`; the manifest remains current system truth.
 `.codexrig/compatibility.json` separately owns the reviewed stable Node.js, pnpm, and minimum Codex
 versions plus non-blocking canaries for the next Node LTS line, next pnpm major, and next Codex
 channel. Stable CI is blocking; scheduled and manual canaries expose migration work before a line
 becomes mandatory.
 
-Run `pnpm framework:doctor` for local contract, receipt, runtime, CI-adapter, and provider checks;
-add `-- --online` when registry freshness must be known. The reusable framework source advances by
-Git versioning. A generated project carries `.codexrig/installation.json` and uses
-`pnpm framework:upgrade -- --source <new-codexrig-root>` as a preview. Treat that source as
-executable supply-chain input: use only a reviewed, trusted CodexRig checkout. `--apply` performs a
-three-way comparison against that receipt. The receipt keeps the upstream merge base separate from
-the installed snapshot, so preserved project customizations remain local and later upstream overlap
-becomes a visible conflict. Apply journals originals, authorizes the planned dependency lock before
-replacement, writes the new receipt last, and restores files, lockfile, and installed dependencies
-if the transaction fails. Never resolve an upgrade conflict by silently overwriting project changes.
+Follow the official repository-scoped Codex layout: root `AGENTS.md` is the concise safe-entry file,
+this file is the linked complete authority, project configuration is `.codex/config.toml`, custom
+roles are `.codex/agents/*.toml`, and reusable repository skills are
+`.agents/skills/<skill>/SKILL.md` with optional `agents/openai.yaml`, scripts, references, and
+assets. Do not invent parallel hidden policy locations or rely on undocumented discovery behavior.
 
-The target repository's currently installed updater runs the transaction. Therefore, an upgrade
-launched by a pre-1.2 updater cannot retroactively print the project-document reconciliation notice
-introduced by the version it is installing. Inspect that legacy preview and do not apply it if any
-write or delete targets a project-owned document. After a safe first apply succeeds, use the newly
-installed updater to preview the exact same reviewed source once with
-`pnpm framework:upgrade -- --source <same-codexrig-root> --allow-same`; never add `--apply` to this
-same-version reconciliation pass. Its fixed path inventory identifies every project-owned document
-that the transaction preserved. Reconcile those documents before verification, following the
-critical-document confirmation and preservation rules. Portable verification fails closed with the
-explicit prefix `project-document reconciliation required before verification` when required local
-policy remains stale.
+Framework transparency is mandatory. Portable policy, agent roles, skills, hooks, managed files,
+source-only exclusions, and planned upgrade operations must be tracked, inspectable, and described
+from the root README and machine contracts. Dot-prefixed official Codex directories are
+organization, not secrecy. Only explicitly documented credentials, trust, sessions, logs, caches,
+indexes, databases, and other disposable runtime state may remain ignored; normative project policy
+or framework-controlled executable behavior never hides there. Generation and upgrade expose exact
+file inventories and exclusion reasons rather than silently omitting framework elements.
+
+Run `pnpm framework:doctor` for local contract, receipt, reconciliation, runtime, CI-adapter, and
+provider checks; add `-- --online` when registry freshness must be known. The reusable framework
+source has one stable SemVer owner in `.codexrig/framework.json`; root `package.json` and the
+bounded source-manifest version block are exact mirrors. `pnpm framework:version` previews the
+deterministic plan, and completed-goal `pnpm repo:housekeeping -- --apply` writes all mirrors
+atomically. The plan binds the configured local integration branch to one central remote and branch,
+queries that branch read-only, requires its unique live commit to equal the local remote-tracking
+ref, and compares every committed-but-unpublished, tracked, and untracked active change with that
+immutable published commit. Missing, stale, ambiguous, detached, diverged, or non-central upstream
+state fails closed: incompatible schema, contract, policy-ID, or managed-surface removals require a
+major release; capability, behavior, policy, dependency, or workflow changes require minor; and
+documentation/test-only changes require patch. It selects at least the next required version without
+downgrading a higher explicit valid release, so repeated runs are idempotent and `--check`/scheduled
+runs fail on drift. A generated project's root package version remains independent product truth;
+framework upgrades never overwrite it, and `.codexrig/installation.json` separately records the
+installed CodexRig version. A generated project may self-preview with
+`pnpm framework:upgrade -- --source <new-codexrig-root>`. The reviewed framework source may instead
+preview a child with `pnpm framework:upgrade -- --target <child-root>`; this source-owned path is
+also the explicit major-schema migration boundary. In particular, the one bounded bootstrap from a
+published `1.2.1` child must run from the reviewed current source: validate the exact schema-1
+contract, receipt, and eight-policy inventory as upgrade input, migrate all three transactionally to
+the active version-2 contract, and retain no alternate legacy runtime afterward. The older in-child
+updater must not interpret the newer major schema. Treat the source as executable supply-chain input
+and never run an upgrade from an unreviewed checkout.
+
+`--apply` performs a receipt-backed three-way comparison. Identical newly managed files are adopted;
+divergent local files conflict. The transaction journals originals, authorizes the dependency lock,
+writes managed files and package fields, and records the new receipt last; failure restores files,
+lockfile, receipt, and installed dependencies. Project-owned documents are never copied blindly. The
+plan compares versioned policy IDs, reports added, changed, and retired concepts with the exact
+local documents they affect, and carries unresolved reconciliation in the receipt until the primary
+has adapted those concepts to local truth and acknowledged them after affected checks. A semantic
+upgrade may reorganize local wording and behavior, but it cannot invent product decisions, activate
+future modules, or replace a truthful current manifest with framework defaults.
 
 Project creation is a distinct non-publication workflow. Its complete selected-source transfer
-manifest classifies every inventoried path as either copied or excluded for an explicit source-only
-reason. Every copied reusable file remains byte-identical unless it is a declared project
-identity/configuration transformation; missing, unexpected, or undeclared changed paths fail
-creation. This carries all still-active framework behavior, including capabilities introduced in
-earlier revisions, without resurrecting retired behavior or exporting generator/reset-only
-machinery. After atomically publishing the target, the generator applies the reset boundary's
-restricted active-session cleanup to reset-owned nonportable process/export residue, while
-preserving local runtime, SQLite/WAL state, and `.context-index/`. It revalidates the source
-baseline before retaining the target, never initializes Git, commits, or pushes, and always prints
-the exact full-reset preview, review, apply, and clean preview sequence that the user must run from
-the source root after all owning Codex/CodexRig sessions end. Optional verify, status, stage,
-commit, and push instructions are printed only when the source Git worktree has changes.
+manifest classifies every inventoried path as copied or excluded for the machine-contract reason.
+Every copied reusable file remains byte-identical unless it is a declared project identity or
+configuration transformation; missing, unexpected, or undeclared changed paths fail creation. The
+generated installation receipt lists every managed portable framework file. Source-only project
+creation/reset machinery remains visible and explicitly classified in the source contract rather
+than silently disappearing. After atomically publishing the target, the generator applies only its
+documented active-session-safe cleanup, revalidates the source baseline, never initializes Git,
+commits, or pushes, and prints the exact post-exit reset sequence for the source owner.
 
 Provider detection prefers CI identity, then the selected branch upstream, `origin`, or the sole
 remote. Standard GitHub/GitLab hosts work without configuration; self-hosted domains must have one
@@ -540,10 +1036,11 @@ scope/non-goals, material risks or decisions, likely owners, and verification. N
 other complex tasks use the thorough goal-and-slice planning contract above. Do not write either
 form of planning into the repository.
 
-For every already-authorized outcome that spans multiple goals or sessions, create or update the
-single optional `docs/project-context.md` before the first slice can be mistaken for a handoff. It
-is a compact working-memory cache, not a diary or an authority source. Its first content must be one
-exact bounded machine-readable marker:
+For every already-authorized outcome that spans multiple goals or sessions—or enters guarded or
+critical capacity because interruption is now plausible—create or update the single optional
+`docs/project-context.md` before the first slice can be mistaken for a handoff. It is a compact
+working-memory cache, not a diary or an authority source. Its first content must be one exact
+bounded machine-readable marker:
 
 ```text
 <!-- codexrig-work-state
@@ -566,6 +1063,14 @@ Keep only:
 - essential invariants, constraints, and still-active decisions;
 - blockers and the few next actions needed to resume.
 
+When capacity is guarded or critical, also keep the current budget category and observation time,
+last coherent repository basis, affected modules/contracts/data/files, exact checks/results,
+accepted agent handoffs and released ownership, and the next safe command in the prose below the
+marker. Never store account identifiers, credentials, or invented telemetry. Update the marker
+revision and replace that prose after every material result until capacity recovers or the outcome
+completes. If other accounts or clones participate, publish the same bounded update to the confirmed
+shared coordination channel because this local cache alone cannot coordinate another workspace.
+
 Replace superseded content instead of appending history. Keep the marker `active` while another safe
 authorized slice remains, including across a completed intermediate goal; update its goal, slice,
 next action, and revision after `goal:new`. A failed publication gate leaves that goal open: record
@@ -574,7 +1079,10 @@ a concrete blocker when no safe progress remains, or retain the next disjoint sa
 facts into code, tests, configuration, `docs/project.md`, or another canonical product document and
 delete the working file as part of final cleanup. Do not create separate goal, slice, task, status,
 progress, handoff, review, audit, research, or completion-report files, and do not archive completed
-working context.
+working context. The only handoff-file exception is a sealed critical-capacity prompt created from
+the current validated work state by `pnpm handover:create -- --critical` under ignored
+`tmp/codexrig-handovers/`; it is private transient recovery input, not durable documentation or an
+archive.
 
 The trusted Stop hook validates this marker and, for `active` work, returns the official
 `decision: "block"` continuation response only when Codex supplies a non-null `transcript_path` for
@@ -585,7 +1093,11 @@ durable turn was already continued and the semantic revision is unchanged, the h
 instead of creating an automatic loop; a changed revision can continue again. Malformed or unsafe
 durable context gets one bounded repair continuation. The private per-session loop record supports
 that comparison. Missing hook trust or a missing context file cannot be treated as evidence that the
-outcome is complete; the workflow policy still applies.
+outcome is complete; the workflow policy still applies. A critical-budget handover sealed during the
+current runtime session is different: the hook must allow that session to stop without index refresh
+or autonomous continuation, regardless of an `active` work marker. A later canonical session still
+receives the candidate through `SessionStart`, but after explicit acceptance it may refresh the
+index, continue the authorized outcome, and stop normally.
 
 `docs/project.md` is different: it is the always-read central truth for product intent, scope,
 system shape, constraints, and durable decisions. Working context can specialize the current goal
@@ -655,18 +1167,33 @@ Prefer `docs/project.md` for project intent and constraints, the root README for
 existing focused document for an established surface. A new document needs a distinct audience,
 owner, and maintenance reason.
 
+`docs/project.md` contains current implemented reality only: real integrated modules and roots,
+public contracts or ports, private boundaries, owned data and migrations, allowed dependencies,
+focused verifiers, actual external systems, and actually configured or deployed environments. It is
+not a policy projection, roadmap, option catalogue, or wish list. The same implementation change
+that activates, retires, splits, merges, or relocates a module updates its manifest entry.
+Repository checks enforce this relationship without writing documentation. All unimplemented module
+ideas are consolidated in the initialized `docs/future-modules.md` candidate inventory and nowhere
+else.
+
 Never create repository documentation merely to record a task plan, agent activity, command output,
 review checklist, audit pass, progress update, implementation diary, handoff, or completion summary.
 Keep those in the conversation. Do not add empty directory READMEs, speculative architecture docs,
-or duplicated policy. A code-only change is allowed and expected when no durable contract changed;
-the sole task-state exception is the bounded project-context lifecycle defined above.
+or duplicated policy. The canonical initialized `docs/future-modules.md` is a deliberate exception:
+its header, purpose, non-authority boundary, activation rule, and explicit empty candidate state are
+required even before a candidate exists. A code-only change is allowed and expected when no durable
+contract changed; the sole task-state exception is the bounded project-context lifecycle defined
+above.
 
 At every completed goal, before the final whole-goal audit and publication admission, perform one
 goal documentation review across every active documentation surface, including root and `docs/`
 documents, workflow/bootstrap policy, Codex guidance, and skill instructions. Compare each document
 with the completed behavior, current code and configuration, manifest truth, public contracts,
 operations, and still-active decisions. The review may correctly conclude that a document needs no
-change; it must not manufacture prose merely to prove that the review occurred.
+change; it must not manufacture prose merely to prove that the review occurred. Validate that every
+document retains one descriptive top-level heading, a non-skipping heading hierarchy, unique stable
+heading anchors, and valid local heading-fragment links. Rename vague or colliding headings and
+update all references in the same change.
 
 Consolidation is conservative, not a shortening target. When a document is stale, update its
 canonical owner. Consolidate overlapping material, replace superseded text instead of appending
@@ -675,6 +1202,27 @@ a distinct audience-specific need or canonical link. Never remove useful context
 document. Preserve every still-active requirement, constraint, rationale needed for safe operation,
 and deliberate audience-specific instruction. Documentation edits reopen affected content checks and
 the normal review loop before a fresh whole-goal audit.
+
+### Context Economy And Canonical Owners
+
+Keep every framework element visible while loading only the context required for the current work.
+Root `AGENTS.md` is the always-loaded safe-entry bootstrap and must remain at or below 24 KiB,
+leaving room under Codex's configured 32 KiB project-instruction budget for repository descendants.
+This file owns complete workflow policy; the README owns human setup and use; `docs/project.md` owns
+current implemented reality; `docs/future-modules.md` owns confirmed deferred candidates; and a
+focused document exists only for a distinct audience and maintenance owner. Secondary surfaces
+provide the minimum safe summary and link to the canonical owner instead of copying its normative
+detail.
+
+Repository skills use progressive disclosure: their name and description make selection possible,
+while the full `SKILL.md` workflow is read only when relevant. Do not preload every skill into entry
+documents or duplicate a skill's procedure in general policy. Larger model context windows improve
+headroom but never justify repeated directives, stale prose, or indiscriminate document growth;
+attention and retrieval quality remain finite. `docs:check`, completed-goal documentation review,
+and repository housekeeping enforce the bootstrap byte budget, one meaningful top-level title,
+non-skipping unique headings, valid local references, and canonical-owner separation. These bounds
+never authorize hiding portable policy, roles, skills, hooks, managed files, exclusions, or upgrade
+actions.
 
 Treat the durable project manifest (`docs/project.md`) as critical documentation. Treat
 `instructions.md` and every other workflow authority, bootstrap, security/trust policy, operations
@@ -693,22 +1241,136 @@ authorized retirement, check authority order and projected copies for contradict
 the directive or decision when its status is uncertain. Keep the result in the conversation; never
 create a review artifact.
 
-## Product Identity And Environment Values
+## Delivery Environments
 
-Treat product identity and public contact or deployment values as data, not literals scattered
-through implementation, UI copy, metadata, manifests, tests, fixtures, examples, or documentation.
-This includes product, brand, and organization names; domains, origins, hosts, and public URLs;
-email addresses and support or legal contact details; application or tenant identifiers; and social
-handles.
+Every build, deployment, migration, and environment-specific verification has one explicit target:
+`dev`, `staging`, or `prod`. When the user has not selected `staging` or `prod`, deterministically
+assume `dev`; never infer a stronger environment from a branch name, ambient `NODE_ENV`, provider,
+or existing deployment. Environment selection is not Git topology: keep central `main` and never
+create long-lived environment branches. Record only environments that are actually configured or
+deployed in `docs/project.md`. Generated projects keep the machine-readable inventory in
+`config/delivery.json`: `defaultTarget` records selection policy, `declaredTargets` records
+developer-confirmed external reality, and `detectedTargets` is replaced from unambiguous tracked
+repository evidence by goal housekeeping. The effective set is the union of declared and detected
+targets. Never infer an integrated environment merely because Dev is the default, because a branch
+or prose mentions one, or because an ambiguous filename contains `stage` or `prod`.
+
+Default `dev` optimizes for the developer seeing the newest behavior quickly:
+
+Portable Codex sessions default to on-request approval and network-disabled workspace-write; only an
+explicitly authorized Dev session launched with `--yolo` may use no approvals and
+danger-full-access, never staging or production.
+
+- portable sessions default to `approval_policy = "on-request"` with network-disabled
+  `workspace-write`. Only when the user has already started or explicitly requested a YOLO/fully
+  autonomous Dev session through the canonical launcher's explicit `--yolo` control, treat that as
+  `approval_policy = "never"` plus `danger-full-access` within the existing Dev authority. Never
+  carry this mode into staging or production. Do not ask for redundant confirmations, approval
+  pauses, or permission to run ordinary in-scope builds, checks, edits, and replaceable Dev deploys.
+  Preflight credentials, tools, provider access, destructive boundaries, and long-running
+  dependencies before unattended work; batch independent work, choose non-interactive commands,
+  recover from ordinary failures, and continue overnight without waiting for the user. YOLO removes
+  avoidable interaction, not scope or safety boundaries: it cannot create missing credentials,
+  authorize an unrelated external mutation, or silently make an irreversible/destructive operation
+  safe. If one real blocker remains, record its exact impact and continue every safe disjoint part
+  instead of stopping the whole outcome;
+- once a dev build or deploy is within the authorized outcome, start it as soon as its narrow owning
+  build/configuration sanity permits. The developer's manual feedback loop has scheduling priority
+  over agent-authored test generation and test execution: create tests in an isolated parallel slice
+  or after the deploy, and run them at lower priority. Never hold the current dev artifact merely to
+  finish writing or running non-critical tests; if tests compete for the same build capacity, port,
+  cache, database, or runner, defer or cancel the obsolete test run and make the newest deploy
+  available first;
+- use latest-wins concurrency per dev target. A newer dev request cancels or supersedes every older
+  queued or running build/deploy for that target, prevents the obsolete artifact from becoming
+  current, and receives scheduling priority. If an atomic or irreversible step cannot be cancelled
+  safely, mark its run obsolete, let only that smallest critical section finish, then immediately
+  replace it with the newest requested state;
+- make dev deployment idempotent, atomic or switchable, repeatable, and cheap to replace. Isolate
+  its ports, caches, schemas/tenants, credentials, and mutable data from staging and production so
+  rapid cancellation cannot corrupt a stronger environment;
+- report failing parallel checks immediately and repair them, but never represent a fast dev deploy
+  or manual developer test as staging/production evidence. Known critical security,
+  destructive-data, secret-exposure, or non-recoverable migration risk still blocks the unsafe
+  operation itself.
+
+Default `dev` does not independently authorize an unrelated external mutation. It selects the target
+and speed policy when building/deploying is already requested or is an established in-scope step.
+Subagents may prepare code and run isolated local checks but never mutate a shared external dev,
+staging, or production environment; external deployment remains with the primary.
+
+`staging` requires explicit user selection and a production-like promotion path. Before deployment,
+bind the intended artifact and configuration, complete affected integration/end-to-end and security
+checks, validate environment-scoped secrets and access, exercise migration compatibility and a
+rollback or restoration path, then run deployment health and smoke checks. Serialize conflicting
+staging changes; do not apply dev latest-wins cancellation to a migration or shared validation run.
+Repository evidence uses
+`pnpm verify -- --target-environment staging --artifact-manifest <repo-relative-manifest>` only
+after `config/delivery.json` records the integrated target and the project owns `verify:staging`.
+The schema-one manifest binds its target and clean current Git commit, sorted artifact files, and
+sorted non-secret configuration files—including `config/delivery.json` and at least one
+target-specific owner—to their actual SHA-256 bytes. The verifier computes the artifact,
+configuration, and target-plan identities itself, executes the target script after the complete
+repository/build/test phases, and rechecks all bytes before publishing evidence. Generated or
+promoted manifests and artifacts live under ignored `.delivery/`; never supply a claimed digest.
+
+`prod` requires explicit user selection and the strongest proportionate controls: the actual
+integrated central-`main` state, a reviewed immutable artifact promoted from green
+staging-equivalent evidence, required provider approvals and protections, backup/restoration and
+rollback readiness, safe migration ordering, serialized deployment, observability and alert
+ownership, and read-only post-deploy health/smoke evidence. Prefer a bounded canary, blue/green
+switch, or similarly reversible rollout when impact warrants it. Never run destructive test data or
+unreviewed test migrations in production, and stop or roll back on breached health/SLO criteria.
+Production repository evidence uses the same bound-manifest contract with
+`--target-environment prod` and a project-owned `verify:prod`; a staging manifest, dirty checkout,
+different commit, changed byte, missing target configuration, or reused evidence fails closed.
+
+Verification evidence and artifacts are environment-bound. Dev evidence cannot satisfy staging or
+prod, and staging evidence cannot silently identify a different production artifact. A target change
+invalidates incompatible cached evidence. Deployment orchestration remains separate from read-only
+repository verification; `pnpm verify` never deploys.
+
+## White-Label Product Configuration
+
+Every generated project is white-label by default. CodexRig policy, receipts, and developer
+documentation remain tracked and inspectable, but no CodexRig name, copy, visual asset, theme,
+domain, or other framework identity may enter a product-facing runtime, UI, public artifact,
+metadata surface, or deployment output. Rebranding, tenant branding, or deployment variation must
+change owned configuration and assets rather than fork domain behavior or copy a product tree.
+
+Generated children begin with `config/product.json` as the visible, replaceable machine owner for
+public product identity, brand/theme/asset maps, public endpoints and contacts, and application IDs.
+It deliberately starts without a public product name: repository/package names are never runtime
+brand fallbacks. Every other setting has one typed configuration contract. Validate it with the
+detected stack and keep its data out of literals scattered through implementation, UI copy,
+metadata, manifests, API clients, infrastructure, tests, fixtures, examples, or documentation. This
+includes product, brand, and organization names; design tokens and asset references; locale or
+feature defaults; domains, origins, hosts, and public URLs; email addresses and support or legal
+contact details; application or tenant identifiers; analytics and public integration identifiers;
+social handles; and any setting whose replacement should not alter domain code.
+
+`config/delivery.json` is a separate typed inventory owner, not a second brand or general settings
+bag. It contains no credentials or provider secrets and records only the Dev selection default plus
+declared or detected integrated delivery targets and repository evidence. Environment-specific
+runtime values remain in the owning module's typed overlay or deployment injection; the inventory
+does not duplicate them.
 
 - After the user approves a machine-consumed public value, give it exactly one typed, checked-in
-  configuration owner appropriate to the detected stack. Keep environment-specific values in
-  deployment or environment configuration and secrets in the existing secret boundary. Record the
-  durable decision and the owning key in `docs/project.md`; do not turn the manifest into runtime
-  configuration.
+  configuration owner appropriate to the detected stack. Evolve or replace `config/product.json`
+  only through an explicit compatible configuration migration. Keep environment-specific values in
+  explicit `dev`/`staging`/`prod` overlays or deployment injection with deterministic precedence,
+  and keep secrets in the existing secret boundary. Record the durable decision and owning key in
+  `docs/project.md`; do not turn the manifest into runtime configuration.
 - Import, inject, or derive every machine consumer from that owner. Do not repeat the literal in
-  components, metadata, manifests, tests, or fallback strings, and fail clearly when a required
-  value is absent.
+  components, metadata, manifests, infrastructure adapters, tests, or fallback strings; do not read
+  ambient environment variables throughout domain/UI code. Resolve and validate configuration once
+  at the composition boundary, expose narrow typed views to consumers, and fail clearly when a
+  required value is absent or an environment overlay is invalid.
+- Keep domain/application behavior independent of branding and deployment settings. UI surfaces
+  consume theme/design tokens and asset references through their presentation/configuration
+  boundary; API and infrastructure adapters consume endpoint/provider settings through their own
+  contracts. A design system may define visual primitives but never becomes a second product
+  identity owner.
 - Human-facing documentation may state an approved product name for clarity, but operational
   instructions must reference the canonical configuration key or environment variable instead of
   introducing another value. Until values are defined, use explicit metavariables such as
@@ -717,6 +1379,29 @@ handles.
 - Names and authoritative documentation URLs for external tools, protocols, providers, and
   dependencies may remain literal when they identify the referenced external system rather than this
   project's identity or deployment.
+- Verification must prove that the configured identity can be replaced without domain-code edits and
+  that tracked product-facing surfaces contain neither CodexRig branding nor duplicated current
+  identity values. Generated package/repository names are build-time projections of the one creation
+  input and must never become runtime branding fallbacks.
+
+## Licensing And Attribution
+
+`LICENSE` contains the unmodified PolyForm Noncommercial License 1.0.0, and `NOTICE` contains the
+controlling CodexRig Required Notice. Every noncommercial CodexRig copy, distribution, derivative
+work, and generated project must retain both files, the Zoran Kikic author credit, and the CodexRig
+Framework credit. They are managed portable framework inputs: project creation, receipt-backed
+upgrade, setup, verification, completed-goal housekeeping, and export validation fail closed when
+they are missing, altered, or no longer managed.
+
+The standard license grants no commercial-use right. Commercial use requires a separate express
+written license from Zoran Kikic. CodexRig itself always retains its license, author credit, and
+framework credit. A separate written commercial license may expressly permit those credits to be
+removed only from the specifically licensed project generated by CodexRig; noncommercial use never
+permits removal. Do not infer a commercial grant or waiver from an inquiry, negotiation,
+contribution, or payment. Product-facing runtime and UI remain white-label: required attribution is
+developer-/source-facing unless a separate agreement or applicable law requires another placement.
+Run `pnpm license:check` after any licensing, package, generator, transfer, upgrade, README, or
+NOTICE change.
 
 ## Security And Privacy
 
@@ -727,34 +1412,243 @@ handles.
   defaults.
 - Keep generated/local state, secrets, symlinks, dependencies, archives, and build output outside
   retrieval and portable exports.
+- Critical-budget prompt files under ignored `tmp/codexrig-handovers/` may contain a bounded private
+  work snapshot. Never commit, publish, export, semantically index, quote into startup context, or
+  use one before the developer explicitly accepts the exact recent repository-bound candidate.
 - The supported Codex home is ignored `.codex/runtime/` below the canonical repository root, never
   the root itself or the user's global Codex home. Portable project defaults live in tracked
-  `.codex/`; mutable authentication, trust, sessions, logs, memories, caches, plugins, runtime
-  skills, history, installation/model metadata, and Codex databases remain there and must not enter
-  Git or any project-source consumer. Legacy loose root paths are cleanup quarantine only.
+  `.codex/`; mutable authentication, trust, approval rules, sessions, logs, memories, caches,
+  plugins, runtime skills, history, installation/model metadata, and Codex databases remain there
+  and must not enter Git or any project-source consumer. Legacy loose root paths are cleanup
+  quarantine only.
 - Use a focused security review only when changes affect trust, auth, secrets, user data,
   dependencies, shell execution, CI, infrastructure, or runtime configuration.
 
-## Subagents
+## Subagent Orchestration And Integration Authority
+
+### Admission, Intelligence, And Provenance
 
 Subagents are a concurrency tool, not a default task ritual. Use them only when at least two
 substantial, independent slices can proceed without shared module, contract, schema, migration, or
-file conflicts and the saved critical-path time clearly outweighs coordination and integration. Give
-each a bounded, non-overlapping read scope or declared write set with one write owner, and keep
-integration with the primary. Prefer parallel discovery, review, test diagnosis, and other
-read-heavy work; parallel write-heavy work requires disjoint declared modules. Configured
-concurrency is a ceiling, not a target: keep small or tightly coupled work with the primary, and
-never create agents merely to duplicate deterministic shell gates.
+file conflicts and the saved critical-path time clearly outweighs coordination, token cost, and
+integration. Configured concurrency is a ceiling, not a target: by default the primary may have at
+most four live subagent threads and may start at most four in one coordination wave, excluding the
+primary. Use fewer whenever independence, isolation, budget, or integration capacity is weaker. More
+requires an explicit user override for the current outcome plus a fresh budget and conflict check;
+never persist that override by silently raising the repository default. Subagents never spawn or
+delegate to further agents.
 
-Project roles under `.codex/agents/` use the current second-tier model (`gpt-5.6-terra`) and inherit
-the primary's configured reasoning effort (`max` by default, or explicitly selected
-`xhigh`/`ultra`). If that tier is unavailable or no longer second in the installed catalog, keep the
-work with the primary and report the mismatch.
+This authority is injected as well as documented. Root `developer_instructions` in tracked
+`.codex/config.toml` bind the primary orchestrator, ownership/provenance boundary, intelligence
+parity, critical drain, and terminal handover stop. The same file's `[agents]` table owns the exact
+global Sol/`ultra` defaults and four-thread ceiling; project-scoped `.codex/agents/*.toml` layers
+inject the bounded role behavior into spawned sessions. Never pass a model or reasoning override at
+spawn. `pnpm codex:validate` fails closed when the primary policy, role policy, permissions, or
+exact primary/subagent intelligence pair is missing or divergent.
 
-The primary owns `.codex/config.toml`, `.codex/agents/**`, `AGENTS.md`, this file,
-`.agents/skills/**`, `.codex/skills/**`, and skill/subagent metadata. Subagents may inspect but not
-edit those surfaces. Delegated agents report whole-repository impact to the primary but do not
-commit or push; goal integration and publication remain primary-thread responsibilities.
+Before using a returned agent identity, the primary records it in a session-local ownership registry
+with the repository realpath and stable repository identity, primary session/thread identity,
+canonical task path, declared scope, isolated checkout, and exact identity returned by spawn. An
+account or host may run many unrelated projects and therefore expose foreign agents through a broad
+listing. Such a listing is untrusted discovery only: count, message, follow up, interrupt, or close
+an agent only when every provenance field matches this primary's registry. A matching name, idle
+state, model, account, or worktree label is never sufficient. An incomplete, stale, reused, or
+ambiguous identity fails closed—leave it untouched and resolve ownership through the appropriate
+repository/session coordination channel. Foreign agents never consume this task's four-agent limit,
+never release its ownership claims, and never receive this project's context. Direct peer exchange
+uses the same registry and may name only confirmed owned agents.
+
+Before starting an asynchronous process, detached command, or other background tool job, the primary
+adds it to the same session-local ownership registry with repository realpath/stable identity,
+primary session identity, purpose and bounded scope, the exact returned process/session identity,
+expected checkpoint, declared safe-boundary behavior, and cancellation method. Host- or account-wide
+process listings are discovery only. Signal, poll, cancel, or terminate a background task only on a
+complete provenance match; leave foreign and ambiguous processes untouched.
+
+### Capacity Admission And Monitoring
+
+Before every spawn and follow-up, the primary performs an admission check from the most current
+usage signals the host exposes: absolute or percentage remaining tokens/capacity, context and goal
+budgets, completion budget, rate-limit windows, and confirmed additive or redeem/reset credits.
+Treat each signal according to its declared unit and scope. Never assume a daily, weekly, renewable,
+windowed, or percentage-based quota, and do not invent a denominator or precision when a signal is
+unavailable. Reserve enough capacity for primary integration, conflict repair, affected
+verification, reviews, documentation reconciliation, final audit, and user handoff; then assign each
+active/new agent a bounded worst-case work envelope plus handoff reserve and a safety margin. Start
+or continue the agent only when confirmed remaining capacity—including only genuinely available
+redeem capacity—covers all envelopes and the primary reserve. Unknown or marginal capacity means no
+new agent. Never consume a redeem/reset credit without authority; after a permitted redemption,
+refresh the actual limits before admitting work.
+
+Classify current capacity as `healthy`, `guarded`, or `critical` from the most constraining current
+host signal rather than one model-specific counter or billing period. If the host exposes a reliable
+remaining percentage for the binding total allocation, regardless of whether that allocation is a
+token pool or a time window, `10%` or less is guarded and `5%` or less is unconditionally critical.
+Compare an absolute remaining token or credit amount directly with the bounded envelopes and primary
+completion reserve: capacity is guarded when current work remains finishable but the next optional
+slice plus its reserve is doubtful, and critical when the primary completion reserve itself is not
+covered. A host-provided critical/exhaustion warning is critical regardless of units or counter
+names. Treat redeem/reset capacity as zero until it is both actually available and authorized. Never
+sum counters unless the host identifies them as additive, average a healthy counter with an
+exhausted one, infer an unknown percentage, or assume a future reset will arrive in time.
+
+Budget monitoring is event-driven and slice-gated. Re-evaluate before every spawn or follow-up,
+after every material tool or agent result, on a material scope or assumption change, after a long
+wait, and immediately when the host changes a usage counter or emits a budget warning. Every active
+subagent has a task-appropriate expected checkpoint. Unless a known long-running operation has an
+explicit later checkpoint, the primary allows no more than ten minutes of active delegation without
+a budget/agent heartbeat. At every completed slice, perform a hard budget, primary-reserve,
+live-agent, handoff, and ownership check before admitting the next slice. Completed-goal
+housekeeping performs the deeper lifecycle cleanup and documentation/audit gates, but it is not the
+first budget trigger. Stop/Resume validates preserved state; it must never be the first time low
+capacity is noticed.
+
+### Guarded And Critical Drain
+
+In guarded state, shorten checkpoints, stop optional exploration, avoid new nonessential delegation,
+and start no broad slice whose bounded completion plus integration reserve is doubtful. Treat entry
+into guarded state as a likely cross-session outcome for Compact Project Memory: create or refresh
+the single bounded `docs/project-context.md` immediately, then increment its revision after each
+material result while guarded or critical. Below its fixed marker, replace the current resume
+summary with the authorized outcome/current goal and slice, last coherent repository basis, affected
+modules/contracts/data/files, accepted decisions and assumptions, exact checks/results, remaining
+work and blockers, agent handoffs plus released ownership, and the next safe command or action.
+Record the observed budget category, timestamp, and available host signal without account identity,
+credentials, or invented precision. Do not create another status file or append a log. In critical
+state, the primary starts no subagent, background task, new slice, or scope-expanding follow-up. It
+cancels queued or obsolete owned work, requests immediate safe checkpoints and coherent handoffs
+from active owned agents and jobs, lets only an already-running non-interruptible atomic section
+reach its declared safe boundary, accepts or records every result, then closes or terminates each
+provenance-bound owned agent and task and verifies that none remain. Foreign or ambiguous agents and
+processes are never contacted, signalled, interrupted, or changed. When independent accounts or
+clones are in scope, the primary sends the same bounded state change and released ownership claims
+through the previously confirmed shared coordination channel; a local context file or quiet Git
+state is not sufficient across that boundary.
+
+The primary then stops scope expansion, optional research, speculative refactors, and non-required
+broad verification; it prioritizes the user-visible critical path, an internally consistent
+repository, required safety/data checks, current plan/context truth, and a precise resumable
+handoff. Dev's developer-first latest-wins delivery priority still applies, but low budget never
+justifies an unsafe partial external change or false completion claim. After every owned agent and
+task has drained, replace the current prose in `docs/project-context.md`, increment its marker
+revision, and include these exact lines:
+
+```text
+## Critical Budget Drain
+- Owned subagents: none live; all handoffs are accepted or recorded.
+- Owned background tasks: none live; queued work is cancelled and atomic sections are complete.
+- Foreign agents and tasks: not contacted, interrupted, or changed.
+```
+
+Run `pnpm handover:create -- --critical` only after that attestation is true, and make it the final
+repository action of the session. The command atomically writes and re-reads one private English,
+repository-bound prompt under ignored `tmp/codexrig-handovers/`. A successful seal is an absolute
+terminal boundary: do not call another tool, run a check or housekeeping step, start or continue a
+task/slice, send a follow-up or agent message, or allow the Stop hook to continue automatically.
+Return only the concise user-facing handover path and stop completely. A failed seal is not a stop
+claim; repair only the bounded sealing prerequisite while capacity safely permits, otherwise report
+the concrete blocker without inventing a successful handover.
+
+The primary and every subagent re-check usage after discovery, a material scope change, a long tool
+result, and before any follow-up. When an envelope or completion reserve is threatened, stop
+exploration, leave the isolated worktree coherent, and hand off immediately. A handoff names the
+checkout/root and assigned scope, changed and untracked files, exact checks and results, remaining
+work, assumptions, risks/blocker, token state when observable, and the safest next action. Never let
+an interrupted delegated stream leave unexplained partial edits.
+
+### Agent Lifecycle And Idle Cleanup
+
+Every spawn also receives an expected next checkpoint based on its bounded task. The primary checks
+its provenance-bound owned-agent inventory at each checkpoint, after material tool waits or
+handoffs, before admitting another agent, and as the session-side first step of completed-goal
+housekeeping. A subagent reports completion or blockage, but the primary alone closes or interrupts
+it after accepting, rejecting, or preserving its handoff. The primary then tells every affected
+active agent what result was accepted, which contracts/files or assumptions changed, what work
+remains, and that the slot and ownership claim were released. An idle agent with no concrete next
+bounded assignment is closed instead of being retained for speculative reuse. If an agent misses its
+task-appropriate checkpoint, request one concise status/handoff; close it when that produces no
+concrete progress, coherent recoverable state, or justified next checkpoint. Do not apply a blind
+wall-clock timeout to a known long-running tool, but do not let silent, blocked, abandoned,
+redundant, or completed agents accumulate. Before final handoff, the primary confirms that no
+unneeded owned subagent remains. Repository `repo:housekeeping` verifies the portable agent policy.
+Only the primary owns host-session agent cleanup because repository scripts cannot enumerate,
+communicate with, or terminate Codex conversations.
+
+### Peer Coordination
+
+When the harness supports direct agent messaging, the primary gives each delegated task the
+identities and declared scopes of any relevant active peers. Those peers may communicate directly
+without routing every message through the primary, but only for bounded factual evidence, status,
+public-contract implications, dependency readiness, and overlap or risk warnings. Direct peer
+communication is coordination, not delegation or authority: a peer cannot assign or expand scope,
+change ownership/order, accept a handoff, release a claim, direct writes, decide integration, or
+close/interrupt another agent. Mirror every direct peer message and response to the primary
+immediately with the participating agent/task identities, topic, complete relevant content or a
+lossless structured summary, outcome, open questions, and any scope/contract/risk implication; the
+primary must always know that the exchange occurred. If the harness cannot reliably deliver that
+visibility, route the exchange through the primary instead of using a direct peer channel. The
+primary acknowledges or corrects the result, resolves every consequential disagreement, and keeps
+the authoritative plan, ownership map, and agent graph current. Keep peer messages bounded and
+budget-aware; a message never authorizes a write or external mutation that the original task did
+not.
+
+### Effective Permissions And Write Isolation
+
+Treat each role's checked-in `sandbox_mode` as a requested least-privilege default, never as
+evidence of the spawned session's effective permissions. Codex reapplies a parent turn's live
+permission overrides—including YOLO—to children even when their role file requests a narrower
+sandbox. Before the child uses any repository tool, require it to report its effective sandbox,
+approval, network, and checkout scope; compare those facts with the selected role and the primary's
+live permission choice. `default` and `explorer` remain read-only and stop before repository tools
+when a live override is broader. A deliberately selected `worker` may accept this same primary
+turn's already-authorized YOLO/danger-full-access override only when its task records the canonical
+repository root and exact disjoint write set. That inheritance never grants a new scope, network,
+credential, external-mutation, commit, push, publication, deployment, or delegation authority. Any
+other mismatch, uncertain provenance, or overlapping ownership stops delegated repository work.
+Prompt obedience, a role filename, and a quiet worktree are not mechanical isolation.
+
+Read-only discovery, review, and diagnosis may run broadly in parallel. A writing subagent is
+allowed only as the explicit `worker` role with one canonical checkout root, one disjoint
+module/contract/data/file write set, and no shared generated artifacts, caches, ports, schemas, or
+credentials. Across accounts, machines, or independent sessions, the primary creates a dedicated
+temporary worktree or clone and uses a confirmed shared coordination channel. Within one local
+primary-owned multi-agent run, a shared checkout is allowed only when exact file ownership is
+disjoint, all writers report it before tools, and the primary continuously monitors changes and
+halts overlap before integration. This is logical isolation, not a filesystem security boundary. The
+primary owns worktree or clone creation when used, branch state, credentials, integration, and
+cleanup. If the harness cannot establish either boundary or the permission provenance is uncertain,
+the worker performs no repository work and the primary writes.
+
+### Intelligence Parity And Integration Authority
+
+The primary and every role under `.codex/agents/` must use exactly the same configured GPT Sol model
+and `ultra` reasoning. `.codex/config.toml` is the intelligence source of truth and pins both global
+delegated defaults to the primary; validation fails closed on any default, role-model, or reasoning
+mismatch. Never pass a different model or effort in a spawn override. No secondary tier, cheaper
+model, lower reasoning level, or silent fallback is allowed. A future GPT Sol version may replace
+the current one only when the primary config, global subagent default, and every role move to that
+exact model in the same change and the installed model catalog confirms `ultra` support. If the
+active harness cannot guarantee that exact parity, do not delegate. `explorer` and `default` are
+explicitly read-only. `worker` requests `workspace-write` with command network disabled, while an
+explicitly inherited primary YOLO override is governed by the narrower task authority above;
+protected Git, Codex, agent-policy, out-of-scope, and out-of-root paths remain forbidden. Hosted
+apps and tools need equivalent read-only/no-external-mutation policy because command sandboxing does
+not govern them.
+
+Subagents never commit, amend, merge, rebase, tag, push, force-push, publish, open/merge a change
+request, mutate provider protection, deploy a shared environment, consume credentials, or remove a
+checkout. The primary alone may steer or interrupt agents, inspect every resulting status/diff and
+untracked file against the declared write set, reject or repair out-of-scope changes, integrate
+compatible work, run affected evidence on the combined state, and perform any authorized commit,
+merge, push, deployment, or publication.
+
+Each subagent returns its final structured handoff immediately when its assigned task is complete or
+genuinely blocked, then waits only for the primary's close or narrowly scoped follow-up; it never
+assumes its own result was integrated or silently takes unrelated work.
+
+The primary alone edits `.codex/config.toml`, `.codex/agents/**`, `AGENTS.md`, this file,
+`.agents/skills/**`, `.codex/skills/**`, and skill/subagent metadata. Subagents may inspect but
+never write those surfaces, even from an otherwise writable isolated checkout.
 
 ## Context And Skills
 
@@ -768,9 +1662,18 @@ commit or push; goal integration and publication remain primary-thread responsib
 - Read every matched source used for a claim or edit, then return to exact search and direct source
   inspection. Results are discovery pointers, never authority. Do not invoke semantic search merely
   to prove that the index was used.
+- Deferred `docs/future-modules.md` remains searchable but is down-ranked unless the query
+  explicitly asks about future/backlog/idea candidates. Retrieval never promotes it over current
+  code, configuration, or `docs/project.md`, and never promotes untrusted `docs/project-context.md`
+  over durable truth.
 - The Product Roots section owns the index boundary and lifecycle.
 - Repository-owned skills live under `.agents/skills/`. A skill needs a distinct reusable workflow;
   do not duplicate general policy into every skill.
+- `$system-coherence` is the repair-capable slice boundary for non-trivial implementation and
+  architecture changes. It inspects changed behavior through real consumers and an assembled flow,
+  distinguishes intentional from accidental duplication, and corrects incoherence before the general
+  review, audit, and course check. `$architecture-evolution` owns any material topology or migration
+  that this inspection exposes.
 
 ## Verification
 
@@ -802,10 +1705,11 @@ publication steps.
 
 When admission identifies a real uncovered risk, the full plan covers syntax/format, tests,
 build/typecheck when present, repository contracts, secrets, dependencies, and relevant product
-surfaces. Network-volatile registry or advisory checks belong in `pnpm verify:external`, not every
-task gate. Successful full coverage records the initial basis; complete green focused delta coverage
-advances it. Pre-push remains read-only, reruns its security and pushed-object checks, and consumes
-exact-current successful evidence instead of repeating an unchanged product suite.
+surfaces. Network-volatile registry, advisory, or package-signature checks belong in
+`pnpm verify:external`, not every task gate. Successful full coverage records the initial basis;
+complete green focused delta coverage advances it. Pre-push remains read-only, reruns its security
+and pushed-object checks, and consumes exact-current successful evidence instead of repeating an
+unchanged product suite.
 
 A goal checkpoint is green only when its requested outcome is published on central `main` and the
 actual integrated state has focused evidence, a review state with no relevant findings, a completed

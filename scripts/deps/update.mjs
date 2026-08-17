@@ -1,3 +1,4 @@
+/** Owns update behavior for the dependency and toolchain maintenance boundary. */
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
@@ -25,10 +26,18 @@ function splitList(value) {
     .filter(Boolean);
 }
 
-function parseArgs(argv) {
-  const args = { level: "patch", select: [], yes: false, allowMajor: false, includePinned: false };
+export function parseDependencyUpdateArgs(argv) {
+  const args = {
+    level: "patch",
+    select: [],
+    yes: false,
+    allowMajor: false,
+    includePinned: false,
+    planHash: null,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
+    if (value === "--") continue;
     if (value === "--yes" || value === "-y") args.yes = true;
     else if (value === "--allow-major") args.allowMajor = true;
     else if (value === "--include-pinned") args.includePinned = true;
@@ -36,11 +45,22 @@ function parseArgs(argv) {
     else if (value.startsWith("--level=")) args.level = value.slice(8);
     else if (value === "--select") args.select.push(...splitList(argv[++index] ?? ""));
     else if (value.startsWith("--select=")) args.select.push(...splitList(value.slice(9)));
+    else if (value === "--plan-hash") args.planHash = argv[++index] ?? "";
+    else if (value.startsWith("--plan-hash=")) args.planHash = value.slice(12);
     else if (value === "--help" || value === "-h") args.help = true;
     else throw new Error(`unknown argument ${value}`);
   }
   if (!["patch", "minor", "major", "all"].includes(args.level)) {
     throw new Error("--level must be patch, minor, major, or all");
+  }
+  if (args.planHash !== null && !/^[a-f0-9]{64}$/u.test(args.planHash)) {
+    throw new Error("--plan-hash must be the 64-character SHA-256 printed by the preview");
+  }
+  if (args.yes && !args.planHash) {
+    throw new Error("--yes requires the exact --plan-hash printed by the reviewed preview");
+  }
+  if (!args.yes && args.planHash) {
+    throw new Error("--plan-hash is accepted only together with --yes");
   }
   return args;
 }
@@ -49,10 +69,10 @@ function usage() {
   return [
     "Usage:",
     "  pnpm deps:update:patch",
-    "  pnpm deps:update -- --select <manifest>:<section>:<package> --level minor --yes",
-    "  pnpm deps:update -- --select <manifest>:<section>:<package> --level major --allow-major --yes",
+    "  pnpm deps:update -- --select <manifest>:<section>:<package> --level minor --yes --plan-hash <sha256>",
+    "  pnpm deps:update -- --select <manifest>:<section>:<package> --level major --allow-major --yes --plan-hash <sha256>",
     "",
-    "Omit --yes to create a reviewed immutable preview. Apply the same preview with --yes.",
+    "Omit --yes to create a reviewed immutable preview. Apply only with --yes and its printed --plan-hash.",
   ].join("\n");
 }
 
@@ -100,7 +120,7 @@ function targetFor(entry, args, selected) {
 }
 
 function main() {
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseDependencyUpdateArgs(process.argv.slice(2));
   if (args.help) {
     console.log(usage());
     return;
@@ -110,7 +130,11 @@ function main() {
   }
   const request = normalizeDependencyRequest(args);
   if (args.yes) {
-    const result = applyStoredDependencyPlan({ projectRoot: root, request });
+    const result = applyStoredDependencyPlan({
+      projectRoot: root,
+      request,
+      planHash: args.planHash,
+    });
     if (result.recovered) console.log(`Recovered prior transaction: ${result.recovered}.`);
     console.log(`Applied reviewed dependency plan ${result.planHash}.`);
     console.log(`Updated manifests: ${result.changed.join(", ")}`);
@@ -165,7 +189,9 @@ function main() {
   });
   console.log(`Reviewed plan: ${plan.hash}`);
   console.log("Stored at .project-state/dependency-update/plan.json for exact review.");
-  console.log("Preview only; rerun with the same options plus --yes to apply this exact plan.");
+  console.log(
+    `Preview only; rerun with the same options plus --yes --plan-hash ${plan.hash} to apply this exact plan.`,
+  );
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

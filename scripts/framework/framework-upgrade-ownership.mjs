@@ -1,60 +1,45 @@
-import { existsSync, lstatSync, mkdirSync, readdirSync, rmSync } from "node:fs";
-import path from "node:path";
+/** Owns explicit framework-to-dependency lifecycle delegation for child upgrade refreshes. */
+import { realpathSync } from "node:fs";
 import process from "node:process";
-import { resolveFrameworkPath } from "./framework-contract.mjs";
+import {
+  adoptRuntimeLifecycleDelegation,
+  releaseRuntimeLifecycleLock,
+} from "../repository/runtime-session-lease.mjs";
 
-const dependencyOwnerPattern = /^dependency-(\d+)$/u;
-
-function ownerIsAlive(pid) {
-  if (!Number.isSafeInteger(pid) || pid <= 0 || pid === process.pid) return pid === process.pid;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return error?.code === "EPERM";
-  }
-}
-
-function lockRoot(root) {
-  return resolveFrameworkPath(root, ".project-state/framework-upgrade/lock");
-}
-
-function safeLockRoot(root, { required = false } = {}) {
-  const directory = lockRoot(root);
-  if (!existsSync(directory)) {
-    if (required) throw new Error("Framework upgrade lock directory is missing.");
-    return null;
-  }
-  const stats = lstatSync(directory);
-  if (stats.isSymbolicLink() || !stats.isDirectory()) {
-    throw new Error("Framework upgrade lock path must be a real directory.");
-  }
-  return directory;
-}
-
-export function dependencyRefreshIsActive(root) {
-  const directory = safeLockRoot(root);
-  if (!directory) return false;
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    const match = entry.name.match(dependencyOwnerPattern);
-    if (!match) continue;
-    if (!entry.isDirectory()) {
-      throw new Error("Framework upgrade dependency owner is unsafe.");
-    }
-    if (ownerIsAlive(Number(match[1]))) return true;
-  }
-  return false;
-}
+const delegationVariables = Object.freeze({
+  operation: "CODEXRIG_LIFECYCLE_DELEGATION_OPERATION",
+  role: "CODEXRIG_LIFECYCLE_DELEGATION_ROLE",
+  root: "CODEXRIG_LIFECYCLE_DELEGATION_ROOT",
+  token: "CODEXRIG_LIFECYCLE_DELEGATION_TOKEN",
+});
 
 export function claimDependencyRefresh(root) {
-  const directory = safeLockRoot(root, { required: true });
-  const owner = path.join(directory, `dependency-${process.pid}`);
-  mkdirSync(owner, { mode: 0o700 });
+  const canonical = realpathSync.native(root);
+  const delegatedRoot = process.env[delegationVariables.root]?.trim();
+  const operation = process.env[delegationVariables.operation]?.trim();
+  const role = process.env[delegationVariables.role]?.trim();
+  const token = process.env[delegationVariables.token]?.trim();
+  if (
+    !delegatedRoot ||
+    realpathSync.native(delegatedRoot) !== canonical ||
+    operation !== "dependency" ||
+    role !== "framework-dependency" ||
+    !token
+  ) {
+    throw new Error("Framework dependency refresh requires its exact lifecycle delegation.");
+  }
+  const lifecycleCapability = adoptRuntimeLifecycleDelegation({
+    root: canonical,
+    operation,
+    role,
+    token,
+  });
   let released = false;
   return Object.freeze({
+    lifecycleCapability,
     release() {
       if (released) return;
-      rmSync(owner, { recursive: false });
+      releaseRuntimeLifecycleLock({ root: canonical, owner: lifecycleCapability });
       released = true;
     },
   });

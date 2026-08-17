@@ -1,3 +1,4 @@
+/** Owns skill paths behavior for the repository verification boundary. */
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";

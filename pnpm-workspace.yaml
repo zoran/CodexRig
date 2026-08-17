@@ -3,6 +3,10 @@ packages:
   - "services/*"
   - "packages/*"
 verifyDepsBeforeRun: error
+ignorePnpmfile: true
+# pnpm 11.22 requires an explicit empty hook list when dependency-status verification and
+# ignorePnpmfile are both enabled; the executable-config verifier permits only this empty value.
+pnpmfile: []
 # Compatible refreshes fail instead of accepting invalid peers or packages that exclude the
 # mise-pinned Node.js runtime.
 strictPeerDependencies: true

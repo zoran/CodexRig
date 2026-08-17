@@ -1,3 +1,4 @@
+/** Owns source inventory policy behavior for the repository inventory and filesystem boundary. */
 import path from "node:path";
 
 export const repositoryCodexRuntimeDirectory = ".codex/runtime";
@@ -46,6 +47,7 @@ export const repositoryCodexHomeRuntimeDirectoryNames = Object.freeze([
   "logs",
   "memories",
   "plugins",
+  "rules",
   "sessions",
   "shell_snapshots",
   "skills",
@@ -103,6 +105,7 @@ export const repositoryCodexHomeRuntimeProbePaths = Object.freeze([
 export const repositoryCodexHomeProtectedGitignoreProbePaths = Object.freeze([
   ...repositoryCodexHomeRuntimeDirectoryNames.flatMap((name) => [name, `${name}/runtime-state`]),
   ...repositoryCodexHomeRuntimeProbePaths.slice(repositoryCodexHomeRuntimeDirectoryNames.length),
+  "rules/default.rules",
   ".codex/auth.json",
   ".codex/cache/runtime-state",
   ".codex/sessions/runtime-state",

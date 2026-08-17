@@ -1,4 +1,5 @@
 #!/bin/sh
+# Owns pre push behavior for the root-bound Git hook boundary.
 # Managed by this repository; installed by hooks:install.
 set -eu
 
@@ -10,7 +11,15 @@ if [ "$script_dir" != "$root/scripts/git-hooks" ] || [ ! -f "$root/scripts/verif
 fi
 
 git_exec_path="${GIT_EXEC_PATH-}"
-unset BASH_ENV ENV NODE_OPTIONS NODE_PATH
+unset BASH_ENV ENV NODE_OPTIONS NODE_PATH \
+  NPM_CONFIG_SCRIPT_SHELL PNPM_CONFIG_SCRIPT_SHELL \
+  npm_config_script_shell pnpm_config_script_shell \
+  NPM_CONFIG_VERIFY_DEPS_BEFORE_RUN PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN \
+  npm_config_verify_deps_before_run pnpm_config_verify_deps_before_run
+export NPM_CONFIG_IGNORE_PNPMFILE=true
+export PNPM_CONFIG_IGNORE_PNPMFILE=true
+export npm_config_ignore_pnpmfile=true
+export pnpm_config_ignore_pnpmfile=true
 for git_name in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do
   unset "$git_name"
 done
@@ -25,4 +34,5 @@ if [ -n "$git_exec_path" ]; then
 fi
 
 cd "$root"
-exec mise exec --locked -- pnpm verify:pre-push -- "$@"
+mise exec --locked -- node scripts/deps/verify-pnpm-execution-policy.mjs
+exec mise exec --locked -- sh scripts/verify/pre-push.sh "$@"

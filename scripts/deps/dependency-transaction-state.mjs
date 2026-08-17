@@ -1,50 +1,34 @@
+/** Owns dependency transaction state behavior for the dependency and toolchain maintenance boundary. */
 import { randomUUID } from "node:crypto";
-import {
-  chmodSync,
-  closeSync,
-  existsSync,
-  fsyncSync,
-  lstatSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  renameSync,
-  rmdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
-import os from "node:os";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { DependencyTransactionError, projectIdentity } from "./dependency-inputs.mjs";
-
-const defaultStaleMilliseconds = 30 * 60 * 1000;
-
-function ensureRealDirectory(directory, mode = 0o700) {
-  if (!existsSync(directory)) {
-    try {
-      mkdirSync(directory, { mode });
-    } catch (error) {
-      if (error?.code !== "EEXIST") throw error;
-    }
-  }
-  const stats = lstatSync(directory);
-  if (stats.isSymbolicLink() || !stats.isDirectory()) {
-    throw new DependencyTransactionError(
-      `Transaction state path must be a real directory: ${directory}`,
-    );
-  }
-  chmodSync(directory, mode);
-}
+import {
+  atomicWriteOwnedFile,
+  createExclusiveOwnedDirectory,
+  removeOwnedArtifact,
+  removeOwnedEmptyDirectory,
+  renameOwnedArtifact,
+} from "../filesystem/owned-file-operations.mjs";
+import {
+  closeOwnedDirectoryBinding,
+  ensureOwnedPrivateDirectory,
+  openPrivateOwnedDirectory,
+  readStableOwnedFile,
+} from "../filesystem/owned-path-safety.mjs";
+import {
+  acquireRuntimeLifecycleLock,
+  releaseRuntimeLifecycleLock,
+  retainRuntimeLifecycleLock,
+} from "../repository/runtime-session-lease.mjs";
 
 export function dependencyTransactionPaths(projectRoot) {
   const { root } = projectIdentity(projectRoot);
   const projectState = path.join(root, ".project-state");
   const state = path.join(projectState, "dependency-update");
-  ensureRealDirectory(projectState);
-  ensureRealDirectory(state);
   return {
+    root,
     state,
     plan: path.join(state, "plan.json"),
     journal: path.join(state, "journal.json"),
@@ -52,125 +36,244 @@ export function dependencyTransactionPaths(projectRoot) {
   };
 }
 
-export function atomicWrite(filePath, content, mode = 0o600) {
-  const parent = path.dirname(filePath);
-  const parentStats = lstatSync(parent);
-  if (parentStats.isSymbolicLink() || !parentStats.isDirectory()) {
-    throw new DependencyTransactionError(`Unsafe transaction output directory: ${parent}`);
-  }
-  if (existsSync(filePath) && lstatSync(filePath).isSymbolicLink()) {
-    throw new DependencyTransactionError(`Refusing symlinked transaction output: ${filePath}`);
-  }
-  const temporaryPath = path.join(
-    parent,
-    `.${path.basename(filePath)}.${process.pid}.${randomUUID()}`,
-  );
-  const descriptor = openSync(temporaryPath, "wx", mode);
-  try {
-    writeFileSync(descriptor, content, "utf8");
-    fsyncSync(descriptor);
-  } finally {
-    closeSync(descriptor);
-  }
-  try {
-    renameSync(temporaryPath, filePath);
-  } finally {
-    rmSync(temporaryPath, { force: true });
-  }
+function ensureDependencyTransactionState(paths) {
+  ensureOwnedPrivateDirectory(paths.root, path.dirname(paths.state), "dependency project state");
+  ensureOwnedPrivateDirectory(paths.root, paths.state, "dependency transaction state");
 }
 
-export function readJsonFile(filePath, label) {
-  if (!existsSync(filePath)) throw new DependencyTransactionError(`Missing ${label}.`);
-  const stats = lstatSync(filePath);
-  if (stats.isSymbolicLink() || !stats.isFile()) {
-    throw new DependencyTransactionError(`${label} must be a real file.`);
-  }
+export function atomicWrite(projectRoot, filePath, content, mode = 0o600, options = {}) {
   try {
-    return JSON.parse(readFileSync(filePath, "utf8"));
-  } catch {
-    throw new DependencyTransactionError(`${label} contains invalid JSON.`);
-  }
-}
-
-function processIsAlive(pid) {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
+    return atomicWriteOwnedFile(projectRoot, filePath, content, mode, {
+      label: options.label ?? "dependency transaction output",
+      testHooks: options.testHooks,
+    });
   } catch (error) {
-    return error?.code === "EPERM";
+    throw new DependencyTransactionError(error.message, 75);
   }
 }
 
-function readLockOwner(lockDirectory) {
+export function readJsonFile(projectRoot, filePath, label) {
+  const directory = openPrivateOwnedDirectory(
+    projectRoot,
+    path.dirname(filePath),
+    `${label} parent`,
+  );
   try {
-    return JSON.parse(readFileSync(path.join(lockDirectory, "owner.json"), "utf8"));
-  } catch {
-    return null;
+    if (!existsSync(filePath)) throw new DependencyTransactionError(`Missing ${label}.`);
+    const snapshot = readStableOwnedFile(directory, path.basename(filePath), label, {
+      maximumBytes: 32 * 1024 * 1024,
+    });
+    try {
+      return JSON.parse(snapshot.buffer.toString("utf8"));
+    } catch {
+      throw new DependencyTransactionError(`${label} contains invalid JSON.`);
+    }
+  } finally {
+    closeOwnedDirectoryBinding(directory);
   }
 }
 
-function staleLock(lockDirectory, owner, staleMilliseconds) {
-  if (owner?.host === os.hostname() && Number.isInteger(owner?.pid)) {
-    return !processIsAlive(owner.pid);
+function validLockOwner(owner) {
+  return Boolean(
+    owner &&
+    typeof owner === "object" &&
+    !Array.isArray(owner) &&
+    Object.keys(owner).sort().join("\n") === "acquiredAt\nlifecycleNonce\npid\ntoken" &&
+    Number.isSafeInteger(owner.pid) &&
+    owner.pid > 0 &&
+    typeof owner.token === "string" &&
+    owner.token.length > 0 &&
+    !/[\0\r\n]/u.test(owner.token) &&
+    typeof owner.lifecycleNonce === "string" &&
+    /^[a-f0-9-]{36}$/u.test(owner.lifecycleNonce) &&
+    typeof owner.acquiredAt === "string" &&
+    Number.isFinite(Date.parse(owner.acquiredAt)),
+  );
+}
+
+function readLockState(projectRoot, lockDirectory) {
+  const directory = openPrivateOwnedDirectory(
+    projectRoot,
+    lockDirectory,
+    "dependency transaction lock",
+  );
+  try {
+    const snapshot = readStableOwnedFile(directory, "owner.json", "dependency transaction owner", {
+      maximumBytes: 4_096,
+    });
+    const owner = JSON.parse(snapshot.buffer.toString("utf8"));
+    return {
+      directoryIdentity: directory.stats,
+      owner: validLockOwner(owner) ? owner : null,
+    };
+  } catch {
+    return { directoryIdentity: directory.stats, owner: null };
+  } finally {
+    closeOwnedDirectoryBinding(directory);
   }
-  return Date.now() - statSync(lockDirectory).mtimeMs > staleMilliseconds;
 }
 
 export function acquireDependencyTransactionLock(projectRoot, options = {}) {
   const paths = dependencyTransactionPaths(projectRoot);
+  let lifecycleCapability;
+  try {
+    lifecycleCapability = options.lifecycleCapability
+      ? retainRuntimeLifecycleLock({
+          root: paths.root,
+          owner: options.lifecycleCapability,
+          operation: "dependency",
+        })
+      : acquireRuntimeLifecycleLock({ root: paths.root, operation: "dependency" });
+  } catch (error) {
+    throw new DependencyTransactionError(
+      `Dependency update cannot overlap another repository mutation: ${error.message}`,
+      75,
+    );
+  }
+  try {
+    ensureDependencyTransactionState(paths);
+  } catch (error) {
+    releaseRuntimeLifecycleLock({ root: paths.root, owner: lifecycleCapability });
+    throw error;
+  }
   const owner = {
     token: options.token ?? randomUUID(),
     pid: process.pid,
-    host: os.hostname(),
     acquiredAt: new Date().toISOString(),
+    lifecycleNonce: lifecycleCapability.nonce,
   };
-  const staleMilliseconds = options.staleMilliseconds ?? defaultStaleMilliseconds;
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    let created = false;
-    try {
-      mkdirSync(paths.lock, { mode: 0o700 });
-      created = true;
-      atomicWrite(path.join(paths.lock, "owner.json"), `${JSON.stringify(owner)}\n`);
-      return { path: paths.lock, owner };
-    } catch (error) {
-      if (created) {
-        rmSync(paths.lock, { recursive: true, force: true });
-        throw error;
-      }
-      if (error?.code !== "EEXIST") throw error;
-      const existing = readLockOwner(paths.lock);
-      if (!staleLock(paths.lock, existing, staleMilliseconds)) {
-        const summary = existing?.pid ? `process ${existing.pid}` : "another process";
-        throw new DependencyTransactionError(`Dependency update is locked by ${summary}.`, 75);
-      }
-      const quarantine = `${paths.lock}.stale-${randomUUID()}`;
-      renameSync(paths.lock, quarantine);
-      const quarantinedOwner = readLockOwner(quarantine);
-      if (quarantinedOwner?.token !== existing?.token) {
-        if (!existsSync(paths.lock)) renameSync(quarantine, paths.lock);
-        throw new DependencyTransactionError(
-          "Dependency lock ownership changed during stale-lock recovery.",
-          75,
+  try {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let created = false;
+      try {
+        createExclusiveOwnedDirectory(paths.root, paths.lock, "dependency transaction lock");
+        created = true;
+        atomicWrite(
+          paths.root,
+          path.join(paths.lock, "owner.json"),
+          `${JSON.stringify(owner)}\n`,
+          0o600,
+          { label: "dependency transaction owner" },
+        );
+        return Object.freeze({
+          lifecycleCapability,
+          owner: Object.freeze(owner),
+          path: paths.lock,
+          root: paths.root,
+        });
+      } catch (error) {
+        if (created) {
+          removeOwnedArtifact(
+            paths.root,
+            paths.lock,
+            "directory",
+            "failed dependency transaction lock",
+          );
+          throw error;
+        }
+        if (error?.code !== "EEXIST") throw error;
+        const existing = readLockState(paths.root, paths.lock);
+        if (!existing.owner) {
+          throw new DependencyTransactionError(
+            "Dependency update lock owner is invalid; manual recovery is required.",
+            75,
+          );
+        }
+        const belongsToCurrentCapability =
+          existing.owner?.lifecycleNonce === lifecycleCapability.nonce;
+        if (belongsToCurrentCapability) {
+          const summary = existing.owner?.pid ? `process ${existing.owner.pid}` : "another process";
+          throw new DependencyTransactionError(`Dependency update is locked by ${summary}.`, 75);
+        }
+        const quarantine = `${paths.lock}.stale-${randomUUID()}`;
+        renameOwnedArtifact(
+          paths.root,
+          paths.lock,
+          quarantine,
+          "directory",
+          "stale dependency transaction lock",
+          { expectedIdentity: existing.directoryIdentity },
+        );
+        const quarantined = readLockState(paths.root, quarantine);
+        if (quarantined.owner?.token !== existing.owner?.token) {
+          if (!existsSync(paths.lock)) {
+            renameOwnedArtifact(
+              paths.root,
+              quarantine,
+              paths.lock,
+              "directory",
+              "restored dependency transaction lock",
+              { expectedIdentity: quarantined.directoryIdentity },
+            );
+          }
+          throw new DependencyTransactionError(
+            "Dependency lock ownership changed during stale-lock recovery.",
+            75,
+          );
+        }
+        removeOwnedArtifact(
+          paths.root,
+          quarantine,
+          "directory",
+          "stale dependency transaction quarantine",
+          { expectedIdentity: quarantined.directoryIdentity },
         );
       }
-      rmSync(quarantine, { recursive: true, force: true });
     }
+    throw new DependencyTransactionError("Could not acquire the dependency update lock.", 75);
+  } catch (error) {
+    releaseRuntimeLifecycleLock({ root: paths.root, owner: lifecycleCapability });
+    throw error;
   }
-  throw new DependencyTransactionError("Could not acquire the dependency update lock.", 75);
 }
 
 export function releaseDependencyTransactionLock(handle) {
-  if (!handle || !existsSync(handle.path)) return;
-  const current = readLockOwner(handle.path);
-  if (current?.token !== handle.owner.token) {
+  if (!handle?.root) {
+    throw new DependencyTransactionError("Dependency lock handle is invalid.", 75);
+  }
+  const paths = dependencyTransactionPaths(handle.root);
+  if (handle.path !== paths.lock) {
+    throw new DependencyTransactionError(
+      "Dependency lock handle does not match its repository root.",
+      75,
+    );
+  }
+  if (!existsSync(handle.path)) {
+    throw new DependencyTransactionError(
+      "Dependency lock disappeared before lifecycle release.",
+      75,
+    );
+  }
+  const projectRoot = paths.root;
+  const current = readLockState(projectRoot, handle.path);
+  if (current.owner?.token !== handle.owner.token) {
     throw new DependencyTransactionError(
       "Dependency lock ownership changed; refusing to remove it.",
       75,
     );
   }
-  rmSync(handle.path, { recursive: true });
+  releaseRuntimeLifecycleLock({
+    root: projectRoot,
+    owner: handle.lifecycleCapability,
+    finalize() {
+      removeOwnedArtifact(projectRoot, handle.path, "directory", "dependency transaction lock", {
+        expectedIdentity: current.directoryIdentity,
+      });
+      const stateDirectory = path.dirname(handle.path);
+      for (const directory of [stateDirectory, path.dirname(stateDirectory)]) {
+        try {
+          removeOwnedEmptyDirectory(
+            path.dirname(path.dirname(stateDirectory)),
+            directory,
+            "empty dependency state",
+          );
+        } catch (error) {
+          if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error?.code)) throw error;
+        }
+      }
+    },
+  });
 }
 
 export function withDependencyTransactionLock(projectRoot, action, options = {}) {
@@ -179,13 +282,5 @@ export function withDependencyTransactionLock(projectRoot, action, options = {})
     return action(handle);
   } finally {
     releaseDependencyTransactionLock(handle);
-    const stateDirectory = path.dirname(handle.path);
-    for (const directory of [stateDirectory, path.dirname(stateDirectory)]) {
-      try {
-        rmdirSync(directory);
-      } catch (error) {
-        if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error?.code)) throw error;
-      }
-    }
   }
 }

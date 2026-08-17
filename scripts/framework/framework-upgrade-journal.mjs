@@ -1,19 +1,28 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+/** Owns framework upgrade journal behavior for the framework lifecycle and child upgrade boundary. */
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
-import process from "node:process";
 import {
   frameworkRoot,
   normalizeFrameworkPath,
   resolveFrameworkPath,
   serializeCanonicalJson,
   sha256,
-} from "./framework-contract.mjs";
+} from "../contracts/framework-contract.mjs";
 import {
   atomicWriteUpgradeFile,
   ensureUpgradeDirectoryChain,
   targetUpgradeFileState,
 } from "./framework-upgrade-io.mjs";
-import { dependencyRefreshIsActive } from "./framework-upgrade-ownership.mjs";
+import {
+  createExclusiveOwnedDirectory,
+  readOptionalOwnedFile,
+  removeOwnedArtifact,
+  removeOwnedRegularFile,
+} from "../filesystem/owned-file-operations.mjs";
+import {
+  acquireRuntimeLifecycleLock,
+  releaseRuntimeLifecycleLock,
+} from "../repository/runtime-session-lease.mjs";
 
 const journalRelativePath = ".project-state/framework-upgrade/journal.json";
 
@@ -40,6 +49,7 @@ export function frameworkUpgradeStatePaths(root) {
     lock: path.join(stateRoot, "lock"),
     owner: path.join(stateRoot, "lock", "owner.json"),
     root: stateRoot,
+    repositoryRoot: realpathSync.native(root),
   };
 }
 
@@ -123,15 +133,14 @@ function validateJournal(journal, expectedDigest) {
 
 export function readFrameworkUpgradeJournal(root, expectedDigest) {
   const journalPath = frameworkUpgradeStatePaths(root).journal;
-  if (!existsSync(journalPath)) {
+  const snapshot = readOptionalOwnedFile(root, journalPath, "framework upgrade journal", {
+    maximumBytes: 32 * 1024 * 1024,
+  });
+  if (!snapshot.exists) {
     throw new Error("Framework upgrade journal is missing; manual recovery is required.");
   }
-  const stats = lstatSync(journalPath);
-  if (stats.isSymbolicLink() || !stats.isFile() || stats.nlink !== 1) {
-    throw new Error("Framework upgrade journal is unsafe; manual recovery is required.");
-  }
   try {
-    return validateJournal(JSON.parse(readFileSync(journalPath, "utf8")), expectedDigest);
+    return validateJournal(JSON.parse(snapshot.buffer.toString("utf8")), expectedDigest);
   } catch (error) {
     if (/manual recovery is required/u.test(error.message)) throw error;
     throw new Error("Framework upgrade journal is invalid; manual recovery is required.");
@@ -159,17 +168,8 @@ export function authorizeFrameworkUpgradeOutput(journal, relativePath, allowedSh
 }
 
 function currentJournalState(root, original) {
-  const target = resolveFrameworkPath(root, original.path);
-  if (!existsSync(target)) return { exists: false, mode: null, sha256: null };
-  const stats = lstatSync(target);
-  if (stats.isSymbolicLink() || !stats.isFile() || stats.nlink !== 1) {
-    throw new Error("Framework upgrade recovery target is unsafe; manual recovery is required.");
-  }
-  return {
-    exists: true,
-    mode: stats.mode & 0o777,
-    sha256: sha256(readFileSync(target, "utf8")),
-  };
+  const state = targetUpgradeFileState(root, original.path);
+  return { exists: state.exists, mode: state.mode, sha256: state.sha256 };
 }
 
 export function restoreFrameworkUpgradeJournal(root, journal) {
@@ -196,75 +196,92 @@ export function restoreFrameworkUpgradeJournal(root, journal) {
       }
       atomicWriteUpgradeFile(root, original.path, content, original.mode);
     } else if (existsSync(target)) {
-      const stats = lstatSync(target);
-      if (stats.isSymbolicLink() || !stats.isFile() || stats.nlink !== 1) {
-        throw new Error(
-          "Framework upgrade recovery target is unsafe; manual recovery is required.",
-        );
-      }
-      rmSync(target);
+      removeOwnedRegularFile(root, target, `framework upgrade recovery ${original.path}`);
     }
-  }
-}
-
-function activeUpgradeOwner(paths) {
-  if (!existsSync(paths.owner)) return false;
-  let owner;
-  try {
-    owner = JSON.parse(readFileSync(paths.owner, "utf8"));
-  } catch {
-    return false;
-  }
-  if (!Number.isSafeInteger(owner?.pid) || owner.pid <= 0 || owner.pid === process.pid) {
-    return false;
-  }
-  try {
-    process.kill(owner.pid, 0);
-    return true;
-  } catch (error) {
-    return error?.code === "EPERM";
   }
 }
 
 export function beginFrameworkUpgrade(plan) {
   const paths = frameworkUpgradeStatePaths(plan.targetRoot);
-  ensureUpgradeDirectoryChain(plan.targetRoot, ".project-state/framework-upgrade");
+  const lifecycleCapability = acquireRuntimeLifecycleLock({
+    root: paths.repositoryRoot,
+    operation: "framework-upgrade",
+  });
+  let stateCreated = false;
   try {
-    mkdirSync(paths.lock, { mode: 0o700 });
+    ensureUpgradeDirectoryChain(plan.targetRoot, ".project-state/framework-upgrade");
+    createExclusiveOwnedDirectory(plan.targetRoot, paths.lock, "framework upgrade lock");
+    stateCreated = true;
   } catch (error) {
+    releaseRuntimeLifecycleLock({ root: paths.repositoryRoot, owner: lifecycleCapability });
     if (error?.code === "EEXIST") throw new Error("Another framework upgrade is active.");
     throw error;
   }
-  atomicWriteUpgradeFile(
-    plan.targetRoot,
-    ".project-state/framework-upgrade/lock/owner.json",
-    serializeCanonicalJson({ pid: process.pid, startedAt: Date.now() }),
-    0o600,
-  );
-  const journal = journalForPlan(plan);
-  persistFrameworkUpgradeJournal(plan.targetRoot, journal);
-  return { journal, paths };
+  try {
+    atomicWriteUpgradeFile(
+      plan.targetRoot,
+      ".project-state/framework-upgrade/lock/owner.json",
+      serializeCanonicalJson({
+        lifecycleNonce: lifecycleCapability.nonce,
+        operation: "framework-upgrade",
+        schemaVersion: 2,
+      }),
+      0o600,
+    );
+    const journal = journalForPlan(plan);
+    persistFrameworkUpgradeJournal(plan.targetRoot, journal);
+    return { journal, lifecycleCapability, paths };
+  } catch (error) {
+    if (stateCreated && existsSync(paths.root)) {
+      try {
+        removeOwnedArtifact(
+          paths.repositoryRoot,
+          paths.root,
+          "directory",
+          "failed framework upgrade state",
+        );
+      } catch {
+        // Suspicious state remains visible and fail-closed for explicit recovery.
+      }
+    }
+    releaseRuntimeLifecycleLock({ root: paths.repositoryRoot, owner: lifecycleCapability });
+    throw error;
+  }
 }
 
-export function removeFrameworkUpgradeState(paths) {
-  rmSync(paths.root, { force: true, recursive: true });
+export function removeFrameworkUpgradeState(paths, lifecycleCapability) {
+  releaseRuntimeLifecycleLock({
+    root: paths.repositoryRoot,
+    owner: lifecycleCapability,
+    finalize() {
+      removeOwnedArtifact(paths.repositoryRoot, paths.root, "directory", "framework upgrade state");
+    },
+  });
 }
 
 export function recoverFrameworkUpgradeState(root = frameworkRoot, { repairDependencies } = {}) {
   if (typeof repairDependencies !== "function") {
     throw new Error("Framework upgrade recovery requires a dependency repair function.");
   }
-  const paths = frameworkUpgradeStatePaths(root);
-  if (activeUpgradeOwner(paths) || dependencyRefreshIsActive(root)) {
-    throw new Error("Another framework upgrade is active.");
-  }
-  if (!existsSync(paths.journal)) {
-    if (!existsSync(paths.root)) return false;
-    removeFrameworkUpgradeState(paths);
+  const lifecycleCapability = acquireRuntimeLifecycleLock({
+    root,
+    operation: "framework-upgrade",
+  });
+  let completing = false;
+  try {
+    const paths = frameworkUpgradeStatePaths(root);
+    if (!existsSync(paths.journal)) {
+      if (!existsSync(paths.root)) return false;
+      completing = true;
+      removeFrameworkUpgradeState(paths, lifecycleCapability);
+      return true;
+    }
+    restoreFrameworkUpgradeJournal(root, readFrameworkUpgradeJournal(root));
+    repairDependencies(root, lifecycleCapability);
+    completing = true;
+    removeFrameworkUpgradeState(paths, lifecycleCapability);
     return true;
+  } finally {
+    if (!completing) releaseRuntimeLifecycleLock({ root, owner: lifecycleCapability });
   }
-  restoreFrameworkUpgradeJournal(root, readFrameworkUpgradeJournal(root));
-  repairDependencies(root);
-  removeFrameworkUpgradeState(paths);
-  return true;
 }

@@ -1,3 +1,4 @@
+/** Owns sensitive paths behavior for the repository inventory and filesystem boundary. */
 import path from "node:path";
 
 const sensitiveDirectories = new Set([

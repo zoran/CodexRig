@@ -43,7 +43,7 @@ description:
    Apply that same reviewed plan explicitly:
 
    ```bash
-   pnpm deps:update:patch:apply
+   pnpm deps:update -- --level patch --yes --plan-hash <sha256-from-preview>
    ```
 
 4. For selected minor/major work, name the package and affected workspace explicitly. Check official

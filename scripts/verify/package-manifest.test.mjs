@@ -1,3 +1,4 @@
+/** Verifies package manifest behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";

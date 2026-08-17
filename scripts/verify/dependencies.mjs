@@ -1,3 +1,4 @@
+/** Owns dependencies behavior for the repository verification boundary. */
 import { spawnSync } from "node:child_process";
 import process from "node:process";
 import { readPolicy, root, validatePolicy } from "../deps/dependency-policy.mjs";
@@ -5,11 +6,19 @@ import { readPolicy, root, validatePolicy } from "../deps/dependency-policy.mjs"
 const failures = validatePolicy(readPolicy());
 const lockCheck = spawnSync(
   "pnpm",
-  ["install", "--lockfile-only", "--frozen-lockfile", "--ignore-scripts", "--offline"],
+  [
+    "install",
+    "--lockfile-only",
+    "--frozen-lockfile",
+    "--ignore-scripts",
+    "--ignore-pnpmfile",
+    "--offline",
+  ],
   {
     cwd: root,
     encoding: "utf8",
     input: "",
+    env: { ...process.env, pnpm_config_ignore_pnpmfile: "true" },
     stdio: "pipe",
     timeout: 120_000,
   },

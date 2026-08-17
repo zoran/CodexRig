@@ -1,8 +1,9 @@
+/** Owns source readiness behavior for the portable clean-project generation boundary. */
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { formatContextError } from "../../../../scripts/context/terminal-output.mjs";
+import { formatContextError } from "../../../../scripts/terminal/terminal-output.mjs";
 import { neutralProductSourceFindings } from "../../../../scripts/verify/path-hygiene.mjs";
 import { fail } from "./project-options.mjs";
 

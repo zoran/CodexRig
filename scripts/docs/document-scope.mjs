@@ -1,7 +1,9 @@
+/** Owns document scope behavior for the durable documentation contract boundary. */
 import { listActiveFiles, repositoryRoot } from "../repository/source-inventory.mjs";
 
 export const projectManifestPath = "docs/project.md";
 export const projectContextPath = "docs/project-context.md";
+export const futureModulesPath = "docs/future-modules.md";
 
 const processDocumentDirectories = new Set([
   "goals",
@@ -22,8 +24,16 @@ export function isManagedMarkdownPath(relativePath) {
   );
 }
 
+export function isDocumentationMarkdownPath(relativePath) {
+  return /\.mdx?$/iu.test(relativePath);
+}
+
 export function listManagedMarkdownFiles({ root = repositoryRoot } = {}) {
   return listActiveFiles({ root }).filter(isManagedMarkdownPath);
+}
+
+export function listDocumentationMarkdownFiles({ root = repositoryRoot } = {}) {
+  return listActiveFiles({ root }).filter(isDocumentationMarkdownPath);
 }
 
 export function isRepositoryProcessArtifactPath(relativePath) {

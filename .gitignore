@@ -11,20 +11,23 @@ playwright-report/
 blob-report/
 playwright/.auth/
 .context-index/
+.delivery/
 .project-state/
 backup/
 backups/
 *.bak
 *.bak.*
 
-# Mutable Codex state is contained in ignored .codex/runtime/. The root-bound entries below are
-# legacy quarantine patterns so upgrades can remove old layouts without ever admitting them.
+# Mutable Codex state is contained in ignored .codex/runtime/. Repository-root /tmp owns private
+# transient critical-budget handovers and process temporaries; /.tmp owns other local cache work.
+# The remaining root-bound entries are legacy cleanup quarantine.
 /.tmp
 /cache
 /log
 /logs
 /memories
 /plugins
+/rules
 /sessions
 /shell_snapshots
 /skills

@@ -1,3 +1,4 @@
+/** Verifies project initialization transfer behavior for the setup, launch, and portable project boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -8,6 +9,7 @@ import {
   assertGeneratedProjectQuality,
   cleanupTemporaryRoots,
   initializeTrackedSource,
+  isolatedTrackedFrameworkSource,
   root,
   runProjectGenerator,
   temporaryRoot,
@@ -16,16 +18,21 @@ import {
 after(cleanupTemporaryRoots);
 
 test("clean project initialization escapes and formats long project names", () => {
+  const source = isolatedTrackedFrameworkSource("long-project-source-");
   const outputParent = temporaryRoot("long-project-name-");
   const projectName =
     "A [linked project label with many words](https://example.invalid/path) that remains neutral";
+  const projectDescription =
+    "Field technicians document offline equipment inspections on phones and supervisors review exceptions on desktop.\n\nThe first release should support German and English; billing is only a later idea. # Not a manifest heading";
   const result = runProjectGenerator([
     "--name",
     projectName,
+    "--description",
+    projectDescription,
     "--directory",
     "long-project-name-fixture",
     "--source",
-    root,
+    source,
     "--output-parent",
     outputParent,
     "--include-untracked",
@@ -33,6 +40,12 @@ test("clean project initialization escapes and formats long project names", () =
   assert.equal(result.status, 0, result.stderr);
   const generated = path.join(outputParent, "long-project-name-fixture", "code");
   assert.match(readFileSync(path.join(generated, "README.md"), "utf8"), /^# A \\\[linked/m);
+  const manifest = readFileSync(path.join(generated, "docs/project.md"), "utf8");
+  assert.match(manifest, /## Initial Project Description/u);
+  assert.match(manifest, /Field technicians document offline equipment inspections/u);
+  assert.match(manifest, /pending intake validation of the supplied creation brief/u);
+  assert.doesNotMatch(manifest, /^# Not a manifest heading$/mu);
+  assert.match(result.stdout, /stored as an intake draft/u);
   assertGeneratedProjectQuality(generated);
 });
 
@@ -49,7 +62,7 @@ test("clean project initialization excludes untracked source drafts by default",
     "scripts/context/context-publication-policy.mjs",
     "scripts/context/refresh-context-index-on-stop.mjs",
     "scripts/context/refresh-context-index-on-stop.sh",
-    "scripts/context/terminal-output.test.mjs",
+    "scripts/terminal/terminal-output.test.mjs",
     "scripts/deps/dependency-owner-normalization.test.mjs",
     "scripts/goals/goal-publication-precondition.mjs",
     "scripts/goals/goal-publication-precondition.test.mjs",

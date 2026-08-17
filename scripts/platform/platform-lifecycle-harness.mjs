@@ -1,3 +1,4 @@
+/** Owns platform lifecycle harness behavior for the Git provider integration boundary. */
 export function applyAccessUpdates(existing, updates, initialId) {
   let nextId = Math.max(initialId, ...existing.map((entry) => entry.id ?? 0));
   let result = structuredClone(existing);

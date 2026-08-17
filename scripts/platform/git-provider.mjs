@@ -1,8 +1,9 @@
+/** Owns git provider behavior for the Git provider integration boundary. */
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { readFrameworkContract } from "../framework/framework-contract.mjs";
+import { readFrameworkContract } from "../contracts/framework-contract.mjs";
 import {
   cleanGitEnvironment,
   isolatedGitArguments,

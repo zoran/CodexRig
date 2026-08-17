@@ -1,3 +1,4 @@
+/** Owns repository smoke behavior for the repository verification boundary. */
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -7,6 +8,8 @@ import {
   portableContextContractFindings,
   supportedCodexStartCommand,
 } from "../context/portable-context-contract.mjs";
+import { validateMinimalMiseTools } from "../contracts/mise-toolchain-configuration.mjs";
+import { readCompatibilityMatrix } from "../contracts/framework-contract.mjs";
 import { discoverProductLayout } from "../repository/product-roots.mjs";
 import {
   listActiveFiles,
@@ -15,9 +18,11 @@ import {
 } from "../repository/source-inventory.mjs";
 import { classifyPath, isFullRelevantPath } from "./adaptive-state.mjs";
 import { repositorySmokeContentExpectations } from "./repository-smoke-content.mjs";
+import { repositorySmokeRequiredFiles } from "./repository-smoke-inventory.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const failures = [];
+const compatibilityMatrix = readCompatibilityMatrix(root);
 
 function readRelative(relativePath) {
   const fullPath = path.join(root, relativePath);
@@ -48,161 +53,7 @@ function requireOccurrenceCount(relativePath, expected, count) {
   }
 }
 
-function validateMinimalMiseTools(content) {
-  const versions = Object.create(null);
-  const errors = [];
-  let toolsSectionCount = 0;
-  let inToolsSection = false;
-
-  for (const [index, rawLine] of content.split(/\r?\n/).entries()) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    if (line === "[tools]") {
-      toolsSectionCount += 1;
-      inToolsSection = true;
-      if (toolsSectionCount > 1) errors.push("must declare [tools] exactly once");
-      continue;
-    }
-    if (line.startsWith("[")) {
-      inToolsSection = false;
-      errors.push(`line ${index + 1} declares a disallowed section or directive`);
-      continue;
-    }
-    if (!inToolsSection) {
-      errors.push(`line ${index + 1} defines a key outside [tools]`);
-      continue;
-    }
-    const match = line.match(/^([a-z][a-z0-9_-]*)\s*=\s*"(\d+\.\d+\.\d+)"$/);
-    if (!match) {
-      errors.push(`line ${index + 1} is not a safe tool name with an exact semantic version pin`);
-      continue;
-    }
-    const [, tool, version] = match;
-    if (versions[tool]) errors.push(`${tool} must be declared exactly once`);
-    else versions[tool] = version;
-  }
-
-  if (toolsSectionCount !== 1) errors.push("must declare [tools] exactly once");
-  for (const tool of ["node", "pnpm"]) {
-    if (!versions[tool]) errors.push(`must declare ${tool} exactly once`);
-  }
-  return { errors, versions };
-}
-
-const requiredFiles = [
-  ".codex/README.md",
-  ".codex/agents/default.toml",
-  ".codex/agents/explorer.toml",
-  ".codex/agents/worker.toml",
-  ".codex/config.toml",
-  ".codex/hooks.json",
-  ".codexrig/compatibility.json",
-  ".codexrig/framework.json",
-  ".codexrig/policy-projection.json",
-  ".github/workflows/ci.yml",
-  ".gitlab-ci.yml",
-  ".gitignore",
-  ".agents/skills/project-implementation/SKILL.md",
-  ".agents/skills/task-quality/SKILL.md",
-  "AGENTS.md",
-  "README.md",
-  "docs/context-index.md",
-  "docs/project.md",
-  "instructions.md",
-  "mise.lock",
-  "mise.toml",
-  "package.json",
-  "pnpm-lock.yaml",
-  "pnpm-workspace.yaml",
-  "scripts/deps/install-compatible.mjs",
-  "scripts/docs/project-document-policy.mjs",
-  "scripts/framework/compatibility-matrix.mjs",
-  "scripts/framework/framework-contract.mjs",
-  "scripts/framework/framework-doctor.mjs",
-  "scripts/framework/framework-lifecycle.test.mjs",
-  "scripts/framework/policy-projection.mjs",
-  "scripts/framework/framework-upgrade-io.mjs",
-  "scripts/framework/framework-upgrade-journal.mjs",
-  "scripts/framework/framework-upgrade-ownership.mjs",
-  "scripts/framework/framework-upgrade-receipt.mjs",
-  "scripts/framework/framework-upgrade.mjs",
-  "scripts/framework/refresh-upgrade-dependencies.mjs",
-  "scripts/goals/goal-publication-precondition.mjs",
-  "scripts/goals/goal-publication-precondition.test.mjs",
-  "scripts/deps/dependency-owner-normalization.test.mjs",
-  "scripts/repository/product-roots.mjs",
-  "scripts/repository/product-roots.test.mjs",
-  "scripts/repository/git-runtime-isolation.mjs",
-  "scripts/repository/source-inventory.mjs",
-  "scripts/repository/source-inventory-policy.mjs",
-  "scripts/repository/source-inventory-git-environment.test.mjs",
-  "scripts/repository/stable-file-snapshot.mjs",
-  "scripts/repository/stable-file-snapshot.test.mjs",
-  "scripts/platform/configure-platform.mjs",
-  "scripts/platform/detect-platform.mjs",
-  "scripts/platform/git-provider.mjs",
-  "scripts/platform/github-platform.mjs",
-  "scripts/platform/gitlab-platform.mjs",
-  "scripts/platform/platform-api.mjs",
-  "scripts/platform/platform-configuration-state.mjs",
-  "scripts/platform/platform-lifecycle-harness.mjs",
-  "scripts/platform/platform-lifecycle.test.mjs",
-  "scripts/verify/format-project.mjs",
-  "scripts/context/context-worker-output.mjs",
-  "scripts/context/context-maintenance-safety.mjs",
-  "scripts/context/context-maintenance.mjs",
-  "scripts/context/context-maintenance.test.mjs",
-  "scripts/context/context-lifecycle.test.mjs",
-  "scripts/context/refresh-context-index-on-stop.sh",
-  "scripts/context/refresh-context-index-on-stop.mjs",
-  "scripts/context/portable-context-contract.mjs",
-  "scripts/context/portable-context-contract.test.mjs",
-  "scripts/web/update-sitemap-lastmod.test.mjs",
-  "scripts/setup/start-codex.sh",
-  "scripts/setup/startup-attestation.mjs",
-  "scripts/setup/codex-launcher.test.mjs",
-  "scripts/setup/install-git-hooks.mjs",
-  "scripts/setup/install-git-hooks.sh",
-  "scripts/setup/portable-project-contract.mjs",
-  "scripts/setup/resolve-git-hooks-path.mjs",
-  "scripts/setup/setup-regression-fixtures.mjs",
-  "scripts/setup/staged-project-validator.test.mjs",
-  "scripts/setup/validate-codex-config.mjs",
-  "scripts/setup/verify-startup-attestation-on-session-start.sh",
-  "scripts/setup/validate-codex-model-policy.mjs",
-  "scripts/setup/validate-staged-project.mjs",
-  "scripts/verify/adaptive.mjs",
-  "scripts/verify/adaptive-cli.test.mjs",
-  "scripts/verify/adaptive-options.mjs",
-  "scripts/verify/verification-admission.mjs",
-  "scripts/verify/adaptive-runner.mjs",
-  "scripts/verify/adaptive-runner-routing.test.mjs",
-  "scripts/verify/adaptive-runner-test-helpers.mjs",
-  "scripts/verify/adaptive-runner.test.mjs",
-  "scripts/verify/adaptive-state.mjs",
-  "scripts/verify/git-remote-identity.mjs",
-  "scripts/verify/pre-push.sh",
-  "scripts/verify/pre-push-steps.sh",
-  "scripts/verify/pre-push.test.mjs",
-  "scripts/verify/pushed-object-scan.mjs",
-  "scripts/verify/verification-evidence.mjs",
-  "scripts/verify/verification-evidence-error.mjs",
-  "scripts/verify/verification-evidence-record.mjs",
-  "scripts/verify/verification-evidence-store.mjs",
-  "scripts/verify/verification-evidence-integrity.test.mjs",
-  "scripts/verify/verification-evidence-test-helpers.mjs",
-  "scripts/verify/verification-evidence.test.mjs",
-  "scripts/verify/verification-entrypoints.mjs",
-  "scripts/verify/verification-executor.mjs",
-  "scripts/verify/verification-git-basis.mjs",
-  "scripts/verify/verification-risk-profile.mjs",
-  "scripts/verify/verification-record-helpers.mjs",
-  "scripts/verify/verification-runtime-identity.mjs",
-  "scripts/verify/verification-session-lock.mjs",
-  "scripts/verify/workspace-verification.mjs",
-];
-
-for (const relativePath of requiredFiles) {
+for (const relativePath of repositorySmokeRequiredFiles) {
   const fullPath = path.join(root, relativePath);
   if (!existsSync(fullPath)) {
     failures.push(`missing required file: ${relativePath}`);
@@ -233,6 +84,7 @@ if (packageJson) {
     failures.push("package.json must pin pnpm through packageManager");
   }
   for (const scriptName of [
+    "auth:check",
     "codex:start",
     "codex:validate",
     "context:check",
@@ -242,7 +94,11 @@ if (packageJson) {
     "deps:install",
     "docs:check",
     "goal:new",
+    "localization:check",
+    "repo:housekeeping",
     "setup",
+    "stack:detect",
+    "tenancy:check",
     "verify",
     "verify:changed",
     "verify:external",
@@ -253,6 +109,15 @@ if (packageJson) {
   if (!packageJson.scripts?.["codex:start"]?.includes("scripts/setup/start-codex.sh")) {
     failures.push("codex:start must use the project launcher");
   }
+  if (packageJson.scripts?.["auth:check"] !== "node scripts/verify/identity-access.mjs") {
+    failures.push("auth:check must use the canonical Identity and Access boundary verifier");
+  }
+  if (packageJson.scripts?.["tenancy:check"] !== "node scripts/verify/tenant-isolation.mjs") {
+    failures.push("tenancy:check must use the canonical tenant-isolation boundary verifier");
+  }
+  if (packageJson.scripts?.["localization:check"] !== "node scripts/verify/localization.mjs") {
+    failures.push("localization:check must use the canonical localization verifier");
+  }
   if (packageJson.scripts?.["deps:install"] !== "node scripts/deps/install-compatible.mjs") {
     failures.push("deps:install must use the compatible dependency installer");
   }
@@ -261,8 +126,22 @@ if (packageJson) {
   ) {
     failures.push("goal:new must use the fail-closed publication precondition");
   }
+  if (
+    packageJson.scripts?.["repo:housekeeping"] !== "node scripts/goals/repository-housekeeping.mjs"
+  ) {
+    failures.push("repo:housekeeping must use the canonical repository housekeeping entry point");
+  }
   if (!packageJson.scripts?.setup?.includes("node scripts/context/index-codebase.mjs --setup")) {
     failures.push("setup must materialize and validate the root context vector space");
+  }
+  if (!packageJson.scripts?.setup?.includes("node scripts/verify/identity-access.mjs")) {
+    failures.push("setup must validate the Identity and Access boundary");
+  }
+  if (!packageJson.scripts?.setup?.includes("node scripts/verify/tenant-isolation.mjs")) {
+    failures.push("setup must validate the tenant-isolation boundary");
+  }
+  if (!packageJson.scripts?.setup?.includes("node scripts/verify/localization.mjs")) {
+    failures.push("setup must validate the localization contract");
   }
   const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
   const hasLance = Boolean(dependencies["@lancedb/lancedb"]);
@@ -496,13 +375,17 @@ if (miseVersions.pnpm) {
 if (/corepack/iu.test(readRelative("scripts/setup/check-prereqs.sh"))) {
   failures.push("the local prerequisite check must not install or activate Corepack shims");
 }
-for (const [filePath, expected] of repositorySmokeContentExpectations(supportedCodexStartCommand)) {
+const sourceFramework = existsSync(
+  path.join(root, ".agents/skills/create-project-from-framework/SKILL.md"),
+);
+for (const [filePath, expected] of repositorySmokeContentExpectations(supportedCodexStartCommand, {
+  sourceFramework,
+})) {
   requireContent(filePath, expected);
 }
 if (packageJson?.scripts?.["framework:reset"]) {
   requireContent("AGENTS.md", "Every `$reset-framework --apply` removes");
   requireContent("instructions.md", "Every framework reset removes");
-  requireContent("docs/project.md", "Every framework reset removes");
   requireContent("docs/context-index.md", "Every framework reset removes");
   requireContent(".agents/skills/reset-framework/SKILL.md", "complete ignored `.context-index/`");
   requireContent(
@@ -581,7 +464,6 @@ for (const filePath of [
   "README.md",
   "instructions.md",
   ".codex/README.md",
-  "docs/project.md",
   "scripts/setup/check-prereqs.sh",
 ]) {
   requireExactContent(filePath, supportedCodexStartCommand);
@@ -602,6 +484,7 @@ for (const filePath of [
   }
 }
 if (existsSync(path.join(root, ".github/workflows/ci.yml"))) {
+  const githubCi = readRelative(".github/workflows/ci.yml");
   requireContent(".github/workflows/ci.yml", `version: ${miseVersions.pnpm}`);
   requireContent(".github/workflows/ci.yml", `node-version: ${miseVersions.node}`);
   requireOccurrenceCount(
@@ -611,12 +494,49 @@ if (existsSync(path.join(root, ".github/workflows/ci.yml"))) {
   );
   requireOccurrenceCount(".github/workflows/ci.yml", "install: false", 2);
   requireOccurrenceCount(".github/workflows/ci.yml", "cache: false", 2);
+  requireOccurrenceCount(
+    ".github/workflows/ci.yml",
+    "node scripts/deps/verify-pnpm-execution-policy.mjs",
+    2,
+  );
+  for (const key of ["NPM_CONFIG_IGNORE_PNPMFILE", "PNPM_CONFIG_IGNORE_PNPMFILE"]) {
+    requireContent(".github/workflows/ci.yml", `${key}: \"true\"`);
+  }
+  if (
+    githubCi.indexOf("node scripts/deps/verify-pnpm-execution-policy.mjs") >
+    githubCi.indexOf("pnpm/action-setup")
+  ) {
+    failures.push(".github/workflows/ci.yml must reject executable pnpm config before pnpm setup");
+  }
 }
 if (existsSync(path.join(root, ".gitlab-ci.yml"))) {
   requireContent(".gitlab-ci.yml", `pnpm@${miseVersions.pnpm}`);
   requireContent(".gitlab-ci.yml", `node:${miseVersions.node}-bookworm`);
   requireContent(".gitlab-ci.yml", "ripgrep shellcheck");
-  requireContent(".gitlab-ci.yml", "mise@latest");
+  for (const misePackage of Object.values(compatibilityMatrix.ci.miseNpmPackages)) {
+    requireContent(".gitlab-ci.yml", misePackage);
+  }
+  for (const integrity of Object.values(compatibilityMatrix.ci.miseNpmPackageIntegrities)) {
+    requireContent(".gitlab-ci.yml", integrity);
+  }
+  requireContent(".gitlab-ci.yml", `\${mise_package}@${compatibilityMatrix.ci.miseVersion}`);
+  requireContent(".gitlab-ci.yml", 'case "$(uname -m)" in');
+  requireContent(".gitlab-ci.yml", "--verify-mise-archive");
+  requireContent(
+    ".gitlab-ci.yml",
+    'npm install --global "$mise_archive" --ignore-scripts --offline',
+  );
+  requireContent(".gitlab-ci.yml", "--ignore-scripts");
+  requireContent(".gitlab-ci.yml", "--ignore-pnpmfile");
+  requireContent(".gitlab-ci.yml", 'NPM_CONFIG_IGNORE_PNPMFILE: "true"');
+  requireContent(".gitlab-ci.yml", 'PNPM_CONFIG_IGNORE_PNPMFILE: "true"');
+  requireContent(".gitlab-ci.yml", "node scripts/deps/verify-pnpm-execution-policy.mjs");
+  if (/mise@latest/u.test(readRelative(".gitlab-ci.yml"))) {
+    failures.push(".gitlab-ci.yml must not execute a floating mise installer");
+  }
+  if (/npm install --global "\$\{mise_package\}@/u.test(readRelative(".gitlab-ci.yml"))) {
+    failures.push(".gitlab-ci.yml must install only the verified local mise archive");
+  }
 }
 for (const runtimePath of ["mise.lock", "mise.toml"]) {
   const categories = classifyPath(runtimePath, { productLayout });
@@ -635,6 +555,7 @@ for (const entry of [
   ...repositoryCodexHomeGitignorePatterns,
   ...portableCodexGitignorePatterns,
   ".context-index/",
+  ".delivery/",
   "node_modules/",
   ".env",
 ]) {

@@ -1,3 +1,4 @@
+/** Verifies staged project validator behavior for the setup, launch, and portable project boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {

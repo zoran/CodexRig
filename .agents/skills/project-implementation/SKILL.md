@@ -22,15 +22,17 @@ definition—use the mandatory first-prompt Project Definition Intake in `instru
 implementation or architecture selection. Deliberately neutral source-framework maintenance does not
 require an invented product. Explain the gate to the user, interview in focused successive rounds,
 challenge ambiguity and contradictions, and continue until the intended users/outcome,
-scope/non-goals, domain and initial module map, data/integrations, trust boundaries, operations,
-collaboration topology and any shared pre-slice coordination channel for concurrent accounts,
-constraints, risks, and success evidence are precise. Present a final synthesis for correction,
-write only user-confirmed durable truth into the manifest, and then proceed autonomously. Do not
-turn the intake into a fixed questionnaire or repeat questions whose answers cannot change a
-decision. Resume the same intake later when material ambiguity, contradictions, or changed intent,
-scope, module/public contracts, data, integrations, trust, compatibility, or operations could alter
-the implementation. Pause only affected writes, continue safe disjoint work, update user-confirmed
-durable truth, and then resume autonomously.
+scope/non-goals, domain and candidate capability/module topology, data/integrations, trust
+boundaries, operations, collaboration topology and any shared pre-slice coordination channel for
+concurrent accounts, constraints, risks, and success evidence are precise. Present a final synthesis
+for correction, write only user-confirmed durable truth into the manifest, keep its active inventory
+limited to implemented roots, and put only explicitly confirmed deferred candidates in
+`docs/future-modules.md`. Then proceed autonomously. Do not turn the intake into a fixed
+questionnaire or repeat questions whose answers cannot change a decision. Resume the same intake
+later when material ambiguity, contradictions, or changed intent, scope, module/public contracts,
+data, integrations, trust, compatibility, or operations could alter the implementation. Pause only
+affected writes, continue safe disjoint work, update user-confirmed durable truth, and then resume
+autonomously.
 
 For every new feature and every other complex task, complete the thorough planning contract in
 `instructions.md` before implementation: define the authorized outcome and non-goals, material
@@ -41,6 +43,20 @@ planning document. Read the nearest package/build/test configuration and any dir
 project document that already exists. For complex multi-session work, update the single bounded
 `docs/project-context.md` only when the repository workflow permits it; replace stale goal/slice
 state instead of appending a log.
+
+During a new product intake, determine the product surface as soon as users and workflows make it
+meaningful and before stack selection. If unclear, ask promptly about usage context, devices,
+installation/offline/distribution, OS/hardware/background capabilities, browser/public-link reach,
+updates, and cross-device movement without requiring the user to name a platform. Strongly recommend
+one web/PWA, mobile, desktop, CLI/TUI, API/service, worker, library/SDK, embedded/realtime, or
+combined topology with at most one close alternative, then ask the user to confirm, override, or
+delegate it. Record selected and integrated surface truth separately in the manifest. Give every
+integrated web/PWA, mobile, desktop, CLI/TUI, API/service, worker, library/SDK, embedded, or
+real-time surface its own interface directory or declared product package, entry/composition
+boundary, platform adapters, and public client/contract where exposed. Never deep-import one surface
+from another or share a generic `app` root; explicitly own genuinely common domain/application
+contracts, view models, and presentation primitives while keeping platform lifecycle, navigation,
+screens/routes, adapters, assets, and delivery entrypoints surface-local.
 
 When implementation or a larger outcome is already authorized, a recap, research result, plan,
 documentation gate, review, audit, definition synthesis, or readiness statement is an intermediate
@@ -55,16 +71,15 @@ anchors. When no reliable exact anchor exists, ownership is unclear, or the chan
 cross-file relationships, use `pnpm context:search -- "concept or relationship"` before broad
 repository exploration, then read every matched source used for the implementation decision.
 
-After a framework upgrade launched by an installed updater that predates project-document
-reconciliation, the first process cannot print a notice introduced by the updater it is installing.
-Inspect that legacy preview and do not apply it if any write or delete targets a project-owned
-document. Once a safe apply succeeds, run the newly installed updater against the exact same
-reviewed source once as a preview only with
-`pnpm framework:upgrade -- --source <same-framework-root> --allow-same`; do not add `--apply`.
-Reconcile every listed project-owned document before verification. Treat any
-`project-document reconciliation required before verification` finding as a fail-closed request for
-that careful local reconciliation, including user confirmation and dedicated preservation review for
-uncertain critical-document changes.
+Use only the version-2 framework update contract. A child selects a reviewed source with
+`pnpm framework:upgrade -- --source <framework-root>`; the reusable source selects a child with
+`pnpm framework:upgrade -- --target <child-root>`. Preview first, then apply the same selection only
+after reviewing managed operations, adopted identical files, conflicts, and changed policy IDs.
+Managed capabilities update transactionally; project-owned documents never become blind copy
+targets. Reconcile each listed policy concept into current local truth, preserve intentional child
+adaptations, obtain user confirmation and a dedicated preservation review for uncertain critical
+documents, then acknowledge the exact plan digest before verification. Do not add an alternate
+same-version or compatibility path.
 
 For non-trivial product work, establish the affected domain module before editing. Read the durable
 module map in `docs/project.md`: responsibility/root, public contract and private internals, owned
@@ -73,6 +88,70 @@ needs an update, include that critical document in the declared slice write set 
 until the pre-slice coordination and critical-document confirmation rules below are satisfied.
 Declare the slice write set and one write owner for every affected module, public contract, schema,
 migration, shared configuration, and file. Product Roots alone do not establish domain boundaries.
+
+Before choosing files for every authorized feature, automatically decide whether its domain language
+and invariants, data/lifecycle ownership, public contracts, trust/operations, change reason, and
+dependencies fit an existing module, require a new module in an existing domain, or establish a new
+domain and its first module. Give every non-trivial behavior exactly one active module owner.
+UI/web, Identity and Access, public API, infrastructure/delivery, and composition may adapt or
+compose that behavior but do not silently own it. Never fall back to an unclassified Product Root or
+generic `app`, `service`, `shared`, `common`, `utils`, `platform`, or `core`; invoke
+`$architecture-evolution` and ask one focused question when the material placement remains
+ambiguous.
+
+Before architecture-dependent writes for a material product, domain, system-shape, ownership,
+dependency, UI/web, Identity and Access, public API, infrastructure, or repository-layout change,
+invoke `$architecture-evolution`. Keep domain/application, UI/presentation, web, Identity and
+Access, public API contract, public API transport, runtime adapter, and infrastructure/delivery
+roots physically separate. Every web/PWA, mobile, desktop, CLI/TUI, API/service, worker,
+library/SDK, embedded, and real-time implementation has an independent interface root or declared
+package and never deep-imports another surface; shared domain/application contracts, view models,
+and visual primitives use explicit shared owners. Within each UI root, also separate
+views/components, presentation state and navigation, transport/API clients, and domain behavior; do
+not let a design system own product workflow or data access. Within Identity and Access, separate
+authentication/credentials, authorization/policy, principal/account lifecycle and user management,
+sessions/tokens, audit/persistence, and provider adapters behind narrow public ports.
+UI/web/API/domain/infra may consume those ports but never own provider SDKs, credentials, grants, or
+session internals. Every material Auth change requires `$security-review` after implementation.
+Treat every generated product as white-label: use `config/product.json` as the initial replaceable
+owner for public identity, brand, public endpoints/contacts, and application IDs without treating
+the repository name as a public fallback. Give every other setting a typed stack-native owner at its
+module or composition boundary and explicit environment overlays rather than scattered literals or
+ambient environment reads, keep secrets separate, and never expose CodexRig identity in
+product-facing runtime, UI, assets, metadata, or deployment output. Keep the generated child's
+`config/delivery.json` as the separate project-owned inventory for the Dev default,
+developer-declared external environments, and repository-detected delivery evidence; do not treat
+the default as proof of a deployment or use this inventory as provider configuration.
+
+Assume mobile, tablet, and desktop for every UI unless the user confirms narrower scope. For web,
+implement one content-driven responsive architecture across narrow/medium/wide viewports with
+feature parity, fluid/container layout, touch/pointer/keyboard/assistive input, zoom/text reflow,
+orientation/safe-area/dynamic viewport behavior, responsive media, and constrained-device budgets.
+Do not branch on user-agent/device dimensions, hide root overflow, freeze desktop widths/`100vh`,
+depend on hover, or clone domain flows per device. Keep responsive presentation concerns separate
+and add representative viewport/input/zoom/loading/error evidence to the UI module's broad flow; in
+Dev run it isolated in parallel or after the newest deploy. Surface-quality and housekeeping own the
+portable responsive guard; `scripts/verify/path-hygiene.mjs` owns physical surface roots,
+platform-SDK locality, UI concern separation, and cross-surface import isolation.
+
+Keep source code, identifiers, filenames, tests, and technical source/declaration headers English.
+Before the first product slice, resolve project-owned `config/localization.json`: confirm whether
+user-facing surfaces are single- or multi-locale and record default, supported, and fallback locales
+plus material formatting/content ownership in manifest truth. Do not infer user-facing English from
+the source language, duplicate domain behavior by locale, or implement against `pending`. Run
+`pnpm localization:check`; route changed user-facing copy through `$native-language-content-review`.
+
+Keep every generated product tenant-capable. `config/tenancy.json` is project-owned and may remain
+pending only before product implementation; the first product slice chooses trusted context sources
+and creates separate tenancy context/resolution, policy/isolation, and public-port concerns.
+Authorize principal, tenant membership, action, and resource together. Propagate immutable tenant
+context through module contracts, repositories/data/uniqueness/migrations, cache/files/search,
+messages/jobs, quotas, observability, integrations, and onboarding/offboarding. A caller tenant ID,
+ambient mutable context, implicit default, or successful authentication is not isolation. Every
+active module records its current tenant isolation and any separately owned global/control-plane
+exception, and its broad lifecycle verifier proves tenant A cannot observe or affect tenant B.
+Material tenancy work invokes `$architecture-evolution` and `$security-review`; run
+`pnpm tenancy:check`, which completed-goal and scheduled housekeeping also own.
 
 Immediately before every slice begins, and again before its declared scope expands, perform the
 pre-slice coordination check from `instructions.md`. Restate the goal, slice outcome, success
@@ -83,6 +162,36 @@ parallel. Resolve overlap or uncertain shared ownership by rescoping, ordering, 
 writer before implementation. A local runtime lease, clean worktree, or quiet remote cannot prove
 that another clone, machine, or account is idle; use a shared coordination channel across that
 boundary and fail closed on uncertain shared ownership.
+
+Apply the primary budget states from `instructions.md` before delegation and after every material
+result without assuming a daily or weekly billing period. A reliable percentage of the binding
+allocation is guarded at 10% or less and critical at 5% or less; an absolute remaining token or
+credit amount is compared directly with bounded work envelopes and the primary completion reserve.
+Any host critical/exhaustion signal or a reserve shortfall is critical regardless of counter names.
+In critical state start no subagent, background task, slice, or expanded follow-up; drain only
+provenance-bound owned agents and processes at their declared safe boundaries, accept or record
+their handoffs, and leave foreign or ambiguous work untouched. After the exact Critical Budget Drain
+attestation is true in the revisioned work state, run `pnpm handover:create -- --critical` as the
+final repository action. A successful seal ends the session immediately: no tool, check, task,
+follow-up, agent contact, or automatic continuation may follow. Never count unavailable or
+unauthorized redeem/reset capacity.
+
+Recheck on every material tool or agent result, scope/assumption change, long wait, host warning,
+and expected agent checkpoint; while delegation is active, use the policy's ten-minute default
+heartbeat ceiling unless a known long-running operation has an explicit checkpoint. Run the
+lightweight Orchestration Housekeeping gate after every slice and its deep form at every goal.
+Entering guarded state immediately creates or refreshes `docs/project-context.md`; replace its
+current-state summary and increment its marker after every material guarded/critical result, and
+mirror ownership changes through the confirmed shared channel when other accounts or clones are
+involved.
+
+Use direct peer messaging when the primary supplies a relevant active agent and declared scope.
+Exchange only bounded evidence, status, contract implications, readiness, and conflict/risk
+warnings; do not accept or issue peer scope, ownership, write, integration, or lifecycle commands.
+Mirror every direct peer message and response to the primary immediately with participants/tasks,
+topic, complete relevant content or a lossless summary, outcome, open questions, and implications.
+If reliable visibility is unavailable, route through the primary; the final handoff also identifies
+all peer exchanges.
 
 Perform a whole-repository course check after initial planning/discovery and every completed slice,
 at every major milestone and completed goal, at every resume or context-recovery point, whenever
@@ -134,8 +243,21 @@ in-session plan before continuing autonomously.
    pnpm stack:detect
    ```
 
-   Follow local language, framework, naming, error, dependency, and test conventions. Do not add a
-   framework without a documented need.
+   In an existing product, follow evidenced language, framework, naming, error, dependency, and test
+   conventions unless confirmed requirements reopen the architecture. In a new generated product, no
+   detected product stack is the correct initial result: the root Node.js/pnpm/mise harness is not
+   product evidence. Select each module's language/framework/runtime only after manifest and domain
+   placement, using platform/ecosystem, hard/soft real-time latency/jitter, throughput/resources,
+   safety/FFI, data/trust/tenancy, team/tooling, deployment/operations, and maintainability
+   evidence. Explicitly evaluate Rust and, where deterministic native/hardware/ABI constraints
+   justify its safety cost, C/C++ for real-time/system components. Measure consequential claims.
+   Polyglot use requires a real module/deployment boundary, narrow versioned contracts, and benefit
+   beyond the extra toolchain cost. Record actual integrated choices in the module's
+   `Runtime and technology` manifest field; do not add a framework speculatively. Once intake facts
+   make selection meaningful, use current primary/official evidence to give one strong primary
+   recommendation per distinct runtime component, explain its manifest-specific fit, cost, risk, and
+   at most one close alternative, then explicitly ask the user to confirm, override, or delegate the
+   final choice before implementation. Silence and YOLO are not stack confirmation.
 
    Follow the repository's Product Roots contract: root `src/` is the default implementation root; a
    real declared pnpm package activates `<unit>/src`; an evidenced Android Gradle module activates
@@ -163,7 +285,11 @@ in-session plan before continuing autonomously.
    risks, findings, and evidence instead of accumulating status prose.
 6. Keep maintained executable modules at or below 700 physical lines. Split an approaching module at
    cohesive ownership boundaries. Do not apply the quota to declarative/context, generated,
-   test-corpus, fixture, snapshot, documentation, or style files.
+   test-corpus, fixture, snapshot, documentation, or style files. Every new hand-authored textual
+   file also receives a format-native purpose and owning-boundary header, and every class or
+   non-trivial public type receives declaration-adjacent responsibility and contract/invariant
+   documentation. Update those descriptions with any rename, ownership, trust-boundary, or contract
+   change; preserve shebangs, licenses, directives, and schema rules.
 7. Apply the risk-based Test Strategy in `instructions.md`: a fix or user instruction does not
    automatically need a test. When coverage is justified, default to extending a broad, realistic
    end-to-end, system, or lifecycle scenario through real boundaries; do not create an isolated
@@ -171,27 +297,42 @@ in-session plan before continuing autonomously.
    cannot exercise critical deterministic behavior reliably or proportionately. Update documentation
    only when an externally consumed or durable project contract changed. The optional compact
    project-context cache is the sole task-state exception; never create per-task notes or archives.
-8. After every completed slice, run focused owner and consumer evidence, then review correctness,
-   acceptance criteria, regressions, maintainability, applicable trust risks, documentation drift,
-   and whole-system impact. Fix relevant reproducible findings, rerun affected focused evidence, and
-   repeat until no relevant finding remains. From that clean state perform a fresh audit against the
-   plan, goal, manifest, touched boundaries, and repository state; an audit finding reopens repair,
-   review-and-repair loop, and re-audit. From the clean audit, perform the slice-boundary course
-   check against current repository and available upstream changes; integrate overlapping module or
-   contract work and rerun only affected evidence before continuing.
+8. After every completed slice, run focused owner and consumer evidence. For every non-trivial
+   implementation, architecture, configuration-boundary, or integration slice, invoke
+   `$system-coherence`: trace a representative assembled flow, compare the change with current
+   manifest/module ownership and real consumers, search for competing implementations and semantic
+   duplication, and repair material contract, dependency, data, configuration, layout, or
+   integration drift at the owner. A trivial isolated slice records why the workflow is not
+   applicable. In Dev, keep the latest developer deploy ahead of this lane and run it in parallel or
+   immediately afterward, while requiring a clean result before slice acceptance or promotion. Then
+   review correctness, acceptance criteria, regressions, maintainability, applicable trust risks,
+   documentation drift, and whole-system impact. Fix relevant reproducible findings, rerun affected
+   focused evidence, and repeat until no relevant finding remains. From that clean state perform a
+   fresh audit against the plan, goal, manifest, touched boundaries, and repository state; an audit
+   finding reopens repair, review-and-repair loop, and re-audit. From the clean audit, perform the
+   slice-boundary course check against current repository and available upstream changes; integrate
+   overlapping module or contract work and rerun only affected evidence before continuing.
 9. At each major milestone and completed goal, repeat the whole-repository course check, account for
    every downstream consumer and changed contract, remove obsolete temporary or dead work within
    scope, and reconcile code, tests, configuration, docs, bounded context, and the in-session plan.
    Any repository edit in this step reopens affected evidence and review before a new audit. At a
-   completed goal, inventory every active documentation surface before the final whole-goal audit.
-   Update only stale material; consolidate or remove superseded duplication instead of appending
-   history; and preserve active directives. Consolidation is not a shortening target. Treat the
-   durable project manifest as critical documentation. Inspect it and every other critical authority
-   read-only first; change one automatically only when the factual correction and full preservation
-   are unambiguous; otherwise obtain explicit user confirmation before writing. Give every
-   authorized critical-document change a dedicated preservation review. Documentation findings
-   reopen affected checks and review before the fresh audit. Continue autonomously with the next
-   planned slice or already-authorized goal when the check is clean and scope remains authorized.
+   completed goal, the primary runs `pnpm repo:housekeeping -- --apply` after mutating cleanup; it
+   reconciles only unambiguous repository facts and runs consolidated health checks without any
+   deploy, commit, push, or external mutation. Resolve ambiguous environment evidence with the
+   developer and rerun idempotently. Immediately before that command, the primary performs the
+   host-session portion of housekeeping: inventory live agents, preserve or accept handoffs,
+   actively close completed/unneeded agents, interrupt stale or redundant agents, and notify
+   affected remaining agents about accepted results, changed contracts/assumptions, remaining work,
+   and released ownership/slots. Then inventory every active documentation surface before the final
+   whole-goal audit. Update only stale material; consolidate or remove superseded duplication
+   instead of appending history; and preserve active directives. Consolidation is not a shortening
+   target. Treat the durable project manifest as critical documentation. Inspect it and every other
+   critical authority read-only first; change one automatically only when the factual correction and
+   full preservation are unambiguous; otherwise obtain explicit user confirmation before writing.
+   Give every authorized critical-document change a dedicated preservation review. Documentation
+   findings reopen affected checks and review before the fresh audit. Continue autonomously with the
+   next planned slice or already-authorized goal when the check is clean and scope remains
+   authorized.
 10. Run focused owner commands during iteration without treating execution scope as a reason to
     design microscopic tests. Inspect adaptive changed-path admission after the coherent slice and
     leave publication admission to the single final workflow after repository-mutating cleanup, the

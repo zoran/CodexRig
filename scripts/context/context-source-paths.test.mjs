@@ -1,3 +1,4 @@
+/** Verifies context source paths behavior for the repository-local semantic context boundary. */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
@@ -35,8 +36,14 @@ test("source discovery includes broad active Git text and excludes unsafe state"
   write(root, "index.html", "<!doctype html><title>Active</title>\n");
   write(root, "tsconfig.json", '{"compilerOptions": {}}\n');
   write(root, "tests/retrieval.test.mjs", "export const covered = true;\n");
-  write(root, "scripts/verify/secret-patterns.mjs", "export const secretPattern = /token/;\n");
+  write(root, "scripts/security/secret-patterns.mjs", "export const secretPattern = /token/;\n");
   write(root, "apps/api/auth.ts", "export function authenticate() { return true; }\n");
+  write(root, "interfaces/web/src/page.tsx", "export function Page() { return null; }\n");
+  write(root, "src/domains/identity-access/auth.ts", "export const authorize = true;\n");
+  write(root, "config/product.json", '{"schemaVersion": 1}\n');
+  write(root, "config/delivery.json", '{"selectedTarget": "dev"}\n');
+  write(root, "config/tenancy.json", '{"status": "pending"}\n');
+  write(root, "config/localization.json", '{"status": "pending"}\n');
   write(
     root,
     "docs/project-context.md",
@@ -60,6 +67,12 @@ test("source discovery includes broad active Git text and excludes unsafe state"
   write(root, "PROJECT_PLAN.md", "# Project plan\n");
   write(root, ".context-index/manifest.json", "{}\n");
   write(root, ".codex/config.toml", "sandbox_mode = 'danger-full-access'\n");
+  write(root, ".codex/hooks.json", '{"hooks": {}}\n');
+  write(root, ".codex/README.md", "# Portable Codex configuration\n");
+  write(root, ".codex/agents/default.toml", 'name = "default"\n');
+  write(root, ".codexrig/framework.json", '{"frameworkVersion": "2.1.0"}\n');
+  write(root, ".codexrig/policy-projection.json", '{"schemaVersion": 2}\n');
+  write(root, ".codexrig/installation.json", '{"managedFiles": {"noise": "hash"}}\n');
   for (const relativePath of repositoryCodexHomeRuntimeProbePaths) {
     write(root, relativePath, "repository-root Codex runtime fixture\n");
   }
@@ -85,12 +98,24 @@ test("source discovery includes broad active Git text and excludes unsafe state"
     "tests/retrieval.test.mjs",
     "tests/untracked.test.mjs",
     "tests/application.snap",
-    "scripts/verify/secret-patterns.mjs",
+    "scripts/security/secret-patterns.mjs",
     "apps/api/auth.ts",
+    "interfaces/web/src/page.tsx",
+    "src/domains/identity-access/auth.ts",
+    "config/product.json",
+    "config/delivery.json",
+    "config/tenancy.json",
+    "config/localization.json",
     "docs/project-context.md",
     "docs/research.md",
     ".agents/skills/example/scripts/run.mjs",
     ".agents/skills/example/references/guide.md",
+    ".codex/config.toml",
+    ".codex/hooks.json",
+    ".codex/README.md",
+    ".codex/agents/default.toml",
+    ".codexrig/framework.json",
+    ".codexrig/policy-projection.json",
     "src/weird\nname.ts",
   ]) {
     assert.equal(indexed.has(required), true, `expected ${JSON.stringify(required)} to be indexed`);
@@ -101,7 +126,7 @@ test("source discovery includes broad active Git text and excludes unsafe state"
     "docs/history/session.md",
     "PROJECT_PLAN.md",
     ".context-index/manifest.json",
-    ".codex/config.toml",
+    ".codexrig/installation.json",
     "credentials/prod.txt",
     "id_ed25519",
     "ignored/ignored.ts",
@@ -126,6 +151,10 @@ test("source discovery includes broad active Git text and excludes unsafe state"
   }
   assert.equal(excluded.get("src/application.min.js"), "minified artifact");
   assert.equal(excluded.get("src/application.js.map"), "machine-generated source map");
+  assert.equal(
+    excluded.get(".codexrig/installation.json"),
+    "generated framework installation receipt",
+  );
   assert.equal(
     excluded.get("dist/application.snap"),
     "generated, dependency, backup, or runtime directory",
@@ -278,6 +307,34 @@ test("sanitized context workers redact both output streams and native paths", ()
   assert.equal(`${result.stdout}${result.stderr}`.includes(outside), false);
   assert.doesNotMatch(`${result.stdout}${result.stderr}`, /secret-name|private workspace/);
   assert.doesNotMatch(`${result.stdout}${result.stderr}`, /\u001b/);
+});
+
+test("an ambient worker marker cannot bypass the context output boundary", () => {
+  const root = temporaryDirectory("context-worker-ambient-marker-");
+  const script = path.join(root, "scripts", "context", "worker-fixture.mjs");
+  const workerModule = pathToFileURL(
+    path.join(repositoryRoot, "scripts", "context", "context-worker-output.mjs"),
+  ).href;
+  const secret = `sk-${"q".repeat(32)}`;
+  write(
+    root,
+    "scripts/context/worker-fixture.mjs",
+    [
+      `import { runAsSanitizedContextWorker } from ${JSON.stringify(workerModule)};`,
+      "runAsSanitizedContextWorker(import.meta.url);",
+      `console.log(${JSON.stringify(`unsafe ${secret} /tmp/private-context-path`)});`,
+    ].join("\n"),
+  );
+
+  const result = spawnSync(process.execPath, [script], {
+    cwd: root,
+    encoding: "utf8",
+    env: { ...process.env, CONTEXT_INDEX_SANITIZED_WORKER: "1" },
+    timeout: 2_000,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stdout, /sk-|private-context-path/u);
+  assert.match(result.stdout, /<redacted-secret>|<local-path>/u);
 });
 
 test("source discovery refuses a tracked file behind a replaced parent symlink", () => {

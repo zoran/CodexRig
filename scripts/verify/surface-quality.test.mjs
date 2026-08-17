@@ -1,9 +1,11 @@
+/** Verifies surface quality behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { readStableRepositoryPrefixText } from "../repository/stable-file-snapshot.mjs";
+import { responsiveFailures } from "./responsive.mjs";
 import { analyzeRepositorySurfaces, createSurfaceSnapshot } from "./surface-quality.mjs";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..", "..");
@@ -93,4 +95,54 @@ test("stack detection reads a stable bounded prefix instead of the complete acti
     maximum,
   );
   assert.equal(snapshot.cache.get("src/large.js").full, undefined);
+});
+
+test("responsive verification covers mobile, tablet, desktop, input, zoom, and viewport hazards", () => {
+  const unsafe = responsiveFailures({
+    hasWebSurface: true,
+    files: [
+      {
+        content:
+          '<html><head><meta name="viewport" content="width=device-width,user-scalable=no"></head></html>\n<script>const mobile = /mobile|ipad/i.test(navigator.userAgent)</script>',
+        extension: ".html",
+        relativePath: "src/index.html",
+      },
+      {
+        content:
+          "body { width: 960px; overflow-x: hidden; height: 100vh }\n.toolbar { display: flex }\nbutton { min-height: 24px }\n@media (device-width: 768px) {}",
+        extension: ".css",
+        relativePath: "src/app.css",
+      },
+    ],
+  });
+  const message = unsafe.join("\n");
+  assert.match(message, /must not disable user zoom/);
+  assert.match(message, /user-agent device classes/);
+  assert.match(message, /without content-driven responsive evidence/);
+  assert.match(message, /fixed 960px width/);
+  assert.match(message, /rather than hidden/);
+  assert.match(message, /dynamic mobile browser/);
+  assert.match(message, /physical device dimensions/);
+  assert.match(message, /touch-usable target/);
+
+  assert.deepEqual(
+    responsiveFailures({
+      hasWebSurface: true,
+      files: [
+        {
+          content:
+            '<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head></html>',
+          extension: ".html",
+          relativePath: "src/index.html",
+        },
+        {
+          content:
+            ".layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: clamp(.5rem, 2vw, 2rem) }\n.toolbar { display: flex; flex-wrap: wrap }\nbutton { min-height: 44px }",
+          extension: ".css",
+          relativePath: "src/app.css",
+        },
+      ],
+    }),
+    [],
+  );
 });

@@ -1,3 +1,4 @@
+/** Verifies context integration behavior for the repository-local semantic context boundary. */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
@@ -31,7 +32,7 @@ const semanticAcceptanceCases = [
   {
     query: "identify authentication material before preserving revisions",
     text: "Secret-pattern scanning detects private tokens and credential material in active sources.",
-    path: "scripts/verify/secret-patterns.mjs",
+    path: "scripts/security/secret-patterns.mjs",
   },
   {
     query: "create a clean sibling from the framework and rewrite manifests",

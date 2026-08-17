@@ -1,3 +1,7 @@
+/** Owns project options behavior for the portable clean-project generation boundary. */
+import { existsSync, lstatSync, realpathSync } from "node:fs";
+import path from "node:path";
+
 export function fail(message) {
   throw new Error(message);
 }
@@ -6,7 +10,8 @@ export function usage() {
   return [
     "Usage:",
     "  mise exec --locked -- node .agents/skills/create-project-from-framework/scripts/create-project-from-framework.mjs",
-    '    --name "<Project Name>" [--directory <project-folder>] [--output-parent <path>] [--include-untracked]',
+    '    --name "<Project Name>" [--description "<detailed product description>"]',
+    "    [--directory <project-folder>] [--output-parent <path>] [--include-untracked]",
   ].join("\n");
 }
 
@@ -18,6 +23,7 @@ function optionValue(args, index, optionName) {
 
 export function parseArgs(argv) {
   const options = {
+    description: "",
     directory: "",
     help: false,
     includeUntracked: false,
@@ -31,7 +37,11 @@ export function parseArgs(argv) {
     if (argument === "--help" || argument === "-h") options.help = true;
     else if (argument === "--include-untracked") options.includeUntracked = true;
     else if (argument === "--skip-verify") options.skipVerify = true;
-    else if (argument.startsWith("--name=")) options.name = argument.slice(7);
+    else if (argument.startsWith("--description=")) options.description = argument.slice(14);
+    else if (argument === "--description") {
+      options.description = optionValue(argv, index, "--description");
+      index += 1;
+    } else if (argument.startsWith("--name=")) options.name = argument.slice(7);
     else if (argument === "--name") {
       options.name = optionValue(argv, index, "--name");
       index += 1;
@@ -60,6 +70,20 @@ export function normalizedName(value) {
   if (!name) fail('A project name is required. Pass --name "<Project Name>".');
   if (/[\u0000-\u001f\u007f]/u.test(name)) fail("Project name contains a control character.");
   return name;
+}
+
+export function normalizedProjectDescription(value) {
+  const description = String(value ?? "")
+    .replace(/\r\n?/gu, "\n")
+    .trim();
+  if (!description) return "";
+  if (description.length > 24_000) {
+    fail("Project description exceeds the 24,000-character creation-intake limit.");
+  }
+  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(description)) {
+    fail("Project description contains an unsupported control character.");
+  }
+  return description;
 }
 
 export function slugify(value, label) {
@@ -137,5 +161,3 @@ export function resolveProjectRoots({ defaultSourceRoot, options, projectDirecto
   }
   return { sourceRoot, outputParent, projectRoot, targetRoot };
 }
-import { existsSync, lstatSync, realpathSync } from "node:fs";
-import path from "node:path";

@@ -1,3 +1,4 @@
+/** Owns stack detector behavior for the product stack detection boundary. */
 import { closeSync, existsSync, openSync, readFileSync, readSync, statSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -404,9 +405,7 @@ function detectLanguages(root, files, detections) {
     {
       id: "javascript-node",
       label: "JavaScript / Node.js",
-      matches: (filePath) =>
-        [".cjs", ".js", ".jsx", ".mjs"].includes(path.extname(filePath)) ||
-        path.basename(filePath) === "package.json",
+      matches: (filePath) => [".cjs", ".js", ".jsx", ".mjs"].includes(path.extname(filePath)),
       action: "Use the declared Node.js module, package-manager, formatter, and test conventions.",
     },
     {

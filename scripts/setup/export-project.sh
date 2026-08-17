@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Owns export project behavior for the setup, launch, and portable project boundary.
 set -euo pipefail
 
 if ! command -v tar >/dev/null 2>&1; then

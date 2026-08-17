@@ -1,9 +1,15 @@
+/** Verifies project initialization behavior for the setup, launch, and portable project boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { after, test } from "node:test";
 import { supportedCodexStartCommand } from "../context/portable-context-contract.mjs";
+import { deliveryConfigurationFindings } from "../contracts/delivery-configuration.mjs";
+import { localizationConfigurationFindings } from "../contracts/localization-configuration.mjs";
+import { productConfigurationFindings } from "../contracts/product-configuration.mjs";
+import { tenancyConfigurationFindings } from "../contracts/tenancy-configuration.mjs";
+import { readFrameworkContract } from "../contracts/framework-contract.mjs";
 import {
   repositoryCodexHomeGitignoreFindings,
   repositoryCodexHomeRuntimeProbePaths,
@@ -16,6 +22,7 @@ import {
   assertGeneratedWorkflowRuntime,
   cleanupTemporaryRoots,
   gitState,
+  isolatedTrackedFrameworkSource,
   provideGeneratedDependenciesForTest,
   readdirNames,
   recordGeneratedVerificationEvidence,
@@ -29,24 +36,27 @@ import {
 after(cleanupTemporaryRoots);
 
 test("clean project initialization removes inherited state and source-specific text", () => {
+  const source = isolatedTrackedFrameworkSource("codexrig-source-");
   const outputParent = temporaryRoot("codexrig-create-");
   const sourceStateBefore = gitState(root);
+  const isolatedSourceStateBefore = gitState(source, { includeIgnored: false });
   const result = runProjectGenerator([
     "--name",
     "Generated Isolation Fixture",
     "--directory",
     "generated-isolation-fixture",
     "--source",
-    root,
+    source,
     "--output-parent",
     outputParent,
     "--include-untracked",
   ]);
   assert.equal(result.status, 0, result.stderr);
-  for (const localValue of [root, outputParent]) {
+  for (const localValue of [root, source, outputParent]) {
     assert.equal(`${result.stdout}${result.stderr}`.includes(localValue), false, localValue);
   }
   assert.deepEqual(gitState(root), sourceStateBefore);
+  assert.deepEqual(gitState(source, { includeIgnored: false }), isolatedSourceStateBefore);
   assert.match(
     result.stdout,
     /Source framework tracked and portable state remained unchanged and baseline-clean\./,
@@ -71,9 +81,18 @@ test("clean project initialization removes inherited state and source-specific t
     "utf8",
   );
   const generatedRetrievalSkill = path.join(generated, ".agents/skills/context-retrieval/SKILL.md");
+  const generatedCoherenceSkill = path.join(generated, ".agents/skills/system-coherence/SKILL.md");
+  const generatedCoherenceMetadata = path.join(
+    generated,
+    ".agents/skills/system-coherence/agents/openai.yaml",
+  );
   const generatedRetrievalMetadata = path.join(
     generated,
     ".agents/skills/context-retrieval/agents/openai.yaml",
+  );
+  assert.ok(
+    Buffer.byteLength(generatedAgents, "utf8") <= 24 * 1024,
+    `generated AGENTS.md exceeds the 24 KiB bootstrap budget (${Buffer.byteLength(generatedAgents, "utf8")} bytes)`,
   );
   for (const forbidden of [
     ".git",
@@ -94,7 +113,13 @@ test("clean project initialization removes inherited state and source-specific t
     readFileSync(path.join(generated, ".codexrig", "installation.json"), "utf8"),
   );
   assert.equal(frameworkReceipt.frameworkId, "codexrig");
-  assert.equal(frameworkReceipt.frameworkVersion, "1.2.1");
+  assert.equal(frameworkReceipt.frameworkVersion, readFrameworkContract(root).frameworkVersion);
+  assert.equal(frameworkReceipt.schemaVersion, 2);
+  assert.equal(frameworkReceipt.pendingReconciliation, null);
+  assert.equal("config/product.json" in frameworkReceipt.managedFiles, false);
+  assert.equal("config/delivery.json" in frameworkReceipt.managedFiles, false);
+  assert.equal("config/tenancy.json" in frameworkReceipt.managedFiles, false);
+  assert.equal("config/localization.json" in frameworkReceipt.managedFiles, false);
   assert.deepEqual(readdirNames(path.join(generated, ".codex")), [
     "README.md",
     "agents",
@@ -109,15 +134,73 @@ test("clean project initialization removes inherited state and source-specific t
     sourceCodexConfig.replace("memories = false", "memories = true"),
   );
   assert.match(generatedCodexConfig, /memories = true/);
+  assert.match(
+    generatedCodexConfig,
+    /developer_instructions = """[\s\S]*primary orchestrator[\s\S]*pnpm handover:create -- --critical[\s\S]*After a successful seal, stop completely/,
+  );
+  assert.match(generatedCodexConfig, /never pass a model or\s+reasoning override/);
   const generatedAgentEntries = readdirNames(path.join(generated, ".codex", "agents"));
   for (const requiredAgent of ["default.toml", "explorer.toml", "worker.toml"]) {
     assert.equal(generatedAgentEntries.includes(requiredAgent), true, requiredAgent);
+    const roleConfig = readFileSync(
+      path.join(generated, ".codex", "agents", requiredAgent),
+      "utf8",
+    );
+    assert.match(roleConfig, /model = "gpt-5\.6-sol"/);
+    assert.match(roleConfig, /model_reasoning_effort = "ultra"/);
+    assert.match(roleConfig, /critical-drain request/);
+    assert.match(roleConfig, /start no further tool or task/);
   }
   assert.deepEqual(readdirNames(path.join(generated, "src")), [".gitkeep"]);
   assert.equal(readFileSync(path.join(generated, "src", ".gitkeep"), "utf8"), "");
   const packageJson = JSON.parse(readFileSync(path.join(generated, "package.json"), "utf8"));
   assert.equal(packageJson.name, "generated-isolation-fixture");
   assert.equal(packageJson.version, "0.1.0");
+  const productConfigurationText = readFileSync(
+    path.join(generated, "config", "product.json"),
+    "utf8",
+  );
+  const productConfiguration = JSON.parse(productConfigurationText);
+  assert.deepEqual(productConfigurationFindings(productConfigurationText), []);
+  assert.equal(productConfiguration.identity.displayName, null);
+  assert.equal(productConfiguration.identity.organizationName, null);
+  assert.deepEqual(productConfiguration.identity.applicationIds, {});
+  assert.deepEqual(productConfiguration.brand, { assets: {}, theme: {} });
+  assert.deepEqual(productConfiguration.public, {
+    contacts: {},
+    domains: {},
+    social: {},
+    urls: {},
+  });
+  assert.doesNotMatch(productConfigurationText, /Generated Isolation Fixture|CodexRig/iu);
+  const deliveryConfigurationText = readFileSync(
+    path.join(generated, "config", "delivery.json"),
+    "utf8",
+  );
+  const deliveryConfiguration = JSON.parse(deliveryConfigurationText);
+  assert.deepEqual(deliveryConfigurationFindings(deliveryConfigurationText), []);
+  assert.equal(deliveryConfiguration.defaultTarget, "dev");
+  assert.deepEqual(deliveryConfiguration.declaredTargets, []);
+  assert.deepEqual(deliveryConfiguration.detectedTargets, []);
+  const tenancyConfigurationText = readFileSync(
+    path.join(generated, "config", "tenancy.json"),
+    "utf8",
+  );
+  const tenancyConfiguration = JSON.parse(tenancyConfigurationText);
+  assert.deepEqual(tenancyConfigurationFindings(tenancyConfigurationText), []);
+  assert.equal(tenancyConfiguration.tenantContext.required, true);
+  assert.equal(tenancyConfiguration.tenantContext.resolutionStrategy, "pending");
+  assert.deepEqual(tenancyConfiguration.tenantContext.trustedSources, []);
+  assert.equal(tenancyConfiguration.crossTenantOperations.default, "forbidden");
+  const localizationConfigurationText = readFileSync(
+    path.join(generated, "config", "localization.json"),
+    "utf8",
+  );
+  const localizationConfiguration = JSON.parse(localizationConfigurationText);
+  assert.deepEqual(localizationConfigurationFindings(localizationConfigurationText), []);
+  assert.equal(localizationConfiguration.codeLanguage, "en");
+  assert.equal(localizationConfiguration.userFacing.strategy, "pending");
+  assert.deepEqual(localizationConfiguration.userFacing.supportedLocales, []);
   assert.equal(
     readFileSync(path.join(generated, "scripts/setup/export-project.sh"), "utf8"),
     readFileSync(path.join(root, "scripts/setup/export-project.sh"), "utf8"),
@@ -126,8 +209,15 @@ test("clean project initialization removes inherited state and source-specific t
     packageJson.scripts["framework:doctor"],
     "node scripts/framework/framework-doctor.mjs",
   );
+  assert.equal(
+    packageJson.scripts["framework:version"],
+    "node scripts/framework/framework-version.mjs",
+  );
   assert.equal(packageJson.scripts["platform:detect"], "node scripts/platform/detect-platform.mjs");
   assert.equal(packageJson.scripts["codex:start"], "bash scripts/setup/start-codex.sh");
+  assert.equal(packageJson.scripts["auth:check"], "node scripts/verify/identity-access.mjs");
+  assert.equal(packageJson.scripts["tenancy:check"], "node scripts/verify/tenant-isolation.mjs");
+  assert.equal(packageJson.scripts["localization:check"], "node scripts/verify/localization.mjs");
   assert.match(packageJson.scripts.setup, /node scripts\/context\/index-codebase\.mjs --setup$/);
   assert.equal(
     packageJson.scripts["context:check"],
@@ -135,6 +225,10 @@ test("clean project initialization removes inherited state and source-specific t
   );
   assert.equal(packageJson.scripts["context:index"], "node scripts/context/index-codebase.mjs");
   assert.equal(packageJson.scripts["context:search"], "node scripts/context/search-context.mjs");
+  assert.equal(
+    packageJson.scripts["handover:create"],
+    "node scripts/context/critical-budget-handover.mjs create",
+  );
   assert.equal(packageJson.scripts.verify, "node scripts/verify/adaptive.mjs --mode full");
   assert.equal(
     packageJson.scripts["verify:changed"],
@@ -176,18 +270,16 @@ test("clean project initialization removes inherited state and source-specific t
     generatedReadme,
     generatedCodexReadme,
     generatedInstructions,
-    generatedManifest,
   ]) {
     assert.equal(content.includes(supportedCodexStartCommand), true);
   }
-  assert.match(generatedManifest, /hash-trusted project\s+Stop hook refreshes/);
   assert.match(generatedCodexReadme, /mutable repository-local Codex runtime/);
   assertGeneratedDependencyFreshnessContract(generated);
   assert.match(generatedReadme, /Root `src\/` is the default Product Root/);
   assert.match(generatedReadme, /`pnpm setup` creates the ignored `\.context-index\/`/);
   assert.match(
     generatedReadme,
-    /project-local Codex Stop hook refreshes\s+changed indexed sources and validates[\s\S]{0,300}non-null `transcript_path`/,
+    /project-local Codex Stop hook\s+refreshes\s+changed\s+indexed\s+sources\s+and\s+validates[\s\S]{0,300}non-null `transcript_path`/,
   );
   assert.match(
     generatedContextIndex,
@@ -237,6 +329,17 @@ test("clean project initialization removes inherited state and source-specific t
     { cwd: generated, encoding: "utf8", input: "", stdio: "pipe" },
   );
   assert.equal(generatedEntrypointCheck.status, 0, generatedEntrypointCheck.stderr);
+  const generatedVersionCheck = spawnSync(
+    process.execPath,
+    ["scripts/framework/framework-version.mjs", "--check"],
+    { cwd: generated, encoding: "utf8", input: "", stdio: "pipe" },
+  );
+  assert.equal(generatedVersionCheck.status, 0, generatedVersionCheck.stderr);
+  assert.match(generatedVersionCheck.stdout, /product version is project-owned/u);
+  assert.equal(
+    JSON.parse(readFileSync(path.join(generated, "package.json"), "utf8")).version,
+    "0.1.0",
+  );
   const generatedEvidenceTest = spawnSync(
     process.execPath,
     [
@@ -247,7 +350,7 @@ test("clean project initialization removes inherited state and source-specific t
     { cwd: generated, encoding: "utf8", input: "", stdio: "pipe" },
   );
   assert.equal(generatedEvidenceTest.status, 0, generatedEvidenceTest.stderr);
-  assert.equal(existsSync(path.join(generated, "scripts/context/terminal-output.test.mjs")), true);
+  assert.equal(existsSync(path.join(generated, "scripts/terminal/terminal-output.test.mjs")), true);
   assert.equal(existsSync(path.join(generated, "scripts/context/context-maintenance.mjs")), true);
   assert.equal(
     existsSync(path.join(generated, "scripts/context/context-maintenance-safety.mjs")),
@@ -292,6 +395,11 @@ test("clean project initialization removes inherited state and source-specific t
     existsSync(path.join(generated, "scripts/goals/goal-publication-precondition.mjs")),
     true,
   );
+  assert.equal(existsSync(path.join(generated, "scripts/context/project-work-state.mjs")), true);
+  assert.equal(
+    existsSync(path.join(generated, "scripts/context/critical-budget-handover.mjs")),
+    true,
+  );
   assert.match(generatedAgents, /`instructions\.md` owns the complete agent workflow/);
   assert.match(generatedAgents, /checks prerequisites/);
   assert.match(generatedAgents, /Local Codex memory isolation is repository-local and root-bound/);
@@ -306,22 +414,27 @@ test("clean project initialization removes inherited state and source-specific t
     assert.match(content, /broad,\s+realistic\s+end-to-end/i);
     assert.match(content, /every\s+new\s+feature/i);
     assert.match(content, /reviewable\s+slices/i);
-    assert.match(content, /no\s+relevant\s+finding\s+remains/i);
+    assert.match(content, /(?:no\s+relevant\s+finding\s+remains|zero\s+relevant\s+findings)/i);
     assert.match(content, /fresh\s+audit/i);
   }
-  for (const content of [generatedAgents, generatedInstructions, generatedManifest]) {
+  for (const content of [generatedAgents, generatedInstructions]) {
     assert.match(content, /Local Codex memory isolation is repository-local and root-bound/i);
-    assert.match(content, /audit\s+finding.*reopen/is);
-    assert.match(content, /branch\s+policy\s+permits/i);
-    assert.match(content, /marker\s+commit/i);
   }
-  for (const content of [generatedAgents, generatedInstructions, generatedManifest]) {
+  assert.match(generatedInstructions, /audit\s+finding.*reopen/is);
+  assert.match(generatedInstructions, /branch\s+policy\s+permits/i);
+  assert.match(generatedInstructions, /marker\s+commit/i);
+  for (const content of [generatedAgents, generatedInstructions]) {
     assert.match(content, /modular\s+monolith/i);
     assert.match(content, /only\s+durable\s+integration\s+branch/i);
-    assert.match(content, /not\s+an\s+authentication\s+boundary/i);
-    assert.match(content, /every\s+completed\s+slice/i);
-    assert.match(content, /without\s+waiting\s+for\s+another\s+prompt/i);
   }
+  assert.match(generatedInstructions, /not\s+an\s+authentication\s+boundary/i);
+  assert.match(generatedInstructions, /pnpm handover:create -- --critical/u);
+  assert.match(generatedInstructions, /final repository action/u);
+  assert.match(generatedInstructions, /stop completely/u);
+  assert.match(generatedReadme, /ignored `tmp\/codexrig-handovers\//u);
+  assert.doesNotMatch(generatedReadme, /`\.tmp\/codexrig-handovers\//u);
+  assert.match(generatedInstructions, /every\s+completed\s+slice/i);
+  assert.match(generatedInstructions, /without\s+waiting\s+for\s+another\s+prompt/i);
   assertGeneratedWorkflowPolicyContract({
     generated,
     agents: generatedAgents,
@@ -330,22 +443,26 @@ test("clean project initialization removes inherited state and source-specific t
     instructions: generatedInstructions,
     manifest: generatedManifest,
   });
-  assert.match(generatedManifest, /Product module map/i);
-  assert.match(generatedManifest, /public contract and private internals/i);
+  assert.match(generatedManifest, /### Active Module Inventory/i);
+  assert.match(generatedManifest, /No active product modules\./i);
+  assert.match(generatedManifest, /docs\/future-modules\.md/i);
+  assert.doesNotMatch(generatedManifest, /Product module map|pre-slice|fresh audit|marker commit/i);
   assert.match(generatedInstructions, /replacement test/i);
   assert.match(generatedInstructions, /exactly one write owner/i);
-  assert.match(generatedAgents, /temporary task branches/i);
-  for (const content of [generatedAgents, generatedInstructions, generatedManifest]) {
+  assert.match(generatedAgents, /temporary (?:task )?branches/i);
+  for (const content of [generatedAgents, generatedInstructions]) {
     assert.match(content, /Project\s+Definition\s+Intake/i);
   }
+  assert.match(generatedManifest, /Product definition: pending/i);
   assert.match(generatedReadme, /## First Prompt: Define The Project/i);
-  assert.match(generatedAgents, /first user interaction/i);
   assert.match(generatedInstructions, /Begin\s+the\s+first\s+response/i);
   assert.match(generatedInstructions, /final\s+opportunity\s+to\s+correct/i);
-  assert.match(generatedReadme, /same\s+focused\s+intake\s+resumes\s+later/i);
+  assert.match(
+    generatedReadme,
+    /resume\s+the\s+intake\s+whenever\s+a\s+material.*decision\s+changes/is,
+  );
   assert.match(generatedAgents, /short safe-entry bootstrap/);
   assert.equal(generatedAgents.length < generatedInstructions.length, true);
-  assert.match(generatedAgents, /major milestone/i);
   assert.match(generatedInstructions, /## Product-First Delivery And Verification Economy/);
   assert.match(generatedInstructions, /whole-repository course check/i);
   assert.match(generatedInstructions, /recompute\s+missing coverage/i);
@@ -361,7 +478,7 @@ test("clean project initialization removes inherited state and source-specific t
   assert.match(generatedInstructions, /marker\s+commit/);
   assert.match(generatedInstructions, /major milestone/i);
   assert.match(generatedReadme, /pnpm context:search.*semantic\s+discovery/s);
-  assert.match(generatedManifest, /replace-in-place\s+record/i);
+  assert.match(generatedInstructions, /replace-in-place\s+successful-evidence\s+record/i);
   for (const filePath of [generatedRetrievalSkill, generatedRetrievalMetadata]) {
     const stats = lstatSync(filePath);
     assert.equal(stats.isFile(), true);
@@ -387,28 +504,45 @@ test("clean project initialization removes inherited state and source-specific t
     assert.match(roleContent, /context recovery/, role);
     assert.match(roleContent, /milestone/, role);
     assert.match(roleContent, /fresh audit/, role);
-    assert.match(roleContent, /audit finding reopens/, role);
-    assert.match(roleContent, /module/, role);
+    assert.match(roleContent, /token envelope/, role);
+    assert.match(roleContent, /critical-drain request/, role);
     assert.match(roleContent, /overlap/, role);
-    assert.match(roleContent, /every completed/, role);
-    assert.match(roleContent, /do not commit or push/, role);
+    assert.match(
+      roleContent,
+      /Mirror every direct peer message and\s+response to\s+the\s+primary/,
+      role,
+    );
+    assert.match(roleContent, /every\s+completed/, role);
+    assert.match(roleContent, /Never[\s\S]*commit/, role);
+    assert.match(roleContent, /never delegate or spawn another\s+agent/i, role);
   }
   assert.match(generatedReadme, /## Project Authority/);
+  assert.match(generatedReadme, /\$system-coherence/);
+  assert.match(generatedReadme, /Documentation Context Economy/);
   assert.match(generatedInstructions, /single committed workflow authority/);
-  assert.match(generatedInstructions, /Documentation has no numeric line or word quota/);
+  assert.match(generatedInstructions, /Documentation has no general numeric line or word quota/);
+  assert.match(generatedInstructions, /\$system-coherence/);
+  assert.match(generatedInstructions, /24 KiB bootstrap cap/);
+  assert.match(generatedAgents, /\$system-coherence/);
   assert.match(generatedInstructions, /at or below 700 physical lines/);
   assert.match(generatedManifest, /Agent workflow authority: `instructions\.md`/);
-  assert.match(generatedManifest, /whole-repository course checks/i);
-  assert.match(generatedManifest, /Product-first delivery/);
-  assert.match(generatedManifest, /failures\s+recompute\s+missing\s+coverage/);
-  assert.match(generatedManifest, /major milestone/i);
-  assert.match(generatedManifest, /fresh audit/i);
-  assert.match(generatedManifest, /pnpm goal:new/);
-  assert.match(generatedManifest, /pre-descent mask/);
-  assert.match(generatedManifest, /marker\s+commit/);
+  assert.doesNotMatch(
+    generatedManifest,
+    /whole-repository course checks|Product-first delivery|pnpm goal:new|pre-descent mask|marker commit/i,
+  );
   assert.match(generatedContextIndex, /opportunistic maintenance/i);
   assert.match(generatedContextIndex, /strictly read-only/i);
   assert.match(generatedContextIndex, /source classifications/i);
+  assert.match(generatedContextIndex, /Portable `\.codex\/config\.toml`/i);
+  assert.match(generatedContextIndex, /future-modules\.md.*rank them below current evidence/is);
+  assert.equal(
+    readFileSync(generatedCoherenceSkill, "utf8"),
+    readFileSync(path.join(root, ".agents/skills/system-coherence/SKILL.md"), "utf8"),
+  );
+  assert.equal(
+    readFileSync(generatedCoherenceMetadata, "utf8"),
+    readFileSync(path.join(root, ".agents/skills/system-coherence/agents/openai.yaml"), "utf8"),
+  );
   assert.equal(
     [generatedAgents, generatedReadme, generatedInstructions, generatedManifest].filter((content) =>
       content.includes("## Compact Project Memory"),
@@ -429,6 +563,7 @@ test("clean project initialization removes inherited state and source-specific t
     "AGENTS.md",
     "README.md",
     "docs/context-index.md",
+    "docs/future-modules.md",
     "docs/project.md",
     "instructions.md",
   ]);
@@ -437,6 +572,7 @@ test("clean project initialization removes inherited state and source-specific t
     .map((filePath) => path.relative(generated, filePath).split(path.sep).join("/"))
     .filter(
       (relativePath) =>
+        !relativePath.startsWith(".agents/") &&
         !relativePath.startsWith(".codex/") &&
         !relativePath.startsWith(".codexrig/") &&
         !relativePath.startsWith("scripts/"),
@@ -444,7 +580,9 @@ test("clean project initialization removes inherited state and source-specific t
     .sort();
   assert.deepEqual(frameworkIdentityFiles, [
     "AGENTS.md",
+    "NOTICE",
     "README.md",
+    "docs/context-index.md",
     "docs/project.md",
     "instructions.md",
   ]);

@@ -1,7 +1,13 @@
+/** Owns dependency policy behavior for the dependency and toolchain maintenance boundary. */
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
+import {
+  discoverPnpmWorkspaceManifestPaths,
+  pnpmHooksDisabledEnvironment,
+} from "../repository/pnpm-workspace-manifests.mjs";
 import { repositoryRoot } from "../repository/source-inventory.mjs";
+import { spawnTrustedPnpm } from "./trusted-pnpm-command.mjs";
 
 export const root = repositoryRoot;
 export const dependencySections = [
@@ -67,78 +73,13 @@ export function validatePolicy(policy) {
   return failures;
 }
 
-export function packageManifests({
-  repositoryRoot: projectRoot = root,
-  spawnPnpm = spawnSync,
-} = {}) {
-  const projects = runPnpmJson(
-    ["--recursive", "list", "--depth", "-1", "--json"],
-    "pnpm recursive workspace list",
-    { cwd: projectRoot, spawnPnpm },
-  );
-  if (!Array.isArray(projects)) {
-    throw new Error("pnpm recursive workspace list returned an invalid project graph");
-  }
+export function packageManifests({ repositoryRoot: projectRoot = root, relativePaths } = {}) {
   const realRoot = realpathSync.native(projectRoot);
-  const rootManifest = path.join(realRoot, "package.json");
-  try {
-    const rootManifestStats = lstatSync(rootManifest);
-    if (
-      rootManifestStats.isSymbolicLink() ||
-      !rootManifestStats.isFile() ||
-      realpathSync.native(rootManifest) !== rootManifest
-    ) {
-      throw new Error("manifest");
-    }
-  } catch {
-    throw new Error("dependency workspace root must contain a real package.json");
-  }
-  const manifestPaths = new Set(["package.json"]);
-  for (const project of projects) {
-    if (!isRecord(project) || typeof project.path !== "string" || !project.path.trim()) {
-      throw new Error("pnpm recursive workspace list returned an invalid project location");
-    }
-    const rawLocation = project.path.trim();
-    if (
-      rawLocation.includes("\0") ||
-      hasTraversal(rawLocation) ||
-      (path.win32.isAbsolute(rawLocation) && !path.isAbsolute(rawLocation))
-    ) {
-      throw new Error("pnpm recursive workspace list returned an unsafe project location");
-    }
-    const absolute = path.isAbsolute(rawLocation)
-      ? path.normalize(rawLocation)
-      : path.resolve(realRoot, rawLocation);
-    const relative = path.relative(realRoot, absolute);
-    if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-      throw new Error("pnpm recursive workspace list returned a project outside the repository");
-    }
-    let cursor = realRoot;
-    try {
-      for (const segment of relative.split(path.sep).filter(Boolean)) {
-        cursor = path.join(cursor, segment);
-        if (lstatSync(cursor).isSymbolicLink()) {
-          throw new Error("symlink");
-        }
-      }
-      if (!lstatSync(absolute).isDirectory() || realpathSync.native(absolute) !== absolute) {
-        throw new Error("directory");
-      }
-      const manifest = path.join(absolute, "package.json");
-      const manifestStats = lstatSync(manifest);
-      if (
-        manifestStats.isSymbolicLink() ||
-        !manifestStats.isFile() ||
-        realpathSync.native(manifest) !== manifest
-      ) {
-        throw new Error("manifest");
-      }
-    } catch {
-      throw new Error("pnpm recursive workspace list returned a non-real project location");
-    }
-    manifestPaths.add(path.posix.join(relative.split(path.sep).join("/") || ".", "package.json"));
-  }
-  const manifests = [...manifestPaths].sort().map((relativePath) => {
+  const manifestPaths = discoverPnpmWorkspaceManifestPaths({
+    repositoryRoot: realRoot,
+    relativePaths,
+  });
+  const manifests = manifestPaths.map((relativePath) => {
     const fullPath = path.join(projectRoot, relativePath);
     let data;
     try {
@@ -241,14 +182,24 @@ export function parsePnpmJsonResult(result, label, { acceptOutdatedStatus = fals
   return parsed;
 }
 
-function runPnpmJson(args, label, { spawnPnpm = spawnSync, cwd = root, ...options } = {}) {
-  const result = spawnPnpm("pnpm", args, {
-    cwd,
-    encoding: "utf8",
-    input: "",
-    maxBuffer: 16 * 1024 * 1024,
-    stdio: "pipe",
-    timeout: 120_000,
+function runPnpmJson(
+  args,
+  label,
+  { spawnPnpm = spawnSync, cwd = root, repositoryRoot: commandRoot = root, ...options } = {},
+) {
+  const result = spawnTrustedPnpm({
+    args,
+    repositoryRoot: commandRoot,
+    spawnPnpm,
+    options: {
+      cwd,
+      encoding: "utf8",
+      env: pnpmHooksDisabledEnvironment(process.env),
+      input: "",
+      maxBuffer: 16 * 1024 * 1024,
+      stdio: "pipe",
+      timeout: 120_000,
+    },
   });
   return parsePnpmJsonResult(result, label, options);
 }
@@ -529,6 +480,7 @@ export function readOutdated(options = {}) {
         const raw = runPnpmJson(["outdated", name, "--format", "json", ...sectionArgs], label, {
           acceptOutdatedStatus: true,
           cwd: workspaceDirectory,
+          repositoryRoot: projectRoot,
           spawnPnpm,
         });
         const entries = rawOutdatedEntries(raw);

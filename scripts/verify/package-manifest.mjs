@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/** Owns package manifest behavior for the repository verification boundary. */
 import { lstatSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";

@@ -1,3 +1,4 @@
+/** Owns report behavior for the dependency and toolchain maintenance boundary. */
 import process from "node:process";
 import {
   formatDependencyTable,

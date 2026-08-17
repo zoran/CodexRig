@@ -1,3 +1,4 @@
+/** Owns secrets behavior for the repository verification boundary. */
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
@@ -8,7 +9,7 @@ import {
 } from "../repository/source-inventory.mjs";
 import { sensitivePathReason } from "../repository/sensitive-paths.mjs";
 import { scanStableRepositoryFile } from "../repository/stable-file-snapshot.mjs";
-import { formatContextError, sanitizeMultilineForTerminal } from "../context/terminal-output.mjs";
+import { formatContextError, sanitizeMultilineForTerminal } from "../terminal/terminal-output.mjs";
 import { createSecretContentScanner } from "./secret-content-scan.mjs";
 
 export async function scanRepositorySecrets({ root = repositoryRoot, files } = {}) {

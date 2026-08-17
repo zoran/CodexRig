@@ -1,3 +1,4 @@
+/** Verifies secrets behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -6,6 +7,8 @@ import path from "node:path";
 import { after, test } from "node:test";
 import { scanRepositorySecrets } from "./secrets.mjs";
 import { activeSourcePathClassification } from "../repository/source-inventory.mjs";
+import { findSecretMatches } from "../security/secret-patterns.mjs";
+import { createSecretContentScanner } from "./secret-content-scan.mjs";
 
 const roots = [];
 
@@ -28,8 +31,13 @@ after(() => {
 test("secret scan covers arbitrary source extensions, binary bytes, and files over one MiB", async () => {
   const root = fixture();
   const apiToken = ["sk-", "a".repeat(24)].join("");
+  const gitlabToken = ["glpat-", "g".repeat(20)].join("");
   const keyHeader = ["-----BEGIN PRI", "VATE KEY-----"].join("");
-  write(root, "sources/app.py", `value = ${JSON.stringify(apiToken)}\n`);
+  write(
+    root,
+    "sources/app.py",
+    `value = ${JSON.stringify(apiToken)}\ngitlab = ${JSON.stringify(gitlabToken)}\n`,
+  );
   write(
     root,
     "assets/large.data",
@@ -39,10 +47,88 @@ test("secret scan covers arbitrary source extensions, binary bytes, and files ov
 
   const findings = await scanRepositorySecrets({ root });
   assert.ok(findings.some((finding) => finding.includes("sources/app.py: OpenAI-style API key")));
+  assert.ok(findings.some((finding) => finding.includes("sources/app.py: GitLab token")));
   assert.ok(findings.some((finding) => finding.includes("assets/large.data: private key block")));
   assert.ok(
     findings.some((finding) => finding.includes("assets/binary.data: OpenAI-style API key")),
   );
+});
+
+test("secret classification catches literal credentials across providers and chunks", () => {
+  const customGitlabToken = `corpgl-${"x".repeat(24)}`;
+  const assignment = `GITLAB_TOKEN=${customGitlabToken}`;
+  assert.deepEqual(findSecretMatches(assignment), [{ label: "literal named credential", line: 1 }]);
+  assert.deepEqual(findSecretMatches(JSON.stringify({ GITLAB_TOKEN: customGitlabToken })), [
+    { label: "literal named credential", line: 1 },
+  ]);
+  for (const source of [
+    ["DATABASE_PASSWORD=correct-horse", "-battery-staple"].join(""),
+    ["API_KEY=provider-", "live-key-0123456789"].join(""),
+    JSON.stringify({ sessionSecret: ["session-live-secret-", "0123456789"].join("") }),
+  ]) {
+    assert.deepEqual(findSecretMatches(source), [{ label: "literal named credential", line: 1 }]);
+  }
+  assert.deepEqual(findSecretMatches(`Authorization: Bearer ${customGitlabToken}`), [
+    { label: "HTTP authorization credential", line: 1 },
+  ]);
+  for (const uri of [
+    ["postgresql://app:supersecret", "-password@db.example.test/app"].join(""),
+    ["redis://default:redis-live", "-password@cache.example.test:6379"].join(""),
+    ["mongodb+srv://app:mongo-live", "-password@cluster.example.test/db"].join(""),
+  ]) {
+    assert.deepEqual(findSecretMatches(`DATABASE_URL=${uri}`), [
+      { label: "credential-bearing connection URI", line: 1 },
+    ]);
+  }
+  assert.deepEqual(
+    findSecretMatches(
+      "DATABASE_URL=postgresql://app:${DATABASE_PASSWORD}@db.example.test/app\nDATABASE_URL=postgresql://app:<password>@db.example.test/app",
+    ),
+    [],
+  );
+  assert.deepEqual(findSecretMatches("GITLAB_TOKEN=<token>\nGH_TOKEN=test-token\n"), []);
+  assert.deepEqual(
+    findSecretMatches(
+      "environment.GITLAB_TOKEN = process.env.GITLAB_TOKEN\nDATABASE_PASSWORD=${DATABASE_PASSWORD}\nAuthorization: Bearer ${GITLAB_TOKEN}\n",
+    ),
+    [],
+  );
+  assert.deepEqual(
+    findSecretMatches(
+      [
+        "SESSION_TOKEN=config.SECRET_TOKEN",
+        "SESSION_TOKEN=runtime.secret_token",
+        "SESSION_TOKEN=state.session_token",
+        "SESSION_TOKEN=SYMBOLIC_RUNTIME_TOKEN",
+        "SESSION_TOKEN=SOME_RUNTIME_TOKEN",
+        'SESSION_TOKEN="SYMBOLIC_RUNTIME_TOKEN"',
+        'SESSION_TOKEN="SOME_RUNTIME_TOKEN"',
+        '{"sessionToken":"SYMBOLIC_RUNTIME_TOKEN"}',
+      ].join("\n"),
+    ),
+    [],
+  );
+
+  const scanner = createSecretContentScanner();
+  const boundary = Math.floor(assignment.length / 2);
+  scanner.write(Buffer.from(assignment.slice(0, boundary)));
+  scanner.write(Buffer.from(assignment.slice(boundary)));
+  assert.ok(scanner.findings().includes("literal named credential"));
+
+  const headerScanner = createSecretContentScanner();
+  const header = `curl -H 'Authorization: Bearer ${customGitlabToken}'`;
+  headerScanner.write(Buffer.from(header.slice(0, 17)));
+  headerScanner.write(Buffer.from(header.slice(17)));
+  assert.ok(headerScanner.findings().includes("HTTP authorization credential"));
+
+  const uriScanner = createSecretContentScanner();
+  const connection = [
+    "DATABASE_URL=postgresql://app:supersecret",
+    "-password@db.example.test/app",
+  ].join("");
+  uriScanner.write(Buffer.from(connection.slice(0, 31)));
+  uriScanner.write(Buffer.from(connection.slice(31)));
+  assert.ok(uriScanner.findings().includes("credential-bearing connection URI"));
 });
 
 test("secret scan flags credential paths without rejecting ordinary security source modules", async () => {

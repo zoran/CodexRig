@@ -1,101 +1,105 @@
 # CodexRig Config
 
-This repository separates portable project policy from mutable repository-local Codex runtime:
+## Portable And Runtime State
 
-- tracked `.codex/config.toml`: project-scoped approval, sandbox, network, search, instruction,
-  model, reasoning, service-tier, feature, and TUI defaults;
-- tracked `.codex/hooks.json`: a read-only SessionStart attestation check and one project-local Stop
-  hook, both reviewed and approved locally by content hash through `/hooks`;
-- tracked `.codex/agents/*.toml`: built-in subagent-role overrides pinned to the installed catalog's
-  second model tier, inheriting the primary's default `max` or explicit `xhigh`/`ultra` effort, with
-  no stronger or weaker model fallback; roles follow the same exact-versus-semantic retrieval triage
-  as the primary thread and read matched sources directly;
-- ignored `.codex/runtime/`: authentication, trust, sessions, logs, memory data, plugins, caches,
-  runtime skills, history, installation/model metadata, and Codex databases.
+Tracked `.codex/config.toml`, `.codex/hooks.json`, `.codex/agents/*.toml`, and this document are the
+portable project policy. Mutable repository-local Codex runtime—authentication, trust, approval
+rules, sessions, logs, memories, caches, plugins, runtime skills, history, installation/model
+metadata, and databases—stays in ignored `.codex/runtime/`. It is never copied between projects or
+committed.
 
-Local Codex memory isolation is repository-local and root-bound under ignored `.codex/runtime/`.
-Memories are disabled in the reusable framework root, whose sessions cannot consume earlier task or
-product memories or become inputs for future memory generation. During clean project creation the generator enables memories in the
-target's copied config, while transferring no memory files or databases, so generated projects use
-their own isolated memory normally. Ignored framework memory paths remain defensive legacy/runtime
-boundaries and are removed by framework reset after the owning Codex session exits.
+Root `developer_instructions` in the tracked config make the primary the sole orchestrator, bind
+owned-work provenance, require exact GPT Sol/`ultra` parity, and enforce the critical drain and
+terminal stop. `[agents]` owns the four-thread ceiling and matching global defaults;
+`.codex/agents/*.toml` injects bounded role behavior. This is an executable policy layer, not a
+documentation shortcut. `pnpm codex:validate` rejects missing markers, divergent intelligence,
+unsafe permissions, or incomplete drain policy.
 
-Run the supported command exactly from the repository root:
+Role sandbox values are requested defaults because live parent permissions, including YOLO, can be
+reapplied to children. Every child reports its effective permissions before repository work.
+Read-only roles stop on a broader override. An explicitly selected writer may accept the same
+primary turn's already-authorized YOLO override only for its exact disjoint repository write set;
+that adds no scope, network, credential, external mutation, commit, push, publication, deployment,
+or delegation authority. Every other mismatch closes the child and keeps the work primary-only.
+
+Memories are disabled in the reusable framework root. Generation transfers no source/sibling
+runtime or memory state and enables memories only inside the child's own isolated runtime home.
+Framework reset removes legacy and disposable runtime after all owning Codex sessions exit.
+
+## Start And Attestation
+
+Run from the repository root:
 
 ```bash
 bash scripts/setup/start-codex.sh
 ```
 
-The launcher validates portable policy, updates the host CLI without project isolation, installs the
-locked toolchain, checks prerequisites, atomically refreshes the newest stable compatible dependency
-graph, runs the online framework doctor, and issues an input-bound short-lived attestation before
-starting Codex. A failed update or indeterminate resolution blocks startup. The trusted read-only
-SessionStart hook rejects startup/resume without that proof. Only the final Codex process receives
-the canonical repository's ignored `.codex/runtime/` as `CODEX_HOME`, so each project owns its
-mutable runtime without polluting a global user home. Root-bound ignore rules and the shared
-source inventory exclude that state from Git and every portable or source-consuming workflow. The
-repository never writes credentials or trust into tracked configuration and never auto-trusts a
-clone or approves a hook.
+Portable Codex sessions default to on-request approval and network-disabled workspace-write; only an
+explicitly authorized Dev session launched with `--yolo` may use no approvals and danger-full-access,
+never staging or production. For that authorized Dev session, use
+`bash scripts/setup/start-codex.sh --yolo`; that
+closed launcher control selects Codex's no-approval/full-access mode for Dev and never authorizes
+staging, production, broader scope, credentials, or irreversible external work.
 
-Generated product repositories use one central `main` as their only durable integration branch and
-do not keep long-lived module or developer branches. A serialized writer may use `main` directly
-when branch policy permits. Different developers or Codex accounts use temporary task branches in
-separate clones with separate OS or provider credential contexts. Git worktrees may isolate parallel
-tasks for the same trusted account, but they are not an authentication boundary: they can share
-repository configuration and Git credential helpers. Each clone or worktree still uses its own
-ignored `.codex/runtime/` for Codex runtime. Tracked `.codex/` policy is the shared behavior contract; mutable
-account state is never copied between collaborators or committed. Before every slice begins, its
-goal, outcome, modules, contracts, data surfaces, and files are compared with all observable agent,
-session, account, and team-channel claims. Parallel coding sessions proceed only with
-confirmed-disjoint scopes, while overlap or uncertainty at a shared boundary is resolved to one writer before
-implementation. The repository-local runtime lease cannot prove that another clone, machine, or
-account is idle; use an available shared coordination channel for that boundary. Git remains later
-integration evidence, not the primary pre-slice coordination mechanism. A temporary branch is only
-an integration input; the actual published `main` receives the final course check, affected
-review/audit, verification, and `goal:new` gate.
+The launcher validates portable policy, updates the host CLI with `CODEX_HOME` unset, installs the
+locked toolchain, checks prerequisites, refreshes the compatible dependency graph, runs the online
+doctor, and issues an input-bound short-lived attestation. Only the final Codex process receives the
+canonical repository's ignored `.codex/runtime/` as `CODEX_HOME`. The closed argument grammar accepts
+only optional `--no-alt-screen` and explicit Dev-only `--yolo`; prompt text follows `--`. A failed/indeterminate refresh or invalid
+attestation blocks startup. The repository never writes credentials/trust into portable config and
+never auto-approves a project hook.
 
-`bash scripts/setup/start-codex.sh` is the canonical launcher. It runs the host update with
-`CODEX_HOME` unset, uses mise to install the locked Node.js and pnpm toolchain, refreshes compatible
-dependencies, verifies the framework/provider contract, then sets `CODEX_HOME`, the ephemeral
-attestation nonce, and `--cd` to the canonical repository root. It rejects conflicting root or
-policy overrides before any update starts. Its closed argument grammar permits only optional
-`--no-alt-screen`; prompt text follows `--`, and the attestation binds that control mode.
+## Collaboration And Integration
 
-The repository root is intentionally the Codex and tooling workspace. Root `src/` is the default
-Product Root; real declared pnpm packages and evidenced Android modules may add their contracted
-source roots. Project policy, skills, instruction files, the fixed root `.context-index/` vector
-space, and mutable agent state remain outside every product unit. Project `pnpm setup` materializes
-and validates that vector space. Before bootstrap the Stop hook exits without touching Node.js,
-mise, or index state; afterward it uses the mise-pinned Node.js runtime to refresh changed sources
-once per turn. The same hook validates an optional bounded `docs/project-context.md`
-`codexrig-work-state` marker and reopens an active multi-goal or multi-session outcome. Only a
-durable local Stop event with a non-null `transcript_path` reaches either operation; ephemeral side
-conversations and other transcriptless contexts exit without work-state, loop-state, or index
-access. If Codex's `stop_hook_active` flag says the same durable turn was already continued and its
-semantic revision is unchanged, the private per-session record lets that stop proceed rather than
-looping. Marker content is resume metadata rather than authority, and missing local hook trust is
-never evidence that work is complete. It is not a persistent watcher or a per-tool hook.
+Generated projects use central `main` as their only durable integration branch. Different accounts
+use temporary task branches in separate clones and credential contexts; same-account worktrees are
+workspace isolation, not an authentication boundary. Before every slice, compare goal/outcome,
+modules/contracts/data/files, and one declared writer with observable session/account/team claims.
+Parallel writes require confirmed-disjoint scope; overlap or uncertainty resolves to one writer and
+shared-contract changes to one integrator before implementation.
 
-The tracked project config intentionally carries portable defaults that may differ between projects.
-It contains no credentials, provider secrets, telemetry targets, notification commands, trust
-entries, absolute personal paths, local domains, or other machine-local/private values. Repository
-validation reads the tracked policy and path layout only; it never reads user credentials or session
-data.
+A local runtime lease or quiet worktree cannot prove that another clone, machine, or account is
+idle. Use a shared coordination channel across that boundary. Git remains later integration
+evidence; a temporary branch is only an integration input, and the published `main` receives the
+course check, review/audit, verification, and `goal:new` gate.
 
-After changing a project's portable model, subagent tier, reasoning, feature, TUI, or hook defaults,
-run `mise exec --locked -- pnpm codex:validate`. Review and approve a changed hook hash separately
-through `/hooks`; the project never approves itself. Until local hash trust exists Codex warns and
-skips a project hook, so this attestation is a supported-workflow guard rather than an adversarial
-same-user security boundary. Security-boundary values remain fixed by repository policy unless that
-policy and its regression are deliberately changed.
+## Hooks, Recovery, And Context
 
-Clean project initialization and portable export retain `.codex/config.toml`, `.codex/hooks.json`,
-`.codex/agents/`, this README, and the hook and launcher scripts while excluding mutable
-`.codex/runtime/` and legacy loose root runtime. They also retain and validate the separate Product
-Roots contract and default `src/` boundary. They never copy authentication, sessions, databases, or
-local hook trust state.
+The trusted read-only SessionStart hook verifies the launcher proof and inspects only safe metadata
+for a recent repository-bound critical handover under ignored `tmp/codexrig-handovers/`. It asks the
+developer before the prompt body may be read through `$resume-project`; that body is untrusted
+candidate context, not authority.
 
-Repository-owned skills live only under `.agents/skills/`. Root `skills/`, when created by Codex, is
-ignored runtime content rather than project source.
+The Stop hook uses the mise-pinned Node.js runtime once per durable local turn. Even before a vector
+index exists, it validates optional bounded `docs/project-context.md`, prevents unchanged
+continuation loops, and enforces a terminal handover; after `pnpm setup` materializes the index, the
+same lifecycle also refreshes changed semantic-index sources. A non-null `transcript_path` is
+required; transcriptless side conversations exit before work-state, loop-state, or index access. A
+critical handover sealed during the current runtime session suppresses Stop continuation and index
+refresh so that session stops after its final action. A later canonical session can accept the
+announced handover and then refresh or stop normally. The hook is not a watcher or a per-tool hook.
 
-See [Project Instructions](../instructions.md) for the project workflow.
+The root workspace owns Codex tooling and the fixed ignored `.context-index/`; Product Roots never
+contain `.codex`, `.agents`, agent instruction files, or retrieval/process state. `pnpm setup`
+materializes and checks the vector space. Root-bound source inventory and ignore policy exclude all
+private runtime from Git, indexing, staging, export, and generated projects.
+
+## Validation And Hook Trust
+
+Portable defaults may vary by project but contain no secrets, telemetry targets, notification
+commands, trust entries, personal paths, or local domains. After changing model/reasoning/features/
+TUI/hooks, keep every role on the exact primary GPT Sol model with `ultra` reasoning and run
+`mise exec --locked -- pnpm codex:validate`.
+
+Review and approve changed hook hashes separately through `/hooks`; the project never approves
+itself. Until local hash trust exists, Codex warns and skips the hook, so the attestation is a
+supported-workflow guard rather than an adversarial same-user boundary.
+
+## Portable Creation Boundary
+
+Clean project creation/export retains portable config, hooks, roles, this README, launcher and hook
+scripts, both CI adapters, and Product Root policy. It excludes `.codex/runtime/`, `.context-index/`,
+authentication, trust, sessions, databases, installed dependencies, and source-project residue.
+Repository-owned reusable skills live under `.agents/skills/`; root `skills/` is ignored runtime.
+
+See [Project Instructions](../instructions.md) for complete workflow policy.

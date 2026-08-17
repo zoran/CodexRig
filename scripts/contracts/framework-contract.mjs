@@ -1,14 +1,14 @@
+/** Owns framework contract behavior for the versioned framework contract boundary. */
 import { createHash } from "node:crypto";
-import {
-  existsSync,
-  lstatSync,
-  readFileSync,
-  readdirSync,
-  realpathSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readOptionalOwnedFile } from "../filesystem/owned-file-operations.mjs";
+import { validateCompatibilityMatrix } from "./compatibility-contract.mjs";
+import { parseSemver } from "./semver-contract.mjs";
+
+export { compareSemver, parseSemver, versionSatisfiesSimpleRange } from "./semver-contract.mjs";
+export { validateCompatibilityMatrix };
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 export const frameworkRoot = path.resolve(scriptDirectory, "..", "..");
@@ -16,12 +16,9 @@ export const frameworkContractPath = ".codexrig/framework.json";
 export const compatibilityMatrixPath = ".codexrig/compatibility.json";
 export const installationReceiptPath = ".codexrig/installation.json";
 
-const supportedContractSchema = 1;
-const supportedCompatibilitySchema = 1;
-const supportedReceiptSchema = 1;
+export const supportedContractSchema = 2;
+export const supportedReceiptSchema = 2;
 const safeRelativePathPattern = /^(?!\.\.?$)(?!.*(?:^|\/)\.\.(?:\/|$))[^\\\0/][^\\\0]*$/u;
-const semverPattern =
-  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/u;
 
 function plainObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -82,25 +79,13 @@ export function resolveFrameworkPath(root, relativePath) {
 
 export function readRegularFrameworkFile(root, relativePath, { optional = false } = {}) {
   const absolutePath = resolveFrameworkPath(root, relativePath);
-  if (!existsSync(absolutePath)) {
+  const ownedRoot = realRoot(root);
+  const snapshot = readOptionalOwnedFile(ownedRoot, absolutePath, `framework file ${relativePath}`);
+  if (!snapshot.exists) {
     if (optional) return null;
     throw new Error(`Missing required framework file: ${relativePath}.`);
   }
-  const stats = lstatSync(absolutePath);
-  if (stats.isSymbolicLink() || !stats.isFile() || stats.nlink !== 1) {
-    throw new Error(`Framework file must be a single-link regular file: ${relativePath}.`);
-  }
-  const parent = realpathSync.native(path.dirname(absolutePath));
-  const ownedRoot = realRoot(root);
-  const relativeParent = path.relative(ownedRoot, parent);
-  if (
-    relativeParent === ".." ||
-    relativeParent.startsWith(`..${path.sep}`) ||
-    path.isAbsolute(relativeParent)
-  ) {
-    throw new Error(`Framework file resolves outside the repository: ${relativePath}.`);
-  }
-  return readFileSync(absolutePath, "utf8");
+  return snapshot.buffer.toString("utf8");
 }
 
 function parseJsonFile(root, relativePath, label, options) {
@@ -111,68 +96,6 @@ function parseJsonFile(root, relativePath, label, options) {
   } catch {
     throw new Error(`${label} must contain valid JSON.`);
   }
-}
-
-export function parseSemver(value, label = "version") {
-  const match = requiredString(value, label).match(semverPattern);
-  if (!match) throw new Error(`${label} must use semantic versioning.`);
-  const components = match.slice(1, 4).map(Number);
-  if (components.some((component) => !Number.isSafeInteger(component))) {
-    throw new Error(`${label} contains an unsupported numeric component.`);
-  }
-  return {
-    build: match[5] ?? "",
-    major: components[0],
-    minor: components[1],
-    patch: components[2],
-    prerelease: match[4] ?? "",
-    raw: value,
-  };
-}
-
-export function compareSemver(left, right) {
-  const a = typeof left === "string" ? parseSemver(left) : left;
-  const b = typeof right === "string" ? parseSemver(right) : right;
-  for (const key of ["major", "minor", "patch"]) {
-    if (a[key] !== b[key]) return a[key] < b[key] ? -1 : 1;
-  }
-  if (a.prerelease === b.prerelease) return 0;
-  if (!a.prerelease) return 1;
-  if (!b.prerelease) return -1;
-  const leftIdentifiers = a.prerelease.split(".");
-  const rightIdentifiers = b.prerelease.split(".");
-  const count = Math.max(leftIdentifiers.length, rightIdentifiers.length);
-  for (let index = 0; index < count; index += 1) {
-    const leftIdentifier = leftIdentifiers[index];
-    const rightIdentifier = rightIdentifiers[index];
-    if (leftIdentifier === undefined) return -1;
-    if (rightIdentifier === undefined) return 1;
-    if (leftIdentifier === rightIdentifier) continue;
-    const leftNumeric = /^\d+$/u.test(leftIdentifier);
-    const rightNumeric = /^\d+$/u.test(rightIdentifier);
-    if (leftNumeric !== rightNumeric) return leftNumeric ? -1 : 1;
-    if (leftNumeric && leftIdentifier.length !== rightIdentifier.length) {
-      return leftIdentifier.length < rightIdentifier.length ? -1 : 1;
-    }
-    return leftIdentifier < rightIdentifier ? -1 : 1;
-  }
-  return 0;
-}
-
-export function versionSatisfiesSimpleRange(version, range) {
-  const parsed = parseSemver(version);
-  const clauses = requiredString(range, "compatibility range").split(/\s+/u).filter(Boolean);
-  if (clauses.length === 0) return false;
-  return clauses.every((clause) => {
-    const match = clause.match(/^(>=|>|<=|<|=)(.+)$/u);
-    if (!match) throw new Error(`Unsupported compatibility range clause: ${clause}.`);
-    const comparison = compareSemver(parsed, parseSemver(match[2], "range version"));
-    if (match[1] === ">=") return comparison >= 0;
-    if (match[1] === ">") return comparison > 0;
-    if (match[1] === "<=") return comparison <= 0;
-    if (match[1] === "<") return comparison < 0;
-    return comparison === 0;
-  });
 }
 
 function stringArray(value, label, { paths = false } = {}) {
@@ -188,6 +111,23 @@ function stringArray(value, label, { paths = false } = {}) {
     throw new Error(`${label} must not contain duplicates.`);
   }
   return normalized;
+}
+
+function excludedPathReasons(value) {
+  const reasons = requiredObject(value, "upgrade.excludedPathReasons");
+  const entries = Object.entries(reasons);
+  if (entries.length === 0) {
+    throw new Error("upgrade.excludedPathReasons must contain at least one source-only path.");
+  }
+  const normalized = {};
+  for (const [relativePath, reason] of entries) {
+    const safePath = normalizeFrameworkPath(relativePath, "upgrade.excludedPathReasons key");
+    if (Object.hasOwn(normalized, safePath)) {
+      throw new Error("upgrade.excludedPathReasons contains duplicate normalized paths.");
+    }
+    normalized[safePath] = requiredString(reason, `upgrade.excludedPathReasons.${safePath}`);
+  }
+  return sortedObject(normalized);
 }
 
 function normalizedProviderApiBase(value, label, provider, remoteHost) {
@@ -355,9 +295,7 @@ export function validateFrameworkContract(value) {
   upgrade.managedRoots = stringArray(upgrade.managedRoots, "upgrade.managedRoots", {
     paths: true,
   });
-  upgrade.excludedPaths = stringArray(upgrade.excludedPaths, "upgrade.excludedPaths", {
-    paths: true,
-  });
+  upgrade.excludedPathReasons = excludedPathReasons(upgrade.excludedPathReasons);
   stringArray(upgrade.managedPackageScripts, "upgrade.managedPackageScripts");
   stringArray(upgrade.managedDevDependencies, "upgrade.managedDevDependencies");
   return contract;
@@ -367,50 +305,6 @@ export function readFrameworkContract(root = frameworkRoot) {
   return validateFrameworkContract(
     parseJsonFile(root, frameworkContractPath, "Framework contract"),
   );
-}
-
-export function validateCompatibilityMatrix(value) {
-  const matrix = requiredObject(value, "Compatibility matrix");
-  if (matrix.schemaVersion !== supportedCompatibilitySchema) {
-    throw new Error(
-      `Unsupported compatibility schema ${String(matrix.schemaVersion)}; expected ${supportedCompatibilitySchema}.`,
-    );
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/u.test(matrix.reviewedOn)) {
-    throw new Error("Compatibility matrix reviewedOn must be an ISO date.");
-  }
-  const stable = requiredObject(matrix.stable, "compatibility.stable");
-  for (const tool of ["node", "pnpm"]) {
-    const entry = requiredObject(stable[tool], `compatibility.stable.${tool}`);
-    parseSemver(entry.version, `compatibility.stable.${tool}.version`);
-    if (!versionSatisfiesSimpleRange(entry.version, entry.range)) {
-      throw new Error(`compatibility.stable.${tool}.version must satisfy its range.`);
-    }
-    requiredString(entry.channel, `compatibility.stable.${tool}.channel`);
-  }
-  const codex = requiredObject(stable.codex, "compatibility.stable.codex");
-  parseSemver(codex.minimumVersion, "compatibility.stable.codex.minimumVersion");
-  requiredString(codex.channel, "compatibility.stable.codex.channel");
-  if (!Array.isArray(matrix.canaries) || matrix.canaries.length === 0) {
-    throw new Error("Compatibility matrix must declare at least one canary.");
-  }
-  const ids = new Set();
-  for (const [index, entryValue] of matrix.canaries.entries()) {
-    const entry = requiredObject(entryValue, `compatibility.canaries[${index}]`);
-    const id = requiredString(entry.id, `compatibility.canaries[${index}].id`);
-    if (!/^[a-z][a-z0-9-]*$/u.test(id) || ids.has(id)) {
-      throw new Error("Compatibility canary ids must be unique lowercase slugs.");
-    }
-    ids.add(id);
-    requiredString(entry.description, `compatibility.canaries[${index}].description`);
-    requiredString(entry.node, `compatibility.canaries[${index}].node`);
-    requiredString(entry.pnpm, `compatibility.canaries[${index}].pnpm`);
-    requiredString(entry.codex, `compatibility.canaries[${index}].codex`);
-    if (typeof entry.required !== "boolean") {
-      throw new Error(`compatibility.canaries[${index}].required must be boolean.`);
-    }
-  }
-  return matrix;
 }
 
 export function readCompatibilityMatrix(
@@ -456,7 +350,10 @@ export function listManagedFrameworkFiles(root, contract = readFrameworkContract
     listFilesBelow(root, managedRoot, files);
   }
   return [...files]
-    .filter((relativePath) => !excludedPath(relativePath, contract.upgrade.excludedPaths))
+    .filter(
+      (relativePath) =>
+        !excludedPath(relativePath, Object.keys(contract.upgrade.excludedPathReasons)),
+    )
     .sort();
 }
 
@@ -478,6 +375,7 @@ export function managedPackageSnapshot(root, contract = readFrameworkContract(ro
     "package.json devDependencies",
   );
   const snapshot = {
+    license: requiredString(packageJson.license, "package.json license"),
     packageManager: requiredString(packageJson.packageManager, "package.json packageManager"),
     scripts: {},
     devDependencies: {},
@@ -496,8 +394,8 @@ export function managedPackageSnapshot(root, contract = readFrameworkContract(ro
   return snapshot;
 }
 
-export function desiredManagedFileContent({ sourceRoot, relativePath }) {
-  let content = readRegularFrameworkFile(sourceRoot, relativePath);
+export function desiredManagedFileContentFromRaw(relativePath, rawContent) {
+  let content = String(rawContent);
   if (relativePath === ".codex/config.toml") {
     const occurrences = content.match(/^memories = false$/gmu)?.length ?? 0;
     if (occurrences !== 1) {
@@ -508,6 +406,13 @@ export function desiredManagedFileContent({ sourceRoot, relativePath }) {
     content = content.replace(/^memories = false$/mu, "memories = true");
   }
   return content;
+}
+
+export function desiredManagedFileContent({ sourceRoot, relativePath }) {
+  return desiredManagedFileContentFromRaw(
+    relativePath,
+    readRegularFrameworkFile(sourceRoot, relativePath),
+  );
 }
 
 function validateReceiptFiles(files) {
@@ -529,6 +434,9 @@ function validateReceiptFiles(files) {
 
 function validateReceiptPackage(value, label) {
   const managedPackage = requiredObject(value, label);
+  if (managedPackage.license !== undefined) {
+    requiredString(managedPackage.license, `${label}.license`);
+  }
   requiredString(managedPackage.packageManager, `${label}.packageManager`);
   for (const section of ["scripts", "devDependencies"]) {
     const entries = requiredObject(managedPackage[section], `${label}.${section}`);
@@ -540,6 +448,65 @@ function validateReceiptPackage(value, label) {
     }
   }
   return managedPackage;
+}
+
+function validatePendingReconciliation(value) {
+  if (value === null) return null;
+  const pending = requiredObject(value, "installation pendingReconciliation");
+  if (!/^[0-9a-f]{64}$/u.test(pending.planDigest)) {
+    throw new Error("installation pendingReconciliation.planDigest is invalid.");
+  }
+  parseSemver(pending.fromVersion, "installation pendingReconciliation.fromVersion");
+  parseSemver(pending.toVersion, "installation pendingReconciliation.toVersion");
+  if (!Array.isArray(pending.policies) || pending.policies.length === 0) {
+    throw new Error("installation pendingReconciliation.policies must be non-empty.");
+  }
+  const ids = new Set();
+  const policies = pending.policies.map((entryValue, index) => {
+    const entry = requiredObject(
+      entryValue,
+      `installation pendingReconciliation.policies[${index}]`,
+    );
+    const id = requiredString(entry.id, `installation pendingReconciliation.policies[${index}].id`);
+    if (!/^[a-z][a-z0-9-]*$/u.test(id) || ids.has(id)) {
+      throw new Error("installation pendingReconciliation policy ids must be unique slugs.");
+    }
+    if (!["added", "changed", "retired"].includes(entry.change)) {
+      throw new Error(`installation pendingReconciliation policy ${id} has an invalid change.`);
+    }
+    for (const [field, version] of [
+      ["fromVersion", entry.fromVersion],
+      ["toVersion", entry.toVersion],
+    ]) {
+      if (version !== null && (!Number.isSafeInteger(version) || version < 1)) {
+        throw new Error(`installation pendingReconciliation policy ${id}.${field} is invalid.`);
+      }
+    }
+    const documents = stringArray(
+      entry.documents,
+      `installation pendingReconciliation policy ${id}.documents`,
+      { paths: true },
+    );
+    const statement = requiredString(
+      entry.statement,
+      `installation pendingReconciliation policy ${id}.statement`,
+    );
+    ids.add(id);
+    return {
+      change: entry.change,
+      documents,
+      fromVersion: entry.fromVersion,
+      id,
+      statement,
+      toVersion: entry.toVersion,
+    };
+  });
+  return {
+    fromVersion: pending.fromVersion,
+    planDigest: pending.planDigest,
+    policies,
+    toVersion: pending.toVersion,
+  };
 }
 
 export function validateInstallationReceipt(value) {
@@ -561,6 +528,7 @@ export function validateInstallationReceipt(value) {
     receipt.installedPackage,
     "installation installedPackage",
   );
+  receipt.pendingReconciliation = validatePendingReconciliation(receipt.pendingReconciliation);
   return receipt;
 }
 
@@ -601,6 +569,7 @@ export function buildInstallationReceipt({
     installedFiles: structuredClone(sortedObject(managedFiles)),
     managedPackage,
     installedPackage: structuredClone(managedPackage),
+    pendingReconciliation: null,
   };
 }
 
@@ -608,19 +577,10 @@ export function serializeCanonicalJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-export function writeInstallationReceipt({
-  root,
-  contract = readFrameworkContract(root),
-  managedPaths,
-}) {
-  const receipt = buildInstallationReceipt({ root, contract, managedPaths });
-  const receiptPath = resolveFrameworkPath(root, contract.upgrade.receiptFile);
-  writeFileSync(receiptPath, serializeCanonicalJson(receipt), { encoding: "utf8", mode: 0o644 });
-  return receipt;
-}
-
 export function isReusableFrameworkSource(root = frameworkRoot) {
-  return existsSync(
-    resolveFrameworkPath(root, ".agents/skills/create-project-from-framework/SKILL.md"),
+  return (
+    existsSync(
+      resolveFrameworkPath(root, ".agents/skills/create-project-from-framework/SKILL.md"),
+    ) && !existsSync(resolveFrameworkPath(root, installationReceiptPath))
   );
 }

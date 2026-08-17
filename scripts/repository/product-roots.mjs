@@ -1,3 +1,4 @@
+/** Owns product roots behavior for the repository inventory and filesystem boundary. */
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +9,14 @@ export const repositoryRoot = path.resolve(scriptDirectory, "..", "..");
 
 function toPosix(value) {
   return value.split(path.sep).join("/");
+}
+
+/** Normalizes directory/module naming conventions across supported implementation languages. */
+export function canonicalArchitectureSegment(value) {
+  return String(value ?? "")
+    .replace(/([a-z0-9])([A-Z])/gu, "$1-$2")
+    .replaceAll("_", "-")
+    .toLowerCase();
 }
 
 export function normalizeProductPath(value) {

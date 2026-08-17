@@ -1,0 +1,6 @@
+interface:
+  display_name: "Architecture Evolution"
+  short_description: "Keep modules and file layout aligned"
+  default_prompt:
+    "Use $architecture-evolution to reassess and evolve this project architecture and repository
+    layout."

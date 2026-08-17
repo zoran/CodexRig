@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "reviewedOn": "2026-08-07",
+  "stable": {
+    "node": {
+      "version": "24.19.0",
+      "range": ">=24.19.0 <25.0.0",
+      "channel": "lts"
+    },
+    "pnpm": {
+      "version": "11.20.0",
+      "range": ">=11.20.0 <12.0.0",
+      "channel": "latest-11"
+    },
+    "codex": {
+      "minimumVersion": "0.147.0",
+      "channel": "latest"
+    }
+  },
+  "canaries": [
+    {
+      "id": "next-node-lts",
+      "description": "Node.js 26 before its October 2026 LTS transition",
+      "node": "26",
+      "pnpm": "11.20.0",
+      "codex": "latest",
+      "required": false
+    },
+    {
+      "id": "next-pnpm",
+      "description": "The next pnpm major on the stable Node.js line",
+      "node": "24.19.0",
+      "pnpm": "next-12",
+      "codex": "latest",
+      "required": false
+    },
+    {
+      "id": "next-codex",
+      "description": "The Codex CLI alpha channel on the stable toolchain",
+      "node": "24.19.0",
+      "pnpm": "11.20.0",
+      "codex": "alpha",
+      "required": false
+    }
+  ]
+}

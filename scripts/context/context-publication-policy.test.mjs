@@ -1,3 +1,4 @@
+/** Verifies context publication policy behavior for the repository-local semantic context boundary. */
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createManifest, validateManifest } from "./context-manifest.mjs";

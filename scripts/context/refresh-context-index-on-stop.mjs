@@ -1,81 +1,29 @@
-import { createHash, randomBytes } from "node:crypto";
-import {
-  closeSync,
-  constants,
-  existsSync,
-  fchmodSync,
-  fstatSync,
-  fsyncSync,
-  lstatSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  readSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
+/** Owns durable Stop continuation, terminal handover, and context refresh lifecycle behavior. */
+import { createHash } from "node:crypto";
+import { existsSync, readSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { runAsSanitizedContextWorker } from "./context-worker-output.mjs";
-import { formatContextError } from "./terminal-output.mjs";
+import { discoverRecentCriticalBudgetHandover } from "./critical-budget-handover.mjs";
+import { readProjectWorkContext } from "./project-work-state.mjs";
+import { inspectRuntimeSessionLease } from "../repository/runtime-session-lease.mjs";
+import {
+  atomicReplaceOwnedFile,
+  closeOwnedDirectoryBinding,
+  ensureOwnedPrivateDirectory,
+  openPrivateOwnedDirectory,
+  ownedDirectoryChildPath,
+  readStableOwnedFile,
+  removeStableOwnedFile,
+} from "../filesystem/owned-path-safety.mjs";
+import { formatContextError } from "../terminal/terminal-output.mjs";
 
 const modulePath = fileURLToPath(import.meta.url);
 const repositoryRoot = path.resolve(path.dirname(modulePath), "..", "..");
-const projectContextRelativePath = "docs/project-context.md";
-const projectContextMaxBytes = 65_536;
 const hookInputMaxBytes = 262_144;
 const markerMaxBytes = 4_096;
 const continuationRuntimeRelativePath = ".codex/runtime/stop-continuation";
-const workStatePattern = /<!-- codexrig-work-state\r?\n([\s\S]*?)\r?\n-->/gu;
-const unsafePromptCharacters = /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u;
-const blockerKinds = new Set(["authority", "safety", "integration", "external"]);
-
-function sameFileIdentity(left, right) {
-  return left.dev === right.dev && left.ino === right.ino;
-}
-
-function isBoundedRegularFile(stats, maxBytes) {
-  return stats.isFile() && stats.nlink === 1n && stats.size <= BigInt(maxBytes);
-}
-
-function pathEntryExists(target) {
-  try {
-    lstatSync(target);
-    return true;
-  } catch (error) {
-    if (error?.code === "ENOENT") return false;
-    throw error;
-  }
-}
-
-function readBoundedRegularFile(target, maxBytes) {
-  const initial = lstatSync(target, { bigint: true });
-  if (initial.isSymbolicLink() || !isBoundedRegularFile(initial, maxBytes)) {
-    throw new Error("working context is not a bounded regular file");
-  }
-
-  const descriptor = openSync(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-  try {
-    const opened = fstatSync(descriptor, { bigint: true });
-    if (!isBoundedRegularFile(opened, maxBytes) || !sameFileIdentity(initial, opened)) {
-      throw new Error("working context changed while it was opened");
-    }
-    const content = readFileSync(descriptor, "utf8");
-    const final = fstatSync(descriptor, { bigint: true });
-    if (
-      !isBoundedRegularFile(final, maxBytes) ||
-      !sameFileIdentity(opened, final) ||
-      final.size !== opened.size
-    ) {
-      throw new Error("working context changed while it was read");
-    }
-    return content;
-  } finally {
-    closeSync(descriptor);
-  }
-}
 
 function requireExactKeys(value, expected, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -88,90 +36,8 @@ function requireExactKeys(value, expected, label) {
   }
 }
 
-function requireBoundedText(value, label, maxLength, { nullable = false } = {}) {
-  if (nullable && value === null) return null;
-  if (
-    typeof value !== "string" ||
-    value.length === 0 ||
-    value.length > maxLength ||
-    value.trim() !== value ||
-    unsafePromptCharacters.test(value)
-  ) {
-    throw new Error(`${label} must be bounded plain text`);
-  }
-  return value;
-}
-
-function parseWorkState(content) {
-  const matches = [...content.matchAll(workStatePattern)];
-  if (matches.length === 0) return null;
-  if (matches.length !== 1 || Buffer.byteLength(matches[0][1], "utf8") > markerMaxBytes) {
-    throw new Error("working context must contain exactly one bounded codexrig-work-state marker");
-  }
-  if (content.slice(0, matches[0].index).trim() !== "") {
-    throw new Error("codexrig-work-state marker must be the first non-whitespace content");
-  }
-
-  let state;
-  try {
-    state = JSON.parse(matches[0][1]);
-  } catch {
-    throw new Error("codexrig-work-state marker is not valid JSON");
-  }
-  requireExactKeys(
-    state,
-    [
-      "blocker",
-      "currentGoal",
-      "currentSlice",
-      "nextAction",
-      "outcome",
-      "revision",
-      "status",
-      "version",
-    ],
-    "codexrig-work-state",
-  );
-  if (state.version !== 1) throw new Error("codexrig-work-state version is unsupported");
-  if (!Number.isSafeInteger(state.revision) || state.revision < 1) {
-    throw new Error("codexrig-work-state revision must be a positive integer");
-  }
-  if (!new Set(["active", "blocked", "complete"]).has(state.status)) {
-    throw new Error("codexrig-work-state status is unsupported");
-  }
-
-  requireBoundedText(state.outcome, "outcome", 600);
-  requireBoundedText(state.currentGoal, "currentGoal", 600);
-  requireBoundedText(state.currentSlice, "currentSlice", 600, { nullable: true });
-
-  if (state.status === "active") {
-    requireBoundedText(state.nextAction, "nextAction", 1_000);
-    if (state.blocker !== null) throw new Error("active work cannot declare a blocker");
-  } else if (state.status === "blocked") {
-    if (state.nextAction !== null) throw new Error("blocked work cannot declare a next action");
-    requireExactKeys(state.blocker, ["kind", "reason"], "work blocker");
-    if (!blockerKinds.has(state.blocker.kind)) throw new Error("work blocker kind is unsupported");
-    requireBoundedText(state.blocker.reason, "blocker reason", 800);
-  } else {
-    if (state.nextAction !== null || state.blocker !== null) {
-      throw new Error("complete work cannot declare a next action or blocker");
-    }
-  }
-
-  return Object.freeze(state);
-}
-
-function readWorkState(root) {
-  const docsDirectory = path.join(root, "docs");
-  const contextPath = path.join(root, projectContextRelativePath);
-  if (!pathEntryExists(contextPath)) return null;
-  const docsStats = lstatSync(docsDirectory);
-  if (!docsStats.isDirectory() || docsStats.isSymbolicLink()) {
-    throw new Error("working context parent is not a real directory");
-  }
-  const state = parseWorkState(readBoundedRegularFile(contextPath, projectContextMaxBytes));
-  if (!state) throw new Error("working context is missing its codexrig-work-state marker");
-  return state;
+function readWorkState(root, testHooks) {
+  return readProjectWorkContext(root, { testHooks })?.state ?? null;
 }
 
 function parseStopHookInput(content) {
@@ -212,42 +78,37 @@ function parseStopHookInput(content) {
   });
 }
 
-function ensureRealDirectory(target, { create = false, mode = 0o700 } = {}) {
-  let stats;
-  try {
-    stats = lstatSync(target);
-  } catch (error) {
-    if (error?.code !== "ENOENT" || !create) {
-      throw new Error("required runtime directory is missing");
-    }
-    try {
-      mkdirSync(target, { mode });
-    } catch (mkdirError) {
-      if (mkdirError?.code !== "EEXIST") throw mkdirError;
-    }
-    stats = lstatSync(target);
-  }
-  if (!stats.isDirectory() || stats.isSymbolicLink()) {
-    throw new Error("continuation runtime path is not a real directory");
-  }
-}
-
-function continuationStatePath(root, sessionId) {
-  const codexDirectory = path.join(root, ".codex");
-  const runtimeDirectory = path.join(codexDirectory, "runtime");
+function continuationStateStore(root, sessionId, { testHooks } = {}) {
   const continuationDirectory = path.join(root, continuationRuntimeRelativePath);
-  ensureRealDirectory(codexDirectory);
-  ensureRealDirectory(runtimeDirectory, { create: true });
-  ensureRealDirectory(continuationDirectory, { create: true });
+  const runtimeDirectory = path.dirname(continuationDirectory);
+  ensureOwnedPrivateDirectory(root, runtimeDirectory, "continuation runtime directory", {
+    testHooks,
+  });
+  ensureOwnedPrivateDirectory(root, continuationDirectory, "Stop continuation directory", {
+    testHooks,
+  });
   const sessionHash = createHash("sha256").update(sessionId, "utf8").digest("hex").slice(0, 32);
-  return path.join(continuationDirectory, `${sessionHash}.json`);
+  return {
+    basename: `${sessionHash}.json`,
+    binding: openPrivateOwnedDirectory(root, continuationDirectory, "Stop continuation directory"),
+  };
 }
 
-function readContinuationState(target) {
+function readContinuationState(store) {
+  const target = ownedDirectoryChildPath(store.binding, store.basename, "continuation loop state");
   if (!existsSync(target)) return null;
   let value;
   try {
-    value = JSON.parse(readBoundedRegularFile(target, markerMaxBytes));
+    const snapshot = readStableOwnedFile(store.binding, store.basename, "continuation loop state", {
+      maximumBytes: markerMaxBytes,
+    });
+    if (
+      (snapshot.stats.mode & 0o077) !== 0 ||
+      (typeof process.getuid === "function" && snapshot.stats.uid !== process.getuid())
+    ) {
+      throw new Error("continuation loop state is not private");
+    }
+    value = JSON.parse(snapshot.buffer.toString("utf8"));
   } catch {
     throw new Error("continuation loop state is invalid");
   }
@@ -264,38 +125,23 @@ function readContinuationState(target) {
   return value;
 }
 
-function writeContinuationState(target, state) {
-  if (existsSync(target) && lstatSync(target).isSymbolicLink()) {
-    throw new Error("continuation loop state cannot be a symbolic link");
-  }
-  const temporary = path.join(
-    path.dirname(target),
-    `.${path.basename(target)}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`,
+function writeContinuationState(store, state, testHooks) {
+  atomicReplaceOwnedFile(
+    store.binding,
+    store.basename,
+    `${JSON.stringify(state)}\n`,
+    "continuation loop state",
+    { testHooks },
   );
-  let descriptor;
-  try {
-    descriptor = openSync(
-      temporary,
-      constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | (constants.O_NOFOLLOW ?? 0),
-      0o600,
-    );
-    fchmodSync(descriptor, 0o600);
-    writeFileSync(descriptor, `${JSON.stringify(state)}\n`, "utf8");
-    fsyncSync(descriptor);
-    closeSync(descriptor);
-    descriptor = undefined;
-    renameSync(temporary, target);
-    const directoryDescriptor = openSync(path.dirname(target), constants.O_RDONLY);
-    try {
-      fsyncSync(directoryDescriptor);
-    } finally {
-      closeSync(directoryDescriptor);
-    }
-  } catch (error) {
-    if (descriptor !== undefined) closeSync(descriptor);
-    if (existsSync(temporary)) unlinkSync(temporary);
-    throw error;
-  }
+}
+
+function removeContinuationState(store) {
+  const target = ownedDirectoryChildPath(store.binding, store.basename, "continuation loop state");
+  if (!existsSync(target)) return;
+  const snapshot = readStableOwnedFile(store.binding, store.basename, "continuation loop state", {
+    maximumBytes: markerMaxBytes,
+  });
+  removeStableOwnedFile(store.binding, store.basename, snapshot.stats, "continuation loop state");
 }
 
 function stateHash(state) {
@@ -349,15 +195,50 @@ function prepareAutonomousContinuation(root, hookInput) {
   return { input, errorOutput: null };
 }
 
-function evaluatePreparedAutonomousContinuation(root, input) {
+function sealedHandoverStop(root, testHooks) {
+  const sealedHandover = discoverRecentCriticalBudgetHandover({ root, testHooks });
+  if (!sealedHandover) return null;
+
+  // A handover is terminal only for the runtime session that could have sealed it. A later
+  // canonical session still discovers the handover at SessionStart, but must be able to resume,
+  // refresh the index, and stop normally after the developer accepts it.
+  try {
+    const session = inspectRuntimeSessionLease({ root });
+    if (
+      session.status === "active" &&
+      session.lease.sessionId !== sealedHandover.sealingSessionId
+    ) {
+      return null;
+    }
+  } catch {
+    // Missing or unsafe lease evidence cannot weaken the terminal guarantee in the sealing session.
+  }
+  return {
+    systemMessage:
+      "A critical-budget handover is sealed for this runtime session. Stop completely: do not " +
+      "continue automatically, start another task or slice, call another tool, or contact an " +
+      "agent. A later SessionStart must ask the developer whether to resume from the handover.",
+  };
+}
+
+function evaluatePreparedAutonomousContinuation(
+  root,
+  input,
+  { inspectHandover = true, testHooks } = {},
+) {
   if (!input) return {};
   // Codex side conversations are ephemeral threads and therefore have no transcript path. Never
   // let an ephemeral or otherwise non-durable context reopen work owned by the persistent thread.
   if (!input.hasDurableTranscript) return {};
 
+  if (inspectHandover) {
+    const sealedStop = sealedHandoverStop(root, testHooks);
+    if (sealedStop) return sealedStop;
+  }
+
   let state;
   try {
-    state = readWorkState(root);
+    state = readWorkState(root, testHooks);
   } catch (error) {
     const output = {
       systemMessage: `Autonomous continuation check skipped: ${formatContextError(error, root)}.`,
@@ -374,16 +255,16 @@ function evaluatePreparedAutonomousContinuation(root, input) {
   }
   if (!state) return {};
 
-  let markerPath;
+  let store;
   try {
-    markerPath = continuationStatePath(root, input.sessionId);
+    store = continuationStateStore(root, input.sessionId, { testHooks });
     if (state.status !== "active") {
-      if (existsSync(markerPath) && !lstatSync(markerPath).isSymbolicLink()) unlinkSync(markerPath);
+      removeContinuationState(store);
       return {};
     }
 
     const hash = stateHash(state);
-    const prior = readContinuationState(markerPath);
+    const prior = readContinuationState(store);
     if (input.stopHookActive && prior?.revision === state.revision && prior?.stateHash === hash) {
       return {
         systemMessage:
@@ -393,7 +274,11 @@ function evaluatePreparedAutonomousContinuation(root, input) {
       };
     }
 
-    writeContinuationState(markerPath, { version: 1, revision: state.revision, stateHash: hash });
+    writeContinuationState(
+      store,
+      { version: 1, revision: state.revision, stateHash: hash },
+      testHooks,
+    );
     return { decision: "block", reason: continuationReason(state) };
   } catch (error) {
     const output = {};
@@ -406,12 +291,21 @@ function evaluatePreparedAutonomousContinuation(root, input) {
       output.reason = continuationReason(state);
     }
     return output;
+  } finally {
+    if (store) closeOwnedDirectoryBinding(store.binding);
   }
 }
 
-export function evaluateAutonomousContinuation({ root = repositoryRoot, hookInput = "" } = {}) {
+export function evaluateAutonomousContinuation({
+  root = repositoryRoot,
+  hookInput = "",
+  testHooks,
+} = {}) {
   const prepared = prepareAutonomousContinuation(root, hookInput);
-  return prepared.errorOutput ?? evaluatePreparedAutonomousContinuation(root, prepared.input);
+  return (
+    prepared.errorOutput ??
+    evaluatePreparedAutonomousContinuation(root, prepared.input, { testHooks })
+  );
 }
 
 async function refreshContextIndex() {
@@ -441,11 +335,19 @@ export async function runStopLifecycle({
   root = repositoryRoot,
   hookInput = "",
   refreshIndex = refreshContextIndex,
+  testHooks,
 } = {}) {
   const prepared = prepareAutonomousContinuation(root, hookInput);
-  const output =
-    prepared.errorOutput ?? evaluatePreparedAutonomousContinuation(root, prepared.input);
-  if (!prepared.input?.hasDurableTranscript) return output;
+  if (prepared.errorOutput) return prepared.errorOutput;
+  if (!prepared.input?.hasDurableTranscript) return {};
+
+  // Sealing is a terminal session boundary. Do not even refresh the semantic index afterward.
+  const sealedStop = sealedHandoverStop(root, testHooks);
+  if (sealedStop) return sealedStop;
+  const output = evaluatePreparedAutonomousContinuation(root, prepared.input, {
+    inspectHandover: false,
+    testHooks,
+  });
 
   const refreshWarning = await refreshIndex();
   if (refreshWarning) mergeSystemMessage(output, refreshWarning);

@@ -1,3 +1,5 @@
+/** Owns verification evidence error behavior for the repository verification boundary. */
+/** Preserves deterministic verification findings as structured failure evidence. */
 export class VerificationEvidenceError extends Error {
   constructor(message, findings = []) {
     super(message);

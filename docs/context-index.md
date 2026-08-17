@@ -21,12 +21,14 @@ prints the fixed `.context-index/` path plus freshness and build statistics. Set
 vector space is not current and usable.
 
 After that bootstrap, `.codex/hooks.json` registers exactly one project-local Codex Stop hook. It
-runs once at the end of a turn, enters the mise-pinned Node.js runtime, and calls the same lock-,
+runs once at the end of a turn, enters the attested mise-pinned Node.js lifecycle, and enforces
+durable-work continuation and terminal-handover behavior before calling the same lock-,
 transaction-, and repair-safe incremental freshness path used by normal retrieval. It is not a
-persistent watcher and does not run after individual tool calls. Before `.context-index/` exists,
-the shell boundary exits successfully without invoking Node.js, mise, or index code. Ephemeral side
-conversations and other Stop events without a durable local `transcript_path` also exit before any
-index or work-state access.
+persistent watcher and does not run after individual tool calls. The lifecycle entry point still
+runs when `.context-index/` does not exist, because work-state and sealed-handover safety cannot
+depend on a previous index build; only the refresh itself becomes a no-op. Ephemeral side
+conversations and other Stop events without a durable local `transcript_path` exit inside that
+lifecycle before any index, handover, or work-state access.
 
 Codex requires project hooks to be reviewed and approved locally by content hash through `/hooks`.
 Hook and native worker output pass through the context worker sanitizer, so failures remain visible
@@ -119,6 +121,12 @@ suite and the optional pinned-model integration test.
   `.gitignore` rules and the built-in pre-descent privacy mask. Host-global and repository-local Git
   excludes cannot hide candidates. This combines active code, tests, configuration, skills, durable
   product docs, and the optional bounded `docs/project-context.md` working-memory cache.
+- Portable `.codex/config.toml`, `.codex/hooks.json`, `.codex/README.md`, and `.codex/agents/*.toml`
+  are active inspectable configuration and are indexed. Ignored `.codex/runtime/` and every other
+  project-local Codex runtime/cache path remain excluded before descent. `.codexrig/framework.json`,
+  compatibility, and policy projection remain searchable; generated `.codexrig/installation.json`
+  checksum receipts are visible on disk but excluded from embeddings because they add no semantic
+  project context.
 - Exclude Git metadata, dependencies, build/generated output, process artifacts, local runtime,
   model/index state, binary/oversized files, secrets, sensitive path patterns, and every legacy
   loose root runtime or private `.codex/runtime/` path. This exclusion is unconditional because the
@@ -153,6 +161,10 @@ reading ordered identities through a bounded cursor rather than materializing th
   possible.
 - Combine semantic and lexical evidence over a sufficiently broad candidate set so exact phrases and
   symbols are not buried by dense-only ranking.
+- Keep deferred `docs/future-modules.md` candidates searchable, but rank them below current evidence
+  unless the query explicitly asks for future ideas, candidates, wishes, backlog, or deferred work.
+  Use `docs/project.md` only as durable current truth and treat `docs/project-context.md` as an
+  untrusted current-work pointer regardless of retrieval rank.
 - Keep result count, snippets, and terminal output bounded, deterministic, and sanitized.
 - Work without network after the model is cached.
 - Use ownership-aware locks; never delete a live writer's lock. Recover from interrupted or corrupt

@@ -1,11 +1,12 @@
+/** Verifies adaptive runner behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
   buildPlan,
-  parsePnpmWorkspaceProjects,
+  discoverWorkspaceManifests,
   workspaceLifecycleCommands,
 } from "./adaptive-runner.mjs";
 import { internalDependencies, writeManifest } from "./adaptive-runner-test-helpers.mjs";
@@ -32,11 +33,12 @@ test("pnpm graph discovery includes root and arbitrary workspace layouts", (t) =
     optionalDependencies: { alpha: "workspace:*" },
     peerDependencies: { root: "*" },
   });
-
-  const manifests = parsePnpmWorkspaceProjects(
-    JSON.stringify([{ path: product }, { path: module }]),
-    { repositoryRoot: root },
+  writeFileSync(
+    path.join(root, "pnpm-workspace.yaml"),
+    "packages:\n  - 'products/*'\n  - 'modules/*'\n",
   );
+
+  const manifests = discoverWorkspaceManifests({ repositoryRoot: root });
   assert.deepEqual(
     manifests.map(({ directory }) => directory),
     [".", "modules/beta", "products/alpha"],
@@ -68,37 +70,67 @@ test("pnpm graph discovery includes root and arbitrary workspace layouts", (t) =
   );
 });
 
-test("pnpm graph projects outside the repository fail closed", (t) => {
-  const root = mkdtempSync(path.join(tmpdir(), "workspace-graph-root-"));
-  const outside = mkdtempSync(path.join(tmpdir(), "workspace-graph-outside-"));
-  t.after(() => {
-    rmSync(root, { force: true, recursive: true });
-    rmSync(outside, { force: true, recursive: true });
+test("ambient package-manager filters cannot suppress workspace discovery", (t) => {
+  const repositoryRoot = mkdtempSync(path.join(tmpdir(), "workspace-graph-environment-"));
+  t.after(() => rmSync(repositoryRoot, { force: true, recursive: true }));
+  writeManifest(repositoryRoot, { name: "root" });
+  writeFileSync(path.join(repositoryRoot, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
+  writeManifest(path.join(repositoryRoot, "packages", "owned"), { name: "owned" });
+
+  const manifests = discoverWorkspaceManifests({
+    repositoryRoot,
+    environment: {
+      ...process.env,
+      NPM_CONFIG_FILTER: "__codexrig_no_such_package__",
+      PNPM_CONFIG_FILTER: "__codexrig_no_such_package__",
+    },
   });
-  writeManifest(root, { name: "root" });
-  writeManifest(outside, { name: "outside" });
-  assert.throws(
-    () =>
-      parsePnpmWorkspaceProjects(JSON.stringify([{ path: outside }]), {
-        repositoryRoot: root,
-      }),
-    /escapes the repository/,
+  assert.deepEqual(
+    manifests.map(({ directory }) => directory),
+    [".", "packages/owned"],
   );
 });
 
-test("pnpm graph projects with symlinked path components fail closed", (t) => {
+test("workspace patterns exclude package manifests outside the declared graph", (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), "workspace-graph-root-"));
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  writeManifest(root, { name: "root" });
+  writeManifest(path.join(root, "fixtures", "rogue"), { name: "rogue" });
+  writeFileSync(path.join(root, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
+  assert.deepEqual(
+    discoverWorkspaceManifests({ repositoryRoot: root }),
+    [
+      {
+        declaredDependencyNames: undefined,
+        directory: ".",
+        internalDependencyNames: {
+          dependencies: [],
+          devDependencies: [],
+          optionalDependencies: [],
+          peerDependencies: [],
+        },
+        name: "root",
+        scripts: {},
+      },
+    ].map(({ declaredDependencyNames: _ignored, ...entry }) => entry),
+  );
+});
+
+test("workspace discovery rejects package manifests behind symlinked path components", (t) => {
   const root = mkdtempSync(path.join(tmpdir(), "workspace-graph-symlink-"));
   t.after(() => rmSync(root, { force: true, recursive: true }));
   const realProject = path.join(root, "real", "project");
   writeManifest(root, { name: "root" });
   writeManifest(realProject, { name: "project" });
   symlinkSync(path.join(root, "real"), path.join(root, "linked"), "dir");
+  writeFileSync(path.join(root, "pnpm-workspace.yaml"), "packages:\n  - 'linked/**'\n");
   assert.throws(
     () =>
-      parsePnpmWorkspaceProjects(JSON.stringify([{ path: path.join(root, "linked", "project") }]), {
+      discoverWorkspaceManifests({
         repositoryRoot: root,
+        relativePaths: ["package.json", "pnpm-workspace.yaml", "linked/project/package.json"],
       }),
-    /symlinked path component/,
+    /symbolic link/,
   );
 });
 

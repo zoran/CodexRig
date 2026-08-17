@@ -1,3 +1,4 @@
+/** Verifies adaptive surfaces behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
 import test from "node:test";
 import { hasImageSurfaceInFiles } from "./adaptive-surfaces.mjs";
