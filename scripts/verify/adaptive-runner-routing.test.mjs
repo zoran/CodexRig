@@ -1,12 +1,24 @@
 /** Verifies adaptive runner routing behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { repositoryCodexHomeRuntimeProbePaths } from "../repository/source-inventory.mjs";
-import { buildPlan } from "./adaptive-runner.mjs";
+import { buildPlan, completeVerificationCommands } from "./adaptive-runner.mjs";
 import { internalDependencies, route, writeManifest } from "./adaptive-runner-test-helpers.mjs";
+
+test("complete verification executes the worktree recovery and reset boundaries", () => {
+  const commands = completeVerificationCommands();
+  const boundary = commands.find((command) => command.key === "verification-boundary-regressions");
+  assert.ok(boundary);
+  assert.ok(boundary.args.includes("scripts/repository/worktree-recovery.test.mjs"));
+  const framework = commands.find((command) => command.key === "framework-regressions");
+  assert.ok(framework);
+  assert.ok(
+    framework.args.includes(".agents/skills/reset-framework/scripts/reset-framework.test.mjs"),
+  );
+});
 
 test("successful basis plus a fully owned product delta stays targeted even at the full entry", () => {
   const plan = route(["src/product.ts"], {
@@ -61,6 +73,16 @@ test("unowned and unknown full-relevant paths receive exact fail-closed admissio
   assert.equal(unknown.admission.mode, "full");
   assert.deepEqual(unknown.admission.unknownPaths, ["unexpected/new-surface.bin"]);
   assert.match(unknown.admission.reason, /unknown changed paths/u);
+});
+
+test("removed framework sources use current baseline and lifecycle owners without path tombstones", () => {
+  const plan = route(["scripts/contracts/retired-contract.mjs"]);
+  const owners = plan.admission.focusedCommandOwners[0]?.ownerKeys ?? [];
+
+  assert.equal(plan.admission.mode, "targeted");
+  assert.deepEqual(plan.admission.uncoveredFullRelevantPaths, []);
+  assert.ok(owners.includes("framework-regressions"));
+  assert.ok(owners.includes("repository-smoke"));
 });
 
 test("license and required-notice changes route to the licensing owner", () => {
@@ -296,25 +318,73 @@ test("direct verifier and support files route exact smallest consumers", () => {
 });
 
 test("moved and shared framework boundaries retain focused verifier owners", () => {
-  for (const [owner, expectedConsumer] of [
+  const expectedOwners = [
     ["scripts/contracts/framework-contract.mjs", "scripts/framework/framework-lifecycle.test.mjs"],
     ["scripts/contracts/mise-toolchain-configuration.mjs", "scripts/verify/repository-smoke.mjs"],
-    ["scripts/contracts/portable-toml-bootstrap.mjs", "scripts/setup/setup-regression.test.mjs"],
+    ["scripts/contracts/portable-toml.mjs", "scripts/setup/setup-regression.test.mjs"],
     ["scripts/docs/document-scope.mjs", "scripts/docs/document-scope.test.mjs"],
     [
       "scripts/docs/project-document-policy.mjs",
       "scripts/context/portable-context-contract.test.mjs",
     ],
+    [
+      "scripts/repository/runtime-process-identity.mjs",
+      "scripts/repository/worktree-recovery.test.mjs",
+    ],
+    [
+      "scripts/repository/runtime-process-io.mjs",
+      "scripts/repository/source-inventory-git-environment.test.mjs",
+    ],
+    [
+      "scripts/repository/runtime-session-state.mjs",
+      "scripts/repository/worktree-recovery.test.mjs",
+    ],
     ["scripts/repository/runtime-session-lease.mjs", "scripts/context/context-lifecycle.test.mjs"],
+    ["scripts/repository/runtime-session-lease.mjs", "scripts/deps/dependency-policy.test.mjs"],
+    [
+      "scripts/repository/runtime-session-lease.mjs",
+      "scripts/repository/worktree-recovery.test.mjs",
+    ],
+    [
+      "scripts/repository/runtime-session-lease.mjs",
+      "scripts/verify/verification-session-lock.test.mjs",
+    ],
+    ["scripts/repository/worktree-recovery.mjs", "scripts/goals/repository-housekeeping.test.mjs"],
+    [
+      "scripts/repository/worktree-recovery-cli.mjs",
+      "scripts/goals/repository-housekeeping.test.mjs",
+    ],
+    [
+      "scripts/repository/worktree-path-reservation.mjs",
+      "scripts/goals/repository-housekeeping.test.mjs",
+    ],
+    [
+      "scripts/repository/worktree-preservation-lock.mjs",
+      "scripts/goals/repository-housekeeping.test.mjs",
+    ],
+    [
+      "scripts/repository/worktree-prune-transaction.mjs",
+      "scripts/goals/repository-housekeeping.test.mjs",
+    ],
+    [
+      "scripts/repository/worktree-recovery-output.mjs",
+      "scripts/goals/repository-housekeeping.test.mjs",
+    ],
+    ["scripts/setup/startup-attestation.mjs", "scripts/framework/framework-lifecycle.test.mjs"],
+    ["scripts/setup/startup-attestation.mjs", "scripts/setup/setup-regression.test.mjs"],
+    ["scripts/setup/session-control-hook-command.mjs", "scripts/setup/setup-regression.test.mjs"],
+    ["scripts/setup/startup-runtime-executables.mjs", "scripts/setup/setup-regression.test.mjs"],
+    ["scripts/setup/startup-session-controller.mjs", "scripts/setup/codex-launcher.test.mjs"],
+    [
+      "scripts/setup/startup-session-controller.mjs",
+      "scripts/setup/startup-session-controller.test.mjs",
+    ],
+    ["scripts/setup/startup-session-context.mjs", "scripts/context/context-lifecycle.test.mjs"],
     ["scripts/repository/local-import-resolution.mjs", "scripts/verify/api-security.test.mjs"],
     ["scripts/repository/local-import-resolution.mjs", "scripts/verify/path-hygiene.test.mjs"],
     ["scripts/repository/source-import-specifiers.mjs", "scripts/verify/api-security.test.mjs"],
     ["scripts/repository/source-import-specifiers.mjs", "scripts/verify/path-hygiene.test.mjs"],
     ["scripts/repository/product-roots.mjs", "scripts/verify/api-security.test.mjs"],
-    [
-      "scripts/repository/runtime-session-lease.mjs",
-      ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
-    ],
     ["scripts/repository/sensitive-paths.mjs", "scripts/repository/source-inventory.test.mjs"],
     [
       "scripts/repository/validate-transfer-source.mjs",
@@ -323,7 +393,20 @@ test("moved and shared framework boundaries retain focused verifier owners", () 
     ["scripts/terminal/terminal-output.mjs", "scripts/terminal/terminal-output.test.mjs"],
     ["scripts/verify/external.mjs", "scripts/verify/repository-smoke.mjs"],
     ["scripts/verify/image-assets.mjs", "scripts/verify/image-assets.test.mjs"],
-  ]) {
+  ];
+  if (existsSync(".agents/skills/reset-framework/scripts/reset-framework.test.mjs")) {
+    for (const owner of [
+      "scripts/repository/runtime-process-identity.mjs",
+      "scripts/repository/runtime-session-state.mjs",
+      "scripts/repository/runtime-session-lease.mjs",
+    ]) {
+      expectedOwners.push([
+        owner,
+        ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
+      ]);
+    }
+  }
+  for (const [owner, expectedConsumer] of expectedOwners) {
     const plan = route([owner]);
     assert.equal(plan.admission.mode, "targeted", owner);
     assert.equal(plan.admission.uncoveredFullRelevantPaths.length, 0, owner);

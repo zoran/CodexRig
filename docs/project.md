@@ -31,10 +31,11 @@ upgradeable product repositories while deliberately defining no child product or
 ## System Shape
 
 - Runtime shape: Node.js ECMAScript modules and shell entrypoints, managed by pnpm and mise.
-- Primary flow: the launcher validates and isolates a Codex session; SessionStart injects the
-  repository-reconstruction gate; tracked roles, skills, policy, and scripts guide resumed or new
-  work; generated projects receive the portable surface and an installation receipt; verification
-  selects evidence from current repository risk and delivery identity.
+- Primary flow: the launcher validates and isolates a Codex session; SessionStart binds its private
+  lease/recovery state and injects the resilient repository-reconstruction gate; tracked roles,
+  skills, policy, and scripts guide resumed or new work; generated projects receive the portable
+  surface and an installation receipt; verification selects evidence from current repository risk
+  and delivery identity.
 - Durable state: tracked source, configuration, contracts, documentation, tests, and lockfiles.
   `.codex/runtime/`, `.context-index/`, and `.project-state/` are disposable local state.
 - Delivery state: no product deployment is integrated in this neutral source.
@@ -79,9 +80,11 @@ upgradeable product repositories while deliberately defining no child product or
 #### Codex Session And Agent Policy
 
 - Root: `.codex`
-- Responsibility: Injects the primary orchestration contract, exact global agent defaults, reviewed
-  lifecycle hooks, least-privilege discovery/worker role requests, and effective-permission
-  admission that fails closed when parent runtime overrides defeat a role sandbox.
+- Responsibility: Injects the primary orchestration contract, exact global agent defaults, an empty
+  project-file hook declaration, least-privilege discovery/worker role requests, and
+  effective-permission admission that fails closed when parent runtime overrides defeat a role
+  sandbox. The setup controller injects and narrowly trusts the two lifecycle hooks at issue time;
+  SessionStart requires complete same-clone worktree/session reconstruction before intake or writes.
 - Runtime and technology: Declarative TOML, JSON, and Markdown consumed by Codex, with lifecycle
   entrypoints implemented in the framework's Node.js/Bash harness.
 - Public contract: Root `developer_instructions` and `[agents]` defaults in `.codex/config.toml`,
@@ -98,12 +101,12 @@ upgradeable product repositories while deliberately defining no child product or
 #### Context Retrieval
 
 - Root: `scripts/context`
-- Responsibility: Builds, checks, searches, refreshes, and safely cleans the repository semantic
-  index, owns bounded continuation state, and seals/discovers private critical-budget handovers used
-  for explicit cross-session recovery.
-- Runtime and technology: Node.js ESM and Bash on the framework's mise-pinned toolchain.
+- Responsibility: Builds, checks, searches, repairs on demand, and safely cleans the repository
+  semantic index; owns the preloaded durable Stop-continuation state; and seals/discovers private
+  critical-budget handovers used for explicit cross-session recovery.
+- Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
 - Public contract: `context:index`, `context:check`, `context:search`, `context:clean`,
-  `handover:create`, and the Stop hook entrypoint.
+  `handover:create`, and the preloaded Stop lifecycle contract.
 - Private internals: Source classification, token-aware chunking, hybrid lexical/vector ranking,
   implemented-versus-deferred intent weighting, embedding, locking, storage, and generation
   maintenance.
@@ -125,7 +128,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
 - Public contract: Exported contract readers, product/delivery/localization/tenancy-configuration
   renderers, normalizers, path guards, and canonical serializers.
-- Private internals: Validation helpers and schema-specific normalization.
+- Private internals: One constrained portable-TOML parser, validation helpers, and schema-specific
+  normalization; no parallel parser exists.
 - Owned data and migrations: No mutable data; schemas govern tracked `.codexrig/` documents.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/filesystem`.
@@ -191,9 +195,9 @@ upgradeable product repositories while deliberately defining no child product or
 - Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
 - Public contract: `framework:doctor`, `framework:version`, `framework:upgrade`, and
   `compatibility:matrix` commands.
-- Private internals: Conservative SemVer classification, three-way planning, the bounded published
-  schema-1-to-2 child bootstrap, journals, ownership locks, rollback, receipt publication,
-  dependency refresh, and policy reconciliation plans.
+- Private internals: Conservative SemVer classification, current-schema target validation, three-way
+  planning, journals, ownership locks, rollback, receipt publication, dependency refresh, and policy
+  reconciliation plans.
 - Owned data and migrations: Child `.codexrig/installation.json` receipts and disposable
   `.project-state/framework-upgrade/` transaction state.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
@@ -206,7 +210,8 @@ upgradeable product repositories while deliberately defining no child product or
 #### Git Hook Adapter
 
 - Root: `scripts/git-hooks`
-- Responsibility: Provides the tracked, root-bound pre-push adapter installed into local Git.
+- Responsibility: Provides the tracked, root-bound pre-push adapter installed into local Git and
+  rejects staged or unstaged substitute content before any reusable-evidence success message.
 - Runtime and technology: Bash adapter delegating to the Node.js ESM verification boundary.
 - Public contract: `scripts/git-hooks/pre-push`.
 - Private internals: Git environment sanitization and delegation to the verification entrypoint.
@@ -221,9 +226,25 @@ upgradeable product repositories while deliberately defining no child product or
 - Root: `scripts/goals`
 - Responsibility: Reconciles bounded repository housekeeping after completed goals and proves that a
   goal is clean, published on central `main`, and covered by exact-current successful evidence
-  before a new goal begins. Its consolidated health pass also checks delivery, manifest/module,
-  white-label, localization, Identity and Access, tenancy, physical-surface,
-  source/declaration-header, stack, dependency, secret, model, and framework drift.
+  before a new goal begins. The primary consumes the read-only Worktree Settlement trigger after
+  every completed slice and keeps a goal open until all no-longer-needed goal-owned worktrees,
+  branches, session/recovery claims, and cleanup artifacts reach an explicit terminal disposition;
+  preservation alone is safety, not completion. Its consolidated health pass also checks delivery,
+  manifest/module, white-label, localization, Identity and Access, tenancy, physical-surface,
+  source/declaration-header, stack, dependency, secret, model, and framework drift. Apply mode also
+  accepts Git-less roots, clears proven-dead worktree writer leases, restores missing or invalid
+  recovery from the exact active-phase lease during normal release or stale cleanup, and retains any
+  valid latest marker; a current process identity observed outside its bound PID namespace or
+  otherwise mechanically indeterminate remains an ownership-confirmation blocker. It preserves
+  existing directories with broken Git links until their ownership is explicitly confirmed and
+  removes only registrations whose missing paths remain held by exact process-bound non-directory
+  reservations across the native prune while process-bound Git locks protect every non-missing
+  linked sibling and every actual unfinished worktree. A shared process-bound transaction in the Git
+  common directory records every reserved path and preservation reason before prune, preserving
+  discovery after registration removal. Only unchanged current-contract cleanup artifacts with a
+  proven-dead exact owner are recovered after a crash. Reset treats missing or unobservable Linux
+  procfs and permission-obscured descriptor state for an exact-root-bound process as indeterminate
+  rather than inactive.
 - Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
 - Public contract: `repo:housekeeping` and `goal:new`.
 - Private internals: Atomic local reconciliation, health-check orchestration, Git publication,
@@ -257,18 +278,32 @@ upgradeable product repositories while deliberately defining no child product or
 
 - Root: `scripts/repository`
 - Responsibility: Owns canonical source inventory, Product Root discovery, sensitive-path masking,
-  Git runtime isolation, repository-bound session leases, stable snapshots, delivery-environment
-  evidence discovery, and transfer-source validation.
+  Git runtime isolation, every same-clone worktree inventory, repository-bound writer leases and
+  exact latest-session recovery markers, Git-less root classification, safe classification and
+  preservation of broken worktree links, the shared crash-recoverable prune transaction, path
+  reservations and preservation locks, stable snapshots, delivery-environment evidence discovery,
+  and transfer-source validation. Per-root inconsistencies remain visible without discarding other
+  safe inventory; orphan recovery corruption is advisory unless writer ownership is also unsafe.
 - Runtime and technology: Node.js ESM over filesystem and isolated Git process boundaries.
-- Public contract: Exported inventory, path-policy, Product Root, runtime-lease, delivery-discovery,
-  and snapshot APIs.
-- Private internals: Repository inventory, process-identity, session-lifecycle, and Git/Git-less
-  traversal detail.
-- Owned data and migrations: No mutable data or migrations.
+- Public contract: `worktree:status` with current/unfinished/settled human markers plus exported
+  inventory, path-policy, Product Root, worktree-recovery, runtime-lease/session-recovery,
+  delivery-discovery, and snapshot APIs.
+- Private internals: Repository inventory, process-identity, session-lifecycle, isolated Git,
+  launcher/writer liveness aggregation, per-root recovery classification, and Git/Git-less traversal
+  detail. The session lease accepts only current schema 5 with namespace-bound coordinator,
+  supervisor, and exact Codex process identities. Lease mutation authenticates the exact controller
+  caller, terminal child proof becomes a durable `completed` transition before release, and a
+  crashed child-PID handoff, corrupt state, or any other mechanically indeterminate state fails
+  closed. Isolated Git accepts only an ordinary terminal result or the exact bounded managed-sandbox
+  completion marker with matching PID, arguments, status, signal, and output contract.
+- Owned data and migrations: Private ignored per-worktree writer lease and latest verified Codex
+  session recovery marker under `.codex/runtime/`. Full reset holds the lifecycle lock, proves
+  repository-wide runtime quiescence, and removes incompatible private runtime without interpreting
+  another lease schema. No product data.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/filesystem`.
 - Focused verifier:
-  `node --test scripts/repository/source-inventory.test.mjs scripts/framework/framework-lifecycle.test.mjs scripts/context/context-lifecycle.test.mjs`
+  `node --test scripts/repository/source-inventory.test.mjs scripts/repository/worktree-recovery.test.mjs scripts/framework/framework-lifecycle.test.mjs scripts/context/context-lifecycle.test.mjs`
 - Steward: Repository boundary maintainer.
 
 #### Secret Classification
@@ -288,20 +323,39 @@ upgradeable product repositories while deliberately defining no child product or
 #### Setup And Project Portability
 
 - Root: `scripts/setup`
-- Responsibility: Launches isolated Codex sessions, attests startup, announces safe recent handover
-  metadata for developer-controlled resume, validates portable configuration and staged white-label
+- Responsibility: Launches deterministic, network-free isolated Codex sessions against an explicitly
+  prepared host/toolchain/dependency state. It atomically selects and reserves the exact latest
+  verified repository-bound session with an unchanged original-basis pre-SessionStart fresh
+  fallback, preloads every lifecycle module, accepts bounded non-executable Codex model/reasoning
+  preferences beneath tracked project policy, rejects executable or unknown ignored runtime
+  configuration, projects the tracked Sol/`ultra` policy into every fresh or resumed CLI launch, and
+  injects exactly two session-owned hook definitions. Codex's stable `hooks/list` inventory must
+  contain only those exact trusted/enabled definitions; only afterward may the controller bind the
+  gated supervisor, durable handoff, and exact Codex PID. Lease release requires the exact
+  controller to authenticate the supervisor's terminal child-exit proof against its private
+  issue-time gate secret and persist completion; a wrapper exit code alone is insufficient, and
+  every non-signal fresh completion requires actual SessionStart activation. The embedded
+  built-in-only client is bound to the controller's exact Node executable and token-bound loopback
+  endpoint. The capability also validates portable configuration and staged white-label
   tenant-capable projects, installs hooks, initializes repositories, and exports the portable
   surface.
 - Runtime and technology: Node.js ESM and Bash on the mise-pinned framework toolchain.
 - Public contract: `codex:start`, `codex:validate`, `setup`, `hooks:install`, and `project:export`.
-- Private internals: Startup attestations, staged identity binding, bootstrap checks, and transfer
-  fixtures.
-- Owned data and migrations: Disposable `.codex/runtime/codexrig-session.json` and startup
-  attestation state plus the installed local Git hook.
+- Private internals: Atomic session selection/reservation and immutable-basis fallback transitions,
+  preloaded session controller, private typed non-executable runtime-config validation, exact
+  model/reasoning CLI projection, absolute external Node.js/Codex/pnpm/hook-shell executable
+  binding, built-in gated supervisor, token-bound proof, and parent-liveness channel, exact
+  child-PID handoff, exact session-hook hash/CLI projection plus stable hook-list preflight,
+  embedded lifecycle client, startup attestations, staged identity binding, prepared-state checks,
+  and transfer fixtures.
+- Owned data and migrations: Disposable current-schema startup attestation under
+  `.codex/runtime/cache/codexrig/` plus the installed local Git hook. Repository Boundaries owns the
+  short-lived writer lease and separate latest-session recovery marker that Setup coordinates.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/docs`,
   `scripts/filesystem`, `scripts/repository`, `scripts/terminal`, `scripts/verify`.
-- Focused verifier: `node --test scripts/setup/setup-regression.test.mjs`
+- Focused verifier:
+  `node --test scripts/setup/setup-regression.test.mjs scripts/setup/codex-launcher.test.mjs scripts/setup/startup-session-controller.test.mjs scripts/framework/framework-lifecycle.test.mjs`
 - Steward: Setup capability maintainer.
 
 #### Stack Detection
@@ -380,6 +434,9 @@ upgradeable product repositories while deliberately defining no child product or
 
 - Root `src/` remains the default child Product Root; a real declared pnpm package or evidenced
   Android Gradle module can activate an additional Product Root.
+- Every internal concern retains one current contract only. Owned state and all consumers migrate in
+  one coherent change; superseded schemas, readers, writers, shims, paths, tests, and documentation
+  are removed. No runtime, reset, or framework-upgrade path interprets a superseded internal schema.
 - No child product identity, product module, product Identity and Access or tenancy capability,
   product surface, public port/protocol, data store, or deployment target is configured in this
   neutral source.

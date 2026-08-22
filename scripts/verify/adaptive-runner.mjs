@@ -256,9 +256,10 @@ export function completeVerificationCommands() {
         "scripts/framework/framework-version.test.mjs",
         "scripts/framework/framework-lifecycle.test.mjs",
         "scripts/platform/platform-lifecycle.test.mjs",
+        ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
       ],
       reason:
-        "complete verification checks versioned upgrades, startup attestation, compatibility tracks, provider detection, and GitHub/GitLab policy adapters",
+        "complete verification checks versioned upgrades, startup attestation, reset safety, compatibility tracks, provider detection, and GitHub/GitLab policy adapters",
     }),
     verificationCommand({
       key: "setup-regressions",
@@ -270,6 +271,7 @@ export function completeVerificationCommands() {
         "--test-concurrency=1",
         ...existingTestFiles([
           "scripts/setup/codex-launcher.test.mjs",
+          "scripts/setup/startup-session-controller.test.mjs",
           "scripts/setup/setup-regression.test.mjs",
           "scripts/setup/project-initialization-boundaries.source.test.mjs",
           "scripts/setup/project-initialization.source.test.mjs",
@@ -298,6 +300,7 @@ export function completeVerificationCommands() {
         "scripts/repository/source-inventory-git-environment.test.mjs",
         "scripts/repository/source-inventory.test.mjs",
         "scripts/repository/stable-file-snapshot.test.mjs",
+        "scripts/repository/worktree-recovery.test.mjs",
         "scripts/stack/stack-detector.test.mjs",
         "scripts/verify/adaptive-surfaces.test.mjs",
         "scripts/verify/api-security.test.mjs",
@@ -312,7 +315,7 @@ export function completeVerificationCommands() {
         "scripts/web/web-quality-scan.test.mjs",
       ],
       reason:
-        "complete verification exercises pushed history, remote, API, stable source snapshots, active-source, documentation-scope, and layout-neutral surface boundaries",
+        "complete verification exercises pushed history, remote, API, worktree recovery, stable source snapshots, active-source, documentation-scope, and layout-neutral surface boundaries",
     }),
     nodeCommand(
       "path-hygiene",

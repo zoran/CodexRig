@@ -30,6 +30,13 @@ const verificationStateRelativePath = `${repositoryCodexRuntimeCacheDirectory}/p
 export const verificationSessionLockPath = `${verificationStateRelativePath}/${ownerFileName}`;
 const lockedMessage =
   "Verification session is already locked; do not overlap full, changed, closure, pre-push, publication, or reset workflows.";
+const ownerTokenPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u;
+
+function validIsoInstant(value) {
+  if (typeof value !== "string") return false;
+  const milliseconds = Date.parse(value);
+  return Number.isFinite(milliseconds) && new Date(milliseconds).toISOString() === value;
+}
 
 function processStatus(pid) {
   try {
@@ -48,10 +55,9 @@ function exactOwner(value) {
     Object.keys(value).sort().join("\n") !== "pid\nstartedAt\ntoken" ||
     !Number.isSafeInteger(value.pid) ||
     value.pid <= 0 ||
-    typeof value.startedAt !== "string" ||
-    !Number.isFinite(Date.parse(value.startedAt)) ||
+    !validIsoInstant(value.startedAt) ||
     typeof value.token !== "string" ||
-    !/^[a-f0-9-]{36}$/u.test(value.token)
+    !ownerTokenPattern.test(value.token)
   ) {
     throw new Error("Verification session lock owner is invalid.");
   }

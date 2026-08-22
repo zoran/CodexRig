@@ -117,11 +117,12 @@ Choose the mode from the user's request:
    A newly required cleanup, context, documentation, or implementation edit reopens steps 4-8 and,
    at a completed goal, the all-document and critical-document gates. Before a next slice begins,
    repeat the goal/slice-based pre-slice coordination check against observable agent, session,
-   account, and team-channel claims and resolve overlap or uncertain shared ownership. A local
-   runtime lease or quiet worktree cannot prove that another clone, machine, or account is idle; use
-   a shared coordination channel across that boundary and fail closed on uncertain shared ownership.
-   Continue autonomously with the next planned slice or already-authorized goal when it remains
-   inside the authorized outcome.
+   same-clone worktree, safe latest-session, and team-channel claims and resolve overlap or
+   uncertain shared ownership. One host represents one developer, so Codex accounts do not make its
+   visible project changes foreign; process control remains provenance-bound. A local runtime lease
+   or quiet worktree cannot prove that another developer's clone is idle; use a shared coordination
+   channel across hosts and fail closed on uncertain shared ownership. Continue autonomously with
+   the next planned slice or already-authorized goal when it remains inside the authorized outcome.
 10. When publication is required, use the declared integration path. Serialized direct-main work
     remains on current `main` for final admission. For a temporary task branch or protected `main`,
     commit and push only its bounded integration input under normal pre-push evidence; one

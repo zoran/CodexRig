@@ -90,9 +90,11 @@ Install or activate mise, then install the repository-locked runtimes:
 Run project commands inside that exact runtime environment:
   mise exec --locked -- bash scripts/setup/check-prereqs.sh
 
-Install the host CLI, then let the canonical launcher update it system-wide, hydrate the locked
-project runtime, refresh compatible dependencies, and start the isolated session:
+Install or update the host CLI through the official Codex installation path. Prepare the locked
+project runtime and compatible dependencies explicitly, then start the isolated session:
   https://developers.openai.com/codex/cli/
+  mise install --locked
+  mise exec --locked -- node scripts/deps/install-compatible.mjs
   bash scripts/setup/start-codex.sh
 
 Locked runtime platforms: Linux x64/arm64 (glibc and musl), macOS arm64, and Windows x64.

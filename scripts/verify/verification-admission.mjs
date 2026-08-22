@@ -18,8 +18,13 @@ import {
   workspaceLifecycleCommands,
 } from "./workspace-verification.mjs";
 import {
+  categoryConsumerKeys,
+  effectiveCategories,
   exactConsumerRegistry,
   ownedCategoryConsumers,
+  removedFrameworkSourceConsumers,
+  startupControlConsumers,
+  worktreeRecoveryConsumers,
 } from "./verification-admission-registry.mjs";
 const explicitTestConsumerRegistry = new Map([
   [
@@ -49,7 +54,7 @@ const explicitTestConsumerRegistry = new Map([
     "scripts/contracts/delivery-configuration.mjs",
     ["scripts/goals/repository-housekeeping.test.mjs"],
   ],
-  ["scripts/contracts/portable-toml-bootstrap.mjs", ["scripts/setup/setup-regression.test.mjs"]],
+  ["scripts/contracts/portable-toml.mjs", ["scripts/setup/setup-regression.test.mjs"]],
   ["scripts/contracts/product-configuration.mjs", ["scripts/verify/white-label.test.mjs"]],
   ["scripts/contracts/localization-configuration.mjs", ["scripts/verify/localization.test.mjs"]],
   ["scripts/contracts/tenancy-configuration.mjs", ["scripts/verify/api-security.test.mjs"]],
@@ -110,13 +115,49 @@ const explicitTestConsumerRegistry = new Map([
   [
     "scripts/repository/runtime-process-identity.mjs",
     [
+      ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
       "scripts/deps/dependency-policy.test.mjs",
       "scripts/framework/framework-lifecycle.test.mjs",
+      "scripts/repository/worktree-recovery.test.mjs",
       "scripts/verify/verification-session-lock.test.mjs",
     ],
   ],
   [
+    "scripts/repository/runtime-process-io.mjs",
+    ["scripts/repository/source-inventory-git-environment.test.mjs"],
+  ],
+  [
     "scripts/repository/runtime-session-state.mjs",
+    [
+      ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
+      "scripts/context/context-lifecycle.test.mjs",
+      "scripts/framework/framework-lifecycle.test.mjs",
+      "scripts/repository/worktree-recovery.test.mjs",
+    ],
+  ],
+  ...[
+    "scripts/repository/worktree-path-reservation.mjs",
+    "scripts/repository/worktree-preservation-lock.mjs",
+    "scripts/repository/worktree-prune-transaction.mjs",
+    "scripts/repository/worktree-recovery.mjs",
+    "scripts/repository/worktree-recovery-cli.mjs",
+    "scripts/repository/worktree-recovery-output.mjs",
+  ].map((owner) => [owner, worktreeRecoveryConsumers]),
+  ...[
+    "scripts/setup/startup-attestation.mjs",
+    "scripts/setup/startup-codex-process.mjs",
+    "scripts/setup/startup-runtime-executables.mjs",
+    "scripts/setup/startup-session-controller.mjs",
+  ].map((owner) => [owner, startupControlConsumers]),
+  [
+    "scripts/setup/session-control-hook-command.mjs",
+    [
+      "scripts/setup/setup-regression.test.mjs",
+      "scripts/setup/startup-session-controller.test.mjs",
+    ],
+  ],
+  [
+    "scripts/setup/startup-session-context.mjs",
     [
       "scripts/context/context-lifecycle.test.mjs",
       "scripts/framework/framework-lifecycle.test.mjs",
@@ -165,6 +206,10 @@ const explicitTestConsumerRegistry = new Map([
   ["scripts/framework/framework-version.mjs", ["scripts/framework/framework-version.test.mjs"]],
   [
     "scripts/framework/framework-installation-receipt.mjs",
+    ["scripts/framework/framework-lifecycle.test.mjs"],
+  ],
+  [
+    "scripts/framework/framework-upgrade-target.mjs",
     ["scripts/framework/framework-lifecycle.test.mjs"],
   ],
   [
@@ -354,9 +399,12 @@ const explicitTestConsumerRegistry = new Map([
   [
     "scripts/repository/runtime-session-lease.mjs",
     [
-      "scripts/context/context-lifecycle.test.mjs",
-      "scripts/framework/framework-lifecycle.test.mjs",
       ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
+      "scripts/context/context-lifecycle.test.mjs",
+      "scripts/deps/dependency-policy.test.mjs",
+      "scripts/framework/framework-lifecycle.test.mjs",
+      "scripts/repository/worktree-recovery.test.mjs",
+      "scripts/verify/verification-session-lock.test.mjs",
     ],
   ],
   [
@@ -397,86 +445,6 @@ const explicitTestConsumerRegistry = new Map([
     ["scripts/platform/platform-lifecycle.test.mjs"],
   ],
 ]);
-function effectiveCategories(entry, { verifyOnlyRootManifest }) {
-  if (entry.path !== "package.json" || !verifyOnlyRootManifest) return entry.categories;
-  return ["framework scripts", "verification orchestration", "verify-only root manifest"];
-}
-
-function categoryConsumerKeys(categories) {
-  const keys = new Set();
-  const has = (category) => categories.includes(category);
-  const add = (...values) => values.forEach((value) => keys.add(value));
-
-  if (has("active documentation"))
-    add("docs", "delivery-environments", "secrets", "language", "path-hygiene");
-  if (has("script catalog")) add("scripts");
-  if (has("context source-policy surface") || has("context workflow")) {
-    add("syntax-lint", "scripts", "context-policy", "context-regressions", "patterns");
-  }
-  if (has("dependency workflow")) {
-    add("syntax-lint", "scripts", "dependencies", "patterns");
-  }
-  if (has("setup workflow")) {
-    add("syntax-lint", "scripts", "codex-config", "secrets", "path-hygiene", "patterns");
-  }
-  if (has("CodexRig framework workflow")) {
-    add("syntax-lint", "scripts", "repository-smoke", "codex-config", "patterns");
-  }
-  if (has("stack workflow") || has("web workflow")) {
-    add("syntax-lint", "scripts", "surface-quality", "patterns");
-  }
-  if (has("image quality surface") || has("image asset surface")) add("surface-quality");
-  if (has("project Codex config") || has("Codex runtime boundary")) {
-    add("codex-config", "secrets", "path-hygiene");
-  }
-  if (has("repo-local skill source") || has("skill path boundary")) {
-    add("skills", "secrets", "language", "path-hygiene");
-  }
-  if (has("repo-local skill executable source")) add("syntax-lint");
-  if (has("verification orchestration")) add("syntax-lint", "scripts", "patterns");
-  if (has("app/package/service/runtime source")) {
-    add(
-      "syntax-lint",
-      "repository-smoke",
-      "secrets",
-      "language",
-      "localization",
-      "patterns",
-      "path-hygiene",
-      "surface-quality",
-      "api-security",
-      "identity-access",
-      "tenant-isolation",
-      "white-label",
-    );
-  }
-  if (has("dependency/package manager files")) {
-    add("syntax-lint", "scripts", "repository-smoke", "dependencies", "secrets", "patterns");
-  }
-  if (has("infrastructure/runtime config")) {
-    add(
-      "syntax-lint",
-      "delivery-environments",
-      "secrets",
-      "patterns",
-      "surface-quality",
-      "api-security",
-      "identity-access",
-      "tenant-isolation",
-    );
-  }
-  if (has("identity/access trust boundary")) {
-    add("identity-access", "api-security", "secrets", "patterns");
-  }
-  if (has("tenant-isolation trust boundary")) {
-    add("tenant-isolation", "identity-access", "api-security", "secrets", "patterns");
-  }
-  if (has("repository source-policy surface")) {
-    add("codex-config", "context-policy", "path-hygiene", "repository-smoke", "secrets");
-  }
-  return [...keys];
-}
-
 function entryRouting({
   entry,
   available,
@@ -489,7 +457,6 @@ function entryRouting({
   const ownerKeys = new Set();
   const testPath = changedTestPath(entry.path, repositoryRoot);
   let hasExactOwner = testPath === entry.path;
-
   const directOwners = directVerifierCommands(available, entry.path);
   if (directOwners.length > 0) {
     commands.push(...directOwners);
@@ -507,6 +474,16 @@ function entryRouting({
     const command = focusedTestCommand(testPath, entry.path);
     commands.push(command);
     ownerKeys.add(command.key);
+  }
+
+  const removedFrameworkSource =
+    categories.includes("framework scripts") &&
+    !existsSync(path.join(repositoryRoot, ...entry.path.split("/")));
+  if (removedFrameworkSource) {
+    const removalCommands = selectCommands(available, removedFrameworkSourceConsumers);
+    commands.push(...removalCommands);
+    removalCommands.forEach((command) => ownerKeys.add(command.key));
+    hasExactOwner = true;
   }
   for (const consumerTest of explicitTestConsumerRegistry.get(entry.path) ?? []) {
     if (!existsSync(path.join(repositoryRoot, ...consumerTest.split("/")))) continue;
@@ -528,7 +505,6 @@ function entryRouting({
     ownerKeys.add(orchestrationFallback.key);
     hasExactOwner = true;
   }
-
   const consumerKeys = categoryConsumerKeys(categories).filter(
     (key) =>
       !hasExactOwner ||
@@ -565,7 +541,6 @@ function entryRouting({
       if (available.has(key)) ownerKeys.add(key);
     }
   }
-
   const selectedWorkspaceManifests = selectChangedWorkspaceManifests(
     workspaceManifests,
     [{ ...entry, categories }],

@@ -42,7 +42,7 @@ const semanticAcceptanceCases = [
 ];
 
 test(
-  "warm-offline CLI and Stop hook incrementally refresh add/change/delete and repair corrupt state",
+  "warm-offline search incrementally refreshes add/change/delete and repairs corrupt state",
   { timeout: 120_000 },
   async (context) => {
     if (process.env.CONTEXT_TEST_REAL_MODEL !== "1") {
@@ -125,32 +125,19 @@ test(
     rmSync(path.join(root, "docs/b.md"));
     write(root, "docs/c.md", "# Gamma\n\nNew exact retrieval phrase.\n");
     const secondStartedAt = performance.now();
-    const stopHookWorker = path.join(
-      repositoryRoot,
-      "scripts/context/refresh-context-index-on-stop.mjs",
-    );
-    const stopHook = spawnSync(process.execPath, [stopHookWorker], {
+    const second = execFileSync(process.execPath, [script, "new exact retrieval phrase"], {
       cwd: repositoryRoot,
       env,
       encoding: "utf8",
       timeout: 60_000,
     });
     const secondWallMs = Math.round(performance.now() - secondStartedAt);
-    assert.equal(stopHook.status, 0);
-    assert.equal(stopHook.stdout, "");
-    assert.equal(stopHook.stderr, "");
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
     assert.ok(manifest.stats.reusedChunks > 0);
     assert.equal(manifest.stats.addedFiles, 1);
     assert.equal(manifest.stats.changedFiles, 1);
     assert.equal(manifest.stats.removedFiles, 1);
-    const second = execFileSync(process.execPath, [script, "new exact retrieval phrase"], {
-      cwd: repositoryRoot,
-      env,
-      encoding: "utf8",
-      timeout: 30_000,
-    });
-    assert.doesNotMatch(second, /Context index refreshed/);
+    assert.match(second, /Context index refreshed/);
     assert.match(second, /docs\/c\.md/);
 
     const warmWallMs = [];

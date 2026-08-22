@@ -1,5 +1,5 @@
 /** Owns dependency policy behavior for the dependency and toolchain maintenance boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import {

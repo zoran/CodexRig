@@ -189,7 +189,7 @@ test(
         inspectRuntimeLifecycleLock({ root: repositoryRoot }).owner?.descendants?.some(
           (entry) =>
             entry.identity.pid === targetPid &&
-            /^linux:[a-f0-9-]{36}:\d+$/u.test(entry.identity.startIdentity),
+            /^linux:[a-f0-9-]{36}:\d+:\d+:\d+$/u.test(entry.identity.startIdentity),
         ),
       "held verification command identity registration",
     );
@@ -379,7 +379,7 @@ test("a file with this PID is not an acquired process capability", (t) => {
 });
 
 test("dead owners are reclaimed while live, malformed, or unknown locks remain blocking", (t) => {
-  const roots = ["dead", "live", "malformed", "unknown"].map((label) =>
+  const roots = ["dead", "live", "malformed", "unknown", "time", "token"].map((label) =>
     mkdtempSync(path.join(os.tmpdir(), `verification-${label}-lock-`)),
   );
   t.after(() => roots.forEach((root) => rmSync(root, { force: true, recursive: true })));
@@ -396,4 +396,10 @@ test("dead owners are reclaimed while live, malformed, or unknown locks remain b
 
   writeOwnerLock(roots[3], owner(999_999_999), true);
   assert.throws(() => acquireVerificationSessionLock({ repositoryRoot: roots[3] }), /locked/u);
+
+  writeOwnerLock(roots[4], { ...owner(999_999_999), startedAt: "August 17, 2026" });
+  writeOwnerLock(roots[5], { ...owner(999_999_999), token: "-".repeat(36) });
+  for (const root of roots.slice(4)) {
+    assert.throws(() => acquireVerificationSessionLock({ repositoryRoot: root }), /locked/u);
+  }
 });

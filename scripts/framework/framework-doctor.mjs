@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Owns framework doctor behavior for the framework lifecycle and child upgrade boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -38,7 +38,9 @@ function toolVersion(root, executable, args, label, errors) {
     encoding: "utf8",
     env: process.env,
     input: "",
+    maxBuffer: 1024 * 1024,
     stdio: "pipe",
+    timeout: 20_000,
   });
   if (result.error || result.status !== 0) {
     pushFinding(errors, `tool.${label}.missing`, `${label} version probe failed.`);
@@ -320,6 +322,25 @@ async function registryLatest(fetchImpl, packageName) {
   return parseSemver(value?.version, `${packageName} registry version`).raw;
 }
 
+export function compatibilityFreshnessWarnings(matrix, latest) {
+  const warnings = [];
+  if (compareSemver(matrix.stable.pnpm.version, latest.pnpm) < 0) {
+    pushFinding(
+      warnings,
+      "online.pnpm.newer",
+      `A newer stable pnpm is available (${latest.pnpm}); review the stable compatibility line.`,
+    );
+  }
+  if (compareSemver(matrix.ci.codexVersion, latest.codex) < 0) {
+    pushFinding(
+      warnings,
+      "online.codex.newer",
+      `Codex stable ${latest.codex} is newer than the reviewed blocking-CI version ${matrix.ci.codexVersion}; keep host installations current through the official installer, and separately review and repin the exact CI archives.`,
+    );
+  }
+  return warnings;
+}
+
 async function onlineFindings({ fetchImpl, matrix, errors, warnings }) {
   if (typeof fetchImpl !== "function") {
     pushFinding(errors, "online.unavailable", "Online doctor requires fetch support.");
@@ -335,20 +356,7 @@ async function onlineFindings({ fetchImpl, matrix, errors, warnings }) {
     pushFinding(errors, "online.indeterminate", "Registry freshness is indeterminate.");
     return latest;
   }
-  if (compareSemver(matrix.stable.pnpm.version, latest.pnpm) < 0) {
-    pushFinding(
-      warnings,
-      "online.pnpm.newer",
-      `A newer stable pnpm is available (${latest.pnpm}); review the stable compatibility line.`,
-    );
-  }
-  if (compareSemver(matrix.ci.codexVersion, latest.codex) < 0) {
-    pushFinding(
-      warnings,
-      "online.codex.newer",
-      `Codex stable is newer than the reviewed blocking-CI version (${latest.codex}); review and repin the exact CI archives while the launcher update path remains authoritative.`,
-    );
-  }
+  warnings.push(...compatibilityFreshnessWarnings(matrix, latest));
   return latest;
 }
 

@@ -1,5 +1,5 @@
 /** Owns source inventory behavior for the repository inventory and filesystem boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "./runtime-process-io.mjs";
 import {
   existsSync,
   lstatSync,
@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import {
   cleanGitEnvironment,
   isolatedGitArguments,
+  isolatedGitResultCompleted,
   resolveOwnedGitMetadata,
 } from "./git-runtime-isolation.mjs";
 import {
@@ -74,14 +75,23 @@ export function repositoryCodexHomeGitignoreBehaviorFindings({ root = repository
   const gitDirectory = path.join(temporaryDirectory, "git");
   const gitEnvironment = cleanGitEnvironment();
   try {
-    const initialized = spawnSync("git", ["init", "--bare", "--quiet", gitDirectory], {
+    const initializationArguments = ["init", "--bare", "--quiet", gitDirectory];
+    const initialized = spawnSync("git", initializationArguments, {
       cwd: realpathSync(root),
       encoding: null,
       env: gitEnvironment,
       input: Buffer.alloc(0),
+      maxBuffer: 1024 * 1024,
       stdio: ["pipe", "pipe", "ignore"],
+      timeout: 20_000,
     });
-    if (initialized.error || initialized.status !== 0) {
+    if (
+      !isolatedGitResultCompleted(initialized, {
+        args: initializationArguments,
+        encoding: null,
+        maximumOutputBytes: 1024 * 1024,
+      })
+    ) {
       return ["effective root Codex ignore policy could not initialize its isolated Git probe"];
     }
 
@@ -89,23 +99,28 @@ export function repositoryCodexHomeGitignoreBehaviorFindings({ root = repository
       ...repositoryCodexHomeProtectedGitignoreProbePaths,
       ...portableCodexGitignoreProbePaths,
     ];
-    const checked = spawnSync(
-      "git",
-      isolatedGitArguments({
-        args: ["check-ignore", "--no-index", "-z", "--stdin"],
-        gitDirectory,
-        workTree: realpathSync(root),
-      }),
-      {
-        cwd: realpathSync(root),
+    const checkedArguments = isolatedGitArguments({
+      args: ["check-ignore", "--no-index", "-z", "--stdin"],
+      gitDirectory,
+      workTree: realpathSync(root),
+    });
+    const checked = spawnSync("git", checkedArguments, {
+      cwd: realpathSync(root),
+      encoding: null,
+      env: gitEnvironment,
+      input: Buffer.from(`${probes.join("\0")}\0`),
+      maxBuffer: 1024 * 1024,
+      stdio: ["pipe", "pipe", "ignore"],
+      timeout: 20_000,
+    });
+    if (
+      !isolatedGitResultCompleted(checked, {
+        acceptedStatuses: [0, 1],
+        args: checkedArguments,
         encoding: null,
-        env: gitEnvironment,
-        input: Buffer.from(`${probes.join("\0")}\0`),
-        maxBuffer: 1024 * 1024,
-        stdio: ["pipe", "pipe", "ignore"],
-      },
-    );
-    if (checked.error || ![0, 1].includes(checked.status) || !Buffer.isBuffer(checked.stdout)) {
+        maximumOutputBytes: 1024 * 1024,
+      })
+    ) {
       return ["effective root Codex ignore policy could not evaluate its isolated Git probe"];
     }
     const ignored = new Set(splitNullBuffer(checked.stdout));
@@ -125,15 +140,23 @@ export function repositoryCodexHomeGitignoreBehaviorFindings({ root = repository
 }
 
 function gitPathOutput(root, gitDirectory, args, label) {
-  const result = spawnSync("git", isolatedGitArguments({ args, gitDirectory, workTree: root }), {
+  const invocationArguments = isolatedGitArguments({ args, gitDirectory, workTree: root });
+  const result = spawnSync("git", invocationArguments, {
     cwd: root,
     encoding: null,
     env: cleanGitEnvironment(),
     input: Buffer.alloc(0),
     maxBuffer: 64 * 1024 * 1024,
     stdio: ["pipe", "pipe", "ignore"],
+    timeout: 120_000,
   });
-  if (result.error || result.status !== 0 || !Buffer.isBuffer(result.stdout)) {
+  if (
+    !isolatedGitResultCompleted(result, {
+      args: invocationArguments,
+      encoding: null,
+      maximumOutputBytes: 64 * 1024 * 1024,
+    })
+  ) {
     const detail = result.error?.message ?? `status ${result.status}`;
     throw new Error(`${label} failed (${detail}); repository source inventory is unavailable.`);
   }
@@ -158,14 +181,23 @@ function sourcePathsFromEphemeralGit(root) {
   const temporaryDirectory = mkdtempSync(path.join(os.tmpdir(), "codex-source-inventory-"));
   const gitDirectory = path.join(temporaryDirectory, "git");
   try {
-    const initialized = spawnSync("git", ["init", "--bare", "--quiet", gitDirectory], {
+    const initializationArguments = ["init", "--bare", "--quiet", gitDirectory];
+    const initialized = spawnSync("git", initializationArguments, {
       cwd: root,
       encoding: "utf8",
       env: cleanGitEnvironment(),
       input: "",
+      maxBuffer: 1024 * 1024,
       stdio: "pipe",
+      timeout: 20_000,
     });
-    if (initialized.error || initialized.status !== 0) {
+    if (
+      !isolatedGitResultCompleted(initialized, {
+        args: initializationArguments,
+        encoding: "utf8",
+        maximumOutputBytes: 1024 * 1024,
+      })
+    ) {
       const detail = initialized.error?.message ?? `status ${initialized.status}`;
       throw new Error(`Temporary Git inventory initialization failed (${detail}).`);
     }
@@ -208,25 +240,27 @@ function sourcePathInventory(root, { includeUntracked = true } = {}) {
       mode: "active-area-fallback",
     };
   }
-  const probe = spawnSync(
-    "git",
-    isolatedGitArguments({
-      args: ["rev-parse", "--show-toplevel"],
-      gitDirectory: gitMetadata.gitDirectory,
-      workTree: gitMetadata.workTree,
-    }),
-    {
-      cwd: root,
+  const probeArguments = isolatedGitArguments({
+    args: ["rev-parse", "--show-toplevel"],
+    gitDirectory: gitMetadata.gitDirectory,
+    workTree: gitMetadata.workTree,
+  });
+  const probe = spawnSync("git", probeArguments, {
+    cwd: root,
+    encoding: "utf8",
+    env: cleanGitEnvironment(),
+    input: "",
+    maxBuffer: 1024 * 1024,
+    stdio: "pipe",
+    timeout: 20_000,
+  });
+  if (
+    isolatedGitResultCompleted(probe, {
+      args: probeArguments,
       encoding: "utf8",
-      env: cleanGitEnvironment(),
-      input: "",
-      stdio: "pipe",
-    },
-  );
-  if (probe.error) {
-    throw new Error(`Git repository probe failed: ${probe.error.message}`);
-  }
-  if (probe.status === 0) {
+      maximumOutputBytes: 1024 * 1024,
+    })
+  ) {
     const topLevel = probe.stdout.trim();
     if (topLevel && realpathSync(topLevel) === realpathSync(root)) {
       const tracked = gitPathOutput(

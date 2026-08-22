@@ -3,28 +3,36 @@ import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { parsePortableTomlBootstrap } from "../contracts/portable-toml-bootstrap.mjs";
+import { parsePortableToml } from "../contracts/portable-toml.mjs";
 import { formatContextError } from "../terminal/terminal-output.mjs";
 import {
   repositoryCodexHomeGitignoreBehaviorFindings,
   repositoryCodexHomeGitignoreFindings,
+  repositoryCodexRuntimeDirectory,
 } from "../repository/source-inventory.mjs";
+import {
+  closeOwnedDirectoryBinding,
+  openPrivateOwnedDirectory,
+  ownedDirectoryChildPath,
+  readStableOwnedFile,
+} from "../filesystem/owned-path-safety.mjs";
+import {
+  sessionControlHookConfigArguments,
+  sessionControlHookExpectations,
+  sessionControlHookPolicies,
+} from "./session-control-hook-command.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(scriptDirectory, "..", "..");
 
-let parseToml = parsePortableTomlBootstrap;
-try {
-  ({ parse: parseToml } = await import("smol-toml"));
-} catch (error) {
-  if (error?.code !== "ERR_MODULE_NOT_FOUND" || !String(error.message).includes("smol-toml")) {
-    throw error;
-  }
-}
-
 export const sharedAgentIntelligencePolicy = Object.freeze({
   modelPattern: /^gpt-[a-z0-9]+(?:[.-][a-z0-9]+)*-sol$/u,
   reasoningEffort: "ultra",
+});
+
+export const startupAttestationHookPolicy = Object.freeze({
+  additionalContextLimit: sessionControlHookPolicies.sessionStart.additionalContextLimit,
+  matcher: sessionControlHookPolicies.sessionStart.matcher,
 });
 
 const portablePolicy = new Map([
@@ -74,6 +82,10 @@ const portablePolicy = new Map([
   ["tui.theme", { type: "string" }],
 ]);
 const portableTables = new Set(["agents", "features", "sandbox_workspace_write", "tui"]);
+// Codex may persist model-picker choices in its user-level CODEX_HOME. They are bounded metadata
+// here because canonical launch explicitly projects the tracked project model and effort.
+const runtimeModelPreferencePattern = /^[a-z0-9][a-z0-9._-]{0,127}$/u;
+const runtimeReasoningPreferencePattern = /^[a-z][a-z0-9_-]{0,63}$/u;
 const requiredAgentRoles = new Set(["default", "explorer", "worker"]);
 const requiredAgentInstructionFragments = Object.freeze([
   "context:search",
@@ -96,11 +108,12 @@ const requiredAgentInstructionFragments = Object.freeze([
 ]);
 const requiredPrimaryInstructionFragments = Object.freeze([
   "primary orchestrator",
+  "exactly one current internal contract",
   "at most four live",
   "never pass a model or reasoning override",
   "exact GPT Sol model with ultra reasoning",
   "owned subagent and background task",
-  "foreign or ambiguous work",
+  "foreign or ambiguous processes",
   "5% or less",
   "Critical Budget Drain",
   "pnpm handover:create -- --critical",
@@ -111,22 +124,12 @@ const requiredPrimaryInstructionFragments = Object.freeze([
   "live parent permission overrides",
   "already-authorized YOLO override",
   "exact disjoint repository write set",
+  "after every completed slice",
+  "pnpm worktree:status -- --json",
+  "preservation is a safety state, never completion",
 ]);
-const contextIndexStopHookPolicy = Object.freeze({
-  description: "Coordinate durable Stop continuation, terminal handover, and context refresh.",
-  command: "bash scripts/context/refresh-context-index-on-stop.sh",
-  timeout: 600,
-  statusMessage: "Finalizing CodexRig Stop lifecycle",
-});
-const startupAttestationHookPolicy = Object.freeze({
-  additionalContextLimit: 768,
-  command: "bash scripts/setup/verify-startup-attestation-on-session-start.sh",
-  matcher: "^(startup|resume)$",
-  statusMessage: "Verifying CodexRig startup",
-  timeout: 30,
-});
 const projectHooksDescription =
-  "Verify canonical startup, announce safe recovery metadata, and coordinate durable Stop continuation, terminal handover, and context refresh.";
+  "Declare that canonical lifecycle hooks are injected only by the issue-time session controller; no mutable project-file hook may execute.";
 /** Identifies a rejected Codex configuration contract without exposing runtime-local state. */
 export class CodexConfigError extends Error {
   constructor(message) {
@@ -137,7 +140,7 @@ export class CodexConfigError extends Error {
 
 function parsedToml(content, label) {
   try {
-    const parsed = parseToml(String(content).replace(/^\uFEFF/u, ""));
+    const parsed = parsePortableToml(String(content));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("root");
     return parsed;
   } catch (error) {
@@ -249,6 +252,121 @@ export function parsePortableCodexConfig(content) {
   return policy;
 }
 
+function requireRuntimeTable(value, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || value instanceof Date) {
+    throw new CodexConfigError(`Repository-local Codex runtime ${label} must be a TOML table.`);
+  }
+  return value;
+}
+
+function requireRuntimeKeys(value, expected, label) {
+  const actual = Object.keys(requireRuntimeTable(value, label)).sort();
+  const allowed = [...expected].sort();
+  if (actual.some((key) => !allowed.includes(key))) {
+    throw new CodexConfigError(
+      `Repository-local Codex runtime ${label} contains an executable or unsupported key.`,
+    );
+  }
+}
+
+function validateRuntimeConfigDocument(value, root) {
+  requireRuntimeKeys(
+    value,
+    [
+      "approvals_reviewer",
+      "hooks",
+      "model",
+      "model_reasoning_effort",
+      "notice",
+      "projects",
+      "service_tier",
+    ],
+    "config",
+  );
+  if (value.approvals_reviewer !== undefined && value.approvals_reviewer !== "user") {
+    throw new CodexConfigError("Repository-local Codex runtime approval routing is unsupported.");
+  }
+  if (
+    value.service_tier !== undefined &&
+    (typeof value.service_tier !== "string" || value.service_tier.length > 64)
+  ) {
+    throw new CodexConfigError("Repository-local Codex runtime service tier is invalid.");
+  }
+  if (
+    value.model !== undefined &&
+    (typeof value.model !== "string" || !runtimeModelPreferencePattern.test(value.model))
+  ) {
+    throw new CodexConfigError("Repository-local Codex runtime model preference is invalid.");
+  }
+  if (
+    value.model_reasoning_effort !== undefined &&
+    (typeof value.model_reasoning_effort !== "string" ||
+      !runtimeReasoningPreferencePattern.test(value.model_reasoning_effort))
+  ) {
+    throw new CodexConfigError("Repository-local Codex runtime reasoning preference is invalid.");
+  }
+  if (value.projects !== undefined) {
+    requireRuntimeKeys(value.projects, [root], "project trust");
+    for (const project of Object.values(value.projects)) {
+      requireRuntimeKeys(project, ["trust_level"], "project trust entry");
+      if (project.trust_level !== "trusted") {
+        throw new CodexConfigError("Repository-local Codex runtime project trust is invalid.");
+      }
+    }
+  }
+  if (value.hooks !== undefined) {
+    requireRuntimeKeys(value.hooks, ["state"], "hook state");
+    const state = requireRuntimeTable(value.hooks.state, "hook state entries");
+    for (const entry of Object.values(state)) {
+      requireRuntimeKeys(entry, ["enabled", "trusted_hash"], "hook state entry");
+      if (
+        !/^sha256:[a-f0-9]{64}$/u.test(entry.trusted_hash ?? "") ||
+        (entry.enabled !== undefined && typeof entry.enabled !== "boolean")
+      ) {
+        throw new CodexConfigError("Repository-local Codex runtime hook state is invalid.");
+      }
+    }
+  }
+  if (value.notice !== undefined) {
+    const notice = requireRuntimeTable(value.notice, "notice state");
+    if (
+      Object.keys(notice).some((key) => !/^[a-z][a-z0-9_]{0,127}$/u.test(key)) ||
+      Object.values(notice).some((entry) => typeof entry !== "boolean")
+    ) {
+      throw new CodexConfigError("Repository-local Codex runtime notice state is invalid.");
+    }
+  }
+}
+
+/** Rejects executable user-runtime configuration before any Codex process can consume it. */
+export function validateRuntimeCodexConfig(projectRoot = defaultRoot) {
+  const root = realpathSync(path.resolve(projectRoot));
+  const runtimeDirectory = path.join(root, repositoryCodexRuntimeDirectory);
+  if (!existsSync(runtimeDirectory)) return Object.freeze({ status: "absent" });
+  const binding = openPrivateOwnedDirectory(root, runtimeDirectory, "Codex runtime home");
+  try {
+    const basename = "config.toml";
+    const target = ownedDirectoryChildPath(binding, basename, "Codex runtime config");
+    if (!existsSync(target)) return Object.freeze({ status: "absent" });
+    const snapshot = readStableOwnedFile(binding, basename, "Codex runtime config", {
+      maximumBytes: 262_144,
+    });
+    if (
+      (snapshot.stats.mode & 0o077) !== 0 ||
+      (typeof process.getuid === "function" && snapshot.stats.uid !== process.getuid())
+    ) {
+      throw new CodexConfigError("Repository-local Codex runtime config must remain private.");
+    }
+    validateRuntimeConfigDocument(
+      parsedToml(snapshot.buffer.toString("utf8"), "Repository-local Codex runtime config"),
+      root,
+    );
+    return Object.freeze({ status: "present" });
+  } finally {
+    closeOwnedDirectoryBinding(binding);
+  }
+}
+
 function requireRegularFile(targetPath, label) {
   let stats;
   try {
@@ -291,72 +409,21 @@ export function parseProjectHooks(content) {
       "Project-scoped Codex hooks must keep the exact portable description.",
     );
   }
-  requireExactObjectKeys(
-    parsed.hooks,
-    ["SessionStart", "Stop"],
-    "Project-scoped Codex hook events",
-  );
-  if (!Array.isArray(parsed.hooks.SessionStart) || parsed.hooks.SessionStart.length !== 1) {
-    throw new CodexConfigError(
-      "Project-scoped Codex hooks must declare exactly one SessionStart group.",
-    );
-  }
-  const startupGroup = parsed.hooks.SessionStart[0];
-  requireExactObjectKeys(
-    startupGroup,
-    ["hooks", "matcher"],
-    "Project-scoped Codex SessionStart group",
-  );
   if (
-    startupGroup.matcher !== startupAttestationHookPolicy.matcher ||
-    !Array.isArray(startupGroup.hooks) ||
-    startupGroup.hooks.length !== 1
+    !parsed.hooks ||
+    typeof parsed.hooks !== "object" ||
+    Array.isArray(parsed.hooks) ||
+    Object.keys(parsed.hooks).length !== 0
   ) {
     throw new CodexConfigError(
-      "Project-scoped Codex SessionStart group violates the startup attestation policy.",
+      "Project-scoped Codex hook events must remain empty; the issue-time controller injects the canonical hooks.",
     );
   }
-  const startupHandler = startupGroup.hooks[0];
-  requireExactObjectKeys(
-    startupHandler,
-    ["additionalContextLimit", "command", "statusMessage", "timeout", "type"],
-    "Project-scoped Codex SessionStart handler",
-  );
-  if (
-    startupHandler.type !== "command" ||
-    startupHandler.command !== startupAttestationHookPolicy.command ||
-    startupHandler.timeout !== startupAttestationHookPolicy.timeout ||
-    startupHandler.statusMessage !== startupAttestationHookPolicy.statusMessage ||
-    startupHandler.additionalContextLimit !== startupAttestationHookPolicy.additionalContextLimit
-  ) {
+  const argumentsList = sessionControlHookConfigArguments();
+  const expectations = sessionControlHookExpectations();
+  if (argumentsList.length !== 6 || expectations.length !== 2) {
     throw new CodexConfigError(
-      "Project-scoped Codex SessionStart handler violates the exact startup attestation policy.",
-    );
-  }
-  if (!Array.isArray(parsed.hooks.Stop) || parsed.hooks.Stop.length !== 1) {
-    throw new CodexConfigError("Project-scoped Codex hooks must declare exactly one Stop group.");
-  }
-
-  const group = parsed.hooks.Stop[0];
-  requireExactObjectKeys(group, ["hooks"], "Project-scoped Codex Stop group");
-  if (!Array.isArray(group.hooks) || group.hooks.length !== 1) {
-    throw new CodexConfigError("Project-scoped Codex Stop group must declare exactly one handler.");
-  }
-
-  const handler = group.hooks[0];
-  requireExactObjectKeys(
-    handler,
-    ["command", "statusMessage", "timeout", "type"],
-    "Project-scoped Codex Stop handler",
-  );
-  if (
-    handler.type !== "command" ||
-    handler.command !== contextIndexStopHookPolicy.command ||
-    handler.timeout !== contextIndexStopHookPolicy.timeout ||
-    handler.statusMessage !== contextIndexStopHookPolicy.statusMessage
-  ) {
-    throw new CodexConfigError(
-      "Project-scoped Codex Stop handler violates the exact automatic context-index policy.",
+      "Issue-time session controller must own exactly two trusted lifecycle hook declarations.",
     );
   }
   return parsed;
@@ -484,19 +551,19 @@ export function validateCodexConfig(projectRoot = defaultRoot) {
   const configPath = path.join(codexDirectory, "config.toml");
   const hooksPath = path.join(codexDirectory, "hooks.json");
   const gitignorePath = path.join(root, ".gitignore");
-  const hookLauncherPath = path.join(
-    root,
-    "scripts",
-    "context",
-    "refresh-context-index-on-stop.sh",
-  );
-  const hookScriptPath = path.join(root, "scripts", "context", "refresh-context-index-on-stop.mjs");
+  const stopLifecyclePath = path.join(root, "scripts", "context", "session-stop-lifecycle.mjs");
   const startupAttestationPath = path.join(root, "scripts", "setup", "startup-attestation.mjs");
-  const startupHookLauncherPath = path.join(
+  const sessionControlHookCommandPath = path.join(
     root,
     "scripts",
     "setup",
-    "verify-startup-attestation-on-session-start.sh",
+    "session-control-hook-command.mjs",
+  );
+  const startupSessionControllerPath = path.join(
+    root,
+    "scripts",
+    "setup",
+    "startup-session-controller.mjs",
   );
   let directoryStats;
   try {
@@ -510,10 +577,10 @@ export function validateCodexConfig(projectRoot = defaultRoot) {
   requireRegularFile(configPath, "project-scoped Codex config");
   requireRegularFile(hooksPath, "project-scoped Codex hooks");
   requireRegularFile(gitignorePath, "root-bound Codex runtime ignore policy");
-  requireRegularFile(hookLauncherPath, "automatic context-index Stop hook launcher");
-  requireRegularFile(hookScriptPath, "automatic context-index Stop hook script");
+  requireRegularFile(stopLifecyclePath, "preloaded Stop lifecycle");
   requireRegularFile(startupAttestationPath, "startup attestation verifier");
-  requireRegularFile(startupHookLauncherPath, "SessionStart hook launcher");
+  requireRegularFile(sessionControlHookCommandPath, "session-control hook command owner");
+  requireRegularFile(startupSessionControllerPath, "startup session controller");
   if (path.dirname(realpathSync(configPath)) !== realpathSync(codexDirectory)) {
     throw new CodexConfigError(
       "Project-scoped Codex config must remain directly under .codex/config.toml.",

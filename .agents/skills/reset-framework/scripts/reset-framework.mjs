@@ -1,41 +1,28 @@
 #!/usr/bin/env node
 /** Owns reset framework behavior for the reusable framework reset boundary. */
-import {
-  existsSync,
-  lstatSync,
-  readFileSync,
-  readlinkSync,
-  readdirSync,
-  realpathSync,
-  rmdirSync,
-  statSync,
-} from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, rmdirSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { removeOwnedContextIndex } from "../../../../scripts/context/clean-context-index.mjs";
 import { isRepositoryProcessArtifactPath } from "../../../../scripts/docs/document-scope.mjs";
-import {
-  chmodOwnedRegularFile,
-  renameOwnedRegularFile,
-} from "../../../../scripts/filesystem/owned-file-operations.mjs";
-import {
-  claimAndRemove,
-  ensureOwnedPrivateDirectory,
-} from "../../../../scripts/filesystem/owned-path-safety.mjs";
+import { claimAndRemove } from "../../../../scripts/filesystem/owned-path-safety.mjs";
 import {
   isPrivateCodexRuntimePath,
   isRepositoryCodexHomePath,
   repositoryCodexRuntimeCacheDirectory,
   repositoryCodexRuntimeDirectory,
 } from "../../../../scripts/repository/source-inventory.mjs";
+import { inspectLinuxOpenRepositoryPaths } from "../../../../scripts/repository/runtime-process-identity.mjs";
 import {
   acquireRuntimeLifecycleLock,
+  inspectRuntimeSessionLease,
+  invalidRuntimeSessionLeaseErrorCode,
   releaseRuntimeLifecycleLock,
   runtimeLifecycleGuardName,
   runtimeLifecycleLockName,
 } from "../../../../scripts/repository/runtime-session-lease.mjs";
-import { inspectRuntimeSessionLease } from "../../../../scripts/setup/startup-attestation.mjs";
+import { readVerificationEvidence } from "../../../../scripts/verify/verification-evidence-store.mjs";
 import { inspectVerificationSessionLock } from "../../../../scripts/verify/verification-session-lock.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -86,22 +73,6 @@ const preservedRuntimeFiles = new Set([
   "installation_id",
   runtimeLifecycleGuardName,
   runtimeLifecycleLockName,
-]);
-// Source order is migration policy: the immediately previous root CODEX_HOME wins over older
-// abandoned `.codex/*` copies when no canonical `.codex/runtime/*` identity exists yet.
-const migrationContracts = Object.freeze([
-  {
-    sources: ["auth.json", ".codex/auth.json"],
-    target: `${repositoryCodexRuntimeDirectory}/auth.json`,
-  },
-  {
-    sources: ["config.toml"],
-    target: `${repositoryCodexRuntimeDirectory}/config.toml`,
-  },
-  {
-    sources: ["installation_id", ".codex/installation_id"],
-    target: `${repositoryCodexRuntimeDirectory}/installation_id`,
-  },
 ]);
 
 function fail(message) {
@@ -201,57 +172,28 @@ function isEmptyRealDirectory(target) {
   );
 }
 
-function processStatus(pid) {
+export function openFrameworkRuntimeStatus(root, { procRoot = "/proc", testHooks } = {}) {
+  if (process.platform !== "linux") return "inactive";
   try {
-    process.kill(pid, 0);
-    return "active";
+    if (!entryStats(procRoot)) return "unknown";
   } catch (error) {
-    return error?.code === "ESRCH" ? "stale" : "unknown";
+    if (["EACCES", "EPERM"].includes(error?.code)) return "unknown";
+    throw error;
   }
-}
-
-function linuxProcessHasOpenRuntime(root, processId) {
-  const processPath = `/proc/${processId}`;
-  try {
-    if (typeof process.getuid === "function" && statSync(processPath).uid !== process.getuid()) {
-      return false;
-    }
-    const descriptors = readdirSync(path.join(processPath, "fd"));
-    for (const descriptor of descriptors) {
-      let target;
-      try {
-        target = readlinkSync(path.join(processPath, "fd", descriptor)).replace(
-          / \(deleted\)$/u,
-          "",
-        );
-      } catch (error) {
-        if (["EACCES", "ENOENT"].includes(error?.code)) continue;
-        throw error;
-      }
-      if (!path.isAbsolute(target)) continue;
-      const relative = relativePath(root, target);
+  return inspectLinuxOpenRepositoryPaths({
+    root,
+    matchesPath(relative) {
       if (
         relative === `${repositoryCodexRuntimeDirectory}/${runtimeLifecycleGuardName}` ||
         relative === `${repositoryCodexRuntimeDirectory}/${runtimeLifecycleLockName}`
       ) {
-        continue;
+        return false;
       }
-      if (!relative.startsWith("../") && isPrivateCodexRuntimePath(relative)) return true;
-    }
-  } catch (error) {
-    if (["EACCES", "ENOENT", "EPERM"].includes(error?.code)) return false;
-    throw error;
-  }
-  return false;
-}
-
-function hasOpenLegacyRuntime(root) {
-  if (process.platform !== "linux" || !entryStats("/proc")) return false;
-  for (const name of readdirSync("/proc")) {
-    if (!/^[1-9]\d*$/u.test(name) || Number(name) === process.pid) continue;
-    if (linuxProcessHasOpenRuntime(root, name)) return true;
-  }
-  return false;
+      return isPrivateCodexRuntimePath(relative);
+    },
+    procRoot,
+    testHooks,
+  }).status;
 }
 
 function assertRuntimeInactive(root) {
@@ -263,14 +205,27 @@ function assertRuntimeInactive(root) {
       fail("Reset refused while this Codex session owns the framework runtime; exit Codex first.");
     }
   }
-  if (hasOpenLegacyRuntime(root)) {
+  const openRuntimeStatus = openFrameworkRuntimeStatus(root);
+  if (openRuntimeStatus === "active") {
     fail("Reset refused while another process still has framework runtime files open.");
+  }
+  if (openRuntimeStatus === "unknown") {
+    fail("Reset refused because framework runtime process ownership is indeterminate.");
   }
   const runtimeStats = entryStats(runtimePath);
   if (runtimeStats && (runtimeStats.isSymbolicLink() || !runtimeStats.isDirectory())) {
     fail("Reset refused: .codex/runtime must be a real directory.");
   }
-  const lease = inspectRuntimeSessionLease({ root });
+  let lease;
+  try {
+    lease = inspectRuntimeSessionLease({ root });
+  } catch (error) {
+    if (error?.code !== invalidRuntimeSessionLeaseErrorCode) throw error;
+    // Full reset owns disposable private runtime as one unit. Once the lifecycle lock is held and
+    // repository-wide runtime quiescence is proven, an unreadable non-current lease is data to
+    // discard, never an alternate schema to interpret.
+    return Object.freeze({ status: "invalid" });
+  }
   if (lease.status === "active" || lease.status === "unknown") {
     fail("Reset refused while a Codex session still owns the framework runtime; exit it first.");
   }
@@ -290,77 +245,6 @@ function requirePreservedFile(target, label) {
     fail(`Reset refused unsafe preserved runtime file: ${label}.`);
   }
   return stats;
-}
-
-function sameFiles(left, right) {
-  const leftStats = requirePreservedFile(left, relativePath(path.dirname(left), left));
-  const rightStats = requirePreservedFile(right, relativePath(path.dirname(right), right));
-  return leftStats.size === rightStats.size && readFileSync(left).equals(readFileSync(right));
-}
-
-export function ensureRuntimeDirectory(root, { testHooks } = {}) {
-  const runtimePath = absolutePath(root, repositoryCodexRuntimeDirectory);
-  ensureOwnedPrivateDirectory(root, runtimePath, "Codex runtime directory", {
-    testHooks: {
-      beforeDirectoryCreate: ({ parent }) =>
-        testHooks?.beforeRuntimeDirectoryCreate?.({ parentBinding: parent, runtimePath }),
-      beforeDirectoryModeRepair: ({ parent }) =>
-        testHooks?.beforeRuntimeDirectoryChmod?.({ parentBinding: parent, runtimePath }),
-    },
-  });
-  return runtimePath;
-}
-
-function planMigrations(root) {
-  const migrations = [];
-  for (const contract of migrationContracts) {
-    const target = absolutePath(root, contract.target);
-    const existingSources = contract.sources
-      .map((relative) => ({ absolute: absolutePath(root, relative), relative }))
-      .filter(({ absolute }) => entryStats(absolute));
-    if (entryStats(target)) {
-      requirePreservedFile(target, contract.target);
-      for (const source of existingSources) {
-        requirePreservedFile(source.absolute, source.relative);
-        if (!sameFiles(source.absolute, target)) {
-          fail(
-            `Reset refused conflicting runtime identity: ${source.relative} and ${contract.target}.`,
-          );
-        }
-      }
-      continue;
-    }
-    const source = existingSources[0];
-    if (source) {
-      requirePreservedFile(source.absolute, source.relative);
-      migrations.push({ from: source.relative, to: contract.target });
-    }
-  }
-  return migrations;
-}
-
-export function applyMigrations(root, migrations, { testHooks } = {}) {
-  if (migrations.length === 0) return;
-  ensureRuntimeDirectory(root, { testHooks });
-  for (const migration of migrations) {
-    const source = absolutePath(root, migration.from);
-    const target = absolutePath(root, migration.to);
-    requirePreservedFile(source, migration.from);
-    if (entryStats(target)) fail(`Migration target appeared during reset: ${migration.to}.`);
-    const migratedStats = renameOwnedRegularFile(root, source, target, migration.to, {
-      testHooks: {
-        beforeBoundRename: ({ sourceParent, targetParent }) =>
-          testHooks?.beforeMigrationRename?.({
-            migration,
-            source,
-            sourceBinding: sourceParent.parentBinding,
-            target,
-            targetBinding: targetParent.parentBinding,
-          }),
-      },
-    });
-    chmodOwnedRegularFile(root, target, migratedStats, 0o600, migration.to);
-  }
 }
 
 function scanProcessDocuments(root) {
@@ -385,17 +269,13 @@ function scanProcessDocuments(root) {
   return matches;
 }
 
-function isPreservedEvidence(target) {
-  const stats = entryStats(target, { bigint: true });
-  return (
-    stats &&
-    !stats.isSymbolicLink() &&
-    stats.isFile() &&
-    stats.nlink === 1n &&
-    stats.size <= 1024n * 1024n &&
-    (stats.mode & 0o022n) === 0n &&
-    (typeof process.getuid !== "function" || stats.uid === BigInt(process.getuid()))
-  );
+function isCurrentVerificationEvidence(root) {
+  try {
+    readVerificationEvidence(root);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isActiveVerificationLock(root) {
@@ -440,8 +320,7 @@ function collectRuntimeCacheCandidates(root, candidates) {
     }
     for (const entry of verificationEntries) {
       const child = `${relative}/${entry}`;
-      const childPath = absolutePath(root, child);
-      if (child === verificationEvidencePath && isPreservedEvidence(childPath)) continue;
+      if (child === verificationEvidencePath && isCurrentVerificationEvidence(root)) continue;
       if (child === verificationLockPath && isActiveVerificationLock(root)) continue;
       candidates.add(child);
     }
@@ -547,7 +426,7 @@ export function removeResetCandidate(root, target, { testHooks } = {}) {
   });
 }
 
-async function applyReset(root, migrations, candidates) {
+async function applyReset(root, candidates) {
   if (candidates.includes(".context-index")) {
     const indexDirectory = path.join(root, ".context-index");
     const indexStats = entryStats(indexDirectory);
@@ -562,7 +441,6 @@ async function applyReset(root, migrations, candidates) {
       });
     } else if (indexStats) removeResetCandidate(root, indexDirectory);
   }
-  applyMigrations(root, migrations);
   for (const relative of candidates) {
     if (relative === ".context-index") continue;
     const target = absolutePath(root, relative);
@@ -576,11 +454,7 @@ async function applyReset(root, migrations, candidates) {
   }
 }
 
-function printPreview(migrations, candidates, applyArguments = "--apply") {
-  if (migrations.length > 0) {
-    console.log("Framework reset would preserve runtime identity by migrating:");
-    for (const migration of migrations) console.log(`- ${migration.from} -> ${migration.to}`);
-  }
+function printPreview(candidates, applyArguments = "--apply") {
   if (candidates.length > 0) {
     console.log("Framework reset would remove:");
     for (const candidate of candidates) console.log(`- ${candidate}`);
@@ -612,13 +486,12 @@ async function main() {
       }
     }
     const includeLocalRuntime = fullReset;
-    const migrations = includeLocalRuntime ? planMigrations(root) : [];
     const candidates = collectCandidates(root, {
       includeLocalRuntime,
     });
 
     if (!options.apply) {
-      if (migrations.length === 0 && candidates.length === 0) {
+      if (candidates.length === 0) {
         console.log(
           reducedSourceBaseline
             ? "Framework portable source baseline is clean."
@@ -629,7 +502,6 @@ async function main() {
         return;
       }
       printPreview(
-        migrations,
         candidates,
         activeSessionCleanup ? "--post-project-creation --apply" : "--apply",
       );
@@ -637,17 +509,9 @@ async function main() {
       return;
     }
 
-    await applyReset(root, migrations, candidates);
-    const residualMigrations = includeLocalRuntime ? planMigrations(root) : [];
+    await applyReset(root, candidates);
     const residual = collectCandidates(root, { includeLocalRuntime });
-    if (residualMigrations.length > 0 || residual.length > 0) {
-      fail(
-        `Reset left removable state: ${[
-          ...residualMigrations.map(({ from }) => from),
-          ...residual,
-        ].join(", ")}`,
-      );
-    }
+    if (residual.length > 0) fail(`Reset left removable state: ${residual.join(", ")}`);
     if (activeSessionCleanup) {
       console.log(
         `Framework active-session cleanup complete; removed ${candidates.length} safe path(s).`,
@@ -656,9 +520,7 @@ async function main() {
         "Local runtime and .context-index were preserved for the mandatory post-exit reset.",
       );
     } else {
-      console.log(
-        `Framework reset complete; migrated ${migrations.length} and removed ${candidates.length} path(s).`,
-      );
+      console.log(`Framework reset complete; removed ${candidates.length} path(s).`);
       console.log(
         "Source, portable .codex policy, required runtime identity, and exact verification evidence were preserved.",
       );

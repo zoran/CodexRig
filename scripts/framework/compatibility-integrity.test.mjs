@@ -19,7 +19,10 @@ import {
   verifyCodexArchives,
   verifyMiseArchive,
 } from "./compatibility-matrix.mjs";
-import { ciAdapterContractViolations } from "./framework-doctor.mjs";
+import {
+  ciAdapterContractViolations,
+  compatibilityFreshnessWarnings,
+} from "./framework-doctor.mjs";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..", "..");
 const matrixScript = fileURLToPath(new URL("./compatibility-matrix.mjs", import.meta.url));
@@ -146,6 +149,23 @@ test("blocking CI uses the exact reviewed Codex wrapper and platform bytes", () 
   assert.doesNotMatch(rootGitlab, /npm install --global @openai\/codex@latest/u);
   assert.deepEqual(ciAdapterContractViolations("github", rootGithub, matrix), []);
   assert.deepEqual(ciAdapterContractViolations("gitlab", rootGitlab, matrix), []);
+});
+
+test("online freshness names the distinct stable and reviewed Codex versions", () => {
+  const matrix = readCompatibilityMatrix();
+  assert.deepEqual(
+    compatibilityFreshnessWarnings(matrix, {
+      codex: "0.149.0",
+      pnpm: matrix.stable.pnpm.version,
+    }),
+    [
+      {
+        code: "online.codex.newer",
+        message:
+          "Codex stable 0.149.0 is newer than the reviewed blocking-CI version 0.147.0; keep host installations current through the official installer, and separately review and repin the exact CI archives.",
+      },
+    ],
+  );
 });
 
 test("Codex archive verification requires both exact reviewed artifacts", () => {

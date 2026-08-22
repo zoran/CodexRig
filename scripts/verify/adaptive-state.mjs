@@ -1,5 +1,5 @@
 /** Owns adaptive state behavior for the repository verification boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -17,6 +17,7 @@ import {
 import {
   cleanGitEnvironment,
   isolatedGitArguments,
+  isolatedGitResultCompleted,
   localGitExcludeIsInactive,
   resolveOwnedGitMetadata,
 } from "../repository/git-runtime-isolation.mjs";
@@ -98,7 +99,9 @@ export function run(command, args, options = {}) {
     cwd: root,
     encoding: "utf8",
     input: options.input ?? "",
+    maxBuffer: options.maxBuffer ?? 64 * 1024 * 1024,
     stdio: options.stdio ?? "pipe",
+    timeout: options.timeout ?? 120_000,
     env: { ...process.env, ...options.env },
   });
   if (result.error) {
@@ -135,29 +138,24 @@ function git(args, options = {}) {
     if (options.allowFailure) return null;
     throw new Error("Project-owned Git metadata is unavailable.");
   }
-  const result = spawnSync(
-    "git",
-    isolatedGitArguments({
-      args,
-      gitDirectory: metadata.gitDirectory,
-      workTree: metadata.workTree,
-    }),
-    {
-      cwd: repositoryRoot,
-      encoding: "utf8",
-      input: options.input ?? "",
-      stdio: options.stdio ?? "pipe",
-      env: { ...cleanGitEnvironment(), ...options.env },
-    },
-  );
-  if (result.error) {
-    if (options.allowFailure) return null;
-    throw result.error;
-  }
-  if (result.status !== 0) {
+  const invocationArguments = isolatedGitArguments({
+    args,
+    gitDirectory: metadata.gitDirectory,
+    workTree: metadata.workTree,
+  });
+  const result = spawnSync("git", invocationArguments, {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    input: options.input ?? "",
+    maxBuffer: options.maxBuffer ?? 64 * 1024 * 1024,
+    stdio: options.stdio ?? "pipe",
+    timeout: options.timeout ?? 120_000,
+    env: { ...cleanGitEnvironment(), ...options.env },
+  });
+  if (!isolatedGitResultCompleted(result, { args: invocationArguments, encoding: "utf8" })) {
     if (options.allowFailure) return null;
     const output = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
-    throw new Error(output || `git ${args.join(" ")} exited with ${result.status}`);
+    throw result.error ?? new Error(output || `git ${args.join(" ")} exited with ${result.status}`);
   }
   return result.stdout ?? "";
 }
@@ -481,7 +479,9 @@ export function classifyPath(inputPath, { productLayout } = {}) {
     filePath.startsWith("scripts/platform/") ||
     [
       "scripts/setup/startup-attestation.mjs",
-      "scripts/setup/verify-startup-attestation-on-session-start.sh",
+      "scripts/setup/session-control-hook-command.mjs",
+      "scripts/setup/startup-runtime-executables.mjs",
+      "scripts/setup/startup-session-controller.mjs",
     ].includes(filePath) ||
     filePath.startsWith(".codexrig/") ||
     filePath === ".gitlab-ci.yml" ||
@@ -605,7 +605,7 @@ export function validateCurrentCheckoutForPush(input, { repositoryRoot = root } 
   const status = freshHeadStatus(repositoryRoot);
   if (status.length > 0) {
     throw new Error(
-      "Pre-push verification requires a clean working tree so checks cannot substitute uncommitted content for the pushed commit.",
+      "Pre-push verification requires a clean working tree and index. Git push sends commits, not staged or unstaged content; git add alone is insufficient. Commit or amend the intended content before pushing.",
     );
   }
 

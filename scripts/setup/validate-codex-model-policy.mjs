@@ -1,5 +1,5 @@
 /** Owns validate codex model policy behavior for the setup, launch, and portable project boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -59,6 +59,7 @@ export function validateInstalledCodexModelPolicy(projectRoot = defaultRoot) {
     input: "",
     maxBuffer: 16 * 1024 * 1024,
     stdio: ["pipe", "pipe", "pipe"],
+    timeout: 20_000,
   });
   if (result.error || result.status !== 0) {
     const detail = result.error?.message || result.stderr.trim() || `status ${result.status}`;
@@ -76,6 +77,8 @@ export function validateInstalledCodexModelPolicy(projectRoot = defaultRoot) {
 function main() {
   try {
     const result = validateInstalledCodexModelPolicy();
+    console.log("Project-scoped Codex config and hooks match the strict portable project policy.");
+    console.log("Repository-local CODEX_HOME isolation matches the portable project policy.");
     console.log(
       `Codex model policy passed (primary and subagents: ${result.primaryModel}; reasoning: ${result.primaryReasoningEffort}).`,
     );

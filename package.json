@@ -18,7 +18,7 @@
     "platform:detect": "node scripts/platform/detect-platform.mjs",
     "platform:configure": "node scripts/platform/configure-platform.mjs",
     "codex:start": "bash scripts/setup/start-codex.sh",
-    "codex:validate": "node scripts/setup/validate-codex-config.mjs && node scripts/setup/validate-codex-model-policy.mjs",
+    "codex:validate": "node scripts/setup/validate-codex-model-policy.mjs",
     "context:check": "node scripts/context/check-context-index.mjs",
     "context:clean": "node scripts/context/clean-context-index.mjs",
     "context:index": "node scripts/context/index-codebase.mjs",
@@ -36,7 +36,7 @@
     "format:check": "node scripts/verify/format-project.mjs --check",
     "goal:new": "node scripts/goals/goal-publication-precondition.mjs",
     "hooks:install": "bash scripts/setup/install-git-hooks.sh",
-    "setup": "bash scripts/setup/check-prereqs.sh --codex && node scripts/setup/validate-codex-config.mjs && node scripts/setup/validate-codex-model-policy.mjs && node scripts/verify/docs.mjs && node scripts/verify/identity-access.mjs && node scripts/verify/tenant-isolation.mjs && node scripts/verify/localization.mjs && node scripts/verify/licensing.mjs && node scripts/verify/secrets.mjs && bash scripts/setup/install-git-hooks.sh && node scripts/context/index-codebase.mjs --setup",
+    "setup": "bash scripts/setup/check-prereqs.sh --codex && node scripts/setup/validate-codex-model-policy.mjs && node scripts/verify/docs.mjs && node scripts/verify/identity-access.mjs && node scripts/verify/tenant-isolation.mjs && node scripts/verify/localization.mjs && node scripts/verify/licensing.mjs && node scripts/verify/secrets.mjs && bash scripts/setup/install-git-hooks.sh && node scripts/context/index-codebase.mjs --setup",
     "stack:detect": "node scripts/stack/stack-detector.mjs",
     "project:export": "bash scripts/setup/export-project.sh",
     "repo:housekeeping": "node scripts/goals/repository-housekeeping.mjs",
@@ -44,13 +44,13 @@
     "verify:changed": "node scripts/verify/adaptive.mjs --mode repo",
     "verify:external": "node scripts/verify/external.mjs",
     "verify:pre-push": "bash scripts/verify/pre-push.sh",
-    "web:update-sitemap-lastmod": "node scripts/web/update-sitemap-lastmod.mjs"
+    "web:update-sitemap-lastmod": "node scripts/web/update-sitemap-lastmod.mjs",
+    "worktree:status": "node scripts/repository/worktree-recovery-cli.mjs"
   },
   "devDependencies": {
     "@huggingface/transformers": "^4.2.0",
     "@lancedb/lancedb": "^0.37.1",
     "onnxruntime-common": "1.24.3",
-    "prettier": "^3.9.6",
-    "smol-toml": "^1.8.0"
+    "prettier": "^3.9.6"
   }
 }

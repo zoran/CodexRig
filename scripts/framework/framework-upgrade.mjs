@@ -17,7 +17,7 @@ import {
   serializeCanonicalJson,
   sha256,
 } from "../contracts/framework-contract.mjs";
-import { readFrameworkUpgradeTargetState } from "./framework-upgrade-bootstrap.mjs";
+import { readFrameworkUpgradeTargetState } from "./framework-upgrade-target.mjs";
 import {
   atomicWriteUpgradeFile,
   ensureUpgradeDirectoryChain,
@@ -89,7 +89,7 @@ export function buildFrameworkUpgradePlan({ sourceRoot, targetRoot = frameworkRo
   const targetState = readFrameworkUpgradeTargetState(target);
   const targetContract = targetState.contract;
   if (sourceContract.upgrade.receiptFile !== targetContract.upgrade.receiptFile) {
-    throw new Error("Framework receipt-path migrations require a newer upgrade schema.");
+    throw new Error("Framework upgrade source and target receipt paths must match.");
   }
   const receipt = targetState.receipt;
   const targetInputSnapshots = Object.fromEntries(

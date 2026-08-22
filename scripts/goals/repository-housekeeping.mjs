@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 /** Owns repository housekeeping behavior for the goal closure and repository housekeeping boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { lstatSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { deliveryReconciliationPlan } from "../docs/delivery-manifest.mjs";
 import { frameworkVersionReconciliationPlan } from "../framework/framework-version.mjs";
-import { formatContextError } from "../terminal/terminal-output.mjs";
+import { formatContextError, sanitizeMultilineForTerminal } from "../terminal/terminal-output.mjs";
 import { verificationChildEnvironment } from "../verify/verification-runtime-identity.mjs";
 import { acquireVerificationSessionLock } from "../verify/verification-session-lock.mjs";
+import { reconcileRepositoryWorktreeState } from "../repository/worktree-recovery.mjs";
 import {
   applyHousekeepingWrites,
   housekeepingStateDirectory,
@@ -118,6 +119,17 @@ async function main() {
         "Repository housekeeping has durable interrupted state; run --apply to recover it before checking.",
       );
     }
+    const worktreePlan = reconcileRepositoryWorktreeState({
+      root: repositoryRoot,
+      apply: options.apply,
+      lifecycleCapability: lock.lifecycleCapability,
+    });
+    for (const advisory of worktreePlan.advisoryFindings) {
+      console.warn(
+        `Repository housekeeping preserved advisory: ${sanitizeMultilineForTerminal(advisory, repositoryRoot)}`,
+      );
+    }
+    failFromPlan(worktreePlan);
     if (options.apply) recoverInterruptedHousekeepingWrites(repositoryRoot);
     let versionPlan = frameworkVersionReconciliationPlan({ root: repositoryRoot });
     if (versionPlan.blockingFindings.length > 0) failFromPlan(versionPlan);

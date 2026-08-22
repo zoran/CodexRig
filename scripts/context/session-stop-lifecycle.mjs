@@ -1,10 +1,8 @@
-/** Owns durable Stop continuation, terminal handover, and context refresh lifecycle behavior. */
+/** Owns preloaded durable Stop continuation and terminal-handover lifecycle behavior. */
 import { createHash } from "node:crypto";
-import { existsSync, readSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
-import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { runAsSanitizedContextWorker } from "./context-worker-output.mjs";
 import { discoverRecentCriticalBudgetHandover } from "./critical-budget-handover.mjs";
 import { readProjectWorkContext } from "./project-work-state.mjs";
 import { inspectRuntimeSessionLease } from "../repository/runtime-session-lease.mjs";
@@ -308,74 +306,29 @@ export function evaluateAutonomousContinuation({
   );
 }
 
-async function refreshContextIndex() {
-  try {
-    const library = await import("./context-index-lib.mjs");
-    if (!existsSync(library.indexDirectory)) return null;
-
-    const result = await library.ensureFreshIndex({ repair: true, maintenance: false });
-    if (!result.manifest || !result.freshness.fresh) {
-      throw new Error(
-        `Context index is not current after automatic refresh: ${library.describeFreshness(
-          result.freshness,
-        )}`,
-      );
-    }
-    return null;
-  } catch (error) {
-    const detail = formatContextError(error);
-    return (
-      `Automatic context index refresh failed: ${detail}. ` +
-      "Run pnpm context:index before relying on semantic retrieval."
-    );
-  }
-}
-
 export async function runStopLifecycle({
   root = repositoryRoot,
   hookInput = "",
-  refreshIndex = refreshContextIndex,
+  expectedSessionId = null,
   testHooks,
 } = {}) {
   const prepared = prepareAutonomousContinuation(root, hookInput);
   if (prepared.errorOutput) return prepared.errorOutput;
+  if (
+    expectedSessionId !== null &&
+    prepared.input !== null &&
+    prepared.input.sessionId !== expectedSessionId
+  ) {
+    throw new Error("Stop hook session does not match the active verified Codex session");
+  }
   if (!prepared.input?.hasDurableTranscript) return {};
 
-  // Sealing is a terminal session boundary. Do not even refresh the semantic index afterward.
+  // Sealing is a terminal session boundary; no later Stop work may run in this runtime session.
   const sealedStop = sealedHandoverStop(root, testHooks);
   if (sealedStop) return sealedStop;
   const output = evaluatePreparedAutonomousContinuation(root, prepared.input, {
     inspectHandover: false,
     testHooks,
   });
-
-  const refreshWarning = await refreshIndex();
-  if (refreshWarning) mergeSystemMessage(output, refreshWarning);
   return output;
-}
-
-function readHookInput() {
-  try {
-    const buffer = Buffer.allocUnsafe(hookInputMaxBytes + 1);
-    let offset = 0;
-    while (offset < buffer.length) {
-      const bytesRead = readSync(0, buffer, offset, buffer.length - offset, null);
-      if (bytesRead === 0) break;
-      offset += bytesRead;
-    }
-    return buffer.subarray(0, offset).toString("utf8");
-  } catch {
-    return "";
-  }
-}
-
-async function main(hookInput) {
-  const output = await runStopLifecycle({ hookInput });
-  if (Object.keys(output).length > 0) process.stdout.write(`${JSON.stringify(output)}\n`);
-}
-
-if (path.resolve(process.argv[1] ?? "") === modulePath) {
-  const hookInput = readHookInput();
-  runAsSanitizedContextWorker(import.meta.url, { input: hookInput });
-  await main(hookInput);
 }

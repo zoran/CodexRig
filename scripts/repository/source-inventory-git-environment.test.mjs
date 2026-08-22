@@ -13,6 +13,8 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { isolatedGitResultCompleted } from "./git-runtime-isolation.mjs";
+import { spawnSyncWithBoundedIo } from "./runtime-process-io.mjs";
 import { listActiveFiles, listPortableTransferFiles } from "./source-inventory.mjs";
 import { projectFormatFiles } from "../verify/format-project.mjs";
 
@@ -21,6 +23,123 @@ function write(root, relativePath, content = relativePath) {
   mkdirSync(path.dirname(target), { recursive: true });
   writeFileSync(target, content, "utf8");
 }
+
+const completionArguments = ["--version"];
+
+function completedGitResult(overrides = {}) {
+  return {
+    error: undefined,
+    pid: 42,
+    signal: null,
+    status: 0,
+    stdout: "git version 2.53.0\n",
+    ...overrides,
+  };
+}
+
+function sandboxCompletionError(overrides = {}) {
+  return Object.assign(new Error("spawnSync git EPERM"), {
+    code: "EPERM",
+    errno: -1,
+    path: "git",
+    spawnargs: completionArguments,
+    syscall: "spawnSync git",
+    ...overrides,
+  });
+}
+
+test("isolated Git accepts only ordinary or exact sandbox terminal completion", () => {
+  assert.equal(
+    isolatedGitResultCompleted(completedGitResult(), { args: completionArguments }),
+    true,
+  );
+  assert.equal(
+    isolatedGitResultCompleted(completedGitResult({ error: sandboxCompletionError() }), {
+      args: completionArguments,
+    }),
+    true,
+  );
+  assert.equal(
+    isolatedGitResultCompleted(
+      completedGitResult({
+        error: sandboxCompletionError(),
+        status: 128,
+        stdout: Buffer.alloc(0),
+      }),
+      {
+        acceptedStatuses: [0, 128],
+        args: completionArguments,
+        encoding: null,
+        maximumOutputBytes: 0,
+      },
+    ),
+    true,
+  );
+
+  for (const result of [
+    completedGitResult({ error: sandboxCompletionError({ code: "ETIMEDOUT" }) }),
+    completedGitResult({ error: sandboxCompletionError({ path: "other" }) }),
+    completedGitResult({ error: sandboxCompletionError({ spawnargs: ["status"] }) }),
+    completedGitResult({ pid: 0 }),
+    completedGitResult({ signal: "SIGTERM", status: null }),
+    completedGitResult({ status: 1 }),
+    completedGitResult({ stdout: Buffer.alloc(0) }),
+  ]) {
+    assert.equal(isolatedGitResultCompleted(result, { args: completionArguments }), false);
+  }
+  assert.equal(
+    isolatedGitResultCompleted(completedGitResult({ stdout: "too large" }), {
+      args: completionArguments,
+      maximumOutputBytes: 3,
+    }),
+    false,
+  );
+});
+
+test("bounded synchronous process I/O preserves EOF and descendant output", () => {
+  const descendantSource = [
+    'import { spawnSync } from "node:child_process";',
+    'import { readFileSync } from "node:fs";',
+    'const input = readFileSync(0, "utf8");',
+    'const child = spawnSync(process.execPath, ["--eval", "process.stdout.write(\\"descendant\\")"], { stdio: ["ignore", "inherit", "inherit"] });',
+    "if (child.status !== 0 || child.signal) process.exit(70);",
+    "process.stdout.write(`:${input}`);",
+    'process.stderr.write("diagnostic");',
+  ].join("\n");
+  const completed = spawnSyncWithBoundedIo(
+    process.execPath,
+    ["--input-type=module", "--eval", descendantSource],
+    {
+      encoding: "utf8",
+      input: "forwarded-input",
+      maxBuffer: 1024,
+      stdio: "pipe",
+      timeout: 5_000,
+    },
+  );
+  assert.equal(completed.error, undefined);
+  assert.equal(completed.status, 0);
+  assert.equal(completed.signal, null);
+  assert.equal(completed.stdout, "descendant:forwarded-input");
+  assert.equal(completed.stderr, "diagnostic");
+
+  const oversized = spawnSyncWithBoundedIo(
+    process.execPath,
+    ["--eval", 'process.stdout.write("four")'],
+    { encoding: "utf8", maxBuffer: 3, stdio: "pipe", timeout: 5_000 },
+  );
+  assert.equal(oversized.status, 0);
+  assert.equal(oversized.error?.code, "CODEXRIG_BOUNDED_PROCESS_IO");
+
+  assert.throws(
+    () =>
+      spawnSyncWithBoundedIo(process.execPath, ["--version"], {
+        input: "unexpected",
+        stdio: "inherit",
+      }),
+    /input requires piped stdin/u,
+  );
+});
 
 test("source inventory ignores ambient and repository-local Git excludes", () => {
   const fixture = mkdtempSync(path.join(os.tmpdir(), "source-inventory-git-environment-"));

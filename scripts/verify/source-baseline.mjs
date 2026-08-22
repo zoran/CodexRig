@@ -1,5 +1,5 @@
 /** Owns source baseline behavior for the repository verification boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -25,7 +25,6 @@ const resetTest = path.join(path.dirname(resetScript), "reset-framework.test.mjs
 const testResult = spawnSync(process.execPath, ["--test", "--test-reporter=dot", resetTest], {
   cwd: root,
   encoding: "utf8",
-  input: "",
   stdio: "inherit",
 });
 if (testResult.error) {
@@ -40,7 +39,6 @@ console.log(
 const result = spawnSync(process.execPath, [resetScript, "--verification-source-baseline"], {
   cwd: root,
   encoding: "utf8",
-  input: "",
   stdio: "inherit",
 });
 

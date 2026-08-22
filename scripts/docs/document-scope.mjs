@@ -4,6 +4,7 @@ import { listActiveFiles, repositoryRoot } from "../repository/source-inventory.
 export const projectManifestPath = "docs/project.md";
 export const projectContextPath = "docs/project-context.md";
 export const futureModulesPath = "docs/future-modules.md";
+const leadingProjectContextMarker = /^\s*<!-- codexrig-work-state\r?\n[\s\S]{1,4096}?\r?\n-->\s*/u;
 
 const processDocumentDirectories = new Set([
   "goals",
@@ -70,4 +71,11 @@ export function isRepositoryProcessArtifactPath(relativePath) {
 
 export function isRepositoryProcessMarkdownPath(relativePath) {
   return isManagedMarkdownPath(relativePath) && isRepositoryProcessArtifactPath(relativePath);
+}
+
+/** Removes only the bounded leading work-state envelope before generic Markdown heading checks. */
+export function markdownBodyForHeadingValidation(relativePath, content) {
+  const value = String(content);
+  if (relativePath !== projectContextPath) return value;
+  return value.replace(leadingProjectContextMarker, "");
 }

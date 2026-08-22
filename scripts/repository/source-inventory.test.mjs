@@ -86,13 +86,6 @@ function writePortableCodexFiles(targetRoot) {
       readFileSync(path.join(repositoryRoot, ...relativePath.split("/")), "utf8"),
     );
   }
-  for (const name of ["refresh-context-index-on-stop.sh", "refresh-context-index-on-stop.mjs"]) {
-    write(
-      targetRoot,
-      `scripts/context/${name}`,
-      readFileSync(path.join(repositoryRoot, "scripts", "context", name), "utf8"),
-    );
-  }
   const configPath = path.join(targetRoot, ".codex", "config.toml");
   write(
     targetRoot,
@@ -607,22 +600,19 @@ test("Git-less staging rejects repository-root Codex runtime and retains portabl
   );
 });
 
-test("stage validation requires the exact portable lifecycle hooks", async () => {
+test("stage validation rejects mutable project-file lifecycle hooks", async () => {
   const stage = temporaryRoot("export-hook-validation-");
   writePortableCodexFiles(stage);
   write(
     stage,
     ".codex/hooks.json",
     readFileSync(path.join(repositoryRoot, ".codex", "hooks.json"), "utf8").replace(
-      '"Stop"',
-      '"PostToolUse"',
+      '"hooks": {}',
+      '"hooks": {"Stop": []}',
     ),
   );
 
-  await assert.rejects(
-    () => validateStagedProject(stage),
-    /hook events must contain exactly these keys: SessionStart, Stop/,
-  );
+  await assert.rejects(() => validateStagedProject(stage), /hook events must remain empty/);
 });
 
 test("stage validation requires the portable primary retrieval contract", async () => {
@@ -724,8 +714,11 @@ test("stage validation sees a copied tracked .env even though the stage has no G
   for (const relativePath of [
     ".codex/hooks.json",
     "scripts/context/context-worker-output.mjs",
-    "scripts/context/refresh-context-index-on-stop.mjs",
-    "scripts/context/refresh-context-index-on-stop.sh",
+    "scripts/context/session-stop-lifecycle.mjs",
+    "scripts/setup/session-control-hook-command.mjs",
+    "scripts/setup/startup-codex-process.mjs",
+    "scripts/setup/startup-runtime-executables.mjs",
+    "scripts/setup/startup-session-controller.mjs",
   ]) {
     assert.equal(
       readFileSync(path.join(target, relativePath), "utf8"),
@@ -733,10 +726,6 @@ test("stage validation sees a copied tracked .env even though the stage has no G
       relativePath,
     );
   }
-  assert.equal(
-    lstatSync(path.join(target, "scripts/context/refresh-context-index-on-stop.sh")).mode & 0o777,
-    0o755,
-  );
   await assert.rejects(() => validateStagedProject(target), /\.env.*environment credential file/s);
 });
 

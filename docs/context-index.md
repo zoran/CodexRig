@@ -20,29 +20,32 @@ downloads the pinned local embedding model when it is not cached, performs a rea
 prints the fixed `.context-index/` path plus freshness and build statistics. Setup fails when that
 vector space is not current and usable.
 
-After that bootstrap, `.codex/hooks.json` registers exactly one project-local Codex Stop hook. It
-runs once at the end of a turn, enters the attested mise-pinned Node.js lifecycle, and enforces
-durable-work continuation and terminal-handover behavior before calling the same lock-,
-transaction-, and repair-safe incremental freshness path used by normal retrieval. It is not a
-persistent watcher and does not run after individual tool calls. The lifecycle entry point still
-runs when `.context-index/` does not exist, because work-state and sealed-handover safety cannot
-depend on a previous index build; only the refresh itself becomes a no-op. Ephemeral side
-conversations and other Stop events without a durable local `transcript_path` exit inside that
-lifecycle before any index, handover, or work-state access.
+After bootstrap, tracked `.codex/hooks.json` contains no executable route. The canonical launcher
+has already loaded the lifecycle implementation into the session controller, injects one
+session-owned Stop definition alongside SessionStart, and uses Codex's `hooks/list` interface to
+require a warning-free inventory containing only those two exact trusted/enabled definitions while
+the exclusive launcher reservation is already held and before a foreground writer is bound. The
+controller first rejects executable or unknown ignored runtime configuration. Codex's in-memory
+definition invokes only an embedded Node-built-in client through the controller's exact Node
+executable and token-bound loopback endpoint. It needs no manual `/hooks` approval and never enables
+the global hook-trust bypass; any additional user, project-file, or plugin hook blocks canonical
+startup. The Stop route enforces durable-work continuation, loop protection, and terminal-handover
+behavior without loading any repository file, mise configuration, package, or semantic-index
+implementation after session admission. It still works when `.context-index/` does not exist.
+Ephemeral side conversations and other Stop events without a durable local `transcript_path` exit
+before handover or work-state access. The preloaded controller sanitizes lifecycle failures before
+returning a `systemMessage`, preventing an unresolvable Stop loop without exposing local paths. It
+does not run index maintenance. `context:search` verifies freshness and performs bounded repair on
+demand; explicit maintenance remains available through `context:index`, while `context:check`
+remains diagnostic and read-only. Index commands retain their own environment, path, locking,
+transaction, and native-worker safety boundaries.
 
-Codex requires project hooks to be reviewed and approved locally by content hash through `/hooks`.
-Hook and native worker output pass through the context worker sanitizer, so failures remain visible
-without exposing absolute local paths. The Stop handler reports failure as a `systemMessage` but
-returns success to Codex, preventing an unresolvable Stop loop; explicit maintenance remains
-available through `context:index`, while `context:check` remains diagnostic and read-only. The
-production shell boundary clears every ambient `CONTEXT_INDEX_*` redirect, test, scope, tuning,
-offline, and internal-worker variable before entering mise, so a caller environment cannot move,
-narrow, or bypass sanitization for the project index.
-
-`pnpm setup` validates the tracked hook definition and enabled hook feature as part of bootstrap and
-configuration validation, but it never creates local trust. A new or changed hook hash still
-requires explicit approval through `/hooks`. Turn-boundary writes remain ignored local index state:
-they neither block nor satisfy the read-only `pnpm goal:new` publication precondition.
+`pnpm setup` validates that tracked `.codex/hooks.json` remains executable-free and that the hook
+feature is enabled. The controller derives narrow trust only for its two exact session-owned hashes,
+and Codex must report precisely those trusted definitions before a foreground writer exists. Any new
+or changed noncanonical hook blocks canonical startup; no global trust bypass is used. Turn-boundary
+writes are limited to ignored local continuation state: they neither block nor satisfy the read-only
+`pnpm goal:new` publication precondition.
 
 `context:search` is the normal semantic query entry point. Use it early for a concrete conceptual,
 ownership, data-flow, or relationship question when no reliable exact anchor exists, terminology is
@@ -77,9 +80,10 @@ explicitly to exercise the cached real model and warm-offline CLI path.
 A bounded, idempotent maintenance pass runs under the existing context rebuild lock during semantic
 search, every explicit `context:index` operation (including an already-current no-op), immediately
 before a rebuild, after atomic publication, and after a failed candidate build when rollback leaves
-cleanup safe. A no-op Stop-hook refresh does not run garbage collection. Setup may invoke the same
-path because this repository explicitly assigns setup the initial index bootstrap; verification,
-pre-push, status/check, application startup, deployment, and goal or slice closure remain read-only.
+cleanup safe. The Stop lifecycle never runs garbage collection or imports the index runtime. Setup
+may invoke the same path because this repository explicitly assigns setup the initial index
+bootstrap; verification, pre-push, status/check, application startup, deployment, and goal or slice
+closure remain read-only.
 
 Maintenance preserves the selected `lancedb/` database, `manifest.json`, and pinned model-cache
 revision. It may remove only validated `next`/`previous` publication generations, interrupted
@@ -128,8 +132,8 @@ suite and the optional pinned-model integration test.
   checksum receipts are visible on disk but excluded from embeddings because they add no semantic
   project context.
 - Exclude Git metadata, dependencies, build/generated output, process artifacts, local runtime,
-  model/index state, binary/oversized files, secrets, sensitive path patterns, and every legacy
-  loose root runtime or private `.codex/runtime/` path. This exclusion is unconditional because the
+  model/index state, binary/oversized files, secrets, sensitive path patterns, and every quarantined
+  loose-root runtime or private `.codex/runtime/` path. This exclusion is unconditional because the
   supported project start always binds `CODEX_HOME` to ignored `.codex/runtime/` under the canonical
   project root; it must not depend on the caller's current environment.
 - Skip symlinks and multiply linked files before active reads; portable transfer rejects them

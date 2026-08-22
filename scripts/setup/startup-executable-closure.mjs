@@ -1,4 +1,4 @@
-/** Derives the repository-local executable closure bound to Codex startup and Stop hooks. */
+/** Derives the repository-local module closure that must load before Codex starts. */
 import { existsSync } from "node:fs";
 import path from "node:path";
 import {
@@ -11,10 +11,11 @@ import { importSpecifiersForFile } from "../repository/source-import-specifiers.
 const maximumClosureFiles = 256;
 const moduleCandidates = Object.freeze(["", ".mjs", ".js", ".json"]);
 export const startupExecutableEntryPoints = Object.freeze([
-  "scripts/context/refresh-context-index-on-stop.mjs",
+  "scripts/context/session-stop-lifecycle.mjs",
+  "scripts/setup/session-control-hook-command.mjs",
   "scripts/setup/startup-attestation.mjs",
   "scripts/setup/startup-executable-closure.mjs",
-  "scripts/setup/startup-hook-dispatcher.mjs",
+  "scripts/setup/startup-session-controller.mjs",
 ]);
 
 function resolvedRelativeModule(root, importer, specifier) {
@@ -35,7 +36,7 @@ function resolvedRelativeModule(root, importer, specifier) {
   throw new Error(`${importer} imports missing repository module ${specifier}.`);
 }
 
-/** Returns the exact static/dynamic repository module graph reachable from hook entry points. */
+/** Returns the exact repository module graph loaded by the issue-time session controller. */
 export function startupExecutableClosurePaths(root) {
   const pending = [...startupExecutableEntryPoints];
   const closure = new Set();

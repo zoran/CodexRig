@@ -1,11 +1,12 @@
 /** Owns verification git basis behavior for the repository verification boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
   cleanGitEnvironment,
   isolatedGitArguments,
+  isolatedGitResultCompleted,
   localGitExcludeIsInactive,
   resolveOwnedGitMetadata,
 } from "../repository/git-runtime-isolation.mjs";
@@ -31,23 +32,27 @@ function git(repositoryRoot, args, { allowFailure = false, environment = {} } = 
     if (allowFailure) return null;
     throw new Error("Verification basis requires project-owned Git metadata.");
   }
-  const result = spawnSync(
-    "git",
-    isolatedGitArguments({
-      args,
-      gitDirectory: metadata.gitDirectory,
-      workTree: metadata.workTree,
-    }),
-    {
-      cwd: repositoryRoot,
+  const invocationArguments = isolatedGitArguments({
+    args,
+    gitDirectory: metadata.gitDirectory,
+    workTree: metadata.workTree,
+  });
+  const result = spawnSync("git", invocationArguments, {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: { ...cleanGitEnvironment(), ...environment },
+    input: "",
+    maxBuffer: 4 * 1024 * 1024,
+    stdio: "pipe",
+    timeout: 60_000,
+  });
+  if (
+    !isolatedGitResultCompleted(result, {
+      args: invocationArguments,
       encoding: "utf8",
-      env: { ...cleanGitEnvironment(), ...environment },
-      input: "",
-      maxBuffer: 4 * 1024 * 1024,
-      stdio: "pipe",
-    },
-  );
-  if (result.error || result.status !== 0) {
+      maximumOutputBytes: 4 * 1024 * 1024,
+    })
+  ) {
     if (allowFailure) return null;
     const output = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
     throw result.error ?? new Error(output || `git ${args.join(" ")} failed.`);

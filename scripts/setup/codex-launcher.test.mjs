@@ -13,13 +13,6 @@ import {
 import path from "node:path";
 import { after, test } from "node:test";
 import {
-  portableCodexGitignorePatterns,
-  portableCodexGitignoreProbePaths,
-  repositoryCodexHomeGitignorePatterns,
-  repositoryCodexHomeProtectedGitignoreProbePaths,
-} from "../repository/source-inventory.mjs";
-import {
-  bashSingleQuotedArray,
   cleanupTemporaryRoots,
   root,
   run,
@@ -28,15 +21,30 @@ import {
   writeProjectAgents,
   writeProjectHookFiles,
 } from "./setup-regression-fixtures.mjs";
+import { sessionControlHookConfigArguments } from "./session-control-hook-command.mjs";
 
 after(cleanupTemporaryRoots);
 
-test("Codex launcher refreshes the CLI and compatible dependencies before isolated startup", () => {
+test("Codex launcher performs deterministic offline validation before isolated startup", () => {
+  const projectIntelligenceArguments = [
+    "-c",
+    'model="gpt-5.6-sol"',
+    "-c",
+    'model_reasoning_effort="ultra"',
+  ];
+  const sessionControlArguments = [
+    ...projectIntelligenceArguments,
+    ...sessionControlHookConfigArguments(),
+  ];
+  const shellWords = sessionControlArguments
+    .map((argument) => `'${argument.replaceAll("'", `'\\''`)}'`)
+    .join(" ");
   const fixture = temporaryRoot("codex launcher with spaces ");
   const setupDirectory = path.join(fixture, "scripts", "setup");
   const dependencyDirectory = path.join(fixture, "scripts", "deps");
   const frameworkDirectory = path.join(fixture, "scripts", "framework");
   const contractDirectory = path.join(fixture, "scripts", "contracts");
+  const filesystemDirectory = path.join(fixture, "scripts", "filesystem");
   const repositoryDirectory = path.join(fixture, "scripts", "repository");
   const securityDirectory = path.join(fixture, "scripts", "security");
   const terminalDirectory = path.join(fixture, "scripts", "terminal");
@@ -46,6 +54,7 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
   mkdirSync(dependencyDirectory, { recursive: true });
   mkdirSync(frameworkDirectory, { recursive: true });
   mkdirSync(contractDirectory, { recursive: true });
+  mkdirSync(filesystemDirectory, { recursive: true });
   mkdirSync(repositoryDirectory, { recursive: true });
   mkdirSync(securityDirectory, { recursive: true });
   mkdirSync(terminalDirectory, { recursive: true });
@@ -58,16 +67,8 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
   const launcher = path.join(setupDirectory, "start-codex.sh");
   copyFileSync(path.join(root, "scripts/setup/start-codex.sh"), launcher);
   copyFileSync(
-    path.join(root, "scripts/setup/validate-codex-bootstrap.sh"),
-    path.join(setupDirectory, "validate-codex-bootstrap.sh"),
-  );
-  copyFileSync(
     path.join(root, "scripts/setup/check-prereqs.sh"),
     path.join(setupDirectory, "check-prereqs.sh"),
-  );
-  copyFileSync(
-    path.join(root, "scripts/deps/install-compatible.mjs"),
-    path.join(dependencyDirectory, "install-compatible.mjs"),
   );
   copyFileSync(
     path.join(root, "scripts/deps/verify-pnpm-execution-policy.mjs"),
@@ -82,16 +83,21 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     path.join(frameworkDirectory, "framework-doctor.mjs"),
   );
   for (const name of [
+    "session-control-hook-command.mjs",
     "startup-attestation.mjs",
+    "startup-session-controller.mjs",
     "validate-codex-config.mjs",
     "validate-codex-model-policy.mjs",
-    "verify-startup-attestation-on-session-start.sh",
   ]) {
     copyFileSync(path.join(root, "scripts/setup", name), path.join(setupDirectory, name));
   }
   copyFileSync(
-    path.join(root, "scripts/contracts/portable-toml-bootstrap.mjs"),
-    path.join(contractDirectory, "portable-toml-bootstrap.mjs"),
+    path.join(root, "scripts/contracts/portable-toml.mjs"),
+    path.join(contractDirectory, "portable-toml.mjs"),
+  );
+  copyFileSync(
+    path.join(root, "scripts/filesystem/owned-path-safety.mjs"),
+    path.join(filesystemDirectory, "owned-path-safety.mjs"),
   );
   copyFileSync(
     path.join(root, "scripts/security/secret-patterns.mjs"),
@@ -103,6 +109,7 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
   );
   for (const name of [
     "git-runtime-isolation.mjs",
+    "runtime-process-io.mjs",
     "source-inventory-policy.mjs",
     "source-inventory.mjs",
   ]) {
@@ -121,10 +128,14 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     [
       "#!/usr/bin/env bash",
       "set -euo pipefail",
+      "for variable in NODE_OPTIONS NODE_PATH NPM_CONFIG_NODE_OPTIONS npm_config_node_options PNPM_CONFIG_NODE_OPTIONS pnpm_config_node_options NPM_CONFIG_SCRIPT_SHELL npm_config_script_shell PNPM_CONFIG_SCRIPT_SHELL pnpm_config_script_shell; do",
+      '  [[ -z "${!variable:-}" ]] || exit 86',
+      "done",
       '[[ "${NPM_CONFIG_IGNORE_PNPMFILE:-}" == "true" ]] || exit 87',
       '[[ "${PNPM_CONFIG_IGNORE_PNPMFILE:-}" == "true" ]] || exit 88',
       '[[ "${npm_config_ignore_pnpmfile:-}" == "true" ]] || exit 89',
       '[[ "${pnpm_config_ignore_pnpmfile:-}" == "true" ]] || exit 90',
+      '[[ -z "${CODEXRIG_LAUNCHER_PID:-}" ]] || exit 104',
       'if [[ "$*" == "debug models --bundled" ]]; then',
       '  printf \'%s\\n\' \'{"models":[{"slug":"gpt-5.6-sol","visibility":"list","priority":1,"supported_reasoning_levels":[{"effort":"ultra"}]}]}\'',
       "  exit 0",
@@ -135,22 +146,30 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
       "  printf '%s\\0' \"$@\"",
       "  printf 'END\\0'",
       '} >> "$CAPTURE_PATH"',
-      'if [[ "${1-}" == "update" ]]; then',
-      '  update_status="${FAKE_CODEX_UPDATE_STATUS:-0}"',
-      '  if [[ "$update_status" != "0" ]]; then',
-      "    printf 'synthetic update failure\\n' >&2",
-      '    exit "$update_status"',
-      "  fi",
-      "  exit 0",
-      "fi",
       'if [[ "${CODEXRIG_STARTUP_NONCE:-}" != "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" ]]; then',
       "  printf 'missing startup nonce\\n' >&2",
       "  exit 91",
+      "fi",
+      "is_resume=false",
+      'for argument in "$@"; do',
+      '  if [[ "$argument" == "resume" ]]; then is_resume=true; fi',
+      "done",
+      'if [[ "$is_resume" == true ]]; then',
+      '  [[ "${CODEXRIG_STARTUP_SESSION_SOURCE:-}" == "resume" ]] || exit 97',
+      '  if [[ -n "${EXPECTED_RESUME_SESSION_ID:-}" ]]; then',
+      '    [[ "${CODEXRIG_STARTUP_RESUME_SESSION_ID:-}" == "$EXPECTED_RESUME_SESSION_ID" ]] || exit 98',
+      "  fi",
+      "else",
+      '  [[ "${CODEXRIG_STARTUP_SESSION_SOURCE:-}" == "startup" ]] || exit 99',
+      '  [[ -z "${CODEXRIG_STARTUP_RESUME_SESSION_ID:-}" ]] || exit 100',
       "fi",
       'case "${CODEXRIG_STARTUP_CONTROL_POLICY:-}" in',
       "  interactive-v2:safe-defaults | interactive-v2:no-alt-screen | dev-yolo-v1:default-screen | dev-yolo-v1:no-alt-screen) ;;",
       "  *) printf 'missing startup control policy\\n' >&2; exit 92 ;;",
       "esac",
+      'if [[ "$is_resume" == true ]]; then',
+      '  exit "${FAKE_CODEX_RESUME_STATUS:-${FAKE_CODEX_START_STATUS:-0}}"',
+      "fi",
       'exit "${FAKE_CODEX_START_STATUS:-0}"',
     ].join("\n"),
     "utf8",
@@ -163,6 +182,9 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     [
       "#!/usr/bin/env bash",
       "set -euo pipefail",
+      "for variable in NODE_OPTIONS NODE_PATH NPM_CONFIG_NODE_OPTIONS npm_config_node_options PNPM_CONFIG_NODE_OPTIONS pnpm_config_node_options NPM_CONFIG_SCRIPT_SHELL npm_config_script_shell PNPM_CONFIG_SCRIPT_SHELL pnpm_config_script_shell CODEXRIG_SESSION_CONTROL_NODE CODEXRIG_SESSION_CONTROL_PORT CODEXRIG_SESSION_CONTROL_TOKEN CODEXRIG_STARTUP_NONCE CODEXRIG_STARTUP_RESUME_SESSION_ID CODEXRIG_STARTUP_SESSION_SOURCE; do",
+      '  [[ -z "${!variable:-}" ]] || exit 85',
+      "done",
       '[[ "${NPM_CONFIG_IGNORE_PNPMFILE:-}" == "true" ]] || exit 93',
       '[[ "${PNPM_CONFIG_IGNORE_PNPMFILE:-}" == "true" ]] || exit 94',
       '[[ "${npm_config_ignore_pnpmfile:-}" == "true" ]] || exit 95',
@@ -179,97 +201,111 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
       'if [[ "${FAKE_MISE_FAIL_COMMAND:-}" == "$*" ]]; then',
       '  exit "${FAKE_MISE_STATUS:-1}"',
       "fi",
+      'if [[ "$1" == "exec" && "$2" == "--locked" && "$3" == "--" && "$4" == "node" && "$5" == "scripts/setup/startup-session-controller.mjs" ]]; then',
+      "  shift 5",
+      '  [[ "$1" == "--control-policy" && "$3" == "--codex-executable" && "$5" == "--prompt-present" && "$7" == "--" ]] || exit 105',
+      '  control_policy="$2"',
+      '  codex_executable="$4"',
+      '  prompt_present="$6"',
+      "  shift 7",
+      '  codex_args=(--cd "$PWD")',
+      '  case "$control_policy" in',
+      "    interactive-v2:no-alt-screen) codex_args+=(--no-alt-screen) ;;",
+      "    dev-yolo-v1:default-screen) codex_args+=(--dangerously-bypass-approvals-and-sandbox) ;;",
+      "    dev-yolo-v1:no-alt-screen) codex_args+=(--no-alt-screen --dangerously-bypass-approvals-and-sandbox) ;;",
+      "    interactive-v2:safe-defaults) ;;",
+      "    *) exit 106 ;;",
+      "  esac",
+      `  codex_args+=(${shellWords})`,
+      "  prompt_args=()",
+      '  if [[ "$prompt_present" == "true" ]]; then prompt_args=(-- "$@"); elif [[ "$prompt_present" != "false" || "$#" != "0" ]]; then exit 107; fi',
+      '  session_plan="${FAKE_STARTUP_SESSION_PLAN:-startup}"',
+      '  session_source="startup"',
+      '  resume_session_id=""',
+      '  if [[ "$session_plan" == resume-id:* ]]; then',
+      '    session_source="resume"',
+      '    resume_session_id="${session_plan#resume-id:}"',
+      '    if env CODEX_HOME="$PWD/.codex/runtime" CODEXRIG_PROJECT_ROOT="$PWD" CODEXRIG_STARTUP_CONTROL_POLICY="$control_policy" CODEXRIG_STARTUP_SESSION_SOURCE="$session_source" CODEXRIG_STARTUP_RESUME_SESSION_ID="$resume_session_id" CODEXRIG_STARTUP_NONCE=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "$codex_executable" "${codex_args[@]}" resume "$resume_session_id" "${prompt_args[@]}"; then',
+      "      codex_status=0",
+      "    else",
+      "      codex_status=$?",
+      "    fi",
+      '    if [[ "$codex_status" -ge 128 || "${FAKE_STARTUP_LAUNCH_STATE:-active}" == "active" ]]; then exit "$codex_status"; fi',
+      '    if [[ "$codex_status" == "0" ]]; then printf "Project resume exited without activating the trusted SessionStart hook; refusing automatic fresh fallback.\\n" >&2; exit 1; fi',
+      '    session_source="startup"',
+      '    resume_session_id=""',
+      '  elif [[ "$session_plan" != "startup" ]]; then',
+      "    exit 108",
+      "  fi",
+      '  exec env CODEX_HOME="$PWD/.codex/runtime" CODEXRIG_PROJECT_ROOT="$PWD" CODEXRIG_STARTUP_CONTROL_POLICY="$control_policy" CODEXRIG_STARTUP_SESSION_SOURCE="$session_source" CODEXRIG_STARTUP_RESUME_SESSION_ID="$resume_session_id" CODEXRIG_STARTUP_NONCE=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA "$codex_executable" "${codex_args[@]}" "${prompt_args[@]}"',
+      "fi",
       'case "$*" in',
-      '  "exec --locked -- node scripts/setup/validate-codex-config.mjs" | "exec --locked -- node scripts/setup/validate-codex-model-policy.mjs")',
+      '  "exec --locked -- node scripts/setup/validate-codex-model-policy.mjs")',
       "    shift 3",
       '    exec "$@"',
       "    ;;",
       "esac",
-      'if [[ "$*" == "exec --locked -- node scripts/setup/startup-attestation.mjs issue --session-pid "* ]]; then',
-      "  printf '%s\\n' 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'",
-      "fi",
       "exit 0",
     ].join("\n"),
     "utf8",
   );
   chmodSync(fakeMise, 0o755);
 
-  function capturedCalls() {
-    const fields = readFileSync(capturePath, "utf8").split("\0");
+  function capturedDelimitedCalls(filePath, metadataKeys) {
+    const fields = readFileSync(filePath, "utf8").split("\0");
     if (fields.at(-1) === "") fields.pop();
     const calls = [];
     for (let index = 0; index < fields.length;) {
       assert.equal(fields[index], "CALL");
-      const home = fields[index + 1];
-      index += 2;
+      index += 1;
+      const metadata = Object.fromEntries(metadataKeys.map((key) => [key, fields[index++]]));
       const args = [];
       while (fields[index] !== "END") args.push(fields[index++]);
       index += 1;
-      calls.push({ home, args });
+      calls.push({ ...metadata, args });
     }
     return calls;
   }
-
-  function capturedMiseCalls() {
-    const fields = readFileSync(miseCapturePath, "utf8").split("\0");
-    if (fields.at(-1) === "") fields.pop();
-    const calls = [];
-    for (let index = 0; index < fields.length;) {
-      assert.equal(fields[index], "CALL");
-      const home = fields[index + 1];
-      const cwd = fields[index + 2];
-      index += 3;
-      const args = [];
-      while (fields[index] !== "END") args.push(fields[index++]);
-      index += 1;
-      calls.push({ home, cwd, args });
-    }
-    return calls;
-  }
-
-  const bootstrapSource = readFileSync(
-    path.join(setupDirectory, "validate-codex-bootstrap.sh"),
-    "utf8",
-  );
-  // Keep the pre-runtime bootstrap validator Bash-3.2-compatible for the supported macOS host.
-  for (const shellSource of [readFileSync(launcher, "utf8"), bootstrapSource]) {
-    assert.doesNotMatch(shellSource, /declare\s+-A|\[\[\s+-v\b/);
-  }
-  assert.match(bootstrapSource, /contains_value\(\)/);
-  assert.deepEqual(bashSingleQuotedArray(bootstrapSource, "required_codex_ignore_patterns"), [
-    ...repositoryCodexHomeGitignorePatterns,
-    ...portableCodexGitignorePatterns,
-  ]);
-  assert.deepEqual(
-    bashSingleQuotedArray(bootstrapSource, "runtime_probe_paths"),
-    repositoryCodexHomeProtectedGitignoreProbePaths,
-  );
-  assert.deepEqual(
-    bashSingleQuotedArray(bootstrapSource, "portable_probe_paths"),
-    portableCodexGitignoreProbePaths,
-  );
+  const capturedCalls = () => capturedDelimitedCalls(capturePath, ["home"]);
+  const capturedMiseCalls = () => capturedDelimitedCalls(miseCapturePath, ["home", "cwd"]);
+  // Keep the launcher Bash-3.2-compatible for the supported macOS host.
+  assert.doesNotMatch(readFileSync(launcher, "utf8"), /declare\s+-A|\[\[\s+-v\b/);
 
   const result = run("bash", [launcher, "--no-alt-screen", "--", "--fixture"], {
     cwd: fixture,
     env: {
       CAPTURE_PATH: capturePath,
       CODEX_HOME: externalCodexHome,
+      CODEXRIG_LAUNCHER_PID: "999999",
+      CODEXRIG_SESSION_CONTROL_NODE: "/synthetic/old-node",
+      CODEXRIG_SESSION_CONTROL_PORT: "65535",
+      CODEXRIG_SESSION_CONTROL_TOKEN: "old-session-control-token",
+      CODEXRIG_STARTUP_CONTROL_POLICY: "old-control-policy",
+      CODEXRIG_STARTUP_NONCE: "old-startup-nonce",
+      CODEXRIG_STARTUP_RESUME_SESSION_ID: "old-resume-session",
+      CODEXRIG_STARTUP_SESSION_SOURCE: "old-session-source",
       MISE_CAPTURE_PATH: miseCapturePath,
+      NODE_OPTIONS: "--require=/synthetic/ambient/preload.cjs",
+      NODE_PATH: "/synthetic/ambient/modules",
+      NPM_CONFIG_SCRIPT_SHELL: "/synthetic/ambient/shell",
+      PNPM_CONFIG_NODE_OPTIONS: "--require=/synthetic/pnpm/preload.cjs",
       PATH: `${binDirectory}:/usr/bin:/bin`,
       SYNTHETIC_LAUNCH_SECRET: syntheticSecret,
     },
   });
-  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    result.status,
+    0,
+    JSON.stringify({ error: result.error?.message, signal: result.signal, stderr: result.stderr }),
+  );
   assert.deepEqual(capturedCalls(), [
-    { home: "<unset>", args: ["update"] },
     {
       home: runtimeCodexHome,
-      args: ["--cd", fixture, "--no-alt-screen", "--", "--fixture"],
+      args: ["--cd", fixture, "--no-alt-screen", ...sessionControlArguments, "--", "--fixture"],
     },
   ]);
   const successfulMiseCalls = capturedMiseCalls();
-  assert.deepEqual(successfulMiseCalls.slice(0, 8), [
-    { home: "<unset>", cwd: fixture, args: ["install", "--locked"] },
+  assert.deepEqual(successfulMiseCalls.slice(0, 5), [
     {
       home: "<unset>",
       cwd: fixture,
@@ -278,17 +314,7 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     {
       home: "<unset>",
       cwd: fixture,
-      args: ["exec", "--locked", "--", "bash", "scripts/setup/check-prereqs.sh"],
-    },
-    {
-      home: "<unset>",
-      cwd: fixture,
-      args: ["exec", "--locked", "--", "node", "scripts/deps/install-compatible.mjs"],
-    },
-    {
-      home: "<unset>",
-      cwd: fixture,
-      args: ["exec", "--locked", "--", "node", "scripts/setup/validate-codex-config.mjs"],
+      args: ["exec", "--locked", "--", "bash", "scripts/setup/check-prereqs.sh", "--codex"],
     },
     {
       home: "<unset>",
@@ -303,33 +329,31 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     {
       home: "<unset>",
       cwd: fixture,
-      args: [
-        "exec",
-        "--locked",
-        "--",
-        "node",
-        "scripts/framework/framework-doctor.mjs",
-        "--online",
-      ],
+      args: ["exec", "--locked", "--", "node", "scripts/framework/framework-doctor.mjs"],
     },
   ]);
-  assert.equal(successfulMiseCalls.length, 9);
-  assert.deepEqual(successfulMiseCalls[8].home, "<unset>");
-  assert.deepEqual(successfulMiseCalls[8].cwd, fixture);
-  assert.deepEqual(successfulMiseCalls[8].args.slice(0, -1), [
+  assert.equal(successfulMiseCalls.length, 6);
+  assert.deepEqual(successfulMiseCalls[5].home, "<unset>");
+  assert.deepEqual(successfulMiseCalls[5].cwd, fixture);
+  assert.deepEqual(successfulMiseCalls[5].args, [
     "exec",
     "--locked",
     "--",
     "node",
-    "scripts/setup/startup-attestation.mjs",
-    "issue",
-    "--session-pid",
+    "scripts/setup/startup-session-controller.mjs",
+    "--control-policy",
+    "interactive-v2:no-alt-screen",
+    "--codex-executable",
+    fakeCodex,
+    "--prompt-present",
+    "true",
+    "--",
+    "--fixture",
   ]);
-  assert.match(successfulMiseCalls[8].args.at(-1), /^[1-9]\d*$/u);
   assert.equal(`${result.stdout}${result.stderr}`.includes(fixture), false);
   assert.equal(`${result.stdout}${result.stderr}`.includes(syntheticSecret), false);
 
-  rmSync(capturePath);
+  rmSync(capturePath, { force: true });
   const yoloResult = run("bash", [launcher, "--yolo", "--", "--fixture"], {
     cwd: fixture,
     env: {
@@ -340,10 +364,105 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
   });
   assert.equal(yoloResult.status, 0, yoloResult.stderr);
   assert.deepEqual(capturedCalls(), [
-    { home: "<unset>", args: ["update"] },
     {
       home: runtimeCodexHome,
-      args: ["--cd", fixture, "--yolo", "--", "--fixture"],
+      args: [
+        "--cd",
+        fixture,
+        "--dangerously-bypass-approvals-and-sandbox",
+        ...sessionControlArguments,
+        "--",
+        "--fixture",
+      ],
+    },
+  ]);
+
+  const resumedSessionId = "01a01234-5678-7abc-8def-0123456789ab";
+
+  rmSync(capturePath);
+  const unavailableResume = run("bash", [launcher, "--", "continue"], {
+    cwd: fixture,
+    env: {
+      CAPTURE_PATH: capturePath,
+      EXPECTED_RESUME_SESSION_ID: resumedSessionId,
+      FAKE_CODEX_RESUME_STATUS: "42",
+      FAKE_STARTUP_LAUNCH_STATE: "launching",
+      FAKE_STARTUP_SESSION_PLAN: `resume-id:${resumedSessionId}`,
+      PATH: `${binDirectory}:/usr/bin:/bin`,
+    },
+  });
+  assert.equal(unavailableResume.status, 0, unavailableResume.stderr);
+  assert.deepEqual(capturedCalls(), [
+    {
+      home: runtimeCodexHome,
+      args: [
+        "--cd",
+        fixture,
+        ...sessionControlArguments,
+        "resume",
+        resumedSessionId,
+        "--",
+        "continue",
+      ],
+    },
+    {
+      home: runtimeCodexHome,
+      args: ["--cd", fixture, ...sessionControlArguments, "--", "continue"],
+    },
+  ]);
+
+  rmSync(capturePath);
+  const unactivatedSuccessfulResume = run("bash", [launcher, "--", "continue"], {
+    cwd: fixture,
+    env: {
+      CAPTURE_PATH: capturePath,
+      EXPECTED_RESUME_SESSION_ID: resumedSessionId,
+      FAKE_STARTUP_LAUNCH_STATE: "launching",
+      FAKE_STARTUP_SESSION_PLAN: `resume-id:${resumedSessionId}`,
+      PATH: `${binDirectory}:/usr/bin:/bin`,
+    },
+  });
+  assert.equal(unactivatedSuccessfulResume.status, 1);
+  assert.match(unactivatedSuccessfulResume.stderr, /refusing automatic fresh fallback/u);
+  assert.deepEqual(capturedCalls(), [
+    {
+      home: runtimeCodexHome,
+      args: [
+        "--cd",
+        fixture,
+        ...sessionControlArguments,
+        "resume",
+        resumedSessionId,
+        "--",
+        "continue",
+      ],
+    },
+  ]);
+
+  rmSync(capturePath);
+  const exactResume = run("bash", [launcher, "--", "continue"], {
+    cwd: fixture,
+    env: {
+      CAPTURE_PATH: capturePath,
+      EXPECTED_RESUME_SESSION_ID: resumedSessionId,
+      EXPECTED_SESSION_SOURCE: "resume",
+      FAKE_STARTUP_SESSION_PLAN: `resume-id:${resumedSessionId}`,
+      PATH: `${binDirectory}:/usr/bin:/bin`,
+    },
+  });
+  assert.equal(exactResume.status, 0, exactResume.stderr);
+  assert.deepEqual(capturedCalls(), [
+    {
+      home: runtimeCodexHome,
+      args: [
+        "--cd",
+        fixture,
+        ...sessionControlArguments,
+        "resume",
+        resumedSessionId,
+        "--",
+        "continue",
+      ],
     },
   ]);
 
@@ -357,41 +476,25 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     },
   });
   assert.equal(startFailure.status, 37);
-  assert.equal(capturedCalls().length, 2);
-
-  rmSync(capturePath);
-  const updateFailure = run("bash", [launcher], {
-    cwd: fixture,
-    env: {
-      CAPTURE_PATH: capturePath,
-      FAKE_CODEX_UPDATE_STATUS: "73",
-      PATH: `${binDirectory}:/usr/bin:/bin`,
-      SYNTHETIC_LAUNCH_SECRET: syntheticSecret,
-    },
-  });
-  assert.equal(updateFailure.status, 73);
-  assert.match(updateFailure.stderr, /synthetic update failure/);
-  assert.deepEqual(capturedCalls(), [{ home: "<unset>", args: ["update"] }]);
-  assert.equal(`${updateFailure.stdout}${updateFailure.stderr}`.includes(fixture), false);
-  assert.equal(`${updateFailure.stdout}${updateFailure.stderr}`.includes(syntheticSecret), false);
+  assert.equal(capturedCalls().length, 1);
 
   rmSync(capturePath);
   rmSync(miseCapturePath);
-  const dependencyFailure = run("bash", [launcher], {
+  const validationFailure = run("bash", [launcher], {
     cwd: fixture,
     env: {
       CAPTURE_PATH: capturePath,
-      FAKE_MISE_FAIL_COMMAND: "exec --locked -- node scripts/deps/install-compatible.mjs",
+      FAKE_MISE_FAIL_COMMAND: "exec --locked -- node scripts/framework/framework-doctor.mjs",
       FAKE_MISE_STATUS: "74",
       MISE_CAPTURE_PATH: miseCapturePath,
       PATH: `${binDirectory}:/usr/bin:/bin`,
     },
   });
-  assert.equal(dependencyFailure.status, 74);
-  assert.deepEqual(capturedCalls(), [{ home: "<unset>", args: ["update"] }]);
-  assert.equal(capturedMiseCalls().length, 4);
+  assert.equal(validationFailure.status, 74);
+  assert.equal(existsSync(capturePath), false);
+  assert.equal(capturedMiseCalls().length, 5);
 
-  rmSync(capturePath);
+  rmSync(capturePath, { force: true });
   for (const override of [
     ["--cd", "/tmp/other-project"],
     ["--cd=/tmp/other-project"],
@@ -454,10 +557,9 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
   });
   assert.equal(promptNamedLikeAnOption.status, 0, promptNamedLikeAnOption.stderr);
   assert.deepEqual(capturedCalls(), [
-    { home: "<unset>", args: ["update"] },
     {
       home: runtimeCodexHome,
-      args: ["--cd", fixture, "--", "--cd", "prompt text"],
+      args: ["--cd", fixture, ...sessionControlArguments, "--", "--cd", "prompt text"],
     },
   ]);
 
@@ -477,7 +579,7 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
   });
   assert.notEqual(missingCriticalPolicy.status, 0);
   assert.match(missingCriticalPolicy.stderr, /developer_instructions.*orchestration marker/i);
-  assert.deepEqual(capturedCalls(), [{ home: "<unset>", args: ["update"] }]);
+  assert.equal(existsSync(capturePath), false);
 
   rmSync(capturePath, { force: true });
   writeFileSync(configPath, validPortableConfig, "utf8");
@@ -494,7 +596,7 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
   });
   assert.notEqual(divergentRole.status, 0);
   assert.match(divergentRole.stderr, /agent default.*primary intelligence|supported GPT Sol/i);
-  assert.deepEqual(capturedCalls(), [{ home: "<unset>", args: ["update"] }]);
+  assert.equal(existsSync(capturePath), false);
   writeFileSync(defaultRolePath, validDefaultRole, "utf8");
 
   rmSync(capturePath, { force: true });
@@ -508,7 +610,7 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     env: { CAPTURE_PATH: capturePath, PATH: `${binDirectory}:/usr/bin:/bin` },
   });
   assert.notEqual(executableConfig.status, 0);
-  assert.match(executableConfig.stderr, /unsupported table/i);
+  assert.match(executableConfig.stderr, /unknown key mcp_servers/i);
   assert.equal(existsSync(capturePath), false);
 
   writeFileSync(
@@ -521,7 +623,7 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     env: { CAPTURE_PATH: capturePath, PATH: `${binDirectory}:/usr/bin:/bin` },
   });
   assert.notEqual(unterminatedInstructions.status, 0);
-  assert.match(unterminatedInstructions.stderr, /unterminated developer_instructions/i);
+  assert.match(unterminatedInstructions.stderr, /must contain valid TOML/i);
   assert.equal(existsSync(capturePath), false);
 
   writeFileSync(configPath, validPortableConfig.replace("hooks = true", "hooks = false"), "utf8");
@@ -530,7 +632,7 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     env: { CAPTURE_PATH: capturePath, PATH: `${binDirectory}:/usr/bin:/bin` },
   });
   assert.notEqual(disabledHooks.status, 0);
-  assert.match(disabledHooks.stderr, /enable lifecycle hooks/i);
+  assert.match(disabledHooks.stderr, /features\.hooks.*outside the portable project policy/i);
   assert.equal(existsSync(capturePath), false);
 
   writeFileSync(configPath, validPortableConfig, "utf8");
@@ -538,40 +640,43 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
   const validHooks = readFileSync(hooksPath, "utf8");
   for (const invalidHooks of [
     "{}\n",
-    validHooks.replace('"Stop": [', '"Start": [],\n    "Stop": ['),
-    validHooks.replace(
-      '"hooks": [\n          {',
-      '"hooks": [\n          {\n            "type": "command",\n            "command": "false"\n          },\n          {',
-    ),
+    validHooks.replace('"hooks": {}', '"hooks": {"Stop": []}'),
+    validHooks.replace("issue-time session controller", "mutable project hook"),
   ]) {
+    rmSync(capturePath, { force: true });
     writeFileSync(hooksPath, invalidHooks, "utf8");
     const rejectedHooks = run("bash", [launcher], {
       cwd: fixture,
       env: { CAPTURE_PATH: capturePath, PATH: `${binDirectory}:/usr/bin:/bin` },
     });
     assert.notEqual(rejectedHooks.status, 0);
-    assert.match(rejectedHooks.stderr, /exactly the supported SessionStart and Stop hooks/i);
+    assert.match(
+      rejectedHooks.stderr,
+      /(exactly these keys|must remain empty|exact portable description)/i,
+    );
     assert.equal(existsSync(capturePath), false);
   }
   writeFileSync(hooksPath, validHooks, "utf8");
 
   const gitignorePath = path.join(fixture, ".gitignore");
   const validGitignore = readFileSync(gitignorePath, "utf8");
+  rmSync(capturePath, { force: true });
   writeFileSync(gitignorePath, validGitignore.replace("/auth.json\n", ""), "utf8");
   const unsafeIgnore = run("bash", [launcher], {
     cwd: fixture,
     env: { CAPTURE_PATH: capturePath, PATH: `${binDirectory}:/usr/bin:/bin` },
   });
   assert.notEqual(unsafeIgnore.status, 0);
-  assert.match(unsafeIgnore.stderr, /runtime ignore policy is incomplete/i);
+  assert.match(unsafeIgnore.stderr, /CODEX_HOME isolation is incomplete/i);
   assert.equal(existsSync(capturePath), false);
   writeFileSync(gitignorePath, validGitignore, "utf8");
 
   for (const [override, expected] of [
-    ["!/auth.json", /runtime ignore policy is ineffective/i],
-    ["/.codex/config.toml", /portable project Codex configuration is unexpectedly ignored/i],
-    ["!.codex/agents/extra.json", /runtime ignore policy is ineffective/i],
+    ["!/auth.json", /runtime is not effectively ignored/i],
+    ["/.codex/config.toml", /portable Codex config is effectively ignored/i],
+    ["!.codex/agents/extra.json", /runtime is not effectively ignored/i],
   ]) {
+    rmSync(capturePath, { force: true });
     writeFileSync(gitignorePath, `${validGitignore}\n${override}\n`, "utf8");
     const overriddenIgnore = run("bash", [launcher], {
       cwd: fixture,
@@ -592,6 +697,6 @@ test("Codex launcher refreshes the CLI and compatible dependencies before isolat
     env: { CAPTURE_PATH: capturePath, PATH: `${binDirectory}:/usr/bin:/bin` },
   });
   assert.notEqual(unsafe.status, 0);
-  assert.match(unsafe.stderr, /real file/i);
+  assert.match(unsafe.stderr, /non-symlink regular file/i);
   assert.equal(existsSync(capturePath), false);
 });

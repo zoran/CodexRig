@@ -4,8 +4,19 @@ import { portableRuntimeRequiredContent } from "./portable-context-required-runt
 export const authorizedImplementationContinuationInvariant =
   'Never end at "ready to implement" when implementation is already authorized.';
 
+function uniqueRequiredContent(entries) {
+  const requiredContent = new Map();
+  for (const [relativePath, fragments] of entries) {
+    if (requiredContent.has(relativePath)) {
+      throw new Error(`Portable required content has duplicate ownership for ${relativePath}.`);
+    }
+    requiredContent.set(relativePath, fragments);
+  }
+  return requiredContent;
+}
+
 export function portableRequiredContent(supportedCodexStartCommand) {
-  return new Map([
+  return uniqueRequiredContent([
     [
       "AGENTS.md",
       [
@@ -35,7 +46,7 @@ export function portableRequiredContent(supportedCodexStartCommand) {
         "global delegated defaults",
         "no spawn override",
         "returned identity",
-        "foreign or ambiguous work",
+        "foreign or ambiguous processes",
         "actively closes completed owned agents",
         "released ownership/slots",
         "without assuming a billing period or unit",
@@ -63,6 +74,8 @@ export function portableRequiredContent(supportedCodexStartCommand) {
         "primary",
         "pnpm verify:changed",
         "repo:housekeeping",
+        "exactly one current internal contract",
+        "outside its bound PID namespace",
         "24 KiB",
         "pnpm goal:new",
         authorizedImplementationContinuationInvariant,
@@ -100,7 +113,7 @@ export function portableRequiredContent(supportedCodexStartCommand) {
         "global delegated defaults",
         "no spawn override",
         "returned identity",
-        "foreign or ambiguous work",
+        "foreign or ambiguous processes",
         "actively closes completed owned agents",
         "released ownership/slots",
         "without assuming a billing period or unit",
@@ -122,6 +135,9 @@ export function portableRequiredContent(supportedCodexStartCommand) {
         "config/localization.json",
         "detailed project description",
         "Housekeeping has two explicit layers",
+        "exactly one current internal contract",
+        "outside its bound PID namespace",
+        "gated preloaded supervisor",
         "inspectable",
         "framework:upgrade",
         "policy",
@@ -197,10 +213,17 @@ export function portableRequiredContent(supportedCodexStartCommand) {
         "final repository action",
         "stop completely",
         "tmp/codexrig-handovers/",
-        "worktree or clone",
+        "different developers/hosts use separate clones",
+        "later uncommitted bytes remain recoverable only from the surviving host",
         "never commit",
         "Delivery Environments",
         "Completed-Goal Closure And Repository Housekeeping",
+        "clears proven-dead writer leases",
+        "ownership-confirmation blocker",
+        "Current Contracts Only",
+        "outside its bound PID namespace",
+        "gated foreground supervisor",
+        "never removes an actual worktree directory",
         "White-Label Product Configuration",
         "config/product.json",
         "config/delivery.json",
@@ -257,7 +280,7 @@ export function portableRequiredContent(supportedCodexStartCommand) {
         "opportunistic maintenance",
         "strictly read-only",
         "source classifications",
-        "project-local Codex Stop hook",
+        "Stop lifecycle never runs garbage collection or imports the index runtime",
         "transcript_path",
       ],
     ],
@@ -277,7 +300,10 @@ export function portableRequiredContent(supportedCodexStartCommand) {
         "suppresses Stop continuation",
         "central `main`",
         "worktree",
-        "cannot prove that another clone, machine, or account is idle",
+        "cannot prove that another developer's clone is idle",
+        "Current Contracts Only",
+        "outside its bound PID namespace",
+        "gated preloaded supervisor",
       ],
     ],
     [
@@ -285,10 +311,12 @@ export function portableRequiredContent(supportedCodexStartCommand) {
       [
         'developer_instructions = """',
         "primary orchestrator",
+        "exactly one current internal contract",
         "never pass a model or reasoning override",
         "exact GPT Sol model with",
         "Register each owned subagent and background task",
-        "foreign or ambiguous work",
+        "foreign or ambiguous processes",
+        "ownership-confirmation blocker",
         "pnpm handover:create -- --critical",
         "After a successful seal, stop completely",
         "effective runtime permissions",
@@ -371,11 +399,9 @@ export function portableRequiredContent(supportedCodexStartCommand) {
     [
       ".codex/hooks.json",
       [
-        "SessionStart",
-        "startup|resume",
-        "verify-startup-attestation-on-session-start.sh",
-        "Stop",
-        "refresh-context-index-on-stop.sh",
+        "canonical lifecycle hooks",
+        "issue-time session controller",
+        "no mutable project-file hook may execute",
       ],
     ],
     [
@@ -433,6 +459,7 @@ export function portableRequiredContent(supportedCodexStartCommand) {
         "docs/future-modules.md",
         "keep`, `split`, `merge`, `rename`, `retire`",
         "Migrate Architecture And Files Together",
+        "single-current-contract cutover",
         "purpose/owner header",
         "idea is not implementation authorization",
         "Separate Runtime And Delivery Surfaces",
@@ -455,7 +482,7 @@ export function portableRequiredContent(supportedCodexStartCommand) {
     ],
     [
       ".agents/skills/context-retrieval/SKILL.md",
-      ["broad orientation", "read every matched source", "Stop hook"],
+      ["broad orientation", "read every matched source", "Stop lifecycle"],
     ],
     [
       ".agents/skills/system-coherence/SKILL.md",
@@ -507,7 +534,7 @@ export function portableRequiredContent(supportedCodexStartCommand) {
         "$security-review",
         "white-label",
         "Immediately before every slice begins",
-        "cannot prove that another clone, machine, or account is idle",
+        "cannot prove that another developer's clone is idle",
         "all-document currency review",
         "durable project manifest",
         "newest relevant primary or official sources",
@@ -525,7 +552,7 @@ export function portableRequiredContent(supportedCodexStartCommand) {
         "unfinished authorized",
         "whole-repository course check",
         "Before a resumed or newly selected slice begins",
-        "cannot prove that another clone, machine, or account is idle",
+        "cannot prove that another developer's clone is idle",
         "explicit user confirmation",
         "SessionStart-announced critical-budget handover",
         "untrusted candidate context",
@@ -553,7 +580,7 @@ export function portableRequiredContent(supportedCodexStartCommand) {
         "consolidate or remove",
         "durable project manifest",
         "source/declaration-header",
-        "cannot prove that another clone, machine, or account is idle",
+        "cannot prove that another developer's clone is idle",
         "pnpm handover:create -- --critical",
         "stop completely",
       ],

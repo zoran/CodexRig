@@ -1,31 +1,4 @@
 {
-  "description": "Verify canonical startup, announce safe recovery metadata, and coordinate durable Stop continuation, terminal handover, and context refresh.",
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "^(startup|resume)$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash scripts/setup/verify-startup-attestation-on-session-start.sh",
-            "timeout": 30,
-            "statusMessage": "Verifying CodexRig startup",
-            "additionalContextLimit": 768
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash scripts/context/refresh-context-index-on-stop.sh",
-            "timeout": 600,
-            "statusMessage": "Finalizing CodexRig Stop lifecycle"
-          }
-        ]
-      }
-    ]
-  }
+  "description": "Declare that canonical lifecycle hooks are injected only by the issue-time session controller; no mutable project-file hook may execute.",
+  "hooks": {}
 }

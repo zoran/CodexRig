@@ -25,6 +25,7 @@ const requiredPolicyIds = Object.freeze([
   "central-integration",
   "codex-runtime-permissions",
   "critical-budget-handover",
+  "current-contract-only",
   "definition-intake",
   "delivery-environments",
   "documentation-context-economy",
@@ -145,6 +146,9 @@ export function generatedPolicyProjectionLines(surface, root = frameworkRoot) {
 }
 
 export function policyProjectionChanges(installedProjection, sourceProjection) {
+  if (installedProjection?.schemaVersion !== 3 || sourceProjection?.schemaVersion !== 3) {
+    throw new Error("Policy projection comparison requires the current schema.");
+  }
   const installed = new Map(installedProjection.policies.map((policy) => [policy.id, policy]));
   const source = new Map(sourceProjection.policies.map((policy) => [policy.id, policy]));
   const changes = [];
@@ -156,22 +160,14 @@ export function policyProjectionChanges(installedProjection, sourceProjection) {
         `Policy ${id} cannot decrease from version ${before.version} to ${after.version}.`,
       );
     }
-    const compareProjectionStatements =
-      installedProjection.schemaVersion >= 3 && sourceProjection.schemaVersion >= 3;
     const samePolicy =
       before &&
       after &&
       before.statement === after.statement &&
-      (!compareProjectionStatements || before.projectionStatement === after.projectionStatement) &&
+      before.projectionStatement === after.projectionStatement &&
       JSON.stringify(before.projectionSurfaces) === JSON.stringify(after.projectionSurfaces) &&
       JSON.stringify(before.reconcileDocuments) === JSON.stringify(after.reconcileDocuments);
-    if (
-      before &&
-      after &&
-      before.version === after.version &&
-      !samePolicy &&
-      installedProjection.schemaVersion !== 1
-    ) {
+    if (before && after && before.version === after.version && !samePolicy) {
       throw new Error(`Policy ${id} changed without increasing its policy version.`);
     }
     const change = !before

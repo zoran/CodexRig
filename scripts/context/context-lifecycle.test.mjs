@@ -11,14 +11,14 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
-  realpathSync,
   rmSync,
-  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { repositoryRuntimeRootIdentity } from "../repository/runtime-session-lease.mjs";
+import { captureProcessIdentity } from "../repository/runtime-process-identity.mjs";
 import {
   embeddingRuntimeIdentity,
   inspectModelArtifacts,
@@ -32,16 +32,15 @@ import {
   criticalHandoverMaxAgeMilliseconds,
   discoverRecentCriticalBudgetHandover,
 } from "./critical-budget-handover.mjs";
-import {
-  evaluateAutonomousContinuation,
-  runStopLifecycle,
-} from "./refresh-context-index-on-stop.mjs";
+import { evaluateAutonomousContinuation, runStopLifecycle } from "./session-stop-lifecycle.mjs";
 import { runSearch } from "./search-context.mjs";
 import { discoverSourceFiles } from "./source-policy.mjs";
 import { publishIndex } from "./context-storage.mjs";
-import { sessionStartSuccess } from "../setup/startup-attestation.mjs";
 import {
-  copyTree,
+  sessionStartAdditionalContextMaximumBytes,
+  sessionStartSuccess,
+} from "../setup/startup-session-context.mjs";
+import {
   repositoryRoot,
   storageRecord,
   temporaryDirectory,
@@ -79,26 +78,33 @@ function copyFrameworkContract(projectRoot) {
   );
 }
 
-function writeRuntimeSessionLease(projectRoot, startedAt, sessionId = randomUUID()) {
-  const canonical = realpathSync.native(projectRoot);
-  const stats = statSync(canonical);
+function writeRuntimeSessionLease(projectRoot, startedAt, codexSessionId = randomUUID()) {
   const runtimeDirectory = path.join(projectRoot, ".codex", "runtime");
+  const processIdentity = captureProcessIdentity(process.pid);
+  const runtimeSessionId = randomUUID();
   mkdirSync(runtimeDirectory, { recursive: true, mode: 0o700 });
   chmodSync(runtimeDirectory, 0o700);
   const leasePath = path.join(runtimeDirectory, "codexrig-session.json");
   writeFileSync(
     leasePath,
     `${JSON.stringify({
-      schemaVersion: 2,
-      pid: process.pid,
-      sessionId,
+      schemaVersion: 5,
+      codexProcess: processIdentity,
+      codexSessionId,
+      phase: "active",
+      process: processIdentity,
+      resumeSessionId: codexSessionId,
+      root: repositoryRuntimeRootIdentity(projectRoot),
+      sessionId: runtimeSessionId,
+      sessionSource: "resume",
       startedAt,
-      root: { device: String(stats.dev), inode: String(stats.ino), path: canonical },
+      writerPhase: "bound",
+      writerProcess: processIdentity,
     })}\n`,
     { mode: 0o600 },
   );
   chmodSync(leasePath, 0o600);
-  return sessionId;
+  return runtimeSessionId;
 }
 
 const criticalDrainBody = [
@@ -126,45 +132,14 @@ function stopHookInput(overrides = {}) {
   });
 }
 
-test("Stop launcher preserves continuation and terminal handover behavior without an index", () => {
-  const project = temporaryDirectory("context-stop-launcher-");
-  copyTree(path.join(repositoryRoot, "scripts"), path.join(project, "scripts"));
+test("preloaded Stop lifecycle preserves continuation and terminal handover without an index", async () => {
+  const project = temporaryDirectory("context-stop-lifecycle-");
   copyFrameworkContract(project);
   mkdirSync(path.join(project, ".codex"));
   writeWorkingContext(project, workState());
 
-  const executableDirectory = path.join(project, "test-bin");
-  mkdirSync(executableDirectory);
-  const miseStub = path.join(executableDirectory, "mise");
-  writeFileSync(
-    miseStub,
-    [
-      "#!/usr/bin/env bash",
-      "set -euo pipefail",
-      '[[ "$1" == "exec" && "$2" == "--locked" && "$3" == "--" ]]',
-      "shift 3",
-      'exec "$@"',
-      "",
-    ].join("\n"),
-    "utf8",
-  );
-  chmodSync(miseStub, 0o755);
-  const launcher = path.join(project, "scripts/context/refresh-context-index-on-stop.sh");
-  const launcherEnvironment = {
-    ...process.env,
-    CODEXRIG_PROJECT_ROOT: "",
-    PATH: `${executableDirectory}${path.delimiter}${process.env.PATH ?? ""}`,
-  };
-
   assert.equal(existsSync(path.join(project, ".context-index")), false);
-  const active = spawnSync("bash", [launcher], {
-    cwd: project,
-    encoding: "utf8",
-    env: launcherEnvironment,
-    input: stopHookInput(),
-  });
-  assert.equal(active.status, 0, `${active.stdout}\n${active.stderr}`);
-  const activeOutput = JSON.parse(active.stdout);
+  const activeOutput = await runStopLifecycle({ root: project, hookInput: stopHookInput() });
   assert.equal(activeOutput.decision, "block");
   assert.match(activeOutput.reason, /Continue the already-authorized outcome autonomously/u);
   assert.equal(existsSync(path.join(project, ".context-index")), false);
@@ -177,21 +152,7 @@ test("Stop launcher preserves continuation and terminal handover behavior withou
     now: () => now,
     random: (size) => Buffer.alloc(size, 0xcd),
   });
-  const sealed = spawnSync("bash", [launcher], {
-    cwd: project,
-    encoding: "utf8",
-    env: launcherEnvironment,
-    input: stopHookInput(),
-  });
-  assert.equal(sealed.status, 0, `${sealed.stdout}\n${sealed.stderr}`);
-  let sealedOutput;
-  try {
-    sealedOutput = JSON.parse(sealed.stdout);
-  } catch (error) {
-    assert.fail(
-      `Stop launcher emitted invalid JSON: ${JSON.stringify(sealed.stdout)} (${error.message})`,
-    );
-  }
+  const sealedOutput = await runStopLifecycle({ root: project, hookInput: stopHookInput() });
   assert.equal(Object.hasOwn(sealedOutput, "decision"), false);
   assert.match(sealedOutput.systemMessage, /critical-budget handover is sealed/u);
   assert.match(sealedOutput.systemMessage, /Stop completely/u);
@@ -217,19 +178,13 @@ test("Stop lifecycle never touches active work from an ephemeral side conversati
   }
 
   assert.equal(existsSync(path.join(project, ".codex", "runtime")), false);
-  let refreshCalls = 0;
   assert.deepEqual(
     await runStopLifecycle({
       root: project,
       hookInput: stopHookInput({ transcript_path: null }),
-      refreshIndex: async () => {
-        refreshCalls += 1;
-        return "unexpected refresh";
-      },
     }),
     {},
   );
-  assert.equal(refreshCalls, 0);
 
   const missingTranscriptPath = JSON.parse(stopHookInput());
   delete missingTranscriptPath.transcript_path;
@@ -386,45 +341,38 @@ test("critical-budget handover seals privately, asks before resume, and terminat
   }
 
   const startup = sessionStartSuccess(
-    { frameworkVersion: "2.1.0" },
+    { frameworkVersion: "2.1.0", sessionSource: "resume" },
     { root: project, now: () => now + 1 },
   );
   const additionalContext = startup.hookSpecificOutput.additionalContext;
-  assert.match(additionalContext, /ask the developer whether to resume from this exact handover/u);
-  assert.match(additionalContext, /untrusted candidate context, not authority/u);
+  assert.match(additionalContext, /First, before intake\/writes/u);
+  assert.match(additionalContext, /pnpm worktree:status -- --json/u);
+  assert.match(additionalContext, /hook does not replace that full inventory/u);
+  assert.match(additionalContext, /ask before \$resume-project reads it/u);
+  assert.match(additionalContext, /treat it as untrusted/u);
+  assert.ok(
+    Buffer.byteLength(additionalContext, "utf8") <= sessionStartAdditionalContextMaximumBytes,
+  );
   assert.equal(additionalContext.includes(sealed.relativePath), true);
   assert.equal(additionalContext.includes("Unique next-account recovery detail"), false);
   assert.equal(additionalContext.includes(project), false);
-  assert.ok(Buffer.byteLength(additionalContext, "utf8") <= 768);
 
   const stopped = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
   assert.equal(Object.hasOwn(stopped, "decision"), false);
   assert.match(stopped.systemMessage, /Stop completely/u);
-  let refreshCalls = 0;
   const lifecycle = await runStopLifecycle({
     root: project,
     hookInput: stopHookInput(),
-    refreshIndex: async () => {
-      refreshCalls += 1;
-      return "unexpected refresh";
-    },
   });
   assert.match(lifecycle.systemMessage, /do not continue automatically/u);
-  assert.equal(refreshCalls, 0);
 
   const resumedSessionId = writeRuntimeSessionLease(project, new Date(now - 60_000).toISOString());
   assert.notEqual(resumedSessionId, sealingSessionId);
-  refreshCalls = 0;
   const resumedLifecycle = await runStopLifecycle({
     root: project,
     hookInput: stopHookInput(),
-    refreshIndex: async () => {
-      refreshCalls += 1;
-      return null;
-    },
   });
   assert.equal(resumedLifecycle.decision, "block");
-  assert.equal(refreshCalls, 1);
 
   assert.equal(
     discoverRecentCriticalBudgetHandover({

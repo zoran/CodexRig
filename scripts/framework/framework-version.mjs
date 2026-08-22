@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Owns automatic source-framework release version reconciliation against the published Git baseline. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -13,20 +13,22 @@ import {
   parseSemver,
   readFrameworkContract,
   readRegularFrameworkFile,
+  validateFrameworkContract,
 } from "../contracts/framework-contract.mjs";
 import {
   cleanGitEnvironment,
   isolatedGitArguments,
+  isolatedGitResultCompleted,
   resolveOwnedGitMetadata,
 } from "../repository/git-runtime-isolation.mjs";
 import { isExcludedActivePath, listActiveFiles } from "../repository/source-inventory.mjs";
 import { formatContextError } from "../terminal/terminal-output.mjs";
+import { policyProjectionPath, validatePolicyProjection } from "./policy-projection.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, "..", "..");
 const packagePath = "package.json";
 const projectManifestPath = "docs/project.md";
-const policyProjectionPath = ".codexrig/policy-projection.json";
 
 export const frameworkVersionStartMarker = "<!-- codexrig:framework-version:start -->";
 export const frameworkVersionEndMarker = "<!-- codexrig:framework-version:end -->";
@@ -42,6 +44,31 @@ function parseJson(content, label) {
     return JSON.parse(content);
   } catch {
     throw new Error(`${label} must contain valid JSON.`);
+  }
+}
+
+function validateIncompatibleBaseline(contract, policyProjection, current) {
+  if (
+    !contract ||
+    typeof contract !== "object" ||
+    Array.isArray(contract) ||
+    !Number.isSafeInteger(contract.schemaVersion) ||
+    contract.schemaVersion < 1 ||
+    contract.schemaVersion === current.contract.schemaVersion ||
+    contract.frameworkId !== current.contract.frameworkId
+  ) {
+    throw new Error("Published incompatible framework baseline identity is invalid.");
+  }
+  stableVersion(contract.frameworkVersion, "published frameworkVersion");
+  if (
+    !policyProjection ||
+    typeof policyProjection !== "object" ||
+    Array.isArray(policyProjection) ||
+    !Number.isSafeInteger(policyProjection.schemaVersion) ||
+    policyProjection.schemaVersion < 1 ||
+    policyProjection.schemaVersion === current.policyProjection.schemaVersion
+  ) {
+    throw new Error("Published incompatible policy baseline identity is invalid.");
   }
 }
 
@@ -82,24 +109,29 @@ function nulPaths(buffer) {
 }
 
 function runGit({ args, gitMetadata, label, root, optional = false, timeoutMilliseconds }) {
-  const result = spawnSync(
-    "git",
-    isolatedGitArguments({
-      args,
-      gitDirectory: gitMetadata.gitDirectory,
-      workTree: gitMetadata.workTree,
-    }),
-    {
-      cwd: root,
+  const invocationArguments = isolatedGitArguments({
+    args,
+    gitDirectory: gitMetadata.gitDirectory,
+    workTree: gitMetadata.workTree,
+  });
+  const result = spawnSync("git", invocationArguments, {
+    cwd: root,
+    encoding: null,
+    env: cleanGitEnvironment(),
+    input: Buffer.alloc(0),
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"],
+    timeout: timeoutMilliseconds,
+  });
+  if (
+    isolatedGitResultCompleted(result, {
+      args: invocationArguments,
       encoding: null,
-      env: cleanGitEnvironment(),
-      input: Buffer.alloc(0),
-      maxBuffer: 64 * 1024 * 1024,
-      stdio: ["pipe", "pipe", "pipe"],
-      timeout: timeoutMilliseconds,
-    },
-  );
-  if (!result.error && result.status === 0 && Buffer.isBuffer(result.stdout)) return result.stdout;
+      maximumOutputBytes: 64 * 1024 * 1024,
+    })
+  ) {
+    return result.stdout;
+  }
   if (optional) return null;
   const detail = result.error?.message ?? result.stderr?.toString("utf8").trim() ?? "failed";
   throw new Error(`${label} failed${detail ? `: ${detail}` : ""}.`);
@@ -295,15 +327,10 @@ function normalizedPackage(packageJson) {
 }
 
 function normalizedManifest(content) {
-  return content
-    .replace(
-      new RegExp(`${frameworkVersionStartMarker}[\\s\\S]*?${frameworkVersionEndMarker}`, "u"),
-      "<framework-version-block>",
-    )
-    .replace(
-      /^- Version `[^`]+` with contract schema `[^`]+` is the current clean framework line\.$/mu,
-      "<framework-version-block>",
-    );
+  return content.replace(
+    new RegExp(`${frameworkVersionStartMarker}[\\s\\S]*?${frameworkVersionEndMarker}`, "u"),
+    "<framework-version-block>",
+  );
 }
 
 function frameworkVersionBlock(version, schemaVersion) {
@@ -324,9 +351,6 @@ export function projectManifestWithFrameworkVersion(content, version, schemaVers
     "u",
   );
   if (startCount === 1 && markedPattern.test(content)) return content.replace(markedPattern, block);
-  const legacyPattern =
-    /^- Version `[^`]+` with contract schema `[^`]+` is the current clean framework line\.$/mu;
-  if (legacyPattern.test(content)) return content.replace(legacyPattern, block);
   throw new Error(
     `${projectManifestPath} is missing its bounded source-framework version block; refusing an ambiguous rewrite.`,
   );
@@ -338,7 +362,6 @@ function removedEntries(before, after) {
 }
 
 function contractExcludedPaths(contract) {
-  if (Array.isArray(contract?.upgrade?.excludedPaths)) return contract.upgrade.excludedPaths;
   const reasons = contract?.upgrade?.excludedPathReasons;
   return reasons && typeof reasons === "object" && !Array.isArray(reasons)
     ? Object.keys(reasons)
@@ -388,9 +411,11 @@ function packageBump(baseline, current) {
 }
 
 function policyBump(baselineContentValue, currentContent) {
+  const baselineValue = parseJson(baselineContentValue, "Published policy projection");
+  const current = validatePolicyProjection(parseJson(currentContent, "Current policy projection"));
+  if (baselineValue.schemaVersion !== current.schemaVersion) return "major";
+  const baseline = validatePolicyProjection(baselineValue);
   if (baselineContentValue === currentContent) return "none";
-  const baseline = parseJson(baselineContentValue, "Published policy projection");
-  const current = parseJson(currentContent, "Current policy projection");
   const currentPolicies = new Map((current.policies ?? []).map((policy) => [policy.id, policy]));
   let removedPolicy = false;
   for (const before of baseline.policies ?? []) {
@@ -402,17 +427,16 @@ function policyBump(baselineContentValue, currentContent) {
     if (!Number.isSafeInteger(after.version) || after.version < before.version) {
       throw new Error(`Policy ${before.id} cannot decrease from version ${before.version}.`);
     }
-    const compareProjectionStatements = baseline.schemaVersion >= 3 && current.schemaVersion >= 3;
     const samePolicy =
       before.statement === after.statement &&
-      (!compareProjectionStatements || before.projectionStatement === after.projectionStatement) &&
+      before.projectionStatement === after.projectionStatement &&
       JSON.stringify(before.projectionSurfaces) === JSON.stringify(after.projectionSurfaces) &&
       JSON.stringify(before.reconcileDocuments) === JSON.stringify(after.reconcileDocuments);
     if (before.version === after.version && !samePolicy) {
       throw new Error(`Policy ${before.id} changed without increasing its policy version.`);
     }
   }
-  return baseline.schemaVersion !== current.schemaVersion || removedPolicy ? "major" : "minor";
+  return removedPolicy ? "major" : "minor";
 }
 
 function requiredChangeBump({
@@ -519,7 +543,21 @@ export function frameworkVersionReconciliationPlan({ root = repositoryRoot } = {
   const baselinePackageContent = baselineContent(root, gitMetadata, baseline.commit, packagePath);
   const baselineManifest = baselineContent(root, gitMetadata, baseline.commit, projectManifestPath);
   const baselinePolicy = baselineContent(root, gitMetadata, baseline.commit, policyProjectionPath);
+  const currentPolicy = readRegularFrameworkFile(root, policyProjectionPath);
+  const currentPolicyValue = validatePolicyProjection(
+    parseJson(currentPolicy, "Current policy projection"),
+  );
   const baselineContract = parseJson(baselineContractContent, "Published framework contract");
+  const baselinePolicyValue = parseJson(baselinePolicy, "Published policy projection");
+  if (baselineContract.schemaVersion === currentContract.schemaVersion) {
+    validateFrameworkContract(baselineContract);
+    validatePolicyProjection(baselinePolicyValue);
+  } else {
+    validateIncompatibleBaseline(baselineContract, baselinePolicyValue, {
+      contract: currentContract,
+      policyProjection: currentPolicyValue,
+    });
+  }
   const baselinePackage = parseJson(baselinePackageContent, "Published package manifest");
   const baselineVersion = stableVersion(
     baselineContract.frameworkVersion,
@@ -537,7 +575,6 @@ export function frameworkVersionReconciliationPlan({ root = repositoryRoot } = {
 
   const currentPackageContent = readRegularFrameworkFile(root, packagePath);
   const currentManifest = readRegularFrameworkFile(root, projectManifestPath);
-  const currentPolicy = readRegularFrameworkFile(root, policyProjectionPath);
   const currentPackage = parseJson(currentPackageContent, "Current package manifest");
   const currentContractVersion = stableVersion(
     currentContract.frameworkVersion,

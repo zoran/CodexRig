@@ -1,5 +1,5 @@
 /** Resolves the compatibility-owned mise pnpm binary without repository-local PATH shadowing. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";

@@ -74,6 +74,7 @@ export function readJsonFile(projectRoot, filePath, label) {
 }
 
 function validLockOwner(owner) {
+  const acquiredAt = Date.parse(owner?.acquiredAt ?? "");
   return Boolean(
     owner &&
     typeof owner === "object" &&
@@ -85,9 +86,12 @@ function validLockOwner(owner) {
     owner.token.length > 0 &&
     !/[\0\r\n]/u.test(owner.token) &&
     typeof owner.lifecycleNonce === "string" &&
-    /^[a-f0-9-]{36}$/u.test(owner.lifecycleNonce) &&
+    /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(
+      owner.lifecycleNonce,
+    ) &&
     typeof owner.acquiredAt === "string" &&
-    Number.isFinite(Date.parse(owner.acquiredAt)),
+    Number.isFinite(acquiredAt) &&
+    new Date(acquiredAt).toISOString() === owner.acquiredAt,
   );
 }
 

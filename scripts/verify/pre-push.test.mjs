@@ -109,11 +109,34 @@ test("pre-push keeps security checks and consumes evidence without running the f
 
 test("public pre-push entrypoint holds the canonical verification session lock", () => {
   const source = readFileSync(sourceScript, "utf8");
+  assert.match(source, /--validate-pre-push-refs/u);
   assert.match(source, /adaptive\.mjs" --mode repo --basis-only/u);
   assert.match(source, /verification-session-lock\.mjs/u);
   assert.match(source, /--hold sh/u);
   assert.match(source, /pre-push-steps\.sh/u);
+  assert.ok(source.indexOf("--validate-pre-push-refs") < source.indexOf("Refreshing"));
+  assert.ok(source.indexOf("--validate-pre-push-refs") < source.indexOf("--basis-only"));
   assert.ok(source.indexOf("--basis-only") < source.indexOf("verification-session-lock.mjs"));
+});
+
+test("a staged-only checkout explains the commit requirement before evidence refresh", () => {
+  const repository = mkdtempSync(path.join(os.tmpdir(), "pre-push-staged-only-"));
+  temporaryRoots.push(repository);
+  writeFileSync(path.join(repository, "tracked.txt"), "committed\n", "utf8");
+  assertGit(repository, "init", "-q");
+  assertGit(repository, "config", "user.name", "Pre-Push Staged Test");
+  assertGit(repository, "config", "user.email", "pre-push-staged@example.invalid");
+  assertGit(repository, "add", "tracked.txt");
+  assertGit(repository, "commit", "-q", "-m", "initial");
+  writeFileSync(path.join(repository, "tracked.txt"), "staged but uncommitted\n", "utf8");
+  assertGit(repository, "add", "tracked.txt");
+
+  assert.throws(
+    () => validateCurrentCheckoutForPush("", { repositoryRoot: repository }),
+    /Git push sends commits, not staged or unstaged content; git add alone is insufficient/u,
+  );
+  const source = readFileSync(sourceScript, "utf8");
+  assert.ok(source.indexOf("--validate-pre-push-refs") < source.indexOf("Refreshing"));
 });
 
 test("source-framework pre-push fails closed on resettable local state", () => {
@@ -176,6 +199,7 @@ test("the installed hook cannot be skipped through BASH_ENV", () => {
   for (const relativePath of [
     "scripts/git-hooks/pre-push",
     "scripts/repository/git-runtime-isolation.mjs",
+    "scripts/repository/runtime-process-io.mjs",
     "scripts/setup/install-git-hooks.mjs",
     "scripts/setup/install-git-hooks.sh",
     "scripts/setup/resolve-git-hooks-path.mjs",

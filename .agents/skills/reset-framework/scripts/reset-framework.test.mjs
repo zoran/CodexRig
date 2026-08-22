@@ -8,6 +8,7 @@ import {
   mkdtempSync,
   openSync,
   readFileSync,
+  readdirSync,
   renameSync,
   rmSync,
   statSync,
@@ -20,23 +21,25 @@ import process from "node:process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
-  issueRuntimeSessionLease,
-  releaseRuntimeSessionLease,
-} from "../../../../scripts/setup/startup-attestation.mjs";
-import {
   acquireRuntimeLifecycleLock,
+  issueRuntimeSessionLease,
   releaseRuntimeLifecycleLock,
+  releaseRuntimeSessionLease,
 } from "../../../../scripts/repository/runtime-session-lease.mjs";
-import { repositoryRuntimeRootIdentity } from "../../../../scripts/repository/runtime-owned-state.mjs";
 import { acquireVerificationSessionLock } from "../../../../scripts/verify/verification-session-lock.mjs";
+import { fullVerificationEvidenceRecord } from "../../../../scripts/verify/verification-evidence-record.mjs";
+import {
+  readVerificationEvidence,
+  writeVerificationEvidence,
+} from "../../../../scripts/verify/verification-evidence-store.mjs";
+import { inspectLinuxOpenRepositoryPaths } from "../../../../scripts/repository/runtime-process-identity.mjs";
 import {
   acquireDependencyTransactionLock,
   releaseDependencyTransactionLock,
 } from "../../../../scripts/deps/dependency-transaction-state.mjs";
-import { applyMigrations, removeResetCandidate } from "./reset-framework.mjs";
+import { openFrameworkRuntimeStatus, removeResetCandidate } from "./reset-framework.mjs";
 
 const script = path.join(path.dirname(fileURLToPath(import.meta.url)), "reset-framework.mjs");
-const definitelyStalePid = 2_147_483_647;
 
 function write(root, relativePath, content = "fixture\n", mode) {
   const filePath = path.join(root, ...relativePath.split("/"));
@@ -56,18 +59,53 @@ function fixture(prefix = "reset-framework-") {
   return root;
 }
 
-function writeLegacyRuntimeSessionLease(root, pid) {
-  write(
-    root,
-    ".codex/runtime/codexrig-session.json",
-    `${JSON.stringify({
-      schemaVersion: 1,
-      pid,
-      startedAt: "2026-08-01T00:00:00.000Z",
-      root: repositoryRuntimeRootIdentity(root),
-    })}\n`,
-    0o600,
+function writeStaleRuntimeSessionLease(root) {
+  const leaseModule = new URL(
+    "../../../../scripts/repository/runtime-session-lease.mjs",
+    import.meta.url,
+  ).href;
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      `import { issueRuntimeSessionLease } from ${JSON.stringify(leaseModule)}; issueRuntimeSessionLease({ root: ${JSON.stringify(root)}, pid: process.pid });`,
+    ],
+    { cwd: root, encoding: "utf8", input: "", stdio: "pipe" },
   );
+  assert.equal(child.status, 0, child.stderr);
+}
+
+function currentVerificationEvidence(root) {
+  const digest = (character) => character.repeat(64);
+  const record = fullVerificationEvidenceRecord(
+    {
+      artifactDigest: "",
+      artifactManifest: "",
+      broadFingerprint: digest("a"),
+      configurationDigest: "",
+      deliveryEnvironment: "dev",
+      deliveryPlanDigest: "",
+      exactFingerprint: digest("b"),
+      planDigest: digest("c"),
+      riskFingerprints: [],
+      runtime: {
+        arch: "fixture-arch",
+        environment: digest("d"),
+        executables: digest("e"),
+        mise: digest("f"),
+        node: "fixture-node",
+        platform: "fixture-platform",
+        pnpm: digest("0"),
+      },
+      runtimeDigest: digest("1"),
+      sourceCommit: "",
+    },
+    { complete: false, dirtyPaths: [], head: "" },
+    "2026-08-22T00:00:00.000Z",
+  );
+  writeVerificationEvidence(root, record);
+  return record;
 }
 
 function run(root, args = [], env = {}) {
@@ -79,7 +117,7 @@ function run(root, args = [], env = {}) {
   });
 }
 
-test("reset migrates required identity and removes all disposable framework runtime", (t) => {
+test("reset preserves current identity and removes all disposable framework runtime", (t) => {
   const root = fixture();
   t.after(() => rmSync(root, { force: true, recursive: true }));
   write(root, "docs/project.md", "# Project Manifest\n");
@@ -98,18 +136,22 @@ test("reset migrates required identity and removes all disposable framework runt
   write(root, "dist/exports/project.tar.gz", "generated\n");
   write(root, ".codex/auth.json", "obsolete auth\n", 0o600);
   write(root, ".codex/history.jsonl", "obsolete history\n");
+  write(root, ".codex/runtime/auth.json", "current auth\n", 0o600);
+  write(root, ".codex/runtime/config.toml", 'model = "fixture"\n', 0o600);
+  write(root, ".codex/runtime/installation_id", "fixture-installation\n", 0o600);
   write(root, ".codex/runtime/cache/codexrig/startup-attestation.json", "{}\n");
-  writeLegacyRuntimeSessionLease(root, definitelyStalePid);
+  const evidence = currentVerificationEvidence(root);
+  writeStaleRuntimeSessionLease(root);
   write(
     root,
-    ".codex/runtime/cache/project-verification/evidence.json",
-    '{"schemaVersion":1}\n',
+    ".codex/runtime/codexrig-session-recovery.json",
+    '{"codexSessionId":"01a01234-5678-7abc-8def-0123456789ab"}\n',
     0o600,
   );
   write(root, ".codex/runtime/logs_2.sqlite", "runtime database\n");
-  write(root, "auth.json", "current auth\n", 0o600);
-  write(root, "config.toml", 'model = "fixture"\n', 0o600);
-  write(root, "installation_id", "fixture-installation\n", 0o600);
+  write(root, "auth.json", "obsolete auth\n", 0o600);
+  write(root, "config.toml", 'model = "obsolete"\n', 0o600);
+  write(root, "installation_id", "obsolete-installation\n", 0o600);
   write(root, "history.jsonl", "project history fixture\n");
   write(root, "rules/default.rules", 'prefix_rule(pattern=["fixture"], decision="allow")\n');
   write(root, "sessions/thread.jsonl", "project session fixture\n");
@@ -118,8 +160,9 @@ test("reset migrates required identity and removes all disposable framework runt
 
   const preview = run(root);
   assert.equal(preview.status, 1);
-  assert.match(preview.stdout, /auth\.json -> \.codex\/runtime\/auth\.json/, preview.stderr);
-  assert.match(preview.stdout, /config\.toml -> \.codex\/runtime\/config\.toml/);
+  assert.match(preview.stdout, /^- auth\.json$/mu, preview.stderr);
+  assert.match(preview.stdout, /^- config\.toml$/mu);
+  assert.match(preview.stdout, /^- installation_id$/mu);
   assert.match(preview.stdout, /\.context-index/);
   assert.match(preview.stdout, /^- \.tmp$/mu);
   assert.match(preview.stdout, /^- tmp$/mu);
@@ -145,6 +188,7 @@ test("reset migrates required identity and removes all disposable framework runt
     ".codex/history.jsonl",
     ".codex/runtime/cache/codexrig",
     ".codex/runtime/codexrig-session.json",
+    ".codex/runtime/codexrig-session-recovery.json",
     ".codex/runtime/logs_2.sqlite",
     "auth.json",
     "config.toml",
@@ -163,17 +207,36 @@ test("reset migrates required identity and removes all disposable framework runt
   );
   assert.equal(statSync(path.join(root, ".codex/runtime/auth.json")).mode & 0o777, 0o600);
   assert.equal(
-    readFileSync(
-      path.join(root, ".codex/runtime/cache/project-verification/evidence.json"),
-      "utf8",
-    ),
-    '{"schemaVersion":1}\n',
+    readFileSync(path.join(root, ".codex/runtime/installation_id"), "utf8"),
+    "fixture-installation\n",
   );
+  assert.deepEqual(readVerificationEvidence(root), evidence);
   assert.equal(
     readFileSync(path.join(root, "src/index.ts"), "utf8"),
     "export const product = true;\n",
   );
   assert.equal(run(root).status, 0);
+});
+
+test("reset discards non-current verification evidence", (t) => {
+  const root = fixture("reset-framework-old-evidence-");
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  write(
+    root,
+    ".codex/runtime/cache/project-verification/evidence.json",
+    '{"schemaVersion":1}\n',
+    0o600,
+  );
+
+  const preview = run(root);
+  assert.equal(preview.status, 1, preview.stderr);
+  assert.match(preview.stdout, /project-verification\/evidence\.json/u);
+  const applied = run(root, ["--apply"]);
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.equal(
+    existsSync(path.join(root, ".codex/runtime/cache/project-verification/evidence.json")),
+    false,
+  );
 });
 
 test("reset refuses an active Codex runtime lease without deleting state", (t) => {
@@ -191,6 +254,28 @@ test("reset refuses an active Codex runtime lease without deleting state", (t) =
   assert.equal(applied.status, 1);
   assert.match(applied.stderr, /Codex session still owns/);
   assert.equal(readFileSync(path.join(root, "history.jsonl"), "utf8"), "preserve while active\n");
+});
+
+test("full reset discards a non-current private lease only after runtime quiescence", (t) => {
+  const root = fixture("reset-framework-non-current-runtime-");
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  write(root, "history.jsonl", "discard with the non-current private runtime\n");
+  write(
+    root,
+    ".codex/runtime/codexrig-session.json",
+    '{"schemaVersion":999,"unsupported":true}\n',
+    0o600,
+  );
+
+  const preview = run(root);
+  assert.equal(preview.status, 1, preview.stderr);
+  assert.match(preview.stdout, /\.codex\/runtime\/codexrig-session\.json/u);
+
+  const applied = run(root, ["--apply"]);
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.equal(existsSync(path.join(root, ".codex/runtime/codexrig-session.json")), false);
+  assert.equal(existsSync(path.join(root, "history.jsonl")), false);
+  assert.equal(run(root).status, 0);
 });
 
 test("the shared runtime lifecycle lock closes reset and session-start races", (t) => {
@@ -223,7 +308,7 @@ test("post-project-creation cleanup removes safe residue while preserving active
   write(root, "dist/exports/generated.tar.gz", "generated\n");
   write(root, ".context-index/manifest.json", "{}\n");
   write(root, ".codex/runtime/logs_2.sqlite", "active runtime\n");
-  write(root, "history.jsonl", "active legacy runtime\n");
+  write(root, "history.jsonl", "active loose-root runtime\n");
   issueRuntimeSessionLease({ root, pid: process.pid });
   t.after(() => {
     if (existsSync(path.join(root, ".codex/runtime/codexrig-session.json"))) {
@@ -286,7 +371,7 @@ test("portable source baseline ignores contained active runtime but not process 
     releaseRuntimeSessionLease({ root, pid: process.pid });
     rmSync(root, { force: true, recursive: true });
   });
-  write(root, "history.jsonl", "active legacy fixture\n");
+  write(root, "history.jsonl", "active pre-lease fixture\n");
   write(root, ".context-index/manifest.json", "{}\n");
 
   const clean = run(root, ["--portable-source-baseline"]);
@@ -300,7 +385,7 @@ test("portable source baseline ignores contained active runtime but not process 
 });
 
 test(
-  "reset refuses legacy runtime files still held open by a pre-lease process",
+  "reset refuses loose-root runtime files still held open by a pre-lease process",
   { skip: process.platform !== "linux" },
   (t) => {
     const root = fixture("reset-framework-open-runtime-");
@@ -318,16 +403,62 @@ test(
   },
 );
 
-test("reset refuses conflicting canonical and legacy runtime identity", (t) => {
+test(
+  "permission-obscured Linux descriptor tables remain indeterminate",
+  { skip: process.platform !== "linux" },
+  (t) => {
+    const root = fixture("reset-framework-indeterminate-runtime-");
+    const procRoot = mkdtempSync(path.join(os.tmpdir(), "reset-framework-proc-"));
+    mkdirSync(path.join(procRoot, "4242", "fd"), { recursive: true });
+    t.after(() => {
+      rmSync(root, { force: true, recursive: true });
+      rmSync(procRoot, { force: true, recursive: true });
+    });
+
+    for (const code of ["EACCES", "EPERM"]) {
+      const inspected = inspectLinuxOpenRepositoryPaths({
+        root,
+        excludePids: [],
+        matchesPath: (isPath) => isPath === "history.jsonl",
+        procRoot,
+        testHooks: {
+          readDirectory(target) {
+            if (target.endsWith(`${path.sep}fd`)) throw Object.assign(new Error(code), { code });
+            return readdirSync(target);
+          },
+          readLink() {
+            return root;
+          },
+        },
+      });
+      assert.deepEqual(inspected, { observationComplete: false, status: "unknown" });
+    }
+  },
+);
+
+test("a missing Linux proc filesystem is indeterminate rather than inactive", (t) => {
+  const root = fixture("reset-framework-missing-proc-");
+  const missingProc = path.join(root, "missing-proc");
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  assert.equal(
+    openFrameworkRuntimeStatus(root, { procRoot: missingProc }),
+    process.platform === "linux" ? "unknown" : "inactive",
+  );
+});
+
+test("reset discards loose-root identity and preserves current runtime identity", (t) => {
   const root = fixture("reset-framework-conflict-");
   t.after(() => rmSync(root, { force: true, recursive: true }));
-  write(root, "auth.json", "legacy auth\n", 0o600);
+  write(root, "auth.json", "loose-root auth\n", 0o600);
   write(root, ".codex/runtime/auth.json", "canonical auth\n", 0o600);
 
   const applied = run(root, ["--apply"]);
-  assert.equal(applied.status, 1);
-  assert.match(applied.stderr, /conflicting runtime identity/);
-  assert.equal(readFileSync(path.join(root, "auth.json"), "utf8"), "legacy auth\n");
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.equal(existsSync(path.join(root, "auth.json")), false);
+  assert.equal(
+    readFileSync(path.join(root, ".codex/runtime/auth.json"), "utf8"),
+    "canonical auth\n",
+  );
 });
 
 test("clean preview tolerates only the currently active verification lock", (t) => {
@@ -443,37 +574,4 @@ test("reset removal binds the complete parent chain before claiming nested state
   );
   assert.equal(readFileSync(path.join(outside, "planning/sentinel.txt"), "utf8"), "outside\n");
   assert.equal(readFileSync(path.join(parkedDocs, "planning/owned.txt"), "utf8"), "owned\n");
-});
-
-test("reset migration refuses a swapped runtime parent before moving or chmodding identity", (t) => {
-  const root = fixture("reset-framework-parent-migration-");
-  const outside = mkdtempSync(path.join(os.tmpdir(), "reset-framework-migration-outside-"));
-  const codex = path.join(root, ".codex");
-  const parkedCodex = path.join(root, ".codex-owned");
-  write(root, "auth.json", "owned auth\n", 0o600);
-  write(outside, "runtime/auth.json", "outside auth\n", 0o640);
-  t.after(() => {
-    rmSync(codex, { force: true, recursive: true });
-    rmSync(root, { force: true, recursive: true });
-    rmSync(outside, { force: true, recursive: true });
-  });
-
-  let swapped = false;
-  const error = assert.throws(
-    () =>
-      applyMigrations(root, [{ from: "auth.json", to: ".codex/runtime/auth.json" }], {
-        testHooks: {
-          beforeMigrationRename() {
-            swapped = true;
-            renameSync(codex, parkedCodex);
-            symlinkSync(outside, codex, "dir");
-          },
-        },
-      }),
-    /unsafe parent|parent identity change/u,
-  );
-  assert.equal(swapped, true, error?.message);
-  assert.equal(readFileSync(path.join(root, "auth.json"), "utf8"), "owned auth\n");
-  assert.equal(readFileSync(path.join(outside, "runtime/auth.json"), "utf8"), "outside auth\n");
-  assert.equal(statSync(path.join(outside, "runtime/auth.json")).mode & 0o777, 0o640);
 });

@@ -8,6 +8,7 @@ import {
   isManagedMarkdownPath,
   isRepositoryProcessMarkdownPath,
   listManagedMarkdownFiles,
+  markdownBodyForHeadingValidation,
 } from "./document-scope.mjs";
 
 test("sync and verification scope includes Markdown in arbitrary active project roots", () => {
@@ -53,6 +54,24 @@ test("repository process documents are distinguishable from durable product docu
   ]) {
     assert.equal(isRepositoryProcessMarkdownPath(relativePath), false, relativePath);
   }
+});
+
+test("project context exposes its Markdown body after the required leading work-state envelope", () => {
+  const context = `<!-- codexrig-work-state
+{"version":1}
+-->
+
+# Current work
+`;
+  assert.equal(
+    markdownBodyForHeadingValidation("docs/project-context.md", context),
+    "# Current work\n",
+  );
+  assert.equal(markdownBodyForHeadingValidation("README.md", context), context);
+  assert.equal(
+    markdownBodyForHeadingValidation("docs/project-context.md", `# Current work\n\n${context}`),
+    `# Current work\n\n${context}`,
+  );
 });
 
 test("canonical active inventory feeds the shared Markdown scope", (t) => {

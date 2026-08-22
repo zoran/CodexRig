@@ -37,6 +37,10 @@ export const verificationRiskRegistry = Object.freeze([
   },
   { path: "scripts/verify/pre-push.sh", riskId: "pre-push-control-chain" },
   { path: "scripts/verify/pre-push-steps.sh", riskId: "pre-push-control-chain" },
+  {
+    path: "scripts/verify/verification-admission-decision.mjs",
+    riskId: "verification-admission",
+  },
   { path: "scripts/verify/verification-admission.mjs", riskId: "verification-admission" },
   {
     path: "scripts/verify/verification-evidence.mjs",

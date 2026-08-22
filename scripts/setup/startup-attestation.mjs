@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 /** Owns startup attestation behavior for the setup, launch, and portable project boundary. */
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 import {
   frameworkRoot,
   readFrameworkContract,
@@ -27,31 +26,33 @@ import {
   readStableOwnedFile,
 } from "../filesystem/owned-path-safety.mjs";
 import {
-  clearStaleRuntimeSessionLease,
+  activateRuntimeSessionLease,
+  fallbackRuntimeSessionLease,
   inspectRuntimeSessionLease,
-  issueRuntimeSessionLease,
+  inspectRuntimeSessionPlan,
   releaseRuntimeSessionLease,
   repositoryRuntimeRootIdentity,
-  runtimeSessionLeasePath,
+  reserveRuntimeSessionLease,
+  transitionRuntimeSessionWriterProcess,
+  validCodexSessionId,
 } from "../repository/runtime-session-lease.mjs";
-import { discoverRecentCriticalBudgetHandover } from "../context/critical-budget-handover.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
 import { startupExecutableClosurePaths } from "./startup-executable-closure.mjs";
+import { validateStartupRuntimeExecutables } from "./startup-runtime-executables.mjs";
+import { parsePortableCodexConfig } from "./validate-codex-config.mjs";
 
 export const startupAttestationPath = `${repositoryCodexRuntimeCacheDirectory}/codexrig/startup-attestation.json`;
-export const startupHookDispatcherPath = `${repositoryCodexRuntimeCacheDirectory}/codexrig/startup-hook-dispatcher.mjs`;
-export {
-  clearStaleRuntimeSessionLease,
-  inspectRuntimeSessionLease,
-  issueRuntimeSessionLease,
-  releaseRuntimeSessionLease,
-  runtimeSessionLeasePath,
-};
+const startupAttestationKeys =
+  "controlPolicySha256\nexpiresAt\nframeworkId\nframeworkVersion\ninputs\nissuedAt\nmodel\nnonceSha256\npermissionMode\nresumeSessionIdSha256\nroot\nruntimeSessionIdSha256\nschemaVersion\nsessionSource\nversions";
 export const startupControlPolicies = Object.freeze({
   default: "interactive-v2:safe-defaults",
   noAltScreen: "interactive-v2:no-alt-screen",
   yolo: "dev-yolo-v1:default-screen",
   yoloNoAltScreen: "dev-yolo-v1:no-alt-screen",
+});
+export const startupSessionSources = Object.freeze({
+  resume: "resume",
+  startup: "startup",
 });
 const fixedStartupAttestedInputs = Object.freeze([
   ".codex/config.toml",
@@ -62,14 +63,13 @@ const fixedStartupAttestedInputs = Object.freeze([
   "mise.toml",
   "package.json",
   "pnpm-lock.yaml",
-  "scripts/deps/install-compatible.mjs",
   "scripts/framework/framework-doctor.mjs",
-  "scripts/context/refresh-context-index-on-stop.sh",
+  "scripts/context/session-stop-lifecycle.mjs",
   "scripts/setup/start-codex.sh",
-  "scripts/setup/validate-codex-bootstrap.sh",
+  "scripts/setup/session-control-hook-command.mjs",
+  "scripts/setup/startup-session-controller.mjs",
   "scripts/setup/validate-codex-config.mjs",
   "scripts/setup/validate-codex-model-policy.mjs",
-  "scripts/setup/verify-startup-attestation-on-session-start.sh",
 ]);
 
 export function startupAttestedInputPaths(root = frameworkRoot) {
@@ -106,23 +106,28 @@ function commandVersion(root, executable, args, label) {
   const result = spawnSync(executable, args, {
     cwd: root,
     encoding: "utf8",
-    env: executable === "pnpm" ? pnpmHooksDisabledEnvironment(process.env) : process.env,
+    env: label === "pnpm" ? pnpmHooksDisabledEnvironment(process.env) : process.env,
     input: "",
+    maxBuffer: 1024 * 1024,
     stdio: "pipe",
+    timeout: 20_000,
   });
-  if (result.error || result.status !== 0) throw new Error(`${label} version probe failed.`);
+  if (result.error || result.signal || result.status !== 0) {
+    throw new Error(`${label} version probe failed.`);
+  }
   const match = `${result.stdout}${result.stderr}`.match(
-    /\b(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\b/u,
+    /\bv?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\b/u,
   );
   if (!match) throw new Error(`${label} did not report a semantic version.`);
   return match[1];
 }
 
-function runtimeVersions(root) {
+function runtimeVersions(root, runtimeExecutables) {
+  const executables = validateStartupRuntimeExecutables(root, runtimeExecutables);
   return {
-    codex: commandVersion(root, "codex", ["--version"], "Codex"),
-    node: process.version.replace(/^v/u, ""),
-    pnpm: commandVersion(root, "pnpm", ["--version"], "pnpm"),
+    codex: commandVersion(root, executables.codex, ["--version"], "Codex"),
+    node: commandVersion(root, executables.node, ["--version"], "Node"),
+    pnpm: commandVersion(root, executables.pnpm, ["--version"], "pnpm"),
   };
 }
 
@@ -161,25 +166,6 @@ function atomicWriteAttestation(root, content, { testHooks } = {}) {
   }
 }
 
-function publishHookDispatcher(root, { testHooks } = {}) {
-  ensurePrivateStateDirectory(root);
-  const source = readRegularFrameworkFile(root, "scripts/setup/startup-hook-dispatcher.mjs");
-  const stateRoot = resolveFrameworkPath(root, `${repositoryCodexRuntimeCacheDirectory}/codexrig`);
-  const directory = openPrivateOwnedDirectory(root, stateRoot, "startup hook dispatcher state");
-  try {
-    atomicReplaceOwnedFile(
-      directory,
-      path.basename(startupHookDispatcherPath),
-      source,
-      "startup hook dispatcher",
-      { mode: 0o500, testHooks },
-    );
-  } finally {
-    closeOwnedDirectoryBinding(directory);
-  }
-  return sha256(source);
-}
-
 function readAttestation(root) {
   const stateRoot = resolveFrameworkPath(root, `${repositoryCodexRuntimeCacheDirectory}/codexrig`);
   if (!existsSync(stateRoot)) throw new Error("No launcher attestation exists.");
@@ -204,7 +190,12 @@ function readAttestation(root) {
   } finally {
     closeOwnedDirectoryBinding(directory);
   }
-  if (value?.schemaVersion !== 3) throw new Error("Launcher attestation schema is unsupported.");
+  if (
+    value?.schemaVersion !== 6 ||
+    Object.keys(value).sort().join("\n") !== startupAttestationKeys
+  ) {
+    throw new Error("Launcher attestation schema is unsupported.");
+  }
   return value;
 }
 
@@ -222,29 +213,310 @@ function startupControlPolicy(value) {
   return value;
 }
 
+function startupRuntimePolicy(root, controlPolicy) {
+  const portablePolicy = parsePortableCodexConfig(
+    readRegularFrameworkFile(root, ".codex/config.toml"),
+  );
+  return Object.freeze({
+    model: portablePolicy.model,
+    reasoningEffort: portablePolicy.model_reasoning_effort,
+    permissionMode:
+      controlPolicy === startupControlPolicies.yolo ||
+      controlPolicy === startupControlPolicies.yoloNoAltScreen
+        ? "bypassPermissions"
+        : "default",
+  });
+}
+
+/** Captures the exact read-only startup basis that must survive preflight and every launch. */
+export function startupAttestationBasis({
+  root = frameworkRoot,
+  controlPolicy = process.env.CODEXRIG_STARTUP_CONTROL_POLICY ?? "",
+  runtimeExecutables,
+} = {}) {
+  const runtimePolicy = startupRuntimePolicy(root, startupControlPolicy(controlPolicy));
+  return Object.freeze({
+    inputs: Object.freeze(inputHashes(root)),
+    model: runtimePolicy.model,
+    permissionMode: runtimePolicy.permissionMode,
+    reasoningEffort: runtimePolicy.reasoningEffort,
+    versions: Object.freeze(runtimeVersions(root, runtimeExecutables)),
+  });
+}
+
+function startupSessionSelection(sourceValue, resumeSessionIdValue) {
+  if (!Object.values(startupSessionSources).includes(sourceValue)) {
+    throw new Error("Canonical launcher session source is missing or unsupported.");
+  }
+  const resumeSessionId = resumeSessionIdValue?.trim() ?? "";
+  if (
+    (sourceValue === startupSessionSources.startup && resumeSessionId !== "") ||
+    (sourceValue === startupSessionSources.resume && !validCodexSessionId(resumeSessionId))
+  ) {
+    throw new Error("Canonical launcher resume session is invalid.");
+  }
+  return { resumeSessionId, source: sourceValue };
+}
+
+/** Selects only the latest canonical repository main thread recorded by the prior launcher lease. */
+export function startupSessionPlan({ root = frameworkRoot } = {}) {
+  return inspectRuntimeSessionPlan({ root });
+}
+
+export function startupSessionPlanToken(plan) {
+  if (plan?.mode === "startup") return "startup";
+  if (plan?.mode === "resume-id" && validCodexSessionId(plan.resumeSessionId)) {
+    return `resume-id:${plan.resumeSessionId}`;
+  }
+  throw new Error("Canonical launcher session plan is invalid.");
+}
+
+/** Atomically reserves the latest safe session selection before attesting its launcher inputs. */
+export function reserveStartupAttestation(
+  root,
+  pid,
+  {
+    controlPolicy = process.env.CODEXRIG_STARTUP_CONTROL_POLICY ?? "",
+    expectedBasis,
+    runtimeExecutables,
+  } = {},
+) {
+  const reservation = reserveRuntimeSessionLease({ root, pid });
+  try {
+    const issued = issueStartupAttestation({
+      root,
+      controlPolicy,
+      expectedBasis,
+      runtimeExecutables,
+      sessionSource: reservation.lease.sessionSource,
+      resumeSessionId: reservation.lease.resumeSessionId ?? "",
+    });
+    return Object.freeze({ ...issued, lease: reservation.lease, plan: reservation.plan });
+  } catch (error) {
+    releaseRuntimeSessionLease({ root, pid });
+    throw error;
+  }
+}
+
+export function runtimeSessionLaunchState(root, pid) {
+  const current = inspectRuntimeSessionLease({ root });
+  if (current.status !== "active" || current.lease.process.pid !== pid) {
+    throw new Error("Launcher process does not own the current runtime session lease.");
+  }
+  return current.lease.phase;
+}
+
+function verifiedSessionTransition(
+  root,
+  pid,
+  { controlPolicy, expectedAttestation, nonce, now, runtimeExecutables },
+  allowedPhases = ["launching"],
+) {
+  const current = inspectRuntimeSessionLease({ root });
+  if (
+    current.status !== "active" ||
+    current.lease.process.pid !== pid ||
+    !allowedPhases.includes(current.lease.phase)
+  ) {
+    throw new Error("Session transition does not match the owned launcher lease phase.");
+  }
+  const effectiveControlPolicy = startupControlPolicy(controlPolicy);
+  const selection = startupSessionSelection(
+    current.lease.sessionSource,
+    current.lease.resumeSessionId ?? "",
+  );
+  const expectedBasis = validateCurrentAttestationBasis({
+    root,
+    runtimeLease: current,
+    effectiveControlPolicy,
+    expectedAttestation,
+    selection,
+    nonce,
+    now,
+    runtimeExecutables,
+  });
+  return { current, expectedBasis };
+}
+
+function transitionStartupSessionWriter(
+  root,
+  pid,
+  writerPid,
+  transition,
+  {
+    controlPolicy = process.env.CODEXRIG_STARTUP_CONTROL_POLICY ?? "",
+    expectedAttestation,
+    nonce = process.env.CODEXRIG_STARTUP_NONCE ?? "",
+    now = Date.now,
+    runtimeExecutables,
+  } = {},
+) {
+  const { current } = verifiedSessionTransition(
+    root,
+    pid,
+    { controlPolicy, expectedAttestation, nonce, now, runtimeExecutables },
+    transition === "codex" ? ["launching", "active"] : ["launching"],
+  );
+  return transitionRuntimeSessionWriterProcess({
+    root,
+    pid,
+    runtimeSessionId: current.lease.sessionId,
+    transition,
+    writerPid,
+  });
+}
+
+/** Binds the already-loaded foreground supervisor while Codex is still behind its closed gate. */
+export function bindStartupSessionWriter(root, pid, writerPid, options = {}) {
+  return transitionStartupSessionWriter(root, pid, writerPid, "supervisor", options);
+}
+
+/** Persists the only crash-indeterminate window immediately before the supervisor may spawn. */
+export function beginStartupSessionWriterHandoff(root, pid, options = {}) {
+  return transitionStartupSessionWriter(root, pid, undefined, "handoff", options);
+}
+
+/** Records a normal supervisor completion when Codex exited before its PID could be captured. */
+export function completeStartupSessionWriterHandoff(
+  root,
+  pid,
+  { expectedAttestation, nonce = process.env.CODEXRIG_STARTUP_NONCE ?? "" } = {},
+) {
+  if (expectedAttestation === undefined) {
+    throw new Error("Terminal writer completion requires its issue-time attestation.");
+  }
+  const current = inspectRuntimeSessionLease({ root });
+  const persistedAttestation = readAttestation(root);
+  if (
+    current.status !== "active" ||
+    current.lease.process.pid !== pid ||
+    !["launching", "active"].includes(current.lease.phase) ||
+    !["handoff", "bound"].includes(current.lease.writerPhase) ||
+    JSON.stringify(expectedAttestation) !== JSON.stringify(persistedAttestation) ||
+    !equalHash(expectedAttestation.nonceSha256, nonce) ||
+    !equalHash(expectedAttestation.runtimeSessionIdSha256, current.lease.sessionId)
+  ) {
+    throw new Error("Terminal writer completion does not match the issue-time launcher state.");
+  }
+  return transitionRuntimeSessionWriterProcess({
+    root,
+    pid,
+    runtimeSessionId: current.lease.sessionId,
+    transition: "complete",
+  });
+}
+
+/** Binds the exact spawned Codex PID before its foreground supervisor may be treated as sufficient. */
+export function bindStartupSessionCodexProcess(root, pid, codexPid, options = {}) {
+  return transitionStartupSessionWriter(root, pid, codexPid, "codex", options);
+}
+
+export function fallbackStartupAttestation(
+  root,
+  pid,
+  {
+    controlPolicy = process.env.CODEXRIG_STARTUP_CONTROL_POLICY ?? "",
+    expectedAttestation,
+    nonce = process.env.CODEXRIG_STARTUP_NONCE ?? "",
+    now = Date.now,
+    runtimeExecutables,
+  } = {},
+) {
+  // Authenticate before cleanup-on-failure. A mismatched caller must not be able to retire another
+  // launcher's still-live reservation merely by forcing a basis validation error.
+  if (expectedAttestation === undefined) {
+    throw new Error("Fresh-session fallback requires its issue-time attestation basis.");
+  }
+  const { current, expectedBasis } = verifiedSessionTransition(root, pid, {
+    controlPolicy,
+    expectedAttestation,
+    nonce,
+    now,
+    runtimeExecutables,
+  });
+  if (current.lease.sessionSource !== startupSessionSources.resume) {
+    throw new Error("Fresh fallback requires an unactivated exact-resume lease.");
+  }
+  fallbackRuntimeSessionLease({
+    root,
+    pid,
+    runtimeSessionId: current.lease.sessionId,
+  });
+  try {
+    return issueStartupAttestation({
+      root,
+      controlPolicy,
+      expectedBasis,
+      now,
+      runtimeExecutables,
+      sessionSource: startupSessionSources.startup,
+      resumeSessionId: "",
+    });
+  } catch (error) {
+    releaseRuntimeSessionLease({ root, pid });
+    throw error;
+  }
+}
+
 export function issueStartupAttestation({
   root = frameworkRoot,
   now = Date.now,
   controlPolicy = process.env.CODEXRIG_STARTUP_CONTROL_POLICY ?? "",
+  sessionSource = startupSessionSources.startup,
+  resumeSessionId = "",
+  expectedBasis,
+  runtimeExecutables,
   testHooks,
 } = {}) {
   const contract = readFrameworkContract(root);
   const effectiveControlPolicy = startupControlPolicy(controlPolicy);
+  const selection = startupSessionSelection(sessionSource, resumeSessionId);
+  const runtimeLease = inspectRuntimeSessionLease({ root });
+  if (runtimeLease.status !== "active") {
+    throw new Error("Startup attestation requires an active current-schema runtime session lease.");
+  }
+  if (
+    runtimeLease.lease.sessionSource !== selection.source ||
+    runtimeLease.lease.resumeSessionId !==
+      (selection.resumeSessionId === "" ? null : selection.resumeSessionId)
+  ) {
+    throw new Error("Startup attestation session selection differs from its runtime lease.");
+  }
+  const currentBasis = startupAttestationBasis({
+    root,
+    controlPolicy: effectiveControlPolicy,
+    runtimeExecutables,
+  });
+  const { inputs, model, permissionMode, reasoningEffort, versions } = currentBasis;
+  if (
+    expectedBasis !== undefined &&
+    (JSON.stringify(expectedBasis.inputs) !== JSON.stringify(inputs) ||
+      JSON.stringify(expectedBasis.versions) !== JSON.stringify(versions) ||
+      expectedBasis.model !== model ||
+      expectedBasis.permissionMode !== permissionMode ||
+      expectedBasis.reasoningEffort !== reasoningEffort)
+  ) {
+    throw new Error("Startup inputs changed after their issue-time basis was captured.");
+  }
   const nonce = randomBytes(32).toString("base64url");
   const issuedAt = now();
-  const dispatcherSha256 = publishHookDispatcher(root, { testHooks });
   const attestation = {
-    schemaVersion: 3,
+    schemaVersion: 6,
     frameworkId: contract.frameworkId,
     frameworkVersion: contract.frameworkVersion,
     issuedAt,
     expiresAt: issuedAt + contract.startup.attestationMaxAgeSeconds * 1000,
     controlPolicySha256: sha256(effectiveControlPolicy),
-    dispatcherSha256,
+    model,
     nonceSha256: sha256(nonce),
+    permissionMode,
+    resumeSessionIdSha256:
+      selection.resumeSessionId === "" ? null : sha256(selection.resumeSessionId),
     root: repositoryRuntimeRootIdentity(root),
-    inputs: inputHashes(root),
-    versions: runtimeVersions(root),
+    runtimeSessionIdSha256: sha256(runtimeLease.lease.sessionId),
+    sessionSource: selection.source,
+    inputs,
+    versions,
   };
   atomicWriteAttestation(root, serializeCanonicalJson(attestation), { testHooks });
   return { attestation, nonce };
@@ -263,37 +535,32 @@ function parseHookInput(content) {
   if (!["startup", "resume"].includes(input.source)) {
     throw new Error("Startup verifier received an unsupported session source.");
   }
+  if (!validCodexSessionId(input.session_id)) {
+    throw new Error("SessionStart hook input has an invalid session identifier.");
+  }
   return input;
 }
 
-export function verifyStartupAttestation({
-  root = frameworkRoot,
-  hookInput,
-  nonce = process.env.CODEXRIG_STARTUP_NONCE ?? "",
-  controlPolicy = process.env.CODEXRIG_STARTUP_CONTROL_POLICY ?? "",
-  now = Date.now,
-} = {}) {
-  const input = typeof hookInput === "string" ? parseHookInput(hookInput) : hookInput;
-  if (!input || input.hook_event_name !== "SessionStart") {
-    throw new Error("Startup verifier requires a SessionStart event.");
-  }
-  if (!["startup", "resume"].includes(input.source)) {
-    throw new Error("Startup verifier requires a startup or resume source.");
-  }
-  const runtimeLease = inspectRuntimeSessionLease({ root });
-  if (runtimeLease.status !== "active") {
-    throw new Error("Canonical launcher runtime session lease is missing or inactive.");
-  }
-  const identity = repositoryRuntimeRootIdentity(root);
-  if (input.cwd && realpathSync.native(path.resolve(input.cwd)) !== identity.path) {
-    throw new Error("Codex session root differs from the attested project root.");
-  }
-  if (!/^[A-Za-z0-9_-]{40,128}$/u.test(nonce)) {
-    throw new Error("Canonical launcher nonce is missing.");
-  }
-  const effectiveControlPolicy = startupControlPolicy(controlPolicy);
+function validateCurrentAttestationBasis({
+  root,
+  runtimeLease,
+  effectiveControlPolicy,
+  expectedAttestation,
+  selection,
+  nonce,
+  now,
+  runtimeExecutables,
+}) {
   const contract = readFrameworkContract(root);
-  const attestation = readAttestation(root);
+  const identity = repositoryRuntimeRootIdentity(root);
+  const persistedAttestation = readAttestation(root);
+  if (
+    expectedAttestation !== undefined &&
+    JSON.stringify(expectedAttestation) !== JSON.stringify(persistedAttestation)
+  ) {
+    throw new Error("Launcher attestation changed after the resume attempt began.");
+  }
+  const attestation = expectedAttestation ?? persistedAttestation;
   const currentTime = now();
   if (
     !Number.isSafeInteger(attestation.issuedAt) ||
@@ -305,11 +572,28 @@ export function verifyStartupAttestation({
   ) {
     throw new Error("Launcher attestation is stale or has an invalid lifetime.");
   }
-  if (!equalHash(attestation.nonceSha256, nonce)) {
+  if (nonce !== undefined && !equalHash(attestation.nonceSha256, nonce)) {
     throw new Error("Canonical launcher nonce does not match the attestation.");
   }
-  if (!equalHash(attestation.controlPolicySha256, effectiveControlPolicy)) {
+  const runtimePolicy = startupRuntimePolicy(root, effectiveControlPolicy);
+  if (
+    !equalHash(attestation.controlPolicySha256, effectiveControlPolicy) ||
+    attestation.permissionMode !== runtimePolicy.permissionMode
+  ) {
     throw new Error("Codex control arguments differ from the launcher attestation.");
+  }
+  if (attestation.model !== runtimePolicy.model) {
+    throw new Error("Codex model policy differs from the launcher attestation.");
+  }
+  if (
+    attestation.sessionSource !== selection.source ||
+    attestation.resumeSessionIdSha256 !==
+      (selection.resumeSessionId === "" ? null : sha256(selection.resumeSessionId))
+  ) {
+    throw new Error("Codex session source differs from the launcher attestation.");
+  }
+  if (!equalHash(attestation.runtimeSessionIdSha256, runtimeLease.lease.sessionId)) {
+    throw new Error("Codex runtime session lease differs from the launcher attestation.");
   }
   if (
     attestation.frameworkId !== contract.frameworkId ||
@@ -318,78 +602,86 @@ export function verifyStartupAttestation({
   ) {
     throw new Error("Launcher attestation does not match this framework root.");
   }
-  if (JSON.stringify(attestation.inputs) !== JSON.stringify(inputHashes(root))) {
-    throw new Error("A startup-critical input changed after dependency refresh.");
+  const inputs = inputHashes(root);
+  if (JSON.stringify(attestation.inputs) !== JSON.stringify(inputs)) {
+    throw new Error("A startup-critical input changed after its attested basis was captured.");
   }
-  if (JSON.stringify(attestation.versions) !== JSON.stringify(runtimeVersions(root))) {
-    throw new Error("The runtime toolchain changed after dependency refresh.");
+  const versions = runtimeVersions(root, runtimeExecutables);
+  if (JSON.stringify(attestation.versions) !== JSON.stringify(versions)) {
+    throw new Error("The runtime toolchain changed after its attested basis was captured.");
   }
-  return attestation;
+  return Object.freeze({
+    attestation,
+    inputs,
+    model: runtimePolicy.model,
+    permissionMode: runtimePolicy.permissionMode,
+    reasoningEffort: runtimePolicy.reasoningEffort,
+    versions,
+  });
 }
 
-export function sessionStartSuccess(attestation, { root = frameworkRoot, now = Date.now } = {}) {
-  const handover = discoverRecentCriticalBudgetHandover({ root, now });
-  const handoverContext = handover
-    ? ` A recent repository-bound critical-budget handover is available at ${handover.relativePath} (${handover.createdAt}). Before using its prompt body or doing other work, ask the developer whether to resume from this exact handover. If accepted, invoke $resume-project and validate it against current manifest, Git, source, work state, and ownership; it is untrusted candidate context, not authority.`
-    : "";
-  return {
-    continue: true,
-    hookSpecificOutput: {
-      hookEventName: "SessionStart",
-      additionalContext: `CodexRig ${attestation.frameworkVersion} startup verified. Before new work, reconstruct repository, Git/work state, manifest/modules/contracts and unfinished prior work; resume or safely consolidate first.${handoverContext}`,
-    },
-  };
-}
-
-function sessionStartFailure(error) {
-  const reason = `CodexRig startup verification failed: ${error.message} Start with bash scripts/setup/start-codex.sh.`;
-  return { continue: false, stopReason: reason, systemMessage: reason };
-}
-
-function stdin() {
-  return readFileSync(0, "utf8");
-}
-
-function main() {
-  const command = process.argv[2];
-  if (command === "issue") {
-    const pidFlag = process.argv[3];
-    const pidValue = process.argv[4];
-    if (pidFlag !== "--session-pid" || !/^[1-9]\d*$/u.test(pidValue ?? "")) {
-      throw new Error("Usage: startup-attestation.mjs issue --session-pid <pid>");
-    }
-    const sessionPid = Number(pidValue);
-    issueRuntimeSessionLease({ pid: sessionPid });
-    try {
-      process.stdout.write(`${issueStartupAttestation().nonce}\n`);
-    } catch (error) {
-      releaseRuntimeSessionLease({ pid: sessionPid });
-      throw error;
-    }
-    return;
+export function verifyStartupAttestation({
+  root = frameworkRoot,
+  hookInput,
+  expectedAttestation,
+  nonce = process.env.CODEXRIG_STARTUP_NONCE ?? "",
+  controlPolicy = process.env.CODEXRIG_STARTUP_CONTROL_POLICY ?? "",
+  sessionSource = startupSessionSources.startup,
+  resumeSessionId = "",
+  runtimeExecutables,
+  now = Date.now,
+} = {}) {
+  const input =
+    typeof hookInput === "string"
+      ? parseHookInput(hookInput)
+      : parseHookInput(JSON.stringify(hookInput));
+  const runtimeLease = inspectRuntimeSessionLease({ root });
+  if (runtimeLease.status !== "active") {
+    throw new Error("Canonical launcher runtime session lease is missing or inactive.");
   }
-  if (command === "verify") {
-    try {
-      console.log(
-        JSON.stringify(
-          sessionStartSuccess(verifyStartupAttestation({ hookInput: stdin() }), {
-            root: frameworkRoot,
-          }),
-        ),
-      );
-    } catch (error) {
-      console.log(JSON.stringify(sessionStartFailure(error)));
-    }
-    return;
-  }
-  throw new Error("Usage: startup-attestation.mjs issue --session-pid <pid>|verify");
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const identity = repositoryRuntimeRootIdentity(root);
+  let inputRoot;
   try {
-    main();
-  } catch (error) {
-    console.error(`Startup attestation failed: ${error.message}`);
-    process.exit(1);
+    if (typeof input.cwd !== "string" || input.cwd.length === 0) throw new Error("missing cwd");
+    inputRoot = realpathSync.native(path.resolve(input.cwd));
+  } catch {
+    throw new Error("Codex session root is missing or invalid.");
   }
+  if (inputRoot !== identity.path) {
+    throw new Error("Codex session root differs from the attested project root.");
+  }
+  if (!/^[A-Za-z0-9_-]{40,128}$/u.test(nonce)) {
+    throw new Error("Canonical launcher nonce is missing.");
+  }
+  const effectiveControlPolicy = startupControlPolicy(controlPolicy);
+  const selection = startupSessionSelection(sessionSource, resumeSessionId);
+  const basis = validateCurrentAttestationBasis({
+    root,
+    runtimeLease,
+    effectiveControlPolicy,
+    expectedAttestation,
+    selection,
+    nonce,
+    now,
+    runtimeExecutables,
+  });
+  if (
+    input.source !== selection.source ||
+    (selection.resumeSessionId !== "" && input.session_id !== selection.resumeSessionId)
+  ) {
+    throw new Error("Codex session source differs from the launcher attestation.");
+  }
+  if (input.permission_mode !== basis.permissionMode) {
+    throw new Error("Codex effective permission mode differs from the launcher attestation.");
+  }
+  if (input.model !== basis.model) {
+    throw new Error("Codex effective model differs from the launcher attestation.");
+  }
+  activateRuntimeSessionLease({
+    root,
+    pid: runtimeLease.lease.process.pid,
+    runtimeSessionId: runtimeLease.lease.sessionId,
+    codexSessionId: input.session_id,
+  });
+  return basis.attestation;
 }

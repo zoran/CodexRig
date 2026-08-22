@@ -1,5 +1,5 @@
 /** Owns docs behavior for the repository verification boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -10,6 +10,7 @@ import {
 import {
   isRepositoryProcessMarkdownPath,
   listDocumentationMarkdownFiles,
+  markdownBodyForHeadingValidation,
 } from "../docs/document-scope.mjs";
 import { futureModuleBacklogHeading } from "../docs/project-manifest-contract.mjs";
 import { repositoryRoot } from "../repository/source-inventory.mjs";
@@ -63,7 +64,9 @@ function headingSlug(label) {
 function markdownHeadingContract(relativePath, content) {
   const findings = [];
   const headings = [];
-  const lines = markdownLinesAfterFrontmatter(content);
+  const lines = markdownLinesAfterFrontmatter(
+    markdownBodyForHeadingValidation(relativePath, content),
+  );
   let fenced = false;
   for (const [index, line] of lines.entries()) {
     if (/^\s*(?:```|~~~)/u.test(line)) {

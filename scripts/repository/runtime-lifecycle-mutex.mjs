@@ -21,7 +21,7 @@ function validMutexOwner(value) {
     !Array.isArray(value) &&
     Object.keys(value).sort().join("\n") === "identity\nnonce" &&
     typeof value.nonce === "string" &&
-    /^[a-f0-9-]{36}$/u.test(value.nonce) &&
+    /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(value.nonce) &&
     (() => {
       try {
         inspectProcessIdentity(value.identity);

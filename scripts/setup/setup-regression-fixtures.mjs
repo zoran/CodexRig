@@ -1,5 +1,4 @@
 /** Owns setup regression fixtures behavior for the setup, launch, and portable project boundary. */
-import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -32,18 +31,9 @@ export function run(executable, args, options = {}) {
   });
 }
 
-export function bashSingleQuotedArray(source, name) {
-  const match = source.match(new RegExp(`^${name}=\\(\\n([\\s\\S]*?)^\\)$`, "m"));
-  assert.ok(match, name);
-  return match[1]
-    .split("\n")
-    .map((line) => line.trim().match(/^'([^']*)'$/)?.[1])
-    .filter((value) => value !== undefined);
-}
-
 export const validPortableConfig = `# Portable policy; assignments in comments do not count.
 developer_instructions = """
-Act as the primary orchestrator. Keep at most four live agents and never pass a model or reasoning override; all use the exact GPT Sol model with ultra reasoning. Register every owned subagent and background task and leave foreign or ambiguous work untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. At 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.
+Act as the primary orchestrator. Retain exactly one current internal contract per concern. Keep at most four live agents and never pass a model or reasoning override; all use the exact GPT Sol model with ultra reasoning. Register every owned subagent and background task and leave foreign or ambiguous processes untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. After every completed slice, run pnpm worktree:status -- --json as the worktree settlement trigger; preservation is a safety state, never completion. At 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.
 """
 project_doc_max_bytes = 32768 # bounded bootstrap context
 project_doc_fallback_filenames = ["instructions.md"]
@@ -99,14 +89,18 @@ export function writeProjectHookFiles(projectRoot) {
   );
   const contextDirectory = path.join(projectRoot, "scripts", "context");
   mkdirSync(contextDirectory, { recursive: true });
-  for (const name of ["refresh-context-index-on-stop.sh", "refresh-context-index-on-stop.mjs"]) {
-    copyFileSync(path.join(root, "scripts", "context", name), path.join(contextDirectory, name));
-  }
+  copyFileSync(
+    path.join(root, "scripts", "context", "session-stop-lifecycle.mjs"),
+    path.join(contextDirectory, "session-stop-lifecycle.mjs"),
+  );
   const setupDirectory = path.join(projectRoot, "scripts", "setup");
   mkdirSync(setupDirectory, { recursive: true });
   for (const name of [
+    "session-control-hook-command.mjs",
     "startup-attestation.mjs",
-    "verify-startup-attestation-on-session-start.sh",
+    "startup-codex-process.mjs",
+    "startup-runtime-executables.mjs",
+    "startup-session-controller.mjs",
   ]) {
     copyFileSync(path.join(root, "scripts", "setup", name), path.join(setupDirectory, name));
   }

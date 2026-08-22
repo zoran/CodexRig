@@ -11,13 +11,31 @@ Before writing, reconstruct the relevant system, identify the root cause and can
 compare viable designs in whole-project context, and research current primary or official evidence
 when it could materially change the decision. Take the time needed to implement the best-supported
 durable solution within the user's scope; speed, Dev urgency, failing checks, or token pressure never
-lower this standard. A temporary mitigation requires explicit authorization or immediate safety
-containment, a recorded removal condition, and may never be represented as completion. Use
+lower this standard. Retain exactly one current internal contract per concern: migrate owned state
+and all consumers together, then remove superseded schemas, shims, paths, tests, and documentation;
+robustness and fault tolerance come from atomic current-state recovery, not compatibility branches.
+Every canonical start inventories all same-clone worktrees and their safe
+latest-session recovery metadata before intake or writes. One physical host represents one
+developer, so its visible project changes are never foreign merely because a different Codex account
+or session produced them; process control still requires exact registered provenance, and a local
+runtime lease cannot prove that another developer's clone is idle. Continue safe reconstruction
+across per-root inconsistencies and automatically reconcile only mechanically proven stale runtime
+state or worktree registrations whose directories are already missing. Preserve an existing
+directory with a broken Git worktree link as an ownership-confirmation blocker; native repair is an
+explicit primary-owned action after directory ownership is confirmed. A live or indeterminate
+competing writer or unsafe binding blocks affected writes and publication rather than suppressing
+the remaining inventory. After every completed slice, run `pnpm worktree:status -- --json` as the
+read-only worktree/session/lease/recovery/task-branch settlement trigger. Preservation is a safety
+state, never completion: keep a
+goal open until every no-longer-needed goal-owned worktree and related coordination residue is
+integrated or explicitly owner-confirmed and retired. A temporary mitigation requires explicit
+authorization or immediate safety containment, a recorded removal condition, and may never be
+represented as completion. Use
 subagents only for substantial disjoint work, keep at most four live, and never pass a model or
 reasoning override: every primary and spawned agent must use this config's exact GPT Sol model with
 ultra reasoning. Register each owned subagent and background task with repository/session/scope,
 returned identity, checkpoint, safe boundary, and cancellation provenance; never contact, signal,
-interrupt, close, or count foreign or ambiguous work. Re-evaluate unit-agnostic capacity before
+interrupt, close, or count foreign or ambiguous processes. Re-evaluate unit-agnostic capacity before
 admission/follow-up and after material events; 5% or less of a reliable binding percentage, a host
 critical signal, or completion-reserve shortfall is critical. Then start no task/slice, gracefully
 drain only owned agents and background tasks, update docs/project-context.md with the exact Critical

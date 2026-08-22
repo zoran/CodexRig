@@ -1,5 +1,5 @@
 /** Owns git provider behavior for the Git provider integration boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -7,6 +7,7 @@ import { readFrameworkContract } from "../contracts/framework-contract.mjs";
 import {
   cleanGitEnvironment,
   isolatedGitArguments,
+  isolatedGitResultCompleted,
   resolveOwnedGitMetadata,
 } from "../repository/git-runtime-isolation.mjs";
 
@@ -73,14 +74,19 @@ function providerForHost(hostname, contract) {
 }
 
 function runGit(root, metadata, args) {
-  const result = spawnSync("git", isolatedGitArguments({ args, ...metadata }), {
+  const invocationArguments = isolatedGitArguments({ args, ...metadata });
+  const result = spawnSync("git", invocationArguments, {
     cwd: root,
     encoding: "utf8",
     env: cleanGitEnvironment(),
     input: "",
+    maxBuffer: 1024 * 1024,
     stdio: "pipe",
+    timeout: 20_000,
   });
-  if (result.error || result.status !== 0) return "";
+  if (!isolatedGitResultCompleted(result, { args: invocationArguments, encoding: "utf8" })) {
+    return "";
+  }
   return result.stdout.trim();
 }
 

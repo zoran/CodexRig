@@ -156,12 +156,13 @@ Material tenancy work invokes `$architecture-evolution` and `$security-review`; 
 Immediately before every slice begins, and again before its declared scope expands, perform the
 pre-slice coordination check from `instructions.md`. Restate the goal, slice outcome, success
 condition, write set, and owners; inspect all observable live-agent assignments, sessions,
-account-level work, bounded context, and shared team or orchestration channels before relying on
-Git; and compare current goal and slice claims. Only confirmed-disjoint slices may write in
-parallel. Resolve overlap or uncertain shared ownership by rescoping, ordering, or exactly one
-writer before implementation. A local runtime lease, clean worktree, or quiet remote cannot prove
-that another clone, machine, or account is idle; use a shared coordination channel across that
-boundary and fail closed on uncertain shared ownership.
+same-clone worktrees, safe latest-session markers, bounded context, and shared team or orchestration
+channels before relying on Git; and compare current goal and slice claims. One host represents one
+developer, so Codex accounts never make visible same-host project changes foreign; process control
+still needs exact provenance. Only confirmed-disjoint slices may write in parallel. Resolve overlap
+or uncertain shared ownership by rescoping, ordering, or exactly one writer before implementation. A
+local runtime lease, clean worktree, or quiet remote cannot prove that another developer's clone is
+idle; use a shared coordination channel across hosts and fail closed on uncertain shared ownership.
 
 Apply the primary budget states from `instructions.md` before delegation and after every material
 result without assuming a daily or weekly billing period. A reliable percentage of the binding
@@ -170,9 +171,9 @@ credit amount is compared directly with bounded work envelopes and the primary c
 Any host critical/exhaustion signal or a reserve shortfall is critical regardless of counter names.
 In critical state start no subagent, background task, slice, or expanded follow-up; drain only
 provenance-bound owned agents and processes at their declared safe boundaries, accept or record
-their handoffs, and leave foreign or ambiguous work untouched. After the exact Critical Budget Drain
-attestation is true in the revisioned work state, run `pnpm handover:create -- --critical` as the
-final repository action. A successful seal ends the session immediately: no tool, check, task,
+their handoffs, and leave foreign or ambiguous processes untouched. After the exact Critical Budget
+Drain attestation is true in the revisioned work state, run `pnpm handover:create -- --critical` as
+the final repository action. A successful seal ends the session immediately: no tool, check, task,
 follow-up, agent contact, or automatic continuation may follow. Never count unavailable or
 unauthorized redeem/reset capacity.
 
@@ -212,7 +213,7 @@ in-session plan before continuing autonomously.
   and owned data private; reject deep imports, cross-module data writes, dependency cycles, shared
   mutable state, and catch-all shared modules.
 - Isolate framework, storage, provider, and transport decisions in adapters. Translate a foreign or
-  legacy domain model at its edge instead of leaking it into the consuming module.
+  superseded external domain model at its edge instead of leaking it into the consuming module.
 - Apply the replacement test: changing a module implementation or adapter should affect only
   composition/configuration, replacement-local work, and an explicit data migration. Scattered
   consumer changes reveal a missing or leaking contract.
@@ -222,15 +223,21 @@ in-session plan before continuing autonomously.
   Verify the focused boundary and a realistic assembled flow so the assembled system is verified as
   one functioning unit; a locally clean component is not done when its consumers no longer work.
 - Keep one central `main` as the only durable integration branch; do not create long-lived module or
-  developer branches. A serialized writer may use `main` directly when branch policy permits.
-  Parallel read-heavy work may span modules. Different developers/accounts use temporary task
-  branches in separate clones and credential contexts; same-account tasks may use worktrees, which
-  are not an authentication boundary. Before each slice, coordinate goal and slice claims without
-  waiting for Git evidence. Concurrent writes need confirmed-disjoint declared write sets and
-  exactly one writer per module or shared contract. Give a shared contract change one integrator and
-  land compatibility before consumer migrations. A task branch is only a bounded integration input;
-  close the goal after the actual published `main` passes its course check, affected review/audit,
-  and verification.
+  developer branches. Git persists/transports work and never isolates writers. A serialized writer
+  may use `main` directly when branch policy permits. Parallel read-heavy work may span modules. One
+  host represents one developer: independent same-host sessions use separate one-lease worktrees
+  with shared read visibility regardless of Codex account; different developers/hosts use temporary
+  task branches in separate clones and credential contexts. Before each slice, coordinate goal and
+  slice claims without waiting for Git evidence. Concurrent writes need confirmed-disjoint declared
+  write sets and exactly one writer per module or shared contract. Give a shared contract change one
+  integrator; migrate the contract, owned state, and consumers within one coherent integration, and
+  remove superseded behavior before it becomes a stable dependency. For host-loss recovery or
+  transfer, the primary commits and pushes each coherent resumable slice through the declared
+  integration path: directly on `main` for serialized work when branch policy permits, otherwise
+  through the short-lived task branch or protected path. Existing gates remain mandatory; this is
+  not a WIP/checkpoint workflow, and later uncommitted bytes remain host-local. A task branch is
+  only bounded recovery/integration input; close the goal after the actual published `main` passes
+  its course check, affected review/audit, and verification.
 
 ## Workflow
 
@@ -265,10 +272,10 @@ in-session plan before continuing autonomously.
    web application, create or import the declared workspace package and its `src/` as part of that
    task instead of pre-creating an empty `apps/web`. Keep repo-wide vector state at root
    `.context-index/`, outside every product unit. Project setup is not complete until that vector
-   space has been materialized and smoke-tested. The locally trusted project Stop hook maintains it
-   at turn boundaries for durable local threads; ephemeral side conversations and other
-   transcriptless contexts exit before index or work-state access. Semantic search retains on-demand
-   repair, and normal verification and pre-push remain read-only.
+   space has been materialized and smoke-tested. Semantic search repairs stale or invalid index
+   state on demand, while explicit `context:index` owns proactive refresh. The preloaded Stop
+   lifecycle never imports mutable index code; ephemeral side conversations and other transcriptless
+   contexts exit before work-state access. Normal verification and pre-push remain read-only.
 
 3. When research or publications inform the work, search for and prioritize the newest relevant
    primary or official sources. Verify publication/update date, version, correction/retraction

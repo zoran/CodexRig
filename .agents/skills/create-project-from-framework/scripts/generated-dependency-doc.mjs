@@ -1,15 +1,15 @@
 /** Owns generated dependency doc behavior for the portable clean-project generation boundary. */
 export const generatedDependencyAgentPolicy = [
-  "- The canonical Codex launcher runs `scripts/deps/install-compatible.mjs` before every session.",
-  "  It resolves the newest stable graph allowed by workspace ranges and explicit pins under strict",
-  "  peer and Node.js engine checks, then freezes and installs it. A frozen install alone is not a",
-  "  freshness check; range changes remain explicit dependency-maintenance work.",
+  "- Canonical Codex start is deterministic and never mutates dependencies. Run",
+  "  `scripts/deps/install-compatible.mjs` explicitly before first use and whenever dependency",
+  "  inputs or requested registry freshness change. It resolves the newest stable allowed graph",
+  "  under strict peer/engine checks; range changes remain explicit dependency-maintenance work.",
 ];
 
 export function generatedDependencyReadmePolicy(fence) {
   return [
-    "The canonical launcher installs pinned project tools and resolves the newest compatible",
-    "dependency graph before Codex starts. For explicit setup or repair, run:",
+    "Canonical Codex start uses the already prepared locked runtime and dependency graph without",
+    "network or lockfile mutation. For first setup, explicit refresh, or repair, run:",
     "",
     fence + "bash",
     "mise install --locked",
@@ -28,10 +28,10 @@ export function generatedDependencyReadmePolicy(fence) {
 export const generatedDependencyInstructionsPolicy = [
   "## Dependency Installation And Freshness",
   "",
-  "Use `mise exec --locked -- node scripts/deps/install-compatible.mjs` for first installation.",
-  "The canonical launcher invokes that same transaction before every Codex session.",
-  "It resolves the newest stable versions allowed by every workspace manifest range, explicit pin,",
-  "override, and supply-chain rule in isolation.",
+  "Canonical Codex start never resolves or installs dependencies. Use",
+  "`mise exec --locked -- node scripts/deps/install-compatible.mjs` before first use and whenever",
+  "workspace dependency inputs or requested registry freshness change. The transaction resolves the",
+  "newest stable versions allowed by every manifest range, pin, override, and supply-chain rule.",
   "Strict peer and Node.js engine checks define compatibility. Only a successful, source-stable",
   "resolution may atomically replace `pnpm-lock.yaml`; installation then reproduces that lockfile",
   "with lifecycle scripts disabled. Registry or installation failure leaves durable dependency",

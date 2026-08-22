@@ -31,17 +31,19 @@ the active session. It never migrates or deletes local runtime, SQLite/WAL state
 3. Apply after any optimization of the framework itself and whenever the user requests a reset. The
    script removes goal/slice/planning/review/handoff artifacts, optional active project context,
    project transaction state, generated exports, now-empty placeholder directories, the complete
-   ignored `.context-index/` vector/model state, legacy loose root runtime, obsolete mutable entries
-   below `.codex/`, and disposable state below `.codex/runtime/`. Index removal uses the same
-   fixed-path ownership and maintenance-lock checks as `pnpm context:clean` and fails closed on
-   unsafe content.
+   ignored `.context-index/` vector/model state, loose-root runtime residue, obsolete mutable
+   entries below `.codex/`, and disposable state below `.codex/runtime/`. Index removal uses the
+   same fixed-path ownership and maintenance-lock checks as `pnpm context:clean` and fails closed on
+   unsafe content. Full reset holds the lifecycle lock and proves repository-wide runtime
+   quiescence. It validates only the current lease schema; an incompatible private lease is
+   discarded with disposable runtime rather than interpreted.
 4. Preserve `.git`, source code, dependencies, and portable `.codex` policy. Preserve only the
-   runtime identity required for the next session (`auth.json`, runtime `config.toml`, and
-   `installation_id`) plus the exact successful publication evidence. The reset migrates those
-   identity files from the former root locations on first cleanup. It removes sessions, history,
-   memories, logs, databases and WAL files, caches, downloaded plugins/skills, snapshots, temporary
-   files, startup attestations, and stale locks. Conflicting identity copies are a blocker rather
-   than an overwrite guess. Never rewrite Git history implicitly.
+   current runtime identity required for the next session (`.codex/runtime/auth.json`, runtime
+   `config.toml`, and `installation_id`) plus exact current-schema, digest-valid successful
+   publication evidence. Non-current or corrupt evidence, loose-root identity, and other non-current
+   identity copies are disposable state and are never interpreted or migrated. It removes sessions,
+   history, memories, logs, databases and WAL files, caches, downloaded plugins/skills, snapshots,
+   temporary files, startup attestations, and stale locks. Never rewrite Git history implicitly.
 5. Ensure `docs/project.md` remains the concise, product-neutral central truth. Remove
    product-specific source manually only when the user explicitly placed it in scope; the reset
    script never guesses. Project generation may use the internal read-only

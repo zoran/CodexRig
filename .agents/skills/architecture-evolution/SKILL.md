@@ -224,20 +224,25 @@ completed-goal housekeeping pass and keep its bounded manifest projection curren
 
 ## Migrate Architecture And Files Together
 
-Plan a compatibility-first sequence before moving implementation:
+Plan one coherent single-current-contract cutover before moving implementation:
 
-1. Introduce or expand the target public contract and composition path.
-2. Migrate owned data with an explicit rollback-safe sequence when data ownership changes.
-3. Move internals and consumers in dependency order, preserving an assembled working path.
+1. Define the target public contract, composition path, state transformation, and complete set of
+   producers and consumers before activating the replacement.
+2. Migrate owned data with an explicit rollback-safe transaction when data ownership changes, and
+   leave only the current representation after the cutover.
+3. Move internals, producers, and consumers in dependency order within the same coherent change,
+   preserving one assembled working path without publishing or persisting both contracts.
 4. Move, rename, or split physical files so their location expresses the new owner. Update each
    moved file's format-native purpose/owner header and each affected class or public type's adjacent
    contract/invariant documentation in the same migration; stale descriptions are architecture
    drift, not harmless comments.
-5. Remove retired roots, duplicate adapters, temporary bridges, dead exports, and stale tests after
-   all consumers leave them.
+5. Remove every superseded root, schema, reader, writer, adapter, bridge, export, fixture, test, and
+   documentation statement before accepting the slice.
 
-Do not leave the old directory topology behind as permanent archaeology. Preserve compatibility only
-where a current consumer or rollout requires it, and make the retirement boundary explicit.
+Do not leave the old topology or compatibility archaeology behind. If an external consumer cannot
+cut over in the authorized change, use only the specifically declared bounded edge adapter permitted
+by `instructions.md#current-contracts-only` or leave the migration blocked; never preserve an old
+internal contract as the workaround.
 
 ## Update Durable Truth At Activation
 

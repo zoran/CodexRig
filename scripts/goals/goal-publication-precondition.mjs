@@ -1,5 +1,5 @@
 /** Owns goal publication precondition behavior for the goal closure and repository housekeeping boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import {
   cleanGitEnvironment,
   isolatedGitArguments,
+  isolatedGitResultCompleted,
   localGitExcludeIsInactive,
   resolveOwnedGitMetadata,
 } from "../repository/git-runtime-isolation.mjs";
@@ -19,25 +20,33 @@ const integrationBranch = "main";
 let repositoryGitMetadata;
 
 function git(args, environment = {}) {
-  return spawnSync(
-    "git",
-    isolatedGitArguments({
-      args,
-      gitDirectory: repositoryGitMetadata.gitDirectory,
-      workTree: repositoryGitMetadata.workTree,
-    }),
-    {
-      cwd: repositoryRoot,
-      encoding: "utf8",
-      env: { ...cleanGitEnvironment(), ...environment },
-      input: "",
-      stdio: "pipe",
-    },
-  );
+  const invocationArguments = isolatedGitArguments({
+    args,
+    gitDirectory: repositoryGitMetadata.gitDirectory,
+    workTree: repositoryGitMetadata.workTree,
+  });
+  const result = spawnSync("git", invocationArguments, {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: { ...cleanGitEnvironment(), ...environment },
+    input: "",
+    maxBuffer: 4 * 1024 * 1024,
+    stdio: "pipe",
+    timeout: 60_000,
+  });
+  result.isolatedGitCompleted = isolatedGitResultCompleted(result, {
+    args: invocationArguments,
+    encoding: "utf8",
+    maximumOutputBytes: 4 * 1024 * 1024,
+  });
+  return result;
 }
 
 function successful(result) {
-  return !result.error && result.status === 0;
+  return (
+    result.isolatedGitCompleted === true ||
+    (result.isolatedGitCompleted === undefined && !result.error && result.status === 0)
+  );
 }
 
 function publicationIndexFlagsAreSafe() {
@@ -80,7 +89,9 @@ function verificationEvidenceIsCurrent() {
       encoding: "utf8",
       env: environment,
       input: "",
+      maxBuffer: 64 * 1024 * 1024,
       stdio: "pipe",
+      timeout: 30 * 60_000,
     },
   );
   return successful(result);

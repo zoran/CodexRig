@@ -38,20 +38,30 @@ import {
   runtimeFile,
 } from "./runtime-owned-state.mjs";
 import {
+  activateRuntimeSessionLeaseState,
   clearStaleRuntimeSessionLeaseState,
+  fallbackRuntimeSessionLeaseState,
   issueRuntimeSessionLeaseState,
   releaseRuntimeSessionLeaseState,
+  reserveRuntimeSessionLeaseState,
+  transitionRuntimeSessionWriterProcessState,
 } from "./runtime-session-state.mjs";
-
-export { inspectRuntimeSessionLease, runtimeSessionLeasePath } from "./runtime-session-state.mjs";
+export {
+  inactiveRuntimeSessionWriterErrorCode,
+  inspectRuntimeSessionLease,
+  inspectRuntimeSessionPlan,
+  inspectRuntimeSessionRecovery,
+  invalidRuntimeSessionLeaseErrorCode,
+  runtimeSessionLeasePath,
+  runtimeSessionRecoveryPath,
+  validCodexSessionId,
+} from "./runtime-session-state.mjs";
 export const runtimeLifecycleLockName = "codexrig-lifecycle.lock";
 export const runtimeLifecycleGuardName = "codexrig-lifecycle.guard";
 export const runtimeLifecycleLockPath = `${repositoryCodexRuntimeDirectory}/${runtimeLifecycleLockName}`;
 const runtimeLifecycleGuardPath = `${repositoryCodexRuntimeDirectory}/${runtimeLifecycleGuardName}`;
 const lifecycleCapabilities = new Map();
-
 export { repositoryRuntimeRootIdentity } from "./runtime-owned-state.mjs";
-
 function readRuntimeLifecycleLock(root) {
   const target = resolveFrameworkPath(root, runtimeLifecycleLockPath);
   const file = runtimeFile(root, runtimeLifecycleLockName, "Codex runtime lifecycle lock", 128_000);
@@ -576,44 +586,115 @@ export function releaseRuntimeLifecycleLock({
   lifecycleCapabilities.delete(record.root);
 }
 
-export function clearStaleRuntimeSessionLease({ root = frameworkRoot, testHooks } = {}) {
+function withSessionManagementCapability(root, testHooks, operation) {
   const lifecycleOwner = acquireRuntimeLifecycleLock({
     root,
     operation: "session-management",
     testHooks,
   });
   try {
-    return clearStaleRuntimeSessionLeaseState({ root, testHooks });
+    return operation();
   } finally {
     releaseRuntimeLifecycleLock({ root, owner: lifecycleOwner, testHooks });
   }
 }
 
-export function issueRuntimeSessionLease({ root = frameworkRoot, pid, testHooks } = {}) {
+export function clearStaleRuntimeSessionLease({
+  root = frameworkRoot,
+  lifecycleCapability,
+  testHooks,
+} = {}) {
+  if (lifecycleCapability) {
+    assertRuntimeLifecycleQuiescent({ root, owner: lifecycleCapability });
+    return clearStaleRuntimeSessionLeaseState({ root, testHooks });
+  }
+  return withSessionManagementCapability(root, testHooks, () =>
+    clearStaleRuntimeSessionLeaseState({ root, testHooks }),
+  );
+}
+
+export function issueRuntimeSessionLease({
+  root = frameworkRoot,
+  pid,
+  sessionSource,
+  resumeSessionId,
+  testHooks,
+} = {}) {
   if (!Number.isSafeInteger(pid) || pid <= 0) {
     throw new Error("Codex runtime session lease requires a positive process id.");
   }
-  const lifecycleOwner = acquireRuntimeLifecycleLock({
-    root,
-    operation: "session-management",
-    testHooks,
-  });
-  try {
-    return issueRuntimeSessionLeaseState({ root, pid, testHooks });
-  } finally {
-    releaseRuntimeLifecycleLock({ root, owner: lifecycleOwner, testHooks });
-  }
+  return withSessionManagementCapability(root, testHooks, () =>
+    issueRuntimeSessionLeaseState({
+      root,
+      pid,
+      sessionSource,
+      resumeSessionId,
+      testHooks,
+    }),
+  );
 }
-
-export function releaseRuntimeSessionLease({ root = frameworkRoot, pid, testHooks } = {}) {
-  const lifecycleOwner = acquireRuntimeLifecycleLock({
-    root,
-    operation: "session-management",
-    testHooks,
-  });
-  try {
-    return releaseRuntimeSessionLeaseState({ root, pid, testHooks });
-  } finally {
-    releaseRuntimeLifecycleLock({ root, owner: lifecycleOwner, testHooks });
+/** Atomically selects the latest safe repository thread and reserves its launcher-owned lease. */
+export function reserveRuntimeSessionLease({ root = frameworkRoot, pid, testHooks } = {}) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) {
+    throw new Error("Codex runtime session reservation requires a positive process id.");
   }
+  return withSessionManagementCapability(root, testHooks, () =>
+    reserveRuntimeSessionLeaseState({ root, pid, testHooks }),
+  );
+}
+export function activateRuntimeSessionLease({
+  root = frameworkRoot,
+  pid,
+  runtimeSessionId,
+  codexSessionId,
+  testHooks,
+} = {}) {
+  return withSessionManagementCapability(root, testHooks, () =>
+    activateRuntimeSessionLeaseState({
+      root,
+      pid,
+      runtimeSessionId,
+      codexSessionId,
+      testHooks,
+    }),
+  );
+}
+export function transitionRuntimeSessionWriterProcess({
+  root = frameworkRoot,
+  pid,
+  runtimeSessionId,
+  transition,
+  writerPid,
+  testHooks,
+} = {}) {
+  return withSessionManagementCapability(root, testHooks, () =>
+    transitionRuntimeSessionWriterProcessState({
+      root,
+      pid,
+      runtimeSessionId,
+      transition,
+      writerPid,
+      testHooks,
+    }),
+  );
+}
+export function fallbackRuntimeSessionLease({
+  root = frameworkRoot,
+  pid,
+  runtimeSessionId,
+  testHooks,
+} = {}) {
+  return withSessionManagementCapability(root, testHooks, () =>
+    fallbackRuntimeSessionLeaseState({
+      root,
+      pid,
+      runtimeSessionId,
+      testHooks,
+    }),
+  );
+}
+export function releaseRuntimeSessionLease({ root = frameworkRoot, pid, testHooks } = {}) {
+  return withSessionManagementCapability(root, testHooks, () =>
+    releaseRuntimeSessionLeaseState({ root, pid, testHooks }),
+  );
 }

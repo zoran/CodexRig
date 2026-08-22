@@ -1,5 +1,5 @@
 /** Owns dependencies behavior for the repository verification boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import process from "node:process";
 import { readPolicy, root, validatePolicy } from "../deps/dependency-policy.mjs";
 

@@ -1,6 +1,6 @@
 /** Owns verification runtime identity behavior for the repository verification boundary. */
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { accessSync, constants, lstatSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -17,6 +17,11 @@ const forbiddenChildEnvironmentKeys = new Set([
 ]);
 const disabledNpmConfigRoot = process.platform === "win32" ? "NUL" : "/dev/null";
 const forcedChildEnvironment = Object.freeze({
+  // Verification, evidence refresh, and pre-push cross the launcher-to-shell boundary. Run every
+  // command under one portable presentation environment instead of binding evidence to whichever
+  // locale or timezone the calling process happened to inherit.
+  LANG: "C",
+  LC_ALL: "C",
   NPM_CONFIG_IGNORE_PNPMFILE: "true",
   // npm derives its global configuration from <prefix>/etc/npmrc. Binding both the
   // explicit user configuration and that prefix to the OS null device produces two
@@ -25,7 +30,11 @@ const forcedChildEnvironment = Object.freeze({
   NPM_CONFIG_USERCONFIG: disabledNpmConfigRoot,
   PNPM_CONFIG_IGNORE_PNPMFILE: "true",
   PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "error",
+  TZ: "Etc/UTC",
 });
+const forcedChildEnvironmentKeys = new Set(
+  Object.keys(forcedChildEnvironment).map((key) => key.toUpperCase()),
+);
 const identityKeys = Object.freeze([
   "arch",
   "environment",
@@ -51,7 +60,7 @@ export function verificationChildEnvironment(environment = process.env) {
     const normalizedKey = key.toUpperCase();
     if (
       !childEnvironmentKeyPattern.test(key) ||
-      normalizedKey === "PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN" ||
+      forcedChildEnvironmentKeys.has(normalizedKey) ||
       forbiddenChildEnvironmentKeys.has(normalizedKey)
     ) {
       continue;

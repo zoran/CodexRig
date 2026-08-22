@@ -51,7 +51,7 @@ after(() => {
   for (const root of temporaryRoots) rmSync(root, { force: true, recursive: true });
 });
 
-test("the hook mutation contract permits bounded lifecycle non-mutation", () => {
+test("the hook mutation contract permits explicit lifecycle non-mutation", () => {
   const root = stagedFixture();
   append(
     root,
@@ -61,15 +61,12 @@ test("the hook mutation contract permits bounded lifecycle non-mutation", () => 
   assert.deepEqual(contradictionFindings(root), []);
 });
 
-test("the hook mutation contract rejects active and passive stale assertions", () => {
+test("the hook mutation contract rejects stale Stop-owned index assertions", () => {
   for (const assertion of [
-    "Project hooks never\nupdate the context index.",
-    "The context index is never\nupdated by the Stop hook.",
-    "Project hooks will never update the context index.",
-    "The Stop hook never updates `.context-index/`.",
-    "The Stop hook does not update the context index before bootstrap, but after bootstrap the Stop hook never updates the context index.",
-    "Verification remains read-only; the Stop hook never updates the context index.",
-    "The Stop hook never updates the context index; verification remains read-only.",
+    "Project hooks update the context index.",
+    "The context index is incrementally refreshed by the Stop hook.",
+    "The Stop hook automatically updates `.context-index/`.",
+    "The project-local Stop hook refreshes the index after a durable turn.",
   ]) {
     const root = stagedFixture();
     append(root, "README.md", assertion);
@@ -102,6 +99,32 @@ test("portable verification requires the active project Codex config", () => {
     portableContextContractFindings({ repositoryRoot: root }).includes(
       "portable context contract is missing .codex/config.toml",
     ),
+  );
+});
+
+test("portable runtime content declarations are active for their existing owners", () => {
+  const root = stagedFixture();
+  const relativePath = "scripts/repository/runtime-session-state.mjs";
+  const absolutePath = path.join(root, relativePath);
+  mkdirSync(path.dirname(absolutePath), { recursive: true });
+  copyFileSync(path.join(repositoryRoot, relativePath), absolutePath);
+
+  assert.equal(
+    portableContextContractFindings({ repositoryRoot: root }).some((finding) =>
+      finding.includes(relativePath),
+    ),
+    false,
+  );
+  writeFileSync(
+    absolutePath,
+    readFileSync(absolutePath, "utf8").replace("schemaVersion: 5", "schemaVersion: 9"),
+    "utf8",
+  );
+  assert.equal(
+    portableContextContractFindings({ repositoryRoot: root }).some(
+      (finding) => finding.includes(relativePath) && finding.includes("schemaVersion: 5"),
+    ),
+    true,
   );
 });
 
@@ -190,8 +213,8 @@ test("portable workflow owners cannot lose pre-slice goal and slice coordination
   }
 });
 
-test("portable workflow owners cannot claim that local state observes other accounts", () => {
-  const marker = "cannot prove that another clone, machine, or account is idle";
+test("portable workflow owners cannot claim that local state observes other developers", () => {
+  const marker = "cannot prove that another developer's clone is idle";
   for (const relativePath of [
     ".codex/README.md",
     ".agents/skills/project-implementation/SKILL.md",
@@ -205,7 +228,7 @@ test("portable workflow owners cannot claim that local state observes other acco
     assert.match(content, markerPattern, relativePath);
     writeFileSync(
       absolutePath,
-      content.replace(markerPattern, "proves that every account is idle"),
+      content.replace(markerPattern, "proves that every developer is idle"),
       "utf8",
     );
     assert.equal(

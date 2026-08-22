@@ -1,6 +1,6 @@
 /** Owns install git hooks behavior for the setup, launch, and portable project boundary. */
 import { randomUUID } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import {
   closeSync,
   constants,
@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import {
   cleanGitEnvironment,
   isolatedGitArguments,
+  isolatedGitResultCompleted,
   resolveOwnedGitMetadata,
 } from "../repository/git-runtime-isolation.mjs";
 import { resolveGitHooksPath } from "./resolve-git-hooks-path.mjs";
@@ -43,22 +44,21 @@ function sameIdentity(left, right) {
 }
 
 function gitOutput(metadata, args) {
-  const result = spawnSync(
-    "git",
-    isolatedGitArguments({
-      args,
-      gitDirectory: metadata.gitDirectory,
-      workTree: metadata.workTree,
-    }),
-    {
-      cwd: metadata.workTree,
-      encoding: "utf8",
-      env: cleanGitEnvironment(),
-      input: "",
-      stdio: "pipe",
-    },
-  );
-  if (result.error || result.status !== 0) {
+  const invocationArguments = isolatedGitArguments({
+    args,
+    gitDirectory: metadata.gitDirectory,
+    workTree: metadata.workTree,
+  });
+  const result = spawnSync("git", invocationArguments, {
+    cwd: metadata.workTree,
+    encoding: "utf8",
+    env: cleanGitEnvironment(),
+    input: "",
+    maxBuffer: 1024 * 1024,
+    stdio: "pipe",
+    timeout: 20_000,
+  });
+  if (!isolatedGitResultCompleted(result, { args: invocationArguments, encoding: "utf8" })) {
     throw new Error("Project-owned Git hook metadata could not be resolved.");
   }
   const value = result.stdout.trim();

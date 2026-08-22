@@ -1,7 +1,14 @@
 /** Owns git remote identity behavior for the repository verification boundary. */
-import { execFileSync } from "node:child_process";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import {
+  cleanGitEnvironment,
+  isolatedGitArguments,
+  isolatedGitResultCompleted,
+  resolveOwnedGitMetadata,
+} from "../repository/git-runtime-isolation.mjs";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
+import { repositoryRoot } from "../repository/source-inventory.mjs";
 import { findSecretMatches } from "../security/secret-patterns.mjs";
 
 function parseArgs(argv) {
@@ -35,16 +42,40 @@ function parseArgs(argv) {
   return parsed;
 }
 
-function runGit(args) {
-  try {
-    return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-  } catch {
-    return "";
+function runGit(root, metadata, args) {
+  const invocationArguments = isolatedGitArguments({ args, ...metadata });
+  const result = spawnSync("git", invocationArguments, {
+    cwd: root,
+    encoding: "utf8",
+    env: cleanGitEnvironment(),
+    input: "",
+    maxBuffer: 1024 * 1024,
+    stdio: "pipe",
+    timeout: 20_000,
+  });
+  if (
+    !isolatedGitResultCompleted(result, {
+      args: invocationArguments,
+      encoding: "utf8",
+      maximumOutputBytes: 1024 * 1024,
+    })
+  ) {
+    throw new Error("configured Git remote inspection did not complete safely");
   }
+  return result.stdout;
 }
 
-function configuredRemoteUrls() {
-  const output = runGit(["remote", "-v"]);
+export function configuredRemoteUrls(root = repositoryRoot) {
+  let metadata;
+  try {
+    metadata = resolveOwnedGitMetadata(root);
+  } catch {
+    throw new Error("configured remote inspection requires safe project-owned Git metadata");
+  }
+  if (!metadata) {
+    throw new Error("configured remote inspection requires a Git worktree");
+  }
+  const output = runGit(root, metadata, ["remote", "-v"]);
   return output
     .split(/\r?\n/)
     .map((line) => line.trim())

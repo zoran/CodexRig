@@ -7,6 +7,7 @@ import { buildRiskBoundPlan, parseArgs } from "./adaptive.mjs";
 import { buildPlan } from "./adaptive-runner.mjs";
 import { decideVerificationAdmission, omitAlreadyCoveredPaths } from "./verification-admission.mjs";
 import { printPlan } from "./verification-executor.mjs";
+import { verificationRiskForPath } from "./verification-risk-profile.mjs";
 
 const productLayout = {
   findings: [],
@@ -105,6 +106,10 @@ test("delivery evidence defaults to dev and requires a real manifest for stronge
 });
 
 test("the adaptive flow resolves risks before binding an uncovered-risk force request", () => {
+  assert.deepEqual(verificationRiskForPath("scripts/verify/verification-admission-decision.mjs"), {
+    path: "scripts/verify/verification-admission-decision.mjs",
+    riskId: "verification-admission",
+  });
   const options = parseArgs([
     "--force-full",
     "--force-reason",

@@ -8,12 +8,11 @@ import {
   readFileSync,
   rmSync,
   statSync,
-  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import { after, test } from "node:test";
-import { parsePortableTomlBootstrap } from "../contracts/portable-toml-bootstrap.mjs";
+import { parsePortableToml } from "../contracts/portable-toml.mjs";
 import {
   CodexConfigError,
   parseProjectHooks,
@@ -22,16 +21,28 @@ import {
   sharedAgentIntelligencePolicy,
   validateCodexConfig,
   validateProjectAgentConfigs,
+  validateRuntimeCodexConfig,
 } from "./validate-codex-config.mjs";
 import { validateModelCatalog } from "./validate-codex-model-policy.mjs";
 import { renderManagedPrePushHook } from "./install-git-hooks.mjs";
 import {
+  sessionControlHookConfigArguments,
+  sessionControlHookExpectations,
+} from "./session-control-hook-command.mjs";
+import {
   issueRuntimeSessionLease,
+  releaseRuntimeSessionLease,
+} from "../repository/runtime-session-lease.mjs";
+import {
+  beginStartupSessionWriterHandoff,
+  bindStartupSessionCodexProcess,
+  bindStartupSessionWriter,
+  completeStartupSessionWriterHandoff,
   issueStartupAttestation,
   startupAttestationPath,
   startupAttestedInputPaths,
   startupControlPolicies,
-  startupHookDispatcherPath,
+  verifyStartupAttestation,
 } from "./startup-attestation.mjs";
 import {
   cleanupTemporaryRoots,
@@ -40,29 +51,11 @@ import {
   run,
   temporaryRoot,
   validPortableConfig,
-  writeProjectHookFiles,
 } from "./setup-regression-fixtures.mjs";
-const clearedHookEnvironmentNames = [
-  "CONTEXT_INDEX_DIRECTORY",
-  "CONTEXT_INDEX_DOCS_ONLY",
-  "CONTEXT_INDEX_EMBEDDING_BATCH_SIZE",
-  "CONTEXT_INDEX_LOCK_TIMEOUT_MS",
-  "CONTEXT_INDEX_MAX_FILE_BYTES",
-  "CONTEXT_INDEX_MAX_SOURCE_FILES",
-  "CONTEXT_INDEX_MAX_TOTAL_BYTES",
-  "CONTEXT_INDEX_MODEL_CACHE",
-  "CONTEXT_INDEX_OFFLINE",
-  "CONTEXT_INDEX_ONNX_THREADS",
-  "CONTEXT_INDEX_ROOT",
-  "CONTEXT_INDEX_SANITIZED_WORKER",
-  "CONTEXT_INDEX_STALE_LOCK_MS",
-  "CONTEXT_INDEX_TEST_MODE",
-  "CONTEXT_INDEX_TRACKED_ONLY",
-];
 
-test("preinstall TOML bootstrap parser is strict and supports the portable config subset", () => {
+test("the sole TOML parser is strict and supports the portable config subset", () => {
   assert.deepEqual(
-    parsePortableTomlBootstrap(`
+    parsePortableToml(`
 name = "fixture # value"
 enabled = true
 items = ["one", 'two']
@@ -82,17 +75,21 @@ network_access = false
       sandbox_workspace_write: { network_access: false },
     },
   );
+  assert.throws(() => parsePortableToml('name = "one"\nname = "two"\n'), /duplicate key name/);
+  assert.throws(() => parsePortableToml("unsupported = 1.5\n"), /unsupported portable TOML/);
   assert.throws(
-    () => parsePortableTomlBootstrap('name = "one"\nname = "two"\n'),
-    /duplicate key name/,
-  );
-  assert.throws(
-    () => parsePortableTomlBootstrap("unsupported = 1.5\n"),
-    /unsupported portable TOML/,
-  );
-  assert.throws(
-    () => parsePortableTomlBootstrap("name = 'not''a-valid-literal'\n"),
+    () => parsePortableToml("name = 'not''a-valid-literal'\n"),
     /unsupported quote in literal string/,
+  );
+  assert.deepEqual(parsePortableToml('[projects."/tmp/project.with-dot"]\ntrusted = true\n'), {
+    projects: { "/tmp/project.with-dot": { trusted: true } },
+  });
+  const prototypeKey = parsePortableToml("[__proto__]\nunsafe = true\n");
+  assert.equal(Object.hasOwn(prototypeKey, "__proto__"), true);
+  assert.equal(Object.prototype.unsafe, undefined);
+  assert.throws(
+    () => parsePortableToml(`value = ${Number.MAX_SAFE_INTEGER + 1}\n`),
+    /integer is out of range/,
   );
 });
 
@@ -101,7 +98,7 @@ after(cleanupTemporaryRoots);
 test("Codex config parser accepts only the complete typed portable policy", () => {
   assert.deepEqual(validateCodexConfig(configFixture()), {
     developer_instructions:
-      "Act as the primary orchestrator. Keep at most four live agents and never pass a model or reasoning override; all use the exact GPT Sol model with ultra reasoning. Register every owned subagent and background task and leave foreign or ambiguous work untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. At 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.\n",
+      "Act as the primary orchestrator. Retain exactly one current internal contract per concern. Keep at most four live agents and never pass a model or reasoning override; all use the exact GPT Sol model with ultra reasoning. Register every owned subagent and background task and leave foreign or ambiguous processes untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. After every completed slice, run pnpm worktree:status -- --json as the worktree settlement trigger; preservation is a safety state, never completion. At 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.\n",
     project_doc_max_bytes: 32_768,
     project_doc_fallback_filenames: ["instructions.md"],
     model_reasoning_effort: "ultra",
@@ -304,7 +301,7 @@ test("Codex config parser accepts only the complete typed portable policy", () =
 
 test("malformed portable TOML diagnostics never echo source values", () => {
   const token = `sk-proj-${"x".repeat(32)}`;
-  for (const parser of [parsePortableCodexConfig, parsePortableTomlBootstrap]) {
+  for (const parser of [parsePortableCodexConfig, parsePortableToml]) {
     let error;
     try {
       parser(`bad = ${token} /tmp/private-config\n`);
@@ -317,25 +314,68 @@ test("malformed portable TOML diagnostics never echo source values", () => {
   }
 });
 
-test("project hooks enforce exact startup attestation and context-index handlers", () => {
+test("runtime Codex config permits only non-executable repository-local metadata", () => {
+  const fixture = configFixture();
+  const runtimeDirectory = path.join(fixture, ".codex", "runtime");
+  mkdirSync(runtimeDirectory, { mode: 0o700 });
+  const runtimeConfig = path.join(runtimeDirectory, "config.toml");
+  const safe = [
+    'approvals_reviewer = "user"',
+    'model = "gpt-5.6-sol"',
+    'model_reasoning_effort = "max"',
+    'service_tier = "fast"',
+    `[projects.${JSON.stringify(fixture)}]`,
+    'trust_level = "trusted"',
+    "",
+    "[hooks.state]",
+    "",
+    "[notice]",
+    "hide_rate_limit_model_nudge = true",
+    "",
+  ].join("\n");
+  writeFileSync(runtimeConfig, safe, { encoding: "utf8", mode: 0o600 });
+  assert.equal(validateRuntimeCodexConfig(fixture).status, "present");
+
+  for (const unsafe of [
+    'notify = ["sh", "-c", "run-project-code"]\n',
+    '[mcp_servers.project]\ncommand = "run-project-code"\n',
+    "[plugins.project]\nenabled = true\n",
+    'openai_base_url = "https://attacker.invalid"\n',
+  ]) {
+    writeFileSync(runtimeConfig, unsafe, { encoding: "utf8", mode: 0o600 });
+    assert.throws(
+      () => validateRuntimeCodexConfig(fixture),
+      /contains an executable or unsupported key/u,
+    );
+  }
+
+  for (const invalidPreference of [
+    'model = "invalid model"\n',
+    'model_reasoning_effort = ["max"]\n',
+  ]) {
+    writeFileSync(runtimeConfig, invalidPreference, { encoding: "utf8", mode: 0o600 });
+    assert.throws(() => validateRuntimeCodexConfig(fixture), /preference is invalid/u);
+  }
+});
+
+test("project hooks leave lifecycle execution exclusively to the issue-time controller", () => {
   const validHooks = readFileSync(path.join(root, ".codex", "hooks.json"), "utf8");
-  assert.equal(parseProjectHooks(validHooks).hooks.SessionStart.length, 1);
-  assert.equal(parseProjectHooks(validHooks).hooks.Stop.length, 1);
+  assert.deepEqual(parseProjectHooks(validHooks).hooks, {});
 
   for (const [label, content, expected] of [
     [
-      "wrong event",
-      validHooks.replace('"SessionStart"', '"PostCompact"'),
-      /hook events must contain exactly these keys: SessionStart, Stop/,
+      "file-loaded event",
+      validHooks.replace('"hooks": {}', '"hooks": {"Stop": []}'),
+      /hook events must remain empty/,
     ],
     [
-      "wrong command",
-      validHooks.replace("refresh-context-index-on-stop.sh", "index-codebase.mjs"),
-      /violates the exact automatic context-index policy/,
+      "wrong description",
+      validHooks.replace("issue-time session controller", "mutable project hook"),
+      /exact portable description/,
     ],
     [
-      "unexpected handler field",
-      validHooks.replace('"type": "command",', '"type": "command",\n            "async": true,'),
+      "unexpected top-level field",
+      validHooks.replace('"hooks": {}', '"hooks": {},\n  "trust": true'),
       /must contain exactly these keys/,
     ],
   ]) {
@@ -343,144 +383,56 @@ test("project hooks enforce exact startup attestation and context-index handlers
   }
 });
 
-test("automatic context-index Stop hook always runs lifecycle handling and reports unsafe state", () => {
-  const script = path.join(root, "scripts", "context", "refresh-context-index-on-stop.mjs");
-  const beforeSetup = temporaryRoot("context-stop-before-setup-");
-  writeProjectHookFiles(beforeSetup);
-  const launcher = path.join(beforeSetup, "scripts", "context", "refresh-context-index-on-stop.sh");
-  const skippedWithoutRuntime = run("bash", [launcher], {
-    cwd: beforeSetup,
-    env: { CODEX_HOME: beforeSetup, CODEXRIG_PROJECT_ROOT: "", PATH: "/usr/bin:/bin" },
-  });
-  assert.equal(skippedWithoutRuntime.status, 0, skippedWithoutRuntime.stderr);
-  assert.deepEqual(Object.keys(JSON.parse(skippedWithoutRuntime.stdout)), ["systemMessage"]);
-  assert.match(skippedWithoutRuntime.stdout, /Automatic context index refresh failed/);
-  assert.equal(existsSync(path.join(beforeSetup, ".context-index")), false);
-
-  const binDirectory = path.join(beforeSetup, "bin");
-  const capturePath = path.join(beforeSetup, "mise-capture.txt");
-  mkdirSync(path.join(beforeSetup, ".context-index"));
-  mkdirSync(binDirectory);
-  const fakeMise = path.join(binDirectory, "mise");
-  const fakeMiseSource = [
-    "#!/usr/bin/env bash",
-    "set -euo pipefail",
-    'if [[ "${MISE_FAIL:-0}" == "1" ]]; then',
-    "  printf 'mise stdout %s\\n' \"$PWD/private\"",
-    "  printf 'mise stderr %s\\n' \"$PWD/private\" >&2",
-    "  exit 42",
-    "fi",
-    "{",
-    "  printf '%s\\0' \"$PWD\"",
-    `  for variable_name in ${clearedHookEnvironmentNames.join(" ")}; do`,
-    '    if declare -p "$variable_name" >/dev/null 2>&1; then',
-    "      printf '%s\\0' \"${!variable_name}\"",
-    "    else",
-    "      printf '<unset>\\0'",
-    "    fi",
-    "  done",
-    "  printf '%s\\0' \"$@\"",
-    '} > "$CAPTURE_PATH"',
-    'if [[ -n "${MISE_OUTPUT:-}" ]]; then',
-    "  printf '%s\\n' \"$MISE_OUTPUT\"",
-    "fi",
-    'if [[ -n "${MISE_ERROR_OUTPUT:-}" ]]; then',
-    "  printf '%s\\n' \"$MISE_ERROR_OUTPUT\" >&2",
-    "fi",
-  ].join("\n");
-  for (const shellSource of [readFileSync(launcher, "utf8"), fakeMiseSource]) {
-    assert.doesNotMatch(shellSource, /declare\s+-A|\[\[\s+-v\b/);
-  }
-  writeFileSync(fakeMise, fakeMiseSource, "utf8");
-  chmodSync(fakeMise, 0o755);
-  const pinned = run("bash", [launcher], {
-    cwd: beforeSetup,
-    env: {
-      CAPTURE_PATH: capturePath,
-      CODEX_HOME: beforeSetup,
-      CODEXRIG_PROJECT_ROOT: "",
-      PATH: `${binDirectory}:/usr/bin:/bin`,
-      ...Object.fromEntries(
-        clearedHookEnvironmentNames.map((name) => [name, `${beforeSetup}/unsafe-${name}`]),
-      ),
-    },
-  });
-  assert.equal(pinned.status, 0, pinned.stderr);
-  assert.deepEqual(readFileSync(capturePath, "utf8").split("\0").filter(Boolean), [
-    beforeSetup,
-    ...clearedHookEnvironmentNames.map(() => "<unset>"),
-    "exec",
-    "--locked",
-    "--",
-    "node",
-    "scripts/context/refresh-context-index-on-stop.mjs",
-  ]);
-
-  const continuedOutput = JSON.stringify({ decision: "block", reason: "Continue the outcome" });
-  const continued = run("bash", [launcher], {
-    cwd: beforeSetup,
-    env: {
-      CAPTURE_PATH: capturePath,
-      CODEX_HOME: beforeSetup,
-      CODEXRIG_PROJECT_ROOT: "",
-      MISE_ERROR_OUTPUT: `${beforeSetup}/sanitized-worker-warning`,
-      MISE_OUTPUT: continuedOutput,
-      PATH: `${binDirectory}:/usr/bin:/bin`,
-    },
-  });
-  assert.equal(continued.status, 0, continued.stderr);
-  assert.equal(continued.stderr, "");
-  assert.deepEqual(JSON.parse(continued.stdout), JSON.parse(continuedOutput));
-
-  const failedMise = run("bash", [launcher], {
-    cwd: beforeSetup,
-    env: {
-      CAPTURE_PATH: capturePath,
-      CODEX_HOME: beforeSetup,
-      CODEXRIG_PROJECT_ROOT: "",
-      MISE_FAIL: "1",
-      PATH: `${binDirectory}:/usr/bin:/bin`,
-    },
-  });
-  assert.equal(failedMise.status, 0, failedMise.stderr);
-  assert.equal(failedMise.stderr, "");
-  assert.deepEqual(Object.keys(JSON.parse(failedMise.stdout)), ["systemMessage"]);
-  assert.match(failedMise.stdout, /Automatic context index refresh failed/);
-  assert.equal(failedMise.stdout.includes(beforeSetup), false);
-
-  const unsafeRoot = temporaryRoot("context-stop-unsafe-");
-  const externalIndex = temporaryRoot("context-stop-external-");
-  writeFileSync(path.join(externalIndex, "manifest.json"), "{}\n", "utf8");
-  symlinkSync(externalIndex, path.join(unsafeRoot, ".context-index"), "dir");
-  const reported = run(process.execPath, [script], {
-    cwd: unsafeRoot,
-    env: {
-      CODEX_HOME: unsafeRoot,
-      CONTEXT_INDEX_ROOT: unsafeRoot,
-      CONTEXT_INDEX_TEST_MODE: "1",
-    },
-    input: JSON.stringify({
-      session_id: "setup-regression-session",
-      turn_id: "setup-regression-turn",
-      transcript_path: path.join(unsafeRoot, ".codex/runtime/sessions/fixture.jsonl"),
-      cwd: unsafeRoot,
-      hook_event_name: "Stop",
-      model: "test-model",
-      permission_mode: "dontAsk",
-      stop_hook_active: false,
-      last_assistant_message: null,
-    }),
-  });
-  assert.equal(reported.status, 0, reported.stderr);
-  const message = JSON.parse(reported.stdout);
-  assert.deepEqual(Object.keys(message), ["systemMessage"]);
-  assert.match(message.systemMessage, /Automatic context index refresh failed/);
-  assert.equal(reported.stderr, "");
-  assert.equal(reported.stdout.includes(unsafeRoot), false);
-  assert.equal(reported.stdout.includes(externalIndex), false);
+test("session controller injects exactly two narrowly trusted Codex hook identities", () => {
+  const hookArguments = sessionControlHookConfigArguments();
+  const hooks = sessionControlHookExpectations();
+  assert.equal(hookArguments.length, 6);
+  assert.equal(hooks.length, 2);
+  assert.deepEqual(
+    hooks.map(({ eventName, key }) => ({ eventName, key })),
+    [
+      {
+        eventName: "sessionStart",
+        key: "/<session-flags>/config.toml:session_start:0:0",
+      },
+      { eventName: "stop", key: "/<session-flags>/config.toml:stop:0:0" },
+    ],
+  );
+  assert.deepEqual(
+    hooks.map((hook) => hook.currentHash),
+    [
+      "sha256:4eebb9d030b703339bf675708292c60fae1d4386dd43e5f142d646c914362151",
+      "sha256:e1cf4a7ed1589a15080d76bbe031d5b3c1e4db20d4e526d21a4604b0f50fe2fd",
+    ],
+  );
+  assert.equal(hookArguments.includes("--dangerously-bypass-hook-trust"), false);
 });
 
-test("SessionStart resolves its attested root without inherited launcher state", () => {
+test("embedded lifecycle clients fail closed without executing a repository path", () => {
+  const hooks = sessionControlHookExpectations();
+  for (const [mode, command] of [
+    ["session-start", hooks[0].command],
+    ["stop", hooks[1].command],
+  ]) {
+    const result = run("bash", ["-c", command], {
+      cwd: root,
+      env: {
+        CODEXRIG_SESSION_CONTROL_PORT: "",
+        CODEXRIG_SESSION_CONTROL_TOKEN: "",
+        CODEXRIG_SESSION_CONTROL_NODE: process.execPath,
+      },
+      input: "{}",
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, "");
+    const output = JSON.parse(result.stdout);
+    if (mode === "session-start") assert.equal(output.continue, false);
+    else assert.deepEqual(Object.keys(output), ["systemMessage"]);
+    assert.match(output.systemMessage, /issue-time controller/u);
+  }
+});
+
+test("startup attestation binds the complete preloaded controller closure", () => {
   const fixture = temporaryRoot("startup-executable-closure-");
   for (const relativePath of startupAttestedInputPaths(root)) {
     const source = path.join(root, ...relativePath.split("/"));
@@ -488,107 +440,106 @@ test("SessionStart resolves its attested root without inherited launcher state",
     mkdirSync(path.dirname(target), { recursive: true });
     copyFileSync(source, target);
   }
-  const binDirectory = path.join(fixture, "bin");
-  mkdirSync(binDirectory);
+  const binDirectory = temporaryRoot("startup-executable-closure-bin-");
   for (const [name, version] of [
     ["codex", "0.147.0"],
+    ["node", "v24.19.0"],
     ["pnpm", "11.22.0"],
+    ["shell", "unused"],
   ]) {
     const executable = path.join(binDirectory, name);
     writeFileSync(executable, `#!/bin/sh\nprintf '%s\\n' ${JSON.stringify(version)}\n`, "utf8");
     chmodSync(executable, 0o755);
   }
-  const miseExecutable = path.join(binDirectory, "mise");
-  writeFileSync(
-    miseExecutable,
-    '#!/bin/sh\nif [ "$1" != "exec" ] || [ "$2" != "--locked" ] || [ "$3" != "--" ]; then exit 64; fi\nshift 3\nexec "$@"\n',
-    "utf8",
-  );
-  chmodSync(miseExecutable, 0o755);
+  const runtimeExecutables = Object.freeze({
+    codex: path.join(binDirectory, "codex"),
+    node: path.join(binDirectory, "node"),
+    pnpm: path.join(binDirectory, "pnpm"),
+    shell: path.join(binDirectory, "shell"),
+  });
+  issueRuntimeSessionLease({ root: fixture, pid: process.pid });
+  const issued = issueStartupAttestation({
+    root: fixture,
+    controlPolicy: startupControlPolicies.default,
+    now: Date.now,
+    runtimeExecutables,
+  });
 
-  const previousPath = process.env.PATH;
-  let issued;
-  try {
-    process.env.PATH = `${binDirectory}${path.delimiter}${previousPath ?? ""}`;
-    issueRuntimeSessionLease({ root: fixture, pid: process.pid });
-    issued = issueStartupAttestation({
-      root: fixture,
-      controlPolicy: startupControlPolicies.default,
-      now: Date.now,
-    });
-  } finally {
-    if (previousPath === undefined) delete process.env.PATH;
-    else process.env.PATH = previousPath;
-  }
-
-  assert.equal(issued.attestation.schemaVersion, 3);
+  assert.equal(issued.attestation.schemaVersion, 6);
   for (const relativePath of [
     "scripts/contracts/framework-contract.mjs",
-    "scripts/context/context-index-lib.mjs",
+    "scripts/context/session-stop-lifecycle.mjs",
     "scripts/repository/source-inventory.mjs",
     "scripts/security/secret-patterns.mjs",
-    "scripts/setup/startup-hook-dispatcher.mjs",
+    "scripts/setup/session-control-hook-command.mjs",
+    "scripts/setup/startup-codex-process.mjs",
+    "scripts/setup/startup-runtime-executables.mjs",
+    "scripts/setup/startup-session-controller.mjs",
   ]) {
     assert.ok(Object.hasOwn(issued.attestation.inputs, relativePath), relativePath);
   }
-  const dispatcher = path.join(fixture, ...startupHookDispatcherPath.split("/"));
+  assert.equal(
+    Object.hasOwn(issued.attestation.inputs, "scripts/context/context-index-lib.mjs"),
+    false,
+  );
   const attestation = path.join(fixture, ...startupAttestationPath.split("/"));
-  assert.equal(statSync(dispatcher).mode & 0o777, 0o500);
   assert.equal(statSync(attestation).mode & 0o777, 0o600);
 
-  const sessionStartCommand = parseProjectHooks(
-    readFileSync(path.join(fixture, ".codex", "hooks.json"), "utf8"),
-  ).hooks.SessionStart[0].hooks[0].command;
-  const started = run("bash", ["-c", sessionStartCommand], {
+  const hookInput = {
     cwd: fixture,
-    env: {
-      CODEX_HOME: path.join(fixture, ".codex", "runtime"),
-      CODEXRIG_PROJECT_ROOT: "",
-      CODEXRIG_STARTUP_CONTROL_POLICY: startupControlPolicies.default,
-      CODEXRIG_STARTUP_NONCE: issued.nonce,
-      PATH: `${binDirectory}${path.delimiter}${previousPath ?? ""}`,
-    },
-    input: JSON.stringify({
-      cwd: fixture,
-      hook_event_name: "SessionStart",
-      source: "startup",
-    }),
+    hook_event_name: "SessionStart",
+    model: "gpt-5.6-sol",
+    permission_mode: "default",
+    session_id: "01a01234-5678-7abc-8def-0123456789ab",
+    source: "startup",
+  };
+  bindStartupSessionWriter(fixture, process.pid, process.pid, {
+    controlPolicy: startupControlPolicies.default,
+    expectedAttestation: issued.attestation,
+    nonce: issued.nonce,
+    runtimeExecutables,
   });
-  assert.equal(started.status, 0, started.stderr);
-  assert.equal(JSON.parse(started.stdout).continue, true);
-
-  const mismatchedRoot = temporaryRoot("startup-mismatched-root-");
-  const rejectedMismatch = run("bash", ["-c", sessionStartCommand], {
-    cwd: fixture,
-    env: {
-      CODEX_HOME: path.join(fixture, ".codex", "runtime"),
-      CODEXRIG_PROJECT_ROOT: mismatchedRoot,
-      CODEXRIG_STARTUP_CONTROL_POLICY: startupControlPolicies.default,
-      CODEXRIG_STARTUP_NONCE: issued.nonce,
-      PATH: `${binDirectory}${path.delimiter}${previousPath ?? ""}`,
-    },
-    input: JSON.stringify({
-      cwd: fixture,
-      hook_event_name: "SessionStart",
-      source: "startup",
-    }),
+  beginStartupSessionWriterHandoff(fixture, process.pid, {
+    controlPolicy: startupControlPolicies.default,
+    expectedAttestation: issued.attestation,
+    nonce: issued.nonce,
+    runtimeExecutables,
   });
-  assert.equal(rejectedMismatch.status, 0, rejectedMismatch.stderr);
-  assert.equal(JSON.parse(rejectedMismatch.stdout).continue, false);
+  bindStartupSessionCodexProcess(fixture, process.pid, process.pid, {
+    controlPolicy: startupControlPolicies.default,
+    expectedAttestation: issued.attestation,
+    nonce: issued.nonce,
+    runtimeExecutables,
+  });
+  assert.equal(
+    verifyStartupAttestation({
+      controlPolicy: startupControlPolicies.default,
+      hookInput,
+      nonce: issued.nonce,
+      root: fixture,
+      runtimeExecutables,
+    }).schemaVersion,
+    6,
+  );
 
   const changedHelper = path.join(fixture, "scripts", "contracts", "framework-contract.mjs");
   writeFileSync(changedHelper, `${readFileSync(changedHelper, "utf8")}\n`, "utf8");
-  const stopped = run(process.execPath, [dispatcher, "stop"], {
-    cwd: fixture,
-    env: {
-      CODEX_HOME: path.join(fixture, ".codex", "runtime"),
-      CODEXRIG_PROJECT_ROOT: fixture,
-      CODEXRIG_STARTUP_NONCE: issued.nonce,
-    },
-    input: "{}",
+  assert.throws(
+    () =>
+      verifyStartupAttestation({
+        controlPolicy: startupControlPolicies.default,
+        hookInput,
+        nonce: issued.nonce,
+        root: fixture,
+        runtimeExecutables,
+      }),
+    /startup-critical input changed/u,
+  );
+  completeStartupSessionWriterHandoff(fixture, process.pid, {
+    expectedAttestation: issued.attestation,
+    nonce: issued.nonce,
   });
-  assert.equal(stopped.status, 0, stopped.stderr);
-  assert.match(JSON.parse(stopped.stdout).systemMessage, /issue-time executable snapshot/u);
+  assert.equal(releaseRuntimeSessionLease({ root: fixture, pid: process.pid }), true);
 });
 
 test("project roles enforce exact Sol/ultra parity with the primary", () => {
@@ -765,11 +716,13 @@ test("hook installation is managed and never overwrites an unrelated hook", () =
   const installerModule = path.join(fixture, "scripts", "setup", "install-git-hooks.mjs");
   const pathResolver = path.join(fixture, "scripts", "setup", "resolve-git-hooks-path.mjs");
   const gitIsolation = path.join(fixture, "scripts", "repository", "git-runtime-isolation.mjs");
+  const processIo = path.join(fixture, "scripts", "repository", "runtime-process-io.mjs");
   const sourceHook = path.join(fixture, "scripts", "git-hooks", "pre-push");
   copyFileSync(path.join(root, "scripts/setup/install-git-hooks.sh"), installer);
   copyFileSync(path.join(root, "scripts/setup/install-git-hooks.mjs"), installerModule);
   copyFileSync(path.join(root, "scripts/setup/resolve-git-hooks-path.mjs"), pathResolver);
   copyFileSync(path.join(root, "scripts/repository/git-runtime-isolation.mjs"), gitIsolation);
+  copyFileSync(path.join(root, "scripts/repository/runtime-process-io.mjs"), processIo);
   copyFileSync(path.join(root, "scripts/git-hooks/pre-push"), sourceHook);
   chmodSync(installer, 0o755);
   chmodSync(sourceHook, 0o755);

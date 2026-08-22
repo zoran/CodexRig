@@ -25,9 +25,6 @@ importers:
       prettier:
         specifier: ^3.9.6
         version: 3.9.6
-      smol-toml:
-        specifier: ^1.8.0
-        version: 1.8.0
 
 packages:
 
@@ -426,10 +423,6 @@ packages:
       '@types/node':
         optional: true
 
-  smol-toml@1.8.0:
-    resolution: {integrity: sha512-kCZr2V3ch9i00x8zXRhjUNVcjG9ijES5dDudkXvUVCT5QlJNQWElSJdZqyPemffHoLNUYwOcou0Fy+ojN0uHSQ==}
-    engines: {node: '>= 18'}
-
   supports-color@7.2.0:
     resolution: {integrity: sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==}
     engines: {node: '>=8'}
@@ -807,8 +800,6 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.3
       '@img/sharp-win32-x64': 0.35.3
       '@types/node': 26.2.0
-
-  smol-toml@1.8.0: {}
 
   supports-color@7.2.0:
     dependencies:

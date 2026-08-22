@@ -1,5 +1,5 @@
 /** Owns seo behavior for the repository verification boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";

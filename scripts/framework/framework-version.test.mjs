@@ -127,6 +127,15 @@ test("framework version helpers produce stable major, minor, and patch successor
       ),
     /at most one complete source-framework version block/u,
   );
+  assert.throws(
+    () =>
+      projectManifestWithFrameworkVersion(
+        "- Version `1.0.0` with contract schema `1` is the current clean framework line.\n",
+        "2.3.5",
+        2,
+      ),
+    /missing its bounded source-framework version block/u,
+  );
 });
 
 test("documentation-only change receives one idempotent patch release", (t) => {
@@ -245,6 +254,46 @@ test("policy content cannot change without its own policy-version increment", (t
     () => frameworkVersionReconciliationPlan({ root }),
     /changed without increasing its policy version/u,
   );
+});
+
+test("an incompatible published schema is a major boundary, not an interpreted contract", (t) => {
+  const root = fixture(t);
+  const contractPath = path.join(root, ".codexrig/framework.json");
+  const projectionPath = path.join(root, ".codexrig/policy-projection.json");
+  const packagePath = path.join(root, "package.json");
+  const manifestPath = path.join(root, "docs/project.md");
+  const currentContract = readFileSync(contractPath, "utf8");
+  const currentProjection = readFileSync(projectionPath, "utf8");
+  const currentPackage = readFileSync(packagePath, "utf8");
+  const currentManifest = readFileSync(manifestPath, "utf8");
+  const incompatibleContract = JSON.parse(currentContract);
+  incompatibleContract.schemaVersion = 1;
+  incompatibleContract.frameworkVersion = "1.9.0";
+  write(root, ".codexrig/framework.json", serializeCanonicalJson(incompatibleContract));
+  const incompatibleProjection = JSON.parse(currentProjection);
+  incompatibleProjection.schemaVersion = 2;
+  write(root, ".codexrig/policy-projection.json", serializeCanonicalJson(incompatibleProjection));
+  const publishedPackage = JSON.parse(currentPackage);
+  publishedPackage.version = "1.9.0";
+  write(root, "package.json", serializeCanonicalJson(publishedPackage));
+  write(root, "docs/project.md", versionManifest("1.9.0", 1));
+  git(root, [
+    "add",
+    ".codexrig/framework.json",
+    ".codexrig/policy-projection.json",
+    "package.json",
+    "docs/project.md",
+  ]);
+  git(root, ["commit", "--quiet", "-m", "publish older policy schema"]);
+  git(root, ["push", "--quiet", "origin", "main"]);
+  write(root, ".codexrig/framework.json", currentContract);
+  write(root, ".codexrig/policy-projection.json", currentProjection);
+  write(root, "package.json", currentPackage);
+  write(root, "docs/project.md", currentManifest);
+
+  const plan = frameworkVersionReconciliationPlan({ root });
+  assert.equal(plan.requiredBump, "major");
+  assert.equal(plan.minimumVersion, "2.0.0");
 });
 
 test("an explicit higher synchronized release is preserved", (t) => {

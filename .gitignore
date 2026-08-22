@@ -20,7 +20,7 @@ backups/
 
 # Mutable Codex state is contained in ignored .codex/runtime/. Repository-root /tmp owns private
 # transient critical-budget handovers and process temporaries; /.tmp owns other local cache work.
-# The remaining root-bound entries are legacy cleanup quarantine.
+# The remaining root-bound entries quarantine unsafe loose-root runtime residue.
 /.tmp
 /cache
 /log

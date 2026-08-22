@@ -1,25 +1,34 @@
 /** Owns source git state behavior for the portable clean-project generation boundary. */
-import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { listPortableTransferFiles } from "../../../../scripts/repository/source-inventory.mjs";
 import { captureStableRepositoryFileIdentity } from "../../../../scripts/repository/stable-file-snapshot.mjs";
 import {
   cleanGitEnvironment,
   isolatedGitArguments,
+  isolatedGitResultCompleted,
   resolveOwnedGitMetadata,
 } from "../../../../scripts/repository/git-runtime-isolation.mjs";
+import { spawnSyncWithBoundedIo as spawnSync } from "../../../../scripts/repository/runtime-process-io.mjs";
 import { fail } from "./project-options.mjs";
 
 function runGit(metadata, args, label) {
-  const result = spawnSync("git", isolatedGitArguments({ args, ...metadata }), {
+  const invocationArguments = isolatedGitArguments({ args, ...metadata });
+  const result = spawnSync("git", invocationArguments, {
     cwd: metadata.workTree,
     encoding: null,
     env: cleanGitEnvironment(),
     input: Buffer.alloc(0),
     maxBuffer: 64 * 1024 * 1024,
     stdio: ["pipe", "pipe", "pipe"],
+    timeout: 120_000,
   });
-  if (result.error || result.status !== 0 || !Buffer.isBuffer(result.stdout)) {
+  if (
+    !isolatedGitResultCompleted(result, {
+      args: invocationArguments,
+      encoding: null,
+      maximumOutputBytes: 64 * 1024 * 1024,
+    })
+  ) {
     const detail = result.error?.message ?? `status ${result.status}`;
     fail(`${label} failed (${detail}).`);
   }

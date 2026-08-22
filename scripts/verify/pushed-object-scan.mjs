@@ -1,13 +1,15 @@
 /** Owns pushed object scan behavior for the repository verification boundary. */
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
   cleanGitEnvironment,
   isolatedGitArguments,
+  isolatedGitResultCompleted,
   resolveOwnedGitMetadata,
 } from "../repository/git-runtime-isolation.mjs";
 import { sensitivePathReason } from "../repository/sensitive-paths.mjs";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { parsePrePushInput, root, validatePushedRefsAgainstHead } from "./adaptive-state.mjs";
 import { createSecretContentScanner } from "./secret-content-scan.mjs";
 
@@ -40,8 +42,15 @@ function git(repositoryRoot, args, { allowFailure = false, encoding = "utf8", in
     input: input ?? (encoding === null ? Buffer.alloc(0) : ""),
     maxBuffer: 64 * 1024 * 1024,
     stdio: ["pipe", "pipe", "pipe"],
+    timeout: 180_000,
   });
-  if (result.error || result.status !== 0) {
+  if (
+    !isolatedGitResultCompleted(result, {
+      args: invocation.args,
+      encoding,
+      maximumOutputBytes: 64 * 1024 * 1024,
+    })
+  ) {
     if (allowFailure) return null;
     const output = [result.stdout, result.stderr]
       .filter(Boolean)

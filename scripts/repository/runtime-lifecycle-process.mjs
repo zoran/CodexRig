@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Supervises lifecycle-bound commands, descendants, process groups, and inherited guard handles. */
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import os from "node:os";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -14,6 +14,7 @@ import {
   unregisterRuntimeLifecycleDescendant,
 } from "./runtime-session-lease.mjs";
 import { runtimeLifecycleOperationPattern } from "./runtime-lifecycle-schema.mjs";
+import { spawnSyncWithBoundedIo as spawnSync } from "./runtime-process-io.mjs";
 
 const supervisorTokenVariable = "CODEXRIG_LIFECYCLE_SUPERVISOR_TOKEN";
 const supervisorOperationVariable = "CODEXRIG_LIFECYCLE_SUPERVISOR_OPERATION";

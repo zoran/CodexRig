@@ -12,7 +12,7 @@ import {
 import {
   generatedFrameworkAgentPolicy,
   generatedFrameworkReadmePolicy,
-} from "../../.agents/skills/create-project-from-framework/scripts/generated-framework-policy.mjs";
+} from "../../.agents/skills/create-project-from-framework/scripts/generated-framework-projections.mjs";
 import { postProjectCreationGuidance } from "../../.agents/skills/create-project-from-framework/scripts/source-readiness.mjs";
 import {
   normalizedProjectDescription,
@@ -27,7 +27,7 @@ test("the source-only project creator keeps the Stop-hook mutation contract", ()
   assert.equal(hasContradictoryStopHookIndexContract(content), false);
   assert.equal(
     hasContradictoryStopHookIndexContract(
-      `${content}\nProject hooks never update the context index.\n`,
+      `${content}\nProject hooks automatically update the context index.\n`,
     ),
     true,
   );
@@ -35,11 +35,11 @@ test("the source-only project creator keeps the Stop-hook mutation contract", ()
 
 test("the source-only project creator derives generated policy surfaces from one owner", () => {
   const projection = readPolicyProjection(root);
-  assert.equal(projection.policies.length, 32);
+  assert.equal(projection.policies.length, 33);
   const projectedPolicy = projection.policies.map(({ statement }) => statement).join("\n");
   assert.match(projectedPolicy, /current-state inventory, never a roadmap/);
   assert.match(projectedPolicy, /exact same configured GPT Sol model and `ultra` reasoning/);
-  assert.match(projectedPolicy, /account- or host-wide listings are untrusted discovery/i);
+  assert.match(projectedPolicy, /account- or host-wide process listings are untrusted discovery/i);
   assert.match(projectedPolicy, /one stable SemVer owner/);
   assert.match(projectedPolicy, /Delivery targets are explicit: `dev` is the default/);
   assert.match(projectedPolicy, /Portable Codex sessions default to on-request approval/);

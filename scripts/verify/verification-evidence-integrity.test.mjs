@@ -91,6 +91,50 @@ test("runtime identity ignores wrapper-only PATH prefixes when every tool resolv
   }
 });
 
+test("runtime identity canonicalizes locale and timezone across lifecycle callers", () => {
+  const root = fixture();
+  const inheritedKeys =
+    process.platform === "win32"
+      ? ["LANG", "LC_ALL", "TZ"]
+      : ["LANG", "LC_ALL", "TZ", "lang", "Lc_All", "tz"];
+  const previous = new Map(inheritedKeys.map((key) => [key, process.env[key]]));
+  try {
+    process.env.LANG = "de_DE.UTF-8";
+    process.env.LC_ALL = "de_DE.UTF-8";
+    process.env.TZ = "Europe/Berlin";
+    if (process.platform !== "win32") {
+      process.env.lang = "fr_FR.UTF-8";
+      process.env.Lc_All = "fr_FR.UTF-8";
+      process.env.tz = "Pacific/Auckland";
+    }
+    const sessionRuntime = normalizedVerificationRuntimeIdentity(undefined, { cwd: root });
+    assert.deepEqual(
+      {
+        LANG: verificationChildEnvironment().LANG,
+        LC_ALL: verificationChildEnvironment().LC_ALL,
+        TZ: verificationChildEnvironment().TZ,
+      },
+      { LANG: "C", LC_ALL: "C", TZ: "Etc/UTC" },
+    );
+
+    delete process.env.LANG;
+    delete process.env.LC_ALL;
+    delete process.env.TZ;
+    if (process.platform !== "win32") {
+      delete process.env.lang;
+      delete process.env.Lc_All;
+      delete process.env.tz;
+    }
+    const shellRuntime = normalizedVerificationRuntimeIdentity(undefined, { cwd: root });
+    assert.deepEqual(shellRuntime, sessionRuntime);
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test("runtime identity hashes every forwarded semantic child control", () => {
   const root = fixture();
   const unknownName = "VERIFICATION_UNBOUND_TEST_CONTROL";

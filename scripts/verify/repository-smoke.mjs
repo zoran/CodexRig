@@ -163,19 +163,30 @@ requireContent("scripts/context/context-index-lib.mjs", "maintainIndexUnlocked()
 requireContent("scripts/context/context-maintenance.mjs", "maintainContextIndex");
 requireContent("scripts/context/check-context-index.mjs", "inspectIndexStatus()");
 requireContent("scripts/verify/image-assets.mjs", "listActiveFiles");
-requireContent(".codex/hooks.json", "bash scripts/context/refresh-context-index-on-stop.sh");
-requireContent("scripts/context/refresh-context-index-on-stop.sh", "mise exec --locked");
-requireContent("scripts/context/refresh-context-index-on-stop.mjs", "ensureFreshIndex");
+requireContent(".codex/hooks.json", "no mutable project-file hook may execute");
+requireContent("scripts/setup/session-control-hook-command.mjs", 'require("node:http")');
+requireContent(
+  "scripts/setup/session-control-hook-command.mjs",
+  "sessionControlHookConfigArguments",
+);
+requireContent("scripts/setup/startup-codex-process.mjs", "codexProcessSupervisorSource");
+requireContent("scripts/setup/startup-session-controller.mjs", "verifyTrustedSessionControlHooks");
+requireContent("scripts/setup/startup-session-controller.mjs", "runStopLifecycle");
 requireContent(
   "scripts/context/context-worker-output.mjs",
   "sanitizeMultilineForTerminal(output, repositoryRoot)",
 );
 requireContent("scripts/context/context-worker-output.mjs", 'stdio: "pipe"');
-requireContent(
-  "scripts/context/refresh-context-index-on-stop.mjs",
-  "runAsSanitizedContextWorker(import.meta.url, { input: hookInput })",
-);
+requireContent("scripts/context/session-stop-lifecycle.mjs", "sealedHandoverStop");
 requireContent("scripts/repository/source-inventory.mjs", "isRepositoryCodexHomePath");
+requireContent(
+  "scripts/repository/worktree-prune-transaction.mjs",
+  "inspectWorktreePruneTransaction",
+);
+requireContent(
+  "scripts/repository/worktree-prune-transaction.mjs",
+  "codexrig-worktree-prune-transaction.json",
+);
 requireContent("scripts/verify/format-project.mjs", "projectFormatFiles");
 requireContent(
   "scripts/verify/adaptive-runner.mjs",
@@ -405,10 +416,7 @@ if (packageJson?.scripts?.["framework:reset"]) {
 const projectCreatorSkill = ".agents/skills/create-project-from-framework/SKILL.md";
 if (existsSync(path.join(root, projectCreatorSkill))) {
   const projectCreatorSkillDirectory = projectCreatorSkill.slice(0, -"/SKILL.md".length);
-  requireContent(
-    projectCreatorSkill,
-    "Stop hook then keeps changed sources current once per durable local Codex turn",
-  );
+  requireContent(projectCreatorSkill, "Semantic search keeps changed sources current on demand");
   requireContent(projectCreatorSkill, "ephemeral side conversations");
   requireContent(projectCreatorSkill, "repository-local FSMonitor");
   requireContent(projectCreatorSkill, "root-owned Git metadata");
@@ -444,7 +452,10 @@ if (existsSync(path.join(root, projectCreatorSkill))) {
     `${projectCreatorSkillDirectory}/scripts/generated-project-finalization.mjs`,
     "changed outside declared project-specific transformations",
   );
-  requireContent("scripts/setup/project-creator-contract.source.test.mjs", "Project hooks never");
+  requireContent(
+    "scripts/setup/project-creator-contract.source.test.mjs",
+    "Project hooks automatically update",
+  );
   requireContent(
     `${projectCreatorSkillDirectory}/scripts/source-git-state.mjs`,
     "isolatedGitArguments",

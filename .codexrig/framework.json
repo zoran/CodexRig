@@ -116,14 +116,14 @@
       "verify:changed",
       "verify:external",
       "verify:pre-push",
-      "web:update-sitemap-lastmod"
+      "web:update-sitemap-lastmod",
+      "worktree:status"
     ],
     "managedDevDependencies": [
       "@huggingface/transformers",
       "@lancedb/lancedb",
       "onnxruntime-common",
-      "prettier",
-      "smol-toml"
+      "prettier"
     ]
   }
 }

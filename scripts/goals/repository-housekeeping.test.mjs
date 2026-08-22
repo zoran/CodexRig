@@ -68,6 +68,19 @@ function write(root, relativePath, content) {
   writeFileSync(target, content, "utf8");
 }
 
+test("apply rejects unsafe worktrees before recovering interrupted writes", () => {
+  const source = readFileSync(new URL("./repository-housekeeping.mjs", import.meta.url), "utf8");
+  const reconciliation = source.indexOf("const worktreePlan = reconcileRepositoryWorktreeState({");
+  const rejection = source.indexOf("failFromPlan(worktreePlan);");
+  const recovery = source.indexOf(
+    "if (options.apply) recoverInterruptedHousekeepingWrites(repositoryRoot);",
+  );
+
+  assert.ok(reconciliation >= 0);
+  assert.ok(rejection > reconciliation);
+  assert.ok(recovery > rejection);
+});
+
 test("housekeeping detects and atomically projects newly integrated staging and prod targets", (t) => {
   const root = fixture(t);
   write(root, "infra/staging/main.tf", "terraform {}\n");

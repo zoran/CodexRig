@@ -1,11 +1,11 @@
 /** Owns generated project finalization behavior for the portable clean-project generation boundary. */
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { formatContextError } from "../../../../scripts/terminal/terminal-output.mjs";
 import { listManagedMarkdownFiles } from "../../../../scripts/docs/document-scope.mjs";
+import { spawnSyncWithBoundedIo as spawnSync } from "../../../../scripts/repository/runtime-process-io.mjs";
 import { listPortableTransferFiles } from "../../../../scripts/repository/source-inventory.mjs";
 import {
   readStableRepositoryText,

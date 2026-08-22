@@ -69,6 +69,7 @@ function copyGoalGateRuntime(repository) {
     "scripts/repository/runtime-lifecycle-schema.mjs",
     "scripts/repository/runtime-owned-state.mjs",
     "scripts/repository/runtime-process-identity.mjs",
+    "scripts/repository/runtime-process-io.mjs",
     "scripts/repository/runtime-session-lease.mjs",
     "scripts/repository/runtime-session-state.mjs",
     "scripts/repository/sensitive-paths.mjs",

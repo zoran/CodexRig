@@ -33,8 +33,8 @@ The manifest remains refinable when later learning changes durable truth.
 Treat the current prompt and current source tree as the only project-creation inputs. Local Codex
 memories are disabled in the reusable source: never retrieve, use, or preserve historical task,
 product, sibling-project, path, outcome, or session-derived facts while creating a fresh project. If
-legacy memory is surfaced by the host despite that policy, classify it as invalid residue and do not
-use it for identity, scope, defaults, decisions, or verification. The generator enables memories
+obsolete memory is surfaced by the host despite that policy, classify it as invalid residue and do
+not use it for identity, scope, defaults, decisions, or verification. The generator enables memories
 again only in the fresh target's isolated `.codex/runtime/` `CODEX_HOME`, after excluding every
 source memory file and database.
 
@@ -99,9 +99,10 @@ its `src/` as part of that task instead of pre-creating an empty `apps/web`. Age
 instructions, and process state remain outside every product unit. The repository-wide vector space
 has one fixed, ignored location at root `.context-index/` and is never product source. Generation
 does not copy or download vector state; the generated project's required `pnpm setup` creates it,
-smoke-tests it, and reports its location and statistics. The portable project Stop hook then keeps
-changed sources current once per durable local Codex turn after local hash-bound approval through
-`/hooks`; ephemeral side conversations and other transcriptless contexts remain inert.
+smoke-tests it, and reports its location and statistics. Semantic search keeps changed sources
+current on demand. The preloaded session controller handles durable Stop continuation through its
+built-in-only hook client; ephemeral side conversations and other transcriptless contexts remain
+inert.
 
 ## Required Result
 
@@ -111,13 +112,16 @@ changed sources current once per durable local Codex turn after local hash-bound
 - local-memory use and generation disabled in the reusable source, with no memory state transferred;
   normal memories enabled only in the generated project's own clean, isolated `.codex/runtime/`;
 - portable `.codex/config.toml`, `.codex/hooks.json`, `.codex/agents/`, `.codex/README.md`, the
-  project launcher, startup attestation, SessionStart verifier, context-index Stop-hook scripts, and
-  the critical-budget handover creator/discovery retained; no source handover prompt is copied;
-- each generated project documents `bash scripts/setup/start-codex.sh` exactly: the launcher updates
-  the host CLI outside project isolation, installs the locked toolchain, checks prerequisites,
-  refreshes the newest stable compatible dependency graph, and only then uses the generated ignored
-  `.codex/runtime/` as the isolated home for mutable Codex runtime; its closed interface accepts
-  only optional `--no-alt-screen` as a control and requires prompt text after `--`;
+  project launcher, startup attestation, preloaded session controller, built-in-only hook client,
+  Stop lifecycle module, and critical-budget handover creator/discovery retained; no source handover
+  prompt is copied;
+- each generated project documents `bash scripts/setup/start-codex.sh` exactly: host CLI update,
+  tool installation, compatible dependency refresh, and online diagnosis are explicit maintenance,
+  while the launcher deterministically validates that prepared state without network or lockfile
+  mutation before using `.codex/runtime/` as the isolated mutable Codex home; its closed interface
+  accepts optional `--no-alt-screen` and explicit Dev-only `--yolo` as controls and requires prompt
+  text after `--`. Canonical no-approval, danger-full-access Dev operation requires exiting a safe
+  session and running exactly `bash scripts/setup/start-codex.sh --yolo`;
 - root-bound ignore and source-inventory policy exclude authentication, sessions, logs, caches,
   plugins, runtime skills, history, metadata, and Codex databases while retaining portable
   `.codex/config.toml`, hooks, roles, and documentation;
@@ -147,19 +151,19 @@ changed sources current once per durable local Codex turn after local hash-bound
 - a mandatory pre-slice coordination checkpoint immediately before every slice begins and before
   every expanded write scope: declare the current goal, slice outcome, modules, contracts,
   schemas/migrations/shared configuration, repository-relative write set, and one writer; inspect
-  all observable agent, session, account, and team-channel claims before relying on Git; permit only
-  confirmed-disjoint parallel writes; and resolve overlap or uncertain shared ownership before
-  implementation;
+  all observable live-agent assignments, same-clone worktrees, safe latest-session markers, and
+  team-channel claims before relying on Git; permit only confirmed-disjoint parallel writes; and
+  resolve overlap or uncertain shared ownership before implementation;
 - a mandatory first-prompt Project Definition Intake while the generated manifest is pending: Codex
   first evaluates any creation draft or filled definition, explains the interview and its proactive
   support, names strengths/gaps/contradictions, asks refinement versus starting from a
   decision-ready confirmed scope, then asks successive material questions, presents a precise
   synthesis for correction, and writes only user-confirmed durable truth before planning and
   autonomous implementation, including the shared pre-slice coordination channel when independent
-  sessions or accounts may work concurrently. The same intake resumes later when material ambiguity
-  or changed intent, scope, module/public contracts, data, integrations, trust, compatibility, or
-  operations could alter the result; only affected writes pause and resolved or irrelevant questions
-  are not repeated;
+  developers or hosts may work concurrently; same-host Codex accounts remain one developer. The same
+  intake resumes later when material ambiguity or changed intent, scope, module/public contracts,
+  data, integrations, trust, compatibility, or operations could alter the result; only affected
+  writes pause and resolved or irrelevant questions are not repeated;
 - a durable module map and modular-monolith default for non-trivial product code: cohesive domain
   responsibilities, narrow public contracts, private internals, owned data/migrations, allowed
   acyclic dependencies, focused verifiers, and replacement-local ports/adapters; components remain
@@ -167,11 +171,16 @@ changed sources current once per durable local Codex turn after local hash-bound
   semantics, and realistic assembled-flow evidence keep the product functioning as one unit;
   strategic DDD only when domain complexity justifies it;
 - one central `main` as the only durable integration branch, without long-lived module or developer
-  branches. Serialized work may use `main` directly when branch policy permits. Different
-  developers/accounts use temporary task branches in separate clones and credential contexts;
-  same-account tasks may use worktrees, which are not an authentication boundary. Concurrent writes
-  need disjoint write sets, exactly one write owner per module or shared surface, and one integrator
-  for shared contracts. A temporary branch is only an integration input; a goal completes after the
+  branches. Git persists/transports work and never isolates writers. Serialized work may use `main`
+  directly when branch policy permits. One host represents one developer: same-host independent
+  sessions use separate one-lease worktrees with shared read visibility regardless of Codex account;
+  different developers/hosts use temporary task branches in separate clones and credential contexts.
+  Concurrent writes need disjoint write sets, exactly one write owner per module or shared surface,
+  and one integrator for shared contracts. For host-loss recovery or transfer, the primary commits
+  and pushes each coherent resumable slice through the declared integration path: directly on `main`
+  for serialized work when branch policy permits, otherwise through the short-lived task branch or
+  protected path. This creates no separate WIP/checkpoint workflow; later uncommitted bytes remain
+  host-local. A temporary branch is only recovery/integration input; a goal completes after the
   published resulting `main` passes its course check, affected review/audit, and verification;
 - whole-repository course checks after planning/discovery and every completed slice, at every major
   milestone and completed goal, at resume or context recovery, on material scope/assumption changes,
@@ -214,13 +223,21 @@ changed sources current once per durable local Codex turn after local hash-bound
 - an always-read primary-agent workflow that uses exact search for known anchors, semantic retrieval
   early for broad orientation or unclear cross-file ownership, and direct matched-source reads
   before claims or edits;
-- exactly one validated SessionStart attestation hook plus one Stop hook. SessionStart exposes only
-  safe metadata for a recent repository-bound sealed handover and asks the developer before its body
-  may be read through `$resume-project`; the Stop hook is inert before bootstrap and for ephemeral
-  side conversations or other transcriptless contexts, uses the mise-pinned runtime afterward for
-  durable local turns, refreshes incrementally through the sanitized worker, suppresses both refresh
-  and continuation only in the runtime session that sealed a terminal handover, lets a later
-  accepted session stop normally, and keeps local hook trust out of portable source;
+- exactly one preloaded SessionStart/Stop controller contract, bound to external Codex, pnpm, and
+  local hook-shell executables, injected as two narrowly trusted session-only definitions, and
+  verified through Codex's stable `hooks/list` inventory containing exactly those two enabled,
+  hash-exact definitions while an exclusive launcher reservation is held and before the foreground
+  writer is bound; ignored runtime configuration is limited to private non-executable metadata and
+  bounded Codex-persisted model/reasoning preferences beneath tracked project policy. The controller
+  projects that exact policy into every fresh or resumed Codex CLI launch; tracked
+  `.codex/hooks.json` contains no executable handler, any additional hook blocks canonical startup,
+  and no global trust bypass is enabled. SessionStart changes no tracked source or external state;
+  after validation it atomically binds private ignored lease/recovery state, exposes only safe
+  metadata for a recent repository-bound sealed handover, and asks the developer before its body may
+  be read through `$resume-project`; the embedded built-in-only hook client returns bounded durable
+  Stop input to the already-loaded controller, never imports index implementation, suppresses
+  continuation in the runtime session that sealed a terminal handover, lets a later accepted session
+  stop normally, and keeps mutable repository code outside the post-admission trust chain;
 - refusal when the outer project directory already exists and post-copy verification before handoff;
 - refusal when the source has resettable process state or its tracked/portable content changes
   during generation;

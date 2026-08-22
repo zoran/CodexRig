@@ -1,5 +1,4 @@
 /** Owns git runtime isolation behavior for the repository inventory and filesystem boundary. */
-import { spawnSync } from "node:child_process";
 import {
   closeSync,
   constants,
@@ -13,6 +12,10 @@ import {
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import {
+  isTerminalSynchronousProcessResult,
+  spawnSyncWithBoundedIo as spawnSync,
+} from "./runtime-process-io.mjs";
 
 export function cleanGitEnvironment(baseEnvironment = process.env) {
   const environment = { ...baseEnvironment };
@@ -144,24 +147,57 @@ export function isolatedGitArguments({ args = [], gitDirectory, workTree } = {})
   ];
 }
 
+/**
+ * Accepts only a terminal isolated-Git result. Managed process sandboxes can attach a synthetic
+ * spawnSync EPERM even after Git returned an exact exit status and complete output; that one
+ * contradictory marker is normalized here, while true spawn failures, signals, timeouts, wrong
+ * output types, oversized output, and unexpected statuses remain failures.
+ */
+export function isolatedGitResultCompleted(
+  result,
+  { acceptedStatuses = [0], args, encoding = "utf8", maximumOutputBytes },
+) {
+  if (
+    !Array.isArray(acceptedStatuses) ||
+    acceptedStatuses.some((status) => !Number.isInteger(status)) ||
+    !acceptedStatuses.includes(result?.status)
+  ) {
+    return false;
+  }
+  return isTerminalSynchronousProcessResult(result, {
+    args,
+    capturedStreams: ["stdout"],
+    command: "git",
+    encoding,
+    maximumOutputBytes,
+  });
+}
+
 export function localGitExcludeIsInactive({ gitDirectory, workTree } = {}) {
   if (!gitDirectory || !workTree) return false;
-  const resolved = spawnSync(
-    "git",
-    isolatedGitArguments({
-      args: ["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"],
-      gitDirectory,
-      workTree,
-    }),
-    {
-      cwd: workTree,
+  const args = isolatedGitArguments({
+    args: ["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"],
+    gitDirectory,
+    workTree,
+  });
+  const resolved = spawnSync("git", args, {
+    cwd: workTree,
+    encoding: "utf8",
+    env: cleanGitEnvironment(),
+    input: "",
+    maxBuffer: 1024 * 1024,
+    stdio: "pipe",
+    timeout: 20_000,
+  });
+  if (
+    !isolatedGitResultCompleted(resolved, {
+      args,
       encoding: "utf8",
-      env: cleanGitEnvironment(),
-      input: "",
-      stdio: "pipe",
-    },
-  );
-  if (resolved.error || resolved.status !== 0) return false;
+      maximumOutputBytes: 1024 * 1024,
+    })
+  ) {
+    return false;
+  }
   const candidate = resolved.stdout.trim();
   if (!candidate || !path.isAbsolute(candidate) || candidate.includes("\0")) return false;
   if (!existsSync(candidate)) return true;

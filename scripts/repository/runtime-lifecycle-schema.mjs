@@ -103,6 +103,11 @@ export function runtimeLifecycleStatus(owner) {
   if (owner.guard) {
     const holders = inspectGuardHolders(owner.guard);
     if (holders.status === "active" || holders.status === "unknown") return holders.status;
+    // Every supervised spawn creates a durable witness before the command exists and cancels it
+    // only after registration or cleanup. If that witness remains after its grace period, a
+    // permission-obscured same-user FD table could be the unregistered guard holder from the crash
+    // window. Ordinary delegation-free release does not depend on unrelated procfs visibility.
+    if (owner.delegations.length > 0 && !holders.observationComplete) return "unknown";
   }
   if (
     owner.delegations.some(

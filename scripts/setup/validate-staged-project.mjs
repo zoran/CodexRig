@@ -1,5 +1,5 @@
 /** Owns validate staged project behavior for the setup, launch, and portable project boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";

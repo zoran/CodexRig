@@ -838,7 +838,7 @@ test(
         inspectRuntimeLifecycleLock({ root }).owner?.descendants?.some(
           (entry) =>
             entry.identity.pid === targetPid &&
-            /^linux:[a-f0-9-]{36}:\d+$/u.test(entry.identity.startIdentity),
+            /^linux:[a-f0-9-]{36}:\d+:\d+:\d+$/u.test(entry.identity.startIdentity),
         ),
       "dependency child identity registration",
     );

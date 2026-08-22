@@ -18,7 +18,6 @@ import {
   assertGeneratedDependencyFreshnessContract,
   assertGeneratedTaskBranchIntegration,
   assertGeneratedTransferParityContract,
-  assertGeneratedWorkflowPolicyContract,
   assertGeneratedWorkflowRuntime,
   cleanupTemporaryRoots,
   gitState,
@@ -32,6 +31,7 @@ import {
   temporaryRoot,
   textFiles,
 } from "./project-initialization-test-helpers.mjs";
+import { assertGeneratedWorkflowPolicyContract } from "../../.agents/skills/create-project-from-framework/scripts/project-initialization-policy-test-helpers.mjs";
 
 after(cleanupTemporaryRoots);
 
@@ -279,24 +279,33 @@ test("clean project initialization removes inherited state and source-specific t
   assert.match(generatedReadme, /`pnpm setup` creates the ignored `\.context-index\/`/);
   assert.match(
     generatedReadme,
-    /project-local Codex Stop hook\s+refreshes\s+changed\s+indexed\s+sources\s+and\s+validates[\s\S]{0,300}non-null `transcript_path`/,
+    /semantic search refreshes and repairs[\s\S]{0,400}controller-injected Codex Stop lifecycle validates[\s\S]{0,300}non-null `transcript_path`/,
   );
   assert.match(
     generatedContextIndex,
     /Use `context:clean` when complete index deletion is intentional/,
   );
   assert.doesNotMatch(generatedContextIndex, /framework:reset|Every framework reset/);
-  assert.match(generatedCodexReadme, /Review changed hook hashes through\s+`\/hooks`/);
+  assert.match(generatedCodexReadme, /canonical lifecycle needs\s+no manual `\/hooks` approval/);
   assert.equal(
     readFileSync(path.join(generated, ".codex", "hooks.json"), "utf8"),
     readFileSync(path.join(root, ".codex", "hooks.json"), "utf8"),
   );
   assert.equal(
-    existsSync(path.join(generated, "scripts/context/refresh-context-index-on-stop.sh")),
+    existsSync(path.join(generated, "scripts/context/session-stop-lifecycle.mjs")),
     true,
   );
   assert.equal(
-    existsSync(path.join(generated, "scripts/context/refresh-context-index-on-stop.mjs")),
+    existsSync(path.join(generated, "scripts/setup/session-control-hook-command.mjs")),
+    true,
+  );
+  assert.equal(existsSync(path.join(generated, "scripts/setup/startup-codex-process.mjs")), true);
+  assert.equal(
+    existsSync(path.join(generated, "scripts/setup/startup-runtime-executables.mjs")),
+    true,
+  );
+  assert.equal(
+    existsSync(path.join(generated, "scripts/setup/startup-session-controller.mjs")),
     true,
   );
   assertGeneratedWorkflowRuntime(generated);
@@ -322,7 +331,11 @@ test("clean project initialization removes inherited state and source-specific t
     ],
     { cwd: generated, encoding: "utf8", input: "", stdio: "pipe" },
   );
-  assert.equal(focusedVerificationTests.status, 0, focusedVerificationTests.stderr);
+  assert.equal(
+    focusedVerificationTests.status,
+    0,
+    `${focusedVerificationTests.stderr}\n${focusedVerificationTests.stdout}`,
+  );
   const generatedEntrypointCheck = spawnSync(
     process.execPath,
     ["scripts/verify/verification-entrypoints.mjs"],
@@ -401,8 +414,11 @@ test("clean project initialization removes inherited state and source-specific t
     true,
   );
   assert.match(generatedAgents, /`instructions\.md` owns the complete agent workflow/);
-  assert.match(generatedAgents, /checks prerequisites/);
-  assert.match(generatedAgents, /Local Codex memory isolation is repository-local and root-bound/);
+  assert.match(
+    generatedAgents,
+    /validates the explicitly prepared host\/toolchain\/dependency state/,
+  );
+  assert.match(generatedAgents, /Keep local Codex state repository\/worktree-bound/);
   for (const content of [generatedAgents, generatedInstructions]) {
     assert.match(content, /no reliable exact\s+anchor/);
     assert.match(content, /cross-file\s+relationships/);
@@ -417,9 +433,7 @@ test("clean project initialization removes inherited state and source-specific t
     assert.match(content, /(?:no\s+relevant\s+finding\s+remains|zero\s+relevant\s+findings)/i);
     assert.match(content, /fresh\s+audit/i);
   }
-  for (const content of [generatedAgents, generatedInstructions]) {
-    assert.match(content, /Local Codex memory isolation is repository-local and root-bound/i);
-  }
+  assert.match(generatedInstructions, /Local Codex state is repository\/worktree-root-bound/);
   assert.match(generatedInstructions, /audit\s+finding.*reopen/is);
   assert.match(generatedInstructions, /branch\s+policy\s+permits/i);
   assert.match(generatedInstructions, /marker\s+commit/i);

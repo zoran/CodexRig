@@ -1,5 +1,5 @@
 /** Owns context worker output behavior for the repository-local semantic context boundary. */
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import process from "node:process";

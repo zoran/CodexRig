@@ -2,7 +2,7 @@
 /** Owns compatibility matrix behavior for the framework lifecycle and child upgrade boundary. */
 import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -20,7 +20,9 @@ function commandVersion(executable, args, label) {
     encoding: "utf8",
     env: process.env,
     input: "",
+    maxBuffer: 1024 * 1024,
     stdio: "pipe",
+    timeout: 20_000,
   });
   if (result.error || result.status !== 0) throw new Error(`${label} version probe failed.`);
   return `${result.stdout}${result.stderr}`.trim();
