@@ -1,7 +1,6 @@
-/** Verifies context lifecycle behavior for the repository-local semantic context boundary. */
+/** Verifies context lifecycle behavior for the durable project-context and session lifecycle boundary. */
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
   copyFileSync,
@@ -20,32 +19,17 @@ import test from "node:test";
 import { repositoryRuntimeRootIdentity } from "../repository/runtime-session-lease.mjs";
 import { captureProcessIdentity } from "../repository/runtime-process-identity.mjs";
 import {
-  embeddingRuntimeIdentity,
-  inspectModelArtifacts,
-  modelRevisionDirectory,
-  requiredModelArtifactPaths,
-} from "./context-embedding.mjs";
-import { createManifest } from "./context-manifest.mjs";
-import { ensureOwnedIndexDirectory } from "./context-paths.mjs";
-import {
   createCriticalBudgetHandover,
   criticalHandoverMaxAgeMilliseconds,
   discoverRecentCriticalBudgetHandover,
 } from "./critical-budget-handover.mjs";
+import * as handoverLifecycle from "./critical-budget-handover.mjs";
 import { evaluateAutonomousContinuation, runStopLifecycle } from "./session-stop-lifecycle.mjs";
-import { runSearch } from "./search-context.mjs";
-import { discoverSourceFiles } from "./source-policy.mjs";
-import { publishIndex } from "./context-storage.mjs";
 import {
   sessionStartAdditionalContextMaximumBytes,
   sessionStartSuccess,
 } from "../setup/startup-session-context.mjs";
-import {
-  repositoryRoot,
-  storageRecord,
-  temporaryDirectory,
-  write,
-} from "./context-regression-helpers.mjs";
+import { repositoryRoot, temporaryDirectory, write } from "./context-regression-helpers.mjs";
 
 function workState(overrides = {}) {
   return {
@@ -88,15 +72,13 @@ function writeRuntimeSessionLease(projectRoot, startedAt, codexSessionId = rando
   writeFileSync(
     leasePath,
     `${JSON.stringify({
-      schemaVersion: 5,
+      schemaVersion: 6,
       codexProcess: processIdentity,
       codexSessionId,
       phase: "active",
       process: processIdentity,
-      resumeSessionId: codexSessionId,
       root: repositoryRuntimeRootIdentity(projectRoot),
       sessionId: runtimeSessionId,
-      sessionSource: "resume",
       startedAt,
       writerPhase: "bound",
       writerProcess: processIdentity,
@@ -132,17 +114,15 @@ function stopHookInput(overrides = {}) {
   });
 }
 
-test("preloaded Stop lifecycle preserves continuation and terminal handover without an index", async () => {
+test("preloaded Stop lifecycle preserves continuation and terminal handover", async () => {
   const project = temporaryDirectory("context-stop-lifecycle-");
   copyFrameworkContract(project);
   mkdirSync(path.join(project, ".codex"));
   writeWorkingContext(project, workState());
 
-  assert.equal(existsSync(path.join(project, ".context-index")), false);
   const activeOutput = await runStopLifecycle({ root: project, hookInput: stopHookInput() });
   assert.equal(activeOutput.decision, "block");
   assert.match(activeOutput.reason, /Continue the already-authorized outcome autonomously/u);
-  assert.equal(existsSync(path.join(project, ".context-index")), false);
 
   const now = Date.now();
   writeRuntimeSessionLease(project, new Date(now - 1_000).toISOString());
@@ -156,7 +136,6 @@ test("preloaded Stop lifecycle preserves continuation and terminal handover with
   assert.equal(Object.hasOwn(sealedOutput, "decision"), false);
   assert.match(sealedOutput.systemMessage, /critical-budget handover is sealed/u);
   assert.match(sealedOutput.systemMessage, /Stop completely/u);
-  assert.equal(existsSync(path.join(project, ".context-index")), false);
 });
 
 test("Stop lifecycle never touches active work from an ephemeral side conversation", async () => {
@@ -439,6 +418,107 @@ test("critical-budget handover seals privately, asks before resume, and terminat
   assert.equal(discoverRecentCriticalBudgetHandover({ root: unsafeParent, now: () => now }), null);
 });
 
+// Problem: sealed handovers had no exact receiving/acknowledgement lifecycle and could be offered again.
+// Contract: a later canonical session reads the complete bound artifact and acknowledges only unchanged bytes.
+test("handover receipt and acknowledgement consume only the exact unchanged later-session artifact", () => {
+  const project = temporaryDirectory("handover-receipt-");
+  copyFrameworkContract(project);
+  const now = Date.now();
+  writeRuntimeSessionLease(project, new Date(now - 1_000).toISOString());
+  writeWorkingContext(project, workState(), criticalDrainBody);
+  const sealed = createCriticalBudgetHandover({ root: project, now: () => now });
+  const target = path.join(project, sealed.relativePath);
+  const before = readFileSync(target, "utf8");
+  const options = { root: project, relativePath: sealed.relativePath };
+  assert.equal(typeof handoverLifecycle.receiveCriticalBudgetHandover, "function");
+  assert.equal(typeof handoverLifecycle.acknowledgeCriticalBudgetHandover, "function");
+  assert.throws(() => handoverLifecycle.receiveCriticalBudgetHandover(options), /later.*session/u);
+  writeRuntimeSessionLease(project, new Date(now + 1_000).toISOString());
+  const received = handoverLifecycle.receiveCriticalBudgetHandover(options);
+  assert.equal(received.content, before);
+  assert.equal(received.sha256, createHash("sha256").update(before).digest("hex"));
+  assert.equal(readFileSync(target, "utf8"), before);
+  const acknowledgement = { ...options, expectedSha256: received.sha256 };
+  assert.throws(
+    () =>
+      handoverLifecycle.acknowledgeCriticalBudgetHandover({
+        ...acknowledgement,
+        expectedSha256: "0".repeat(64),
+      }),
+    /digest/u,
+  );
+  assert.throws(
+    () =>
+      handoverLifecycle.receiveCriticalBudgetHandover({
+        ...options,
+        relativePath: `../${sealed.relativePath}`,
+      }),
+    /path/u,
+  );
+  assert.throws(
+    () =>
+      handoverLifecycle.receiveCriticalBudgetHandover({
+        ...options,
+        relativePath: target,
+      }),
+    /path/u,
+  );
+  writeFileSync(target, `${before}\nchanged`, "utf8");
+  assert.throws(() => handoverLifecycle.acknowledgeCriticalBudgetHandover(acknowledgement));
+  assert.equal(existsSync(target), true);
+  writeFileSync(target, before, "utf8");
+  assert.throws(
+    () =>
+      handoverLifecycle.acknowledgeCriticalBudgetHandover({
+        ...acknowledgement,
+        testHooks: {
+          beforeHandoverAcknowledge() {
+            writeFileSync(target, `${before}\nchanged`, "utf8");
+          },
+        },
+      }),
+    /identity|content/u,
+  );
+  assert.equal(existsSync(target), true);
+  writeFileSync(target, before, "utf8");
+  assert.throws(
+    () =>
+      handoverLifecycle.acknowledgeCriticalBudgetHandover({
+        ...acknowledgement,
+        testHooks: {
+          beforeHandoverAcknowledge() {
+            writeRuntimeSessionLease(project, new Date(now + 2_000).toISOString());
+          },
+        },
+      }),
+    /session changed/u,
+  );
+  assert.equal(readFileSync(target, "utf8"), before);
+  const foreign = temporaryDirectory("handover-receipt-foreign-");
+  copyFrameworkContract(foreign);
+  writeRuntimeSessionLease(foreign, new Date(now + 2_000).toISOString());
+  const foreignTarget = path.join(foreign, sealed.relativePath);
+  mkdirSync(path.dirname(foreignTarget), { recursive: true, mode: 0o700 });
+  writeFileSync(foreignTarget, before, { mode: 0o600 });
+  assert.throws(
+    () =>
+      handoverLifecycle.acknowledgeCriticalBudgetHandover({
+        ...acknowledgement,
+        root: foreign,
+      }),
+    /another repository/u,
+  );
+  assert.equal(readFileSync(foreignTarget, "utf8"), before);
+  const unrelated = path.join(path.dirname(target), "unrelated.txt");
+  writeFileSync(unrelated, "preserve\n", { mode: 0o600 });
+  const result = handoverLifecycle.acknowledgeCriticalBudgetHandover(acknowledgement);
+  assert.equal(result.relativePath, sealed.relativePath);
+  assert.equal(existsSync(target), false);
+  assert.equal(readFileSync(unrelated, "utf8"), "preserve\n");
+  assert.equal(discoverRecentCriticalBudgetHandover({ root: project }), null);
+  assert.throws(() => handoverLifecycle.acknowledgeCriticalBudgetHandover(acknowledgement));
+});
+
 test("Stop lifecycle rejects unsafe or ambiguous working context without exposing paths", () => {
   const project = temporaryDirectory("autonomous-stop-invalid-");
   const outside = temporaryDirectory("autonomous-stop-outside-");
@@ -509,251 +589,4 @@ test("Stop lifecycle rejects unsafe or ambiguous working context without exposin
   const formatted = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
   assert.equal(formatted.decision, "block");
   assert.match(formatted.systemMessage, /nextAction must be bounded plain text/);
-});
-
-function environmentSnapshot(names) {
-  return new Map(names.map((name) => [name, process.env[name]]));
-}
-
-function restoreEnvironment(snapshot) {
-  for (const [name, value] of snapshot) {
-    if (value === undefined) delete process.env[name];
-    else process.env[name] = value;
-  }
-}
-
-function treeSnapshot(root) {
-  const snapshot = [];
-  const pending = [{ absolutePath: root, relativePath: "" }];
-  while (pending.length > 0) {
-    const current = pending.pop();
-    for (const entry of readdirSync(current.absolutePath, { withFileTypes: true })) {
-      const relativePath = current.relativePath
-        ? `${current.relativePath}/${entry.name}`
-        : entry.name;
-      const absolutePath = path.join(current.absolutePath, entry.name);
-      const stats = lstatSync(absolutePath, { bigint: true });
-      const record = {
-        path: relativePath,
-        type: entry.isDirectory() ? "directory" : entry.isFile() ? "file" : "other",
-        bytes: stats.size.toString(),
-        modified: stats.mtimeNs.toString(),
-        changed: stats.ctimeNs.toString(),
-      };
-      if (entry.isDirectory()) pending.push({ absolutePath, relativePath });
-      else if (entry.isFile()) {
-        record.hash = createHash("sha256").update(readFileSync(absolutePath)).digest("hex");
-      }
-      snapshot.push(record);
-    }
-  }
-  return snapshot.sort((left, right) => left.path.localeCompare(right.path));
-}
-
-async function currentIndexFixture() {
-  const root = temporaryDirectory("context-read-only-status-");
-  execFileSync("git", ["init", "-q"], { cwd: root });
-  write(root, "README.md", "# Read-only status fixture\n");
-  execFileSync("git", ["add", "README.md"], { cwd: root });
-  const indexDirectory = path.join(root, ".context-index");
-  const databasePath = path.join(indexDirectory, "lancedb");
-  const manifestPath = path.join(indexDirectory, "manifest.json");
-  const modelCachePath = path.join(indexDirectory, "model-cache");
-  ensureOwnedIndexDirectory({ repositoryRoot: root, indexDirectory });
-  const selectedModelDirectory = modelRevisionDirectory(modelCachePath);
-  for (const artifactPath of requiredModelArtifactPaths) {
-    write(selectedModelDirectory, artifactPath, `fixture ${artifactPath}\n`);
-  }
-  const discovered = discoverSourceFiles({ repositoryRoot: root });
-  const [{ content: _content, ...sourceFile }] = discovered.files;
-  const chunk = { id: "status-fixture-chunk", embeddingHash: "a".repeat(64) };
-  const files = [{ ...sourceFile, headings: [], symbols: [], imports: [], chunks: [chunk] }];
-  const manifest = createManifest({
-    files,
-    skippedFiles: discovered.skipped,
-    excludedFiles: discovered.excluded,
-    chunks: [chunk],
-    modelArtifacts: inspectModelArtifacts(modelCachePath, { includeHash: true }),
-    runtimeIdentity: embeddingRuntimeIdentity(),
-    sourceMode: discovered.sourceMode,
-    buildStats: {
-      reusedChunks: 0,
-      embeddedChunks: 1,
-      embeddedVectors: 1,
-      addedFiles: 1,
-      changedFiles: 0,
-      removedFiles: 0,
-      processedFiles: 1,
-      databaseModificationOperations: 0,
-    },
-    databasePath: ".context-index/lancedb",
-    tableName: "context_chunks",
-  });
-  await publishIndex({
-    indexDirectory,
-    databasePath,
-    manifestPath,
-    tableName: "context_chunks",
-    records: [
-      {
-        ...storageRecord(0, "Read-only status fixture", sourceFile.path),
-        id: chunk.id,
-        contentHash: sourceFile.hash,
-        embeddingHash: chunk.embeddingHash,
-      },
-    ],
-    manifest,
-  });
-  return { databasePath, indexDirectory, manifestPath, root };
-}
-
-test("high-level semantic search performs maintenance before its bounded query", async () => {
-  const root = temporaryDirectory("context-search-maintenance-");
-  const indexDirectory = path.join(root, ".context-index");
-  ensureOwnedIndexDirectory({ repositoryRoot: root, indexDirectory });
-  mkdirSync(path.join(indexDirectory, "lancedb", "context_chunks.lance"), { recursive: true });
-  const staleCandidate = path.join(indexDirectory, "manifest.next-49.json");
-  writeFileSync(staleCandidate, "stale candidate\n");
-  const environment = environmentSnapshot([
-    "CONTEXT_INDEX_DIRECTORY",
-    "CONTEXT_INDEX_ROOT",
-    "CONTEXT_INDEX_TEST_MODE",
-  ]);
-  process.env.CONTEXT_INDEX_TEST_MODE = "1";
-  process.env.CONTEXT_INDEX_ROOT = root;
-  process.env.CONTEXT_INDEX_DIRECTORY = indexDirectory;
-  try {
-    const libraryUrl = new URL("./context-index-lib.mjs", import.meta.url);
-    libraryUrl.searchParams.set("fixture", `${Date.now()}-${Math.random()}`);
-    const library = await import(libraryUrl.href);
-    const row = {
-      id: "maintenance-result",
-      path: "docs/maintenance.md",
-      startLine: 1,
-      endLine: 2,
-      text: "Maintenance runs before semantic retrieval.",
-      headingsText: "Maintenance",
-      symbolsText: "",
-      importsText: "",
-      _distance: 0.1,
-    };
-    const results = await library.searchIndex("maintenance retrieval", {
-      limit: 1,
-      embedQuery: async () => [[1, 0, 0]],
-      querySelectedDatabase: async () => {
-        assert.equal(existsSync(staleCandidate), false);
-        return { denseResults: [row], allRows: [row] };
-      },
-    });
-    assert.equal(results[0].path, row.path);
-    assert.equal(existsSync(staleCandidate), false);
-    assert.equal(existsSync(path.join(indexDirectory, "model-cache")), false);
-  } finally {
-    restoreEnvironment(environment);
-  }
-});
-
-test("search command reports one sanitized maintenance summary and preserves results", async () => {
-  const output = [];
-  const originalLog = console.log;
-  console.log = (...values) => output.push(values.join(" "));
-  try {
-    const row = { id: "result", path: "docs/result.md", text: "result" };
-    const result = await runSearch(
-      { query: "bounded result", limit: 1, retry: true },
-      {
-        describeBuildStats: () => "unused",
-        describeFreshness: () => "current",
-        describeMaintenance: () => "removed 1 validated stale artifact(s)",
-        ensureFreshIndex: async () => ({
-          manifest: {},
-          freshness: { fresh: true },
-          initialFreshness: { reason: "current" },
-          rebuilt: false,
-          maintenance: { removedManifestGenerations: 1 },
-        }),
-        forceRepairIndex: () => assert.fail("fresh search must not repair"),
-        maintenanceChanged: () => true,
-        searchIndex: async (_query, options) => {
-          assert.equal(options.maintenance, false);
-          return [row];
-        },
-      },
-    );
-    assert.deepEqual(result.results, [row]);
-    assert.deepEqual(output, ["Context index maintenance: removed 1 validated stale artifact(s)"]);
-  } finally {
-    console.log = originalLog;
-  }
-});
-
-test("search never downgrades a database path safety failure to corruption repair", async () => {
-  /** Models the database safety error contract without importing the production implementation. */
-  class FixtureDatabaseSafetyError extends Error {}
-  const failure = new FixtureDatabaseSafetyError("unsafe selected database path");
-  await assert.rejects(
-    runSearch(
-      { query: "safe boundary", limit: 1, retry: true },
-      {
-        ContextDatabaseSafetyError: FixtureDatabaseSafetyError,
-        ensureFreshIndex: async () => ({
-          manifest: { stats: { chunks: 1 } },
-          freshness: { fresh: true },
-          rebuilt: false,
-          maintenance: {},
-        }),
-        searchIndex: async () => {
-          throw failure;
-        },
-        forceRepairIndex: () => assert.fail("safety errors must not trigger database repair"),
-        maintenanceChanged: () => false,
-      },
-    ),
-    (error) => error === failure,
-  );
-});
-
-test("context check preserves a valid database and transaction journal", async () => {
-  const fixture = await currentIndexFixture();
-  const lancedb = await import("@lancedb/lancedb");
-  let database = await lancedb.connect(fixture.databasePath);
-  let table = await database.openTable("context_chunks");
-  const selectedVersion = await table.version();
-  await database.close();
-  const journalPath = path.join(fixture.indexDirectory, "database-transaction.json");
-  write(
-    fixture.indexDirectory,
-    "database-transaction.json",
-    `${JSON.stringify({
-      version: 1,
-      beforeVersion: selectedVersion,
-      targetManifestHash: "f".repeat(64),
-      createdAt: new Date().toISOString(),
-    })}\n`,
-  );
-  const beforeTree = treeSnapshot(fixture.indexDirectory);
-  const beforeManifest = readFileSync(fixture.manifestPath);
-  const beforeJournal = readFileSync(journalPath);
-  const checkScript = path.join(repositoryRoot, "scripts/context/check-context-index.mjs");
-  const result = spawnSync(process.execPath, [checkScript], {
-    cwd: repositoryRoot,
-    env: {
-      ...process.env,
-      CONTEXT_INDEX_TEST_MODE: "1",
-      CONTEXT_INDEX_ROOT: fixture.root,
-      CONTEXT_INDEX_DIRECTORY: fixture.indexDirectory,
-    },
-    encoding: "utf8",
-    timeout: 10_000,
-  });
-  assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /interrupted context index state requires maintenance/);
-  assert.deepEqual(readFileSync(fixture.manifestPath), beforeManifest);
-  assert.deepEqual(readFileSync(journalPath), beforeJournal);
-  assert.deepEqual(treeSnapshot(fixture.indexDirectory), beforeTree);
-  assert.equal(existsSync(path.join(fixture.root, ".codex", "runtime")), false);
-  database = await lancedb.connect(fixture.databasePath);
-  table = await database.openTable("context_chunks");
-  assert.equal(await table.version(), selectedVersion);
-  await database.close();
 });

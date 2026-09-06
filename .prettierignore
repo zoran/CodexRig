@@ -1,3 +1,4 @@
+# Excludes generated and local artifacts from formatting; source inventory also masks private runtime.
 node_modules/
 .pnpm-store/
 pnpm-lock.yaml
@@ -11,7 +12,6 @@ playwright-report/
 blob-report/
 playwright/.auth/
 .codex/*
-.context-index/
 backup/
 backups/
 *.bak

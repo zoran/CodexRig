@@ -244,6 +244,45 @@ test("managed-surface removal receives a major release", (t) => {
   assert.equal(plan.minimumVersion, "3.0.0");
 });
 
+test("policy reconciliation documents follow their own framework snapshot across retirement", (t) => {
+  const root = fixture(t);
+  const contract = JSON.parse(readFileSync(path.join(root, ".codexrig/framework.json"), "utf8"));
+  const projection = JSON.parse(
+    readFileSync(path.join(root, ".codexrig/policy-projection.json"), "utf8"),
+  );
+  const document = "docs/operations.md";
+  contract.upgrade.projectOwnedDocuments.push(document);
+  projection.policies[0].reconcileDocuments.push(document);
+  projection.policies[0].version += 1;
+  write(root, ".codexrig/framework.json", serializeCanonicalJson(contract));
+  write(root, ".codexrig/policy-projection.json", serializeCanonicalJson(projection));
+  write(root, document, "# Operations\n\nOwns the fixture operations policy.\n");
+  git(root, ["add", "--all"]);
+  git(root, ["commit", "--quiet", "-m", "publish owned operations document"]);
+  git(root, ["push", "--quiet", "origin", "main"]);
+
+  contract.upgrade.projectOwnedDocuments = contract.upgrade.projectOwnedDocuments.filter(
+    (entry) => entry !== document,
+  );
+  write(root, ".codexrig/framework.json", serializeCanonicalJson(contract));
+  assert.throws(
+    () => frameworkVersionReconciliationPlan({ root }),
+    /reconcileDocuments contains unsupported value docs\/operations\.md/u,
+  );
+  projection.policies[0].reconcileDocuments = projection.policies[0].reconcileDocuments.filter(
+    (entry) => entry !== document,
+  );
+  projection.policies[0].version += 1;
+  write(root, ".codexrig/policy-projection.json", serializeCanonicalJson(projection));
+  rmSync(path.join(root, document));
+
+  const plan = frameworkVersionReconciliationPlan({ root });
+  assert.equal(plan.requiredBump, "major");
+  assert.equal(plan.targetVersion, "3.0.0");
+  applyHousekeepingWrites({ root, writes: plan.writes });
+  assert.deepEqual(frameworkVersionReconciliationPlan({ root }).writes, []);
+});
+
 test("policy content cannot change without its own policy-version increment", (t) => {
   const root = fixture(t);
   const projectionPath = path.join(root, ".codexrig/policy-projection.json");

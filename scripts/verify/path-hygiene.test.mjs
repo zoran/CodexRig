@@ -89,7 +89,7 @@ test("default Product Root rejects missing, redirected, and nested agent state",
   ]);
 });
 
-test("declared workspace and Android units reject nested agent or vector state", (t) => {
+test("declared workspace and Android units reject nested agent state", (t) => {
   const root = mkdtempSync(path.join(tmpdir(), "product-units-polluted-"));
   t.after(() => rmSync(root, { force: true, recursive: true }));
   mkdirSync(path.join(root, "src"));
@@ -97,7 +97,7 @@ test("declared workspace and Android units reject nested agent or vector state",
   writeFileSync(path.join(root, "pnpm-workspace.yaml"), "packages:\n  - 'apps/*'\n");
   mkdirSync(path.join(root, "apps", "web", "src"), { recursive: true });
   writeFileSync(path.join(root, "apps", "web", "package.json"), '{"name":"web"}\n');
-  mkdirSync(path.join(root, "apps", "web", ".context-index"));
+  mkdirSync(path.join(root, "apps", "web", ".codex"));
   writeFileSync(path.join(root, "settings.gradle.kts"), 'include(":app")\n');
   mkdirSync(path.join(root, "app", "src", "main"), { recursive: true });
   writeFileSync(path.join(root, "app", "build.gradle.kts"), "plugins {}\n");
@@ -106,7 +106,7 @@ test("declared workspace and Android units reject nested agent or vector state",
 
   assert.deepEqual(productSourceBoundaryFindings({ repositoryRoot: root }), [
     "app/.agents: agent-only path is forbidden inside product unit app",
-    "apps/web/.context-index: agent-only path is forbidden inside product unit apps/web",
+    "apps/web/.codex: agent-only path is forbidden inside product unit apps/web",
   ]);
 });
 

@@ -126,7 +126,7 @@ test("verification children use the runtime-bound environment owner", () => {
   assert.equal(verificationChildEnvironment, runtimeChildEnvironment);
   const child = verificationChildEnvironment({
     BASH_ENV: "/tmp/attack",
-    CONTEXT_INDEX_OFFLINE: "1",
+    IMAGE_ASSET_OFFLINE: "1",
     ENV: "/tmp/attack",
     IMAGE_ASSET_MAX_BYTES: "9999999",
     NODE_OPTIONS: "--require=/tmp/preload.cjs",
@@ -145,7 +145,7 @@ test("verification children use the runtime-bound environment owner", () => {
   assert.equal(child.PNPM_CONFIG_NODE_OPTIONS, undefined);
   assert.equal(child.PNPM_CONFIG_SCRIPT_SHELL, undefined);
   assert.equal(child.TEST_FORCE_FAILURE, undefined);
-  assert.equal(child.CONTEXT_INDEX_OFFLINE, "1");
+  assert.equal(child.IMAGE_ASSET_OFFLINE, "1");
   assert.equal(child.IMAGE_ASSET_MAX_BYTES, "9999999");
   assert.equal(child.PATH, "/safe/bin");
   assert.equal(child.PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN, "error");

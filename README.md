@@ -1,7 +1,7 @@
 # CodexRig Framework
 
 CodexRig is a reusable, production-ready, code-first framework for isolated Codex projects. It
-provides portable policy, compatible dependency maintenance, semantic retrieval, modular
+provides portable policy, compatible dependency maintenance, durable context recovery, modular
 architecture guardrails, provider-neutral Git automation, and risk-based verification without
 imposing a product stack.
 
@@ -23,7 +23,7 @@ canonical entry point with `--yolo`:
 bash scripts/setup/start-codex.sh --yolo
 ```
 
-`--yolo` is a launcher control and therefore belongs before an optional `--` prompt delimiter.
+Only `--no-alt-screen` and `--yolo` are launcher controls. Enter prompts after selecting a session.
 Changing permissions in the UI or parent runtime after a safe launch can change the effective live
 permissions, but it cannot retroactively turn that session's startup attestation into a canonical
 YOLO attestation. The tracked portable config intentionally remains on-request, network-disabled
@@ -33,19 +33,23 @@ so every child still reports its effective runtime permissions before repository
 Dev-only and does not grant credentials, broaden task scope, authorize unrelated external mutations,
 or apply to staging or production.
 
-Canonical start is deterministic and network-free. It does not update the host CLI, install the
-toolchain, or change the dependency graph. Instead it validates the already prepared locked runtime,
-portable policy, model/license contract, and local framework health, then replaces itself with the
-mise-pinned session controller. The controller binds external executables, accepts only bounded
-non-executable runtime metadata and Codex-persisted model/reasoning preferences, rejects executable
-or unknown ignored runtime configuration, and explicitly projects the tracked Sol/`ultra` policy
-into every fresh or resumed Codex CLI launch. It reserves one current-schema writer lease and uses
-Codex's stable `hooks/list` interface to require exactly the two session-owned, enabled, hash-exact
-trusted lifecycle hooks. Only then does it start the gated foreground supervisor and bind the exact
-Codex child. This gated preloaded supervisor keeps the repository controller immutable while the
-child is active. SessionStart activates the lease and recovery marker; terminal authenticated child
-proof is required before release. The detailed process, crash, fallback, and ownership invariants
-have one canonical description in [Project Instructions](instructions.md#session-start).
+Canonical start follows `codex update && CODEX_HOME="$PWD" codex resume --cd "$PWD"`: it updates the
+host CLI first and stops if the update fails. It does not install the toolchain or change the
+dependency graph. It then validates the already prepared locked runtime, portable policy,
+model/license contract, and local framework health, then replaces itself with the mise-pinned
+session controller. The controller binds external executables, accepts only bounded non-executable
+runtime metadata and Codex-persisted model/reasoning preferences, rejects executable or unknown
+ignored runtime configuration, and explicitly projects the tracked Astra/`ultra` policy into the
+native resume picker without a fixed session ID or `--last`. Codex uses the repository root as
+`CODEX_HOME`; private framework coordination stays in ignored `.codex/runtime/`. It reserves one
+current-schema writer lease and uses Codex's stable `hooks/list` interface to require exactly the
+two session-owned, enabled, hash-exact trusted lifecycle hooks. Only then does it start the gated
+foreground supervisor and bind the exact Codex child. This gated preloaded supervisor keeps the
+repository controller immutable while the child is active. SessionStart activates the lease and
+recovery marker; terminal authenticated child proof is required before release. Cancelling the
+picker creates no session/recovery record and never triggers an automatic replacement session. The
+detailed process, crash, and ownership invariants have one canonical description in
+[Project Instructions](instructions.md#session-start).
 
 Portable TOML, project policy, and runtime-config validation have one constrained implementation;
 the launcher uses that same owner before it admits a session.
@@ -55,8 +59,8 @@ new slice: manifest and bounded work state, roots/modules/surfaces/contracts, da
 tests/docs/composition, Git/upstream, every same-clone worktree, and safe latest-session recovery
 metadata. It automatically resumes the unique coherent unfinished stream or consolidates only
 unambiguous residue, preserves incompatible ambiguity and active writers, and course-checks the
-result. Exact paths and `rg` handle known anchors; semantic retrieval handles unclear ownership and
-cross-file relationships without blindly loading the repository.
+result. Exact paths and `rg` handle known anchors; manifest-led discovery traces unclear ownership
+and cross-file relationships through actual source without loading the whole repository.
 
 Prepare or refresh the host and repository explicitly before first use and whenever the toolchain,
 dependency policy, or online compatibility evidence changes. Install or update Codex through the
@@ -74,7 +78,8 @@ this framework. Then preview and apply the bounded reset; never delete `.codex/r
 
 ```bash
 mise exec --locked -- pnpm framework:reset
-mise exec --locked -- pnpm framework:reset -- --apply
+mise exec --locked -- pnpm framework:reset --apply
+mise exec --locked -- pnpm framework:reset
 bash scripts/setup/start-codex.sh
 ```
 
@@ -115,9 +120,8 @@ it or—only when decision-ready—begin from confirmed scope. An incomplete def
 focused interview before dependent implementation.
 
 Generation never initializes Git, commits, or pushes. It removes only active-session-safe source
-residue, preserves runtime and `.context-index/`, and prints the exact post-exit reset sequence.
-Optional verification/staging/commit/push guidance appears only when the source worktree has
-changes.
+residue, preserves runtime, and prints the exact post-exit reset sequence. Optional
+verification/staging/commit/push guidance appears only when the source worktree has changes.
 
 ## Framework Capability Map
 
@@ -175,6 +179,17 @@ linked sections of [Project Instructions](instructions.md).
 
 ### Delivery And Quality
 
+- Approved work continues across intermediate checks, recaps, and additive questions; only explicit
+  pause/replacement or a real scope, safety, permission, capacity, or integration boundary
+  interrupts it. Explicitly requested native Codex Goals provide multi-turn continuation;
+  `pnpm goal:new` checks publication and does not create Goals. A finished slice is not the
+  completed overall outcome.
+- Existing UI appearance, navigation, and interactions are preserved unless a material redesign is
+  approved. New UI gets an early representative-flow review; affected real rendered states provide
+  evidence that source checks and screenshots of a different state cannot replace. These decisions
+  stay with existing manifest/design/component owners, not another framework subsystem.
+  `$ui-ux-review` checks the actual affected experience; `$system-coherence` covers code quality and
+  assembled integration. Review-only requests never authorize repairs.
 - Delivery defaults to `dev`. The newest developer build/deploy and manual feedback outrank agent
   test generation/execution, which run isolated in parallel or afterward; latest-wins replaces stale
   Dev work. Portable Codex sessions default to on-request approval and network-disabled
@@ -245,7 +260,7 @@ linked sections of [Project Instructions](instructions.md).
   gates remain mandatory. There is no separate WIP/checkpoint workflow; anything newer and
   uncommitted remains host-local.
 - The primary admits at most four live subagents only when independent scope and completion reserve
-  justify them. Primary and subagents use the exact same configured GPT Sol model with `ultra`
+  justify them. Primary and subagents use the exact same configured GPT Astra model with `ultra`
   reasoning; global delegated defaults and roles match, and no spawn override differs. Within one
   primary-owned local run, writers may share a checkout only under continuously monitored exact
   disjoint file ownership. Across same-host independent sessions they use dedicated disjoint
@@ -270,7 +285,10 @@ linked sections of [Project Instructions](instructions.md).
   English prompt in ignored `tmp/codexrig-handovers/` as the final repository action. Success means
   that runtime session must stop completely—no later tool, check, task, follow-up, agent contact, or
   continuation. A later SessionStart asks before `$resume-project` may use that exact untrusted
-  handover; after acceptance, the later session may continue, refresh, and stop normally.
+  handover. The later session receives the complete artifact with `handover:receive`, acknowledges
+  its meaning in the conversation, and uses `handover:acknowledge` with the received digest to
+  remove only that unchanged file. This does not erase native conversation/provider history. After
+  acceptance, the later session may continue, refresh, and stop normally.
 
 ### Framework Lifecycle And Transparency
 
@@ -297,22 +315,36 @@ pnpm compatibility:matrix
 pnpm worktree:status -- --json
 pnpm verify:changed -- --print-plan
 pnpm verify
-pnpm context:search -- "query"
 pnpm handover:create -- --critical       # terminal critical-capacity seal
 pnpm project:export
 pnpm framework:reset
 pnpm framework:reset --apply
+pnpm framework:publish --message "<commit message>"  # after exiting Codex
 ```
 
 The handover command is not routine housekeeping. After it reports a sealed path, the Codex session
 must stop without another action.
 
-For the source framework, final publication order is verification, Codex exit, reset preview,
-reviewed apply, clean preview, commit, then push. Reset removes obsolete process/runtime/index state
-while retaining only approved runtime identity and exact publication evidence. It holds the
-lifecycle lock, proves repository-wide runtime quiescence, and discards an incompatible private
-lease without interpreting another schema. Pre-push repeats the clean reset preview and
-security/evidence checks.
+After reviewing all source changes, exit every Codex session for this framework and run one command
+from its root:
+
+```bash
+mise exec --locked -- pnpm framework:publish --message "GPT 6 Upgrade"
+```
+
+This explicitly authorizes publication of all non-ignored source changes on `main`. The command
+checks worktree ownership and the unique central upstream, refreshes its tracking ref, previews and
+applies the reset, confirms a clean preview, runs housekeeping, installs the managed Git hook, and
+invokes `pnpm verify`. It resets temporary verification residue, stages and commits the exact
+verified source, pushes through `pre-push`, confirms remote `main`, and checks `goal:new`. An
+unchanged source tree creates no empty commit; a rejected push preserves the local commit for a
+later retry. Any failed gate stops the sequence. Commit and push never run while a Codex session
+owns the runtime.
+
+Reset removes obsolete process/runtime state while retaining only approved runtime identity and
+exact publication evidence. It holds the lifecycle lock and proves repository-wide runtime
+quiescence. Pre-push repeats the clean reset preview and security/evidence checks. The publisher is
+source-framework tooling and is excluded from generated projects.
 
 ## Repository Housekeeping
 
@@ -340,8 +372,19 @@ Every framework element remains visible, but each concern has one canonical owne
 the always-loaded safe-entry bootstrap capped at 24 KiB; `instructions.md` owns complete policy;
 this README owns human setup/use; the manifest owns current reality; Future Modules owns deferred
 ideas; and skills load progressively. Secondary documents summarize and link rather than duplicate
-policy. `docs:check` and housekeeping enforce meaningful H1/H2 anchors, hierarchy, local links, and
-the bootstrap budget. Larger context windows do not make duplicated or stale prose useful.
+policy. Skills cover specialized work rather than a second orchestration stack: discovery lives in
+[Context And Skills](instructions.md#context-and-skills), and review selection in `$task-quality`.
+Native implicit invocation remains the default; an explicitly chosen explicit-only skill can set
+`policy.allow_implicit_invocation: false`.
+
+Superpowers is not bundled or required. The implementation workflow uses hypothesis-driven
+root-cause investigation, informed by
+[Superpowers debugging](https://github.com/obra/superpowers/blob/main/skills/systematic-debugging/SKILL.md);
+skill maintenance uses bounded realistic scenarios. No upstream plugin, planning store, hooks or
+separate subagent workflow is installed by this framework.
+
+`docs:check` and housekeeping enforce meaningful H1/H2 anchors, hierarchy, local links, and the
+bootstrap budget. Larger context windows do not make duplicated or stale prose useful.
 
 ## Update Generated Projects
 
@@ -375,6 +418,5 @@ always retains its license, author credit, and framework credit.
 - [AGENTS.md](AGENTS.md) is the short safe-entry bootstrap.
 - [Project Manifest](docs/project.md) owns current durable truth and active modules.
 - [Future Modules](docs/future-modules.md) owns confirmed deferred candidates only.
-- [Context Index](docs/context-index.md) owns semantic retrieval and freshness.
 - [.codex/README](.codex/README.md) explains portable Codex configuration and private runtime.
 - `.codexrig/` owns versioned framework, compatibility, provider, and upgrade contracts.

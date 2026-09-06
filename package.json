@@ -1,6 +1,6 @@
 {
   "name": "codexrig",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "private": true,
   "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
@@ -11,6 +11,7 @@
     "license:check": "node scripts/verify/licensing.mjs",
     "tenancy:check": "node scripts/verify/tenant-isolation.mjs",
     "framework:reset": "node .agents/skills/reset-framework/scripts/reset-framework.mjs",
+    "framework:publish": "node .agents/skills/reset-framework/scripts/publish-framework.mjs",
     "framework:doctor": "node scripts/framework/framework-doctor.mjs",
     "framework:upgrade": "node scripts/framework/framework-upgrade.mjs",
     "framework:version": "node scripts/framework/framework-version.mjs",
@@ -19,13 +20,10 @@
     "platform:configure": "node scripts/platform/configure-platform.mjs",
     "codex:start": "bash scripts/setup/start-codex.sh",
     "codex:validate": "node scripts/setup/validate-codex-model-policy.mjs",
-    "context:check": "node scripts/context/check-context-index.mjs",
-    "context:clean": "node scripts/context/clean-context-index.mjs",
-    "context:index": "node scripts/context/index-codebase.mjs",
-    "context:search": "node scripts/context/search-context.mjs",
-    "context:test": "node --test scripts/context/context-regression.test.mjs",
-    "context:test:integration": "CONTEXT_TEST_REAL_MODEL=1 node --test --test-name-pattern='warm-offline CLI' scripts/context/context-regression.test.mjs",
+    "context:test": "node --test scripts/context/context-lifecycle.test.mjs scripts/context/portable-context-contract.test.mjs",
     "handover:create": "node scripts/context/critical-budget-handover.mjs create",
+    "handover:receive": "node scripts/context/critical-budget-handover.mjs receive",
+    "handover:acknowledge": "node scripts/context/critical-budget-handover.mjs acknowledge",
     "deps:install": "node scripts/deps/install-compatible.mjs",
     "deps:preflight": "node scripts/deps/verify-pnpm-execution-policy.mjs",
     "deps:report": "node scripts/deps/report.mjs",
@@ -36,7 +34,7 @@
     "format:check": "node scripts/verify/format-project.mjs --check",
     "goal:new": "node scripts/goals/goal-publication-precondition.mjs",
     "hooks:install": "bash scripts/setup/install-git-hooks.sh",
-    "setup": "bash scripts/setup/check-prereqs.sh --codex && node scripts/setup/validate-codex-model-policy.mjs && node scripts/verify/docs.mjs && node scripts/verify/identity-access.mjs && node scripts/verify/tenant-isolation.mjs && node scripts/verify/localization.mjs && node scripts/verify/licensing.mjs && node scripts/verify/secrets.mjs && bash scripts/setup/install-git-hooks.sh && node scripts/context/index-codebase.mjs --setup",
+    "setup": "bash scripts/setup/check-prereqs.sh --codex && node scripts/setup/validate-codex-model-policy.mjs && node scripts/verify/docs.mjs && node scripts/verify/identity-access.mjs && node scripts/verify/tenant-isolation.mjs && node scripts/verify/localization.mjs && node scripts/verify/licensing.mjs && node scripts/verify/secrets.mjs && bash scripts/setup/install-git-hooks.sh",
     "stack:detect": "node scripts/stack/stack-detector.mjs",
     "project:export": "bash scripts/setup/export-project.sh",
     "repo:housekeeping": "node scripts/goals/repository-housekeeping.mjs",
@@ -48,9 +46,6 @@
     "worktree:status": "node scripts/repository/worktree-recovery-cli.mjs"
   },
   "devDependencies": {
-    "@huggingface/transformers": "^4.2.0",
-    "@lancedb/lancedb": "^0.37.1",
-    "onnxruntime-common": "1.24.3",
     "prettier": "^3.9.6"
   }
 }

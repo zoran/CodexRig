@@ -22,6 +22,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   acquireRuntimeLifecycleLock,
+  invalidRuntimeSessionLeaseErrorCode,
   issueRuntimeSessionLease,
   releaseRuntimeLifecycleLock,
   releaseRuntimeSessionLease,
@@ -38,8 +39,11 @@ import {
   releaseDependencyTransactionLock,
 } from "../../../../scripts/deps/dependency-transaction-state.mjs";
 import { openFrameworkRuntimeStatus, removeResetCandidate } from "./reset-framework.mjs";
+import { startupControllerFailureMessage } from "../../../../scripts/setup/startup-session-controller.mjs";
+import { postProjectCreationGuidance } from "../../create-project-from-framework/scripts/source-readiness.mjs";
 
 const script = path.join(path.dirname(fileURLToPath(import.meta.url)), "reset-framework.mjs");
+const frameworkRoot = path.resolve(path.dirname(script), "..", "..", "..", "..");
 
 function write(root, relativePath, content = "fixture\n", mode) {
   const filePath = path.join(root, ...relativePath.split("/"));
@@ -117,6 +121,60 @@ function run(root, args = [], env = {}) {
   });
 }
 
+test("operator reset guidance executes preview, apply, and clean preview through mise and pnpm", async (t) => {
+  const error = new Error("Fixture private lease is not current.");
+  error.code = invalidRuntimeSessionLeaseErrorCode;
+  const guidance = [
+    ["startup recovery", startupControllerFailureMessage(error, frameworkRoot)],
+    ["README recovery", readFileSync(path.join(frameworkRoot, "README.md"), "utf8")],
+    ["project creation", postProjectCreationGuidance({ sourceHasChanges: false }).join("\n")],
+  ];
+  for (const [label, content] of guidance) {
+    await t.test(label, () => {
+      const root = fixture("reset operator guidance ");
+      try {
+        write(root, "history.jsonl", "disposable fixture history\n");
+        write(root, "src/index.ts", "export const product = true;\n");
+        const commands = content
+          .split("\n")
+          .map((line) => {
+            const start = line.indexOf("mise exec --locked -- pnpm framework:reset");
+            return start === -1 ? null : line.slice(start).trim().split(/\s+/u);
+          })
+          .filter(Boolean);
+        for (const [index, [executable, ...args]] of commands.entries()) {
+          const result = spawnSync(executable, [...args, "--root", root], {
+            cwd: frameworkRoot,
+            encoding: "utf8",
+            env: { ...process.env, CODEX_HOME: "" },
+            input: "",
+            stdio: "pipe",
+            timeout: 30_000,
+          });
+          assert.equal(result.error, undefined);
+          assert.equal(result.status, index === 0 ? 1 : 0, result.stderr);
+          assert.match(
+            result.stdout,
+            [
+              /Framework reset would remove:/u,
+              /Framework reset complete;/u,
+              /Framework baseline is clean\./u,
+            ][index],
+          );
+          assert.equal(existsSync(path.join(root, "history.jsonl")), index === 0);
+          assert.equal(
+            readFileSync(path.join(root, "src/index.ts"), "utf8"),
+            "export const product = true;\n",
+          );
+        }
+        assert.equal(commands.length, 3, `${label} must provide the complete reset sequence`);
+      } finally {
+        rmSync(root, { force: true, recursive: true });
+      }
+    });
+  }
+});
+
 test("reset preserves current identity and removes all disposable framework runtime", (t) => {
   const root = fixture();
   t.after(() => rmSync(root, { force: true, recursive: true }));
@@ -125,7 +183,6 @@ test("reset preserves current identity and removes all disposable framework runt
   write(root, "notes/reviews/final-audit.md", "# Final Audit\n");
   write(root, "scripts/planning/create-goal.mjs", "export {};\n");
   write(root, ".project-state/dependency-update/plan.json", "{}\n");
-  write(root, ".context-index/manifest.json", "{}\n");
   write(
     root,
     "tmp/codexrig-handovers/critical-budget-fixture.prompt.md",
@@ -136,9 +193,9 @@ test("reset preserves current identity and removes all disposable framework runt
   write(root, "dist/exports/project.tar.gz", "generated\n");
   write(root, ".codex/auth.json", "obsolete auth\n", 0o600);
   write(root, ".codex/history.jsonl", "obsolete history\n");
-  write(root, ".codex/runtime/auth.json", "current auth\n", 0o600);
-  write(root, ".codex/runtime/config.toml", 'model = "fixture"\n', 0o600);
-  write(root, ".codex/runtime/installation_id", "fixture-installation\n", 0o600);
+  write(root, "auth.json", "current auth\n", 0o600);
+  write(root, "config.toml", 'model = "fixture"\n', 0o600);
+  write(root, "installation_id", "fixture-installation\n", 0o600);
   write(root, ".codex/runtime/cache/codexrig/startup-attestation.json", "{}\n");
   const evidence = currentVerificationEvidence(root);
   writeStaleRuntimeSessionLease(root);
@@ -149,9 +206,9 @@ test("reset preserves current identity and removes all disposable framework runt
     0o600,
   );
   write(root, ".codex/runtime/logs_2.sqlite", "runtime database\n");
-  write(root, "auth.json", "obsolete auth\n", 0o600);
-  write(root, "config.toml", 'model = "obsolete"\n', 0o600);
-  write(root, "installation_id", "obsolete-installation\n", 0o600);
+  write(root, ".codex/runtime/auth.json", "obsolete auth\n", 0o600);
+  write(root, ".codex/runtime/config.toml", 'model = "obsolete"\n', 0o600);
+  write(root, ".codex/runtime/installation_id", "obsolete-installation\n", 0o600);
   write(root, "history.jsonl", "project history fixture\n");
   write(root, "rules/default.rules", 'prefix_rule(pattern=["fixture"], decision="allow")\n');
   write(root, "sessions/thread.jsonl", "project session fixture\n");
@@ -160,10 +217,9 @@ test("reset preserves current identity and removes all disposable framework runt
 
   const preview = run(root);
   assert.equal(preview.status, 1);
-  assert.match(preview.stdout, /^- auth\.json$/mu, preview.stderr);
-  assert.match(preview.stdout, /^- config\.toml$/mu);
-  assert.match(preview.stdout, /^- installation_id$/mu);
-  assert.match(preview.stdout, /\.context-index/);
+  assert.match(preview.stdout, /^- \.codex\/runtime\/auth\.json$/mu, preview.stderr);
+  assert.match(preview.stdout, /^- \.codex\/runtime\/config\.toml$/mu);
+  assert.match(preview.stdout, /^- \.codex\/runtime\/installation_id$/mu);
   assert.match(preview.stdout, /^- \.tmp$/mu);
   assert.match(preview.stdout, /^- tmp$/mu);
   assert.match(preview.stdout, /\.codex\/history\.jsonl/);
@@ -180,7 +236,6 @@ test("reset preserves current identity and removes all disposable framework runt
     "notes/reviews/final-audit.md",
     "scripts/planning",
     ".project-state",
-    ".context-index",
     ".tmp",
     "tmp",
     "dist/exports",
@@ -190,9 +245,9 @@ test("reset preserves current identity and removes all disposable framework runt
     ".codex/runtime/codexrig-session.json",
     ".codex/runtime/codexrig-session-recovery.json",
     ".codex/runtime/logs_2.sqlite",
-    "auth.json",
-    "config.toml",
-    "installation_id",
+    ".codex/runtime/auth.json",
+    ".codex/runtime/config.toml",
+    ".codex/runtime/installation_id",
     "history.jsonl",
     "rules",
     "sessions",
@@ -200,16 +255,10 @@ test("reset preserves current identity and removes all disposable framework runt
   ]) {
     assert.equal(existsSync(path.join(root, ...removed.split("/"))), false, removed);
   }
-  assert.equal(readFileSync(path.join(root, ".codex/runtime/auth.json"), "utf8"), "current auth\n");
-  assert.equal(
-    readFileSync(path.join(root, ".codex/runtime/config.toml"), "utf8"),
-    'model = "fixture"\n',
-  );
-  assert.equal(statSync(path.join(root, ".codex/runtime/auth.json")).mode & 0o777, 0o600);
-  assert.equal(
-    readFileSync(path.join(root, ".codex/runtime/installation_id"), "utf8"),
-    "fixture-installation\n",
-  );
+  assert.equal(readFileSync(path.join(root, "auth.json"), "utf8"), "current auth\n");
+  assert.equal(readFileSync(path.join(root, "config.toml"), "utf8"), 'model = "fixture"\n');
+  assert.equal(statSync(path.join(root, "auth.json")).mode & 0o777, 0o600);
+  assert.equal(readFileSync(path.join(root, "installation_id"), "utf8"), "fixture-installation\n");
   assert.deepEqual(readVerificationEvidence(root), evidence);
   assert.equal(
     readFileSync(path.join(root, "src/index.ts"), "utf8"),
@@ -300,13 +349,12 @@ test("the shared runtime lifecycle lock closes reset and session-start races", (
   }
 });
 
-test("post-project-creation cleanup removes safe residue while preserving active runtime and index", (t) => {
+test("post-project-creation cleanup removes safe residue while preserving active runtime", (t) => {
   const root = fixture("reset-framework-post-creation-");
   t.after(() => rmSync(root, { force: true, recursive: true }));
   write(root, "docs/planning/current-goal.md", "# Safe process residue\n");
   write(root, ".project-state/generator/transaction.json", "{}\n");
   write(root, "dist/exports/generated.tar.gz", "generated\n");
-  write(root, ".context-index/manifest.json", "{}\n");
   write(root, ".codex/runtime/logs_2.sqlite", "active runtime\n");
   write(root, "history.jsonl", "active loose-root runtime\n");
   issueRuntimeSessionLease({ root, pid: process.pid });
@@ -321,7 +369,6 @@ test("post-project-creation cleanup removes safe residue while preserving active
   assert.match(preview.stdout, /docs\/planning/);
   assert.match(preview.stdout, /\.project-state/);
   assert.match(preview.stdout, /dist\/exports/);
-  assert.doesNotMatch(preview.stdout, /\.context-index/);
   assert.doesNotMatch(preview.stdout, /logs_2\.sqlite|history\.jsonl/);
   assert.match(preview.stdout, /--post-project-creation --apply/);
 
@@ -332,7 +379,6 @@ test("post-project-creation cleanup removes safe residue while preserving active
     assert.equal(existsSync(path.join(root, ...removed.split("/"))), false, removed);
   }
   for (const preserved of [
-    ".context-index/manifest.json",
     ".codex/runtime/logs_2.sqlite",
     ".codex/runtime/codexrig-session.json",
     "history.jsonl",
@@ -341,7 +387,7 @@ test("post-project-creation cleanup removes safe residue while preserving active
   }
   const clean = run(root, ["--post-project-creation"]);
   assert.equal(clean.status, 0, clean.stderr);
-  assert.match(clean.stdout, /local runtime and \.context-index are deferred until Codex exits/);
+  assert.match(clean.stdout, /local runtime are deferred until Codex exits/);
 });
 
 test("post-project-creation cleanup cannot overlap an active dependency transaction", (t) => {
@@ -372,7 +418,6 @@ test("portable source baseline ignores contained active runtime but not process 
     rmSync(root, { force: true, recursive: true });
   });
   write(root, "history.jsonl", "active pre-lease fixture\n");
-  write(root, ".context-index/manifest.json", "{}\n");
 
   const clean = run(root, ["--portable-source-baseline"]);
   assert.equal(clean.status, 0, clean.stderr);
@@ -446,19 +491,16 @@ test("a missing Linux proc filesystem is indeterminate rather than inactive", (t
   );
 });
 
-test("reset discards loose-root identity and preserves current runtime identity", (t) => {
+test("reset preserves root Codex identity and discards non-current coordination-home identity", (t) => {
   const root = fixture("reset-framework-conflict-");
   t.after(() => rmSync(root, { force: true, recursive: true }));
-  write(root, "auth.json", "loose-root auth\n", 0o600);
-  write(root, ".codex/runtime/auth.json", "canonical auth\n", 0o600);
+  write(root, ".codex/runtime/auth.json", "non-current auth\n", 0o600);
+  write(root, "auth.json", "canonical auth\n", 0o600);
 
   const applied = run(root, ["--apply"]);
   assert.equal(applied.status, 0, applied.stderr);
-  assert.equal(existsSync(path.join(root, "auth.json")), false);
-  assert.equal(
-    readFileSync(path.join(root, ".codex/runtime/auth.json"), "utf8"),
-    "canonical auth\n",
-  );
+  assert.equal(existsSync(path.join(root, ".codex/runtime/auth.json")), false);
+  assert.equal(readFileSync(path.join(root, "auth.json"), "utf8"), "canonical auth\n");
 });
 
 test("clean preview tolerates only the currently active verification lock", (t) => {
@@ -480,24 +522,6 @@ test("clean preview tolerates only the currently active verification lock", (t) 
   assert.match(preview.stdout, /Framework portable source baseline is clean/);
 });
 
-test("reset refuses unsafe content inside the context index", (t) => {
-  const root = fixture("reset-framework-unsafe-index-");
-  t.after(() => rmSync(root, { force: true, recursive: true }));
-  write(root, ".context-index/project-data.txt", "preserve me\n");
-
-  const preview = run(root);
-  assert.equal(preview.status, 1);
-  assert.match(preview.stdout, /\.context-index/);
-
-  const applied = run(root, ["--apply"]);
-  assert.equal(applied.status, 1);
-  assert.match(applied.stderr, /contains non-index content and will not be modified/);
-  assert.equal(
-    readFileSync(path.join(root, ".context-index/project-data.txt"), "utf8"),
-    "preserve me\n",
-  );
-});
-
 test("reset unlinks top-level and nested runtime symlinks without touching their targets", (t) => {
   const root = fixture("reset-framework-symlink-");
   const outside = mkdtempSync(path.join(os.tmpdir(), "reset-framework-outside-"));
@@ -509,7 +533,6 @@ test("reset unlinks top-level and nested runtime symlinks without touching their
   write(outside, "bin/codex", "outside binary\n");
   symlinkSync(outside, path.join(root, "sessions"));
   symlinkSync("missing-history-target", path.join(root, "history.jsonl"));
-  symlinkSync(outside, path.join(root, ".context-index"));
   write(root, ".codex/runtime/tmp/arg0/codex-arg0-fixture/owned.txt", "runtime temp\n");
   symlinkSync(
     path.join(outside, "bin/codex"),
@@ -519,7 +542,6 @@ test("reset unlinks top-level and nested runtime symlinks without touching their
   const applied = run(root, ["--apply"]);
   assert.equal(applied.status, 0, applied.stderr);
   assert.equal(existsSync(path.join(root, "sessions")), false);
-  assert.equal(existsSync(path.join(root, ".context-index")), false);
   assert.equal(existsSync(path.join(root, ".codex/runtime/tmp")), false);
   assert.equal(readFileSync(path.join(outside, "sentinel.txt"), "utf8"), "outside\n");
   assert.equal(readFileSync(path.join(outside, "bin/codex"), "utf8"), "outside binary\n");

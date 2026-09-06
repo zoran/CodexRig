@@ -17,6 +17,12 @@ project-management files or ceremonial prose.
 Normal implementation should primarily change product code, tests, and necessary configuration.
 Repository process artifacts are overhead unless the user explicitly requests one as a deliverable.
 
+Before adding research, abstraction, hardening, tests, documentation, cleanup, or optimization,
+identify the user outcome, acceptance blocker, or plausible material risk it changes. Omit work that
+changes none of them. Best-supported means fit for the approved purpose, not maximum depth. Once
+evidence is sufficient, return to the highest-value unfinished part of the authorized outcome. This
+proportionality rule never waives material correctness, security, data, or acceptance risks.
+
 ## Current Contracts Only
 
 CodexRig provides no backward compatibility for superseded internal contracts. A non-current
@@ -155,6 +161,8 @@ Keep this mechanism bounded: one replace-in-place successful-evidence record and
 session lock. Do not add per-run receipts, checkpoint chains, or verification history unless a
 measured project-specific need justifies that complexity.
 
+## Authorized Work And Native Codex
+
 Within the user's authorized objective, continue autonomously through the planned slices, focused
 evidence, review fixes, audits, course checks, cleanup, and publication. Stop only for a real
 external blocker, unsafe or ambiguous scope, missing authority for a materially different action, or
@@ -174,6 +182,44 @@ instruction. Honor an explicit user requirement to pause for approval before imp
 infer that pause from a recap request or absence. Persistence never broadens scope, bypasses
 approvals or safety controls, authorizes destructive or external action, invents a new product goal,
 or conceals a genuine blocker.
+
+An approval remains effective for its confirmed scope until the user changes or withdraws it. Do not
+repeatedly ask permission for the same ordinary in-scope repository work. Interpret an additive
+question, status request, correction, or constraint in the main conversation, answer or incorporate
+it, then return to the still-authorized outcome. A genuine stop, pause, cancellation, or replacement
+changes that mandate; preserve unfinished work and do not automatically restart it. Side
+conversations remain independent unless the user explicitly brings their content into the main
+stream. Repository ownership does not make every file disposable or grant process control. A general
+improvement mandate is not permission for new product features or an unsolicited redesign.
+
+Choose reasonable reversible assumptions when they cannot materially change the result. Before a
+necessary question, complete safe authorized work that makes the decision concrete. Name the exact
+blocked action, missing decision, and recommended option; continue disjoint work. When a skill
+causes a pause or a change of direction, identify that skill and the applicable requirement.
+Explicit user instructions take precedence over skill guidelines, never over higher-priority host,
+permission, safety, or publication constraints.
+
+Codex owns native Goals, plans, sessions, subagents, approvals, models, and their controls. Use
+native Goals for an explicitly requested durable objective with a clear stopping condition; do not
+create a Goal or assign a token budget merely because a task is substantial. Prefer native
+pause/resume/clear controls when the user requests them. Native Goal completion, one successful
+check, and a finished slice are not proof that the broader authorized outcome is complete.
+`pnpm goal:new` is a repository publication check, not a native Goal creator or task store. Keep
+related unfinished slices in one coherent repository goal rather than manufacturing early
+publication boundaries. A required post-exit reset, missing publication authority, or rejected
+publication leaves closure open; report that exact boundary without claiming completion, bypassing
+it, or discarding recovery context.
+
+Official [Codex Goals](https://learn.chatgpt.com/use-cases/follow-goals) provide continuation across
+turns;
+[Astra guidance](https://developers.openai.com/api/docs/guides/latest-model#prompting-best-practices)
+supports scoped initiative and proportional clarification. API-only controls are not Codex config.
+Catalog support, configured values, delivered instructions, actual runtime permissions, and model
+compliance are different evidence. A changed file does not refresh an already-running root or child;
+use the supported native instruction channel and a fresh session when needed. Retire the existing
+bounded Stop guard only after the installed native path proves the required continuation, user
+pause/cancellation, side-conversation, recovery, and terminal-handover behavior. Until then preserve
+that current contract; add no scheduler, watchdog, endless loop, or second task runtime.
 
 ## Planning, Goals, Slices, Review Loops, And Audits
 
@@ -378,13 +424,13 @@ current owning session may remain only until the mandatory post-exit framework r
    delivery block in `docs/project.md`. It also checks manifest/module truth, documentation and
    heading anchors, current source/declaration headers, localization, physical product, Identity and
    Access, and white-label boundaries, secrets and path hygiene, dependency/lock consistency, skill
-   and Sol/ultra model policy, framework health, and formatting. Explicit declarations preserve real
-   external environments that have no tracked adapter. A possible `staging` or `prod` hint outside a
-   recognized typed boundary is never guessed: ask the developer whether it is real, then declare it
-   or move the adapter to its owning boundary. In the reusable source framework, the same atomic
-   apply also reconciles the release version from active changes since the unique live commit of the
-   configured central integration branch, which must match its local remote-tracking ref, as defined
-   under
+   and Astra/ultra model policy, framework health, and formatting. Explicit declarations preserve
+   real external environments that have no tracked adapter. A possible `staging` or `prod` hint
+   outside a recognized typed boundary is never guessed: ask the developer whether it is real, then
+   declare it or move the adapter to its owning boundary. In the reusable source framework, the same
+   atomic apply also reconciles the release version from active changes since the unique live commit
+   of the configured central integration branch, which must match its local remote-tracking ref, as
+   defined under
    [Framework Lifecycle, Compatibility, And Git Platforms](#framework-lifecycle-compatibility-and-git-platforms).
 3. Perform the goal-wide documentation review and any required critical-document confirmation and
    dedicated preservation review. Repeat affected focused checks, root-cause review and repair, the
@@ -657,6 +703,32 @@ descriptions against behavior. `scripts/verify/patterns.mjs` validates maintaine
 `scripts/verify/docs.mjs` validates document headings and anchors, and completed-goal plus scheduled
 repository housekeeping reruns both in the framework and every generated project.
 
+### UI Intent And Change Boundaries
+
+Before broad UI implementation, establish the intended users, critical workflow, information
+hierarchy, navigation, interaction patterns, and visual direction. For a new surface, show a
+representative coherent flow with important states and obtain confirmation of material design
+choices before propagating them. Record only confirmed durable decisions in `docs/project.md` or an
+existing linked design owner; observed existing design is evidence, not retrospective approval. Keep
+tokens, assets and components with their existing presentation/configuration owners.
+
+For an existing product, preserve its established appearance and behavior by default. General
+repository approval, modernization, refactoring, or optimization does not authorize an unsolicited
+redesign. Obtain focused approval before materially changing visual language, information
+architecture, navigation, central interaction patterns, or the design system. Routine in-scope bug
+fixes, consistency corrections and accessibility improvements within that direction need no separate
+design ceremony. If a necessary correction changes a central flow, explain the conflict and
+recommended solution before that change.
+
+`$project-implementation` owns the rendered-flow workflow; `$ui-ux-review` checks experience,
+preservation and shared-consumer effects, while `$system-coherence` checks code and integration. Use
+the actual affected surface, states, realistic content and representative devices/input modes. For
+meaningful changes compare before and after where available. Source inspection, static scanners,
+mock screenshots and green tests do not establish rendered UX quality, design approval, or an
+unobserved target. Report missing observations explicitly. Add no separate UX registry, approval
+service, or mandatory screenshot infrastructure; pure framework work without product UI does not
+need a fabricated visual review.
+
 ### Multi-Device Experience
 
 Assume every generated product UI must work on mobile, tablet, and desktop unless the user confirms
@@ -816,10 +888,10 @@ visible changes. This is workspace isolation and shared visibility, not an authe
 and worktrees may share repository configuration and Git credential helpers. Different
 developers/hosts use separate clones with separate OS/provider credential contexts plus ordinary
 short-lived task branches and a confirmed shared coordination channel. Every Codex session uses its
-worktree or clone's ignored `.codex/runtime/` as `CODEX_HOME`; never copy credentials between
-repositories. A repository-local lease cannot prove another developer's clone idle. Read-heavy
-discovery and review may run more broadly in parallel. Write-heavy work runs concurrently only when
-module and file scopes are confirmed disjoint before the slice.
+worktree or clone's root as `CODEX_HOME`; never copy credentials between repositories. A
+repository-local lease cannot prove another developer's clone idle. Read-heavy discovery and review
+may run more broadly in parallel. Write-heavy work runs concurrently only when module and file
+scopes are confirmed disjoint before the slice.
 
 When a coherent resumable slice must survive physical host loss or move to another developer, the
 primary records and pushes ordinary commits through the declared integration path: directly on
@@ -846,20 +918,21 @@ selected remote.
 ## Session Start
 
 1. Start Codex from the repository root with the exact supported command
-   `bash scripts/setup/start-codex.sh`. Host CLI update, locked-tool installation, compatible
-   dependency refresh, and online framework diagnosis are explicit maintenance actions, not hidden
-   startup mutations. Canonical start is deterministic and network-free: it validates the prepared
-   runtime and portable policy, binds the external executables, reserves and attests one current
-   writer lease, and requires the exact warning-free two-hook inventory through Codex's stable
-   `hooks/list` interface before opening the foreground writer. The current lifecycle contract below
-   owns the process, recovery, and failure details. The launcher's deny-by-default interface accepts
-   only optional `--no-alt-screen` and explicit Dev-only `--yolo` as control arguments; prompt text
-   must follow `--`, and the attestation binds the accepted control mode without retaining prompt
-   content. Canonical no-approval, danger-full-access Dev operation requires exiting any current
-   safe session and starting exactly `bash scripts/setup/start-codex.sh --yolo`. A later UI or
-   parent-runtime permission change may alter effective live permissions but cannot retroactively
-   convert the already-attested startup mode. Tracked portable config remains on-request,
-   network-disabled `workspace-write`.
+   `bash scripts/setup/start-codex.sh`. The launcher runs `codex update` first and stops if it
+   fails; locked-tool installation, compatible dependency refresh, and online framework diagnosis
+   remain separate maintenance actions. After the update it validates the prepared runtime and
+   portable policy, binds the external executables, reserves and attests one current writer lease,
+   and requires the exact warning-free two-hook inventory through Codex's stable `hooks/list`
+   interface before opening the foreground writer. The current lifecycle contract below owns the
+   process, recovery, and failure details. The launcher's deny-by-default interface accepts only
+   optional `--no-alt-screen` and explicit Dev-only `--yolo`. It opens the native
+   `codex resume --cd "$PWD"` picker with repository-root `CODEX_HOME`, without an exact ID or
+   `--last`. Enter prompts after selecting a session; attestation binds the accepted control mode.
+   Canonical no-approval, danger-full-access Dev operation requires exiting any current safe session
+   and starting exactly `bash scripts/setup/start-codex.sh --yolo`. A later UI or parent-runtime
+   permission change may alter effective live permissions but cannot retroactively convert the
+   already-attested startup mode. Tracked portable config remains on-request, network-disabled
+   `workspace-write`.
 2. Stop only when startup reports a missing core requirement or invalid/indeterminate prepared
    runtime, policy, hook, or ownership state. Repair preparation explicitly; never weaken startup
    validation or silently reuse incompatible private state.
@@ -887,10 +960,9 @@ and relationship analysis, not a requirement to load every file byte into the mo
    all safe reconstruction, and let housekeeping repair only mechanically proven cases. A live or
    indeterminate competing writer, unsafe filesystem/Git binding, or unresolved content ambiguity
    blocks the affected writes and publication, not understanding of the remaining repository.
-3. Use known paths and `rg` for exact anchors, then `$context-retrieval` or
-   `pnpm context:search -- "concept or relationship"` for unfamiliar terminology, ownership, and
-   cross-file flows. Read every matched source used in the reconstruction and trace representative
-   assembled relationships without indiscriminate context loading.
+3. Follow [Context And Skills](#context-and-skills): exact searches for known anchors, manifest-led
+   ownership discovery and direct matched-source reads. Trace representative assembled relationships
+   without indiscriminate context loading.
 4. Determine whether an authorized prior outcome, goal, or slice is unfinished and whether current
    state contains partial implementation, duplicate or contradictory concepts, obsolete/dead paths,
    stale generated residue, failed migration/transaction state, or concurrent ownership. In the
@@ -909,16 +981,17 @@ and relationship analysis, not a requirement to load every file byte into the mo
 Current files and command output outrank remembered conversation context.
 
 The canonical launcher keeps the exact last verified Codex session ID separately from the
-short-lived process writer lease. After deterministic preflight it replaces itself with the
-mise-pinned Node.js session controller, whose complete repository module graph is loaded before
-Codex starts. The controller binds the exact external Node.js, Codex, pnpm, and local hook-shell
-executables once. It captures the startup-critical input and toolchain basis, atomically reserves
-the selected launcher lease, and then validates ignored `.codex/runtime/config.toml` before any
-Codex process can consume it. The one current runtime-config contract permits only private,
-non-executable repository trust, prior hook state, notice state, approval routing, service-tier
-metadata, and bounded Codex-persisted model/reasoning preferences. Tracked project config remains
-the model/reasoning source of truth, and the controller projects its exact values into every fresh
-or resumed Codex CLI launch; `notify`, MCP, plugin, provider, or any unknown key blocks canonical
+short-lived process writer lease, as recovery evidence rather than an automatic selection. After
+updating Codex and validating the prepared state it replaces itself with the mise-pinned Node.js
+session controller, whose complete repository module graph is loaded before Codex starts. The
+controller binds the exact external Node.js, Codex, pnpm, and local hook-shell executables once. It
+captures the startup-critical input and toolchain basis, atomically reserves a pending native-picker
+lease, and then validates ignored root `config.toml` before any Codex process can consume it. The
+one current runtime-config contract permits only private, non-executable repository trust, prior
+hook state, notice state, approval routing, service-tier metadata, typed terminal preferences, and
+bounded Codex-persisted model/reasoning preferences. Tracked project config remains the
+model/reasoning source of truth, and the controller projects its exact values into every fresh or
+resumed Codex CLI launch; `notify`, MCP, plugin, provider, or any unknown key blocks canonical
 startup. The controller then injects one SessionStart and one Stop command through session-only CLI
 configuration. The exact external hook shell is forced through the sanitized child environment and
 encoded command shape; the same Codex executable's stable `hooks/list` inventory must be
@@ -926,7 +999,7 @@ warning-free and contain exactly the two hooks with the controller-derived hashe
 session-flag identities, enabled state, and `trusted` status. No additional hook may remain loaded.
 No global hook-trust bypass is permitted, and tracked `.codex/hooks.json` contains no executable
 handler. Only after that proof may the controller bind a gated foreground supervisor and open its
-token-bound loopback lifecycle endpoint. The current schema-5 lease records the controller,
+token-bound loopback lifecycle endpoint. The current schema-6 lease records the controller,
 supervisor, durable spawn-handoff phase, and exact Codex PID. The gate opens only after the handoff
 becomes durable. The state owner accepts mutation only from the exact registered controller process.
 Lease release requires that controller to authenticate the terminal child-exit proof against the
@@ -936,15 +1009,13 @@ terminate and reap the child, while a killed supervisor cannot hide the separate
 process. A crash before exact PID binding remains an ownership-confirmation blocker, so concurrent
 launchers cannot reuse an indeterminate selection. At a proven terminal child exit, the controller
 releases its short-lived lease while retaining the separate verified recovery ID; an interrupted
-controller instead leaves mechanically recoverable stale state. Every non-signal fresh completion is
-accepted only if SessionStart actually activated the lease, including after fallback. If that Codex
-thread is unavailable and SessionStart never activated, the controller retires only the unstarted
-lease after its supervisor and Codex writer are proven finished and opens a fresh session with the
-same prompt only while the original in-memory attestation, inputs, and toolchain remain unchanged.
-Once SessionStart activates, fallback is forbidden. Any attestation drift ends the controller
+controller instead leaves mechanically recoverable stale state. The picker owns native session
+selection. Authenticated SessionStart binds its actual session ID; it may report a resumed or new
+session. Cancellation before SessionStart releases only the pending lease and creates no activation
+or recovery record. A failed selection never triggers an automatic fresh fallback. A failed
+SessionStart cannot be reported as successful activation. Any attestation drift ends the controller
 instead of blessing changed startup code. No repository script, mise configuration, or package is
-loaded or executed after admission; the fresh session still performs the complete reconstruction
-above.
+loaded or executed after admission; the selected session performs the complete reconstruction above.
 
 Codex retains the injected hook definitions in its in-memory hook registry before the writable
 session begins. Both lifecycle commands are the same embedded Node-built-in-only client, bound by
@@ -973,9 +1044,19 @@ using it or beginning other work. A refusal leaves it unused. After explicit acc
 validate it against the current manifest, Git/source/tests/docs, bounded work state, and
 coordination ownership before acting.
 
+In that later active canonical session, `pnpm handover:receive -- <exact-path>` delivers the full
+validated artifact and SHA-256 digest. Read all of it, then acknowledge the project, authorized
+outcome, constraints, and next action briefly in the conversation. Only after complete delivery and
+that acknowledgement run `pnpm handover:acknowledge -- <exact-path> --sha256 <received-digest>`. It
+removes only the unchanged selected file; failed validation or incomplete/truncated delivery leaves
+it in place. Native conversation/provider history is not erased. These commands verify
+repository/session binding and file equality, not model comprehension or instruction compliance;
+they neither grant authority nor permit the sealing session to act again.
+
 ## Memory Isolation And Durable Truth
 
-Local Codex state is repository- and worktree-root-bound under ignored `.codex/runtime/`. Memories
+Local Codex state lives in ignored entries of the repository- and worktree-root-bound `CODEX_HOME`.
+Framework lease, attestation, and verification state alone uses ignored `.codex/runtime/`. Memories
 are disabled in the reusable framework source. Codex must neither inject historical local memories
 into a framework session nor use that session to generate future memory, so prior task, product,
 sibling-project, path, outcome, and session-derived facts cannot become project-creation inputs.
@@ -983,10 +1064,9 @@ Remove obsolete framework memory only through Codex's supported memory controls;
 durable truth.
 
 Every generated project enables local memories normally only inside its own clean, isolated
-repository-local `.codex/runtime/` home. Generation transfers no source or sibling runtime, memory
-database, summary, recent input, or supporting evidence. A generated project's later memories
-therefore belong only to that project and never flow back into the reusable framework or another
-project.
+repository-root `CODEX_HOME`. Generation transfers no source or sibling runtime, memory database,
+summary, recent input, or supporting evidence. A generated project's later memories therefore belong
+only to that project and never flow back into the reusable framework or another project.
 
 Durable continuity belongs in current source, tests, configuration, `docs/project.md`, and the one
 bounded `docs/project-context.md` exception. This separation prevents a reusable framework or a new
@@ -1013,60 +1093,46 @@ project merely to imply a stack. Stack, web, SEO, sitemap, image, API, and adapt
 this same Product Roots contract automatically.
 
 Keep `.codex`, `.agents`, `AGENTS.md`, process state, and other Codex tooling outside every product
-unit. Ignored `.codex/runtime/` is the single isolated Codex home inside the canonical repository.
-Mutable authentication, trust, approval-rule, session, log, memory, cache, plugin, runtime-skill,
-history, installation, model, and database state is contained there by a shared root-relative
-classifier and matching `.gitignore` rules. Loose-root runtime paths remain quarantined only for
-safe cleanup. It must never enter active source, formatting, the semantic index, generated projects,
-staging, or exports. Portable `.codex/config.toml`, `.codex/hooks.json`, `.codex/agents/*.toml`, and
-`.codex/README.md` remain tracked and are searchable active context; private `.codex/runtime/`
-remains excluded. Semantic `.codexrig` policy stays searchable while the generated installation
-checksum receipt does not consume vector space. The repository-wide semantic index has one fixed
-ignored root `.context-index/`; it may index active repository context, but it is never product
-source and cannot be redirected into a product unit. `pnpm setup` materializes and smoke-tests it.
+unit. The canonical repository root is `CODEX_HOME`; native mutable entries are ignored and excluded
+before source discovery. Ignored `.codex/runtime/` owns only framework coordination. Authentication,
+trust, approval-rule, session, log, memory, cache, plugin, runtime-skill, history, installation,
+model, and database state is excluded by a shared root-relative classifier and matching `.gitignore`
+rules. This state must never enter active source, formatting, generated projects, staging, or
+exports. Portable `.codex/config.toml`, `.codex/hooks.json`, `.codex/agents/*.toml`,
+`.codex/README.md`, and `.codexrig` policy remain tracked and inspectable; private `.codex/runtime/`
+remains excluded.
+
 The locally trusted Stop route handles only durable-work continuation, loop protection, and terminal
 critical handover through the already-loaded session controller. Transcriptless contexts exit first.
-It never imports mutable repository modules or semantic-index packages after session admission.
-Semantic search owns freshness and bounded on-demand repair; explicit `pnpm context:index` owns
-maintenance, while unrelated verification and pre-push stay read-only. Every framework reset removes
-the complete project-owned index and model cache; `pnpm setup`, `pnpm context:index`, or the next
-semantic search rebuilds it. There is no watcher, per-tool refresh, or automatic Stop refresh. New
-or changed noncanonical hook definitions block canonical startup. The controller derives narrow
-trust only for its two exact session-owned hashes and proves that result through Codex before the
-foreground writer exists; it never globally approves hooks. Path hygiene enforces these boundaries,
-including Git-less staged exports.
-
-Explicit indexing and semantic search also run bounded opportunistic maintenance under the existing
-context lock. It preserves the selected database and model revision and removes only validated stale
-generated artifacts; unsafe or ambiguous state fails closed. Incremental database pressure replaces
-the complete selected generation atomically at the documented operation/affected-row thresholds,
-reusing only vectors from a deep-validated generation and never during corruption repair.
-`context:check`, ordinary verification, pre-push, and unrelated lifecycle commands remain strictly
-read-only. The canonical details live in `docs/context-index.md`.
+It never imports mutable repository modules after session admission. New or changed noncanonical
+hook definitions block canonical startup. The controller derives narrow trust only for its two exact
+session-owned hashes and proves that result through Codex before the foreground writer exists; it
+never globally approves hooks. Path hygiene enforces these boundaries, including Git-less staged
+exports.
 
 Git and Git-less source inventory use repository `.gitignore` rules plus a built-in pre-descent mask
 from the same root-runtime authority. Host-global and repository-local Git exclude files cannot hide
-active source. Private `.codex/runtime` CODEX_HOME, loose-root runtime residue, index, and process
-state are rejected before directory descent even when no Git metadata or usable source `.gitignore`
-exists. Repository-local `.git/info/exclude` patterns are forbidden: the tracked worktree
-`.gitignore` is the only local ignore authority. Local masks never count as proof, never enter
-portable output, and any active repository-local Git exclude rule blocks `pnpm goal:new`. Source
-inventory, generator source-state checks, and `goal:new` bind root-owned Git metadata with the
-canonical worktree and pin stat checks. Goal publication compares worktree content through a fresh
-temporary index; policy-sensitive probes disable repository-local FSMonitor execution and reject
-hidden index flags. A Git-less root beneath another repository remains Git-less. The staged
-validator runs from the copied stage, derives its target from its own script rather than a
-caller-selected stage path, and rechecks the bound directory identity through validation.
+active source. Private root CODEX_HOME entries, `.codex/runtime` coordination and process state are
+rejected before directory descent even when no Git metadata or usable source `.gitignore` exists.
+Repository-local `.git/info/exclude` patterns are forbidden: the tracked worktree `.gitignore` is
+the only local ignore authority. Local masks never count as proof, never enter portable output, and
+any active repository-local Git exclude rule blocks `pnpm goal:new`. Source inventory, generator
+source-state checks, and `goal:new` bind root-owned Git metadata with the canonical worktree and pin
+stat checks. Goal publication compares worktree content through a fresh temporary index;
+policy-sensitive probes disable repository-local FSMonitor execution and reject hidden index flags.
+A Git-less root beneath another repository remains Git-less. The staged validator runs from the
+copied stage, derives its target from its own script rather than a caller-selected stage path, and
+rechecks the bound directory identity through validation.
 
 ## Dependency Installation And Freshness
 
 Canonical `bash scripts/setup/start-codex.sh` never resolves or installs dependencies. Registry
 freshness and lockfile mutation are explicit maintenance work, while session start remains
-deterministic and network-free against the already prepared runtime. Run the compatible installer
-before first use and whenever workspace manifests, declared ranges, explicit pins, overrides,
-supply-chain policy, or requested freshness change. Moving a manifest to another minor/major policy
-line remains an explicit dependency-maintenance migration with official upgrade guidance and
-affected consumer evidence.
+update-first and validates the already prepared runtime without refreshing dependencies. Run the
+compatible installer before first use and whenever workspace manifests, declared ranges, explicit
+pins, overrides, supply-chain policy, or requested freshness change. Moving a manifest to another
+minor/major policy line remains an explicit dependency-maintenance migration with official upgrade
+guidance and affected consumer evidence.
 
 Use `mise exec --locked -- node scripts/deps/install-compatible.mjs` for the first dependency
 installation in this repository and every generated project. Invoking the checked-in Node boundary
@@ -1244,8 +1310,8 @@ controller-hook trust blocks canonical startup before a writable session instead
 disabling continuation. A critical-budget handover sealed during the current runtime session is
 different: the hook must allow that session to stop without autonomous continuation, regardless of
 an `active` work marker. A later canonical session still receives the candidate through
-`SessionStart`, but after explicit acceptance it may refresh the index, continue the authorized
-outcome, and stop normally.
+`SessionStart`, but after explicit acceptance it may continue the authorized outcome, and stop
+normally.
 
 `docs/project.md` is different: it is the always-read central truth for product intent, scope,
 system shape, constraints, and durable decisions. Working context can specialize the current goal
@@ -1297,7 +1363,14 @@ existing high-level suite when that preserves clarity.
 
 Use a narrow unit or contract test only when a broad flow cannot exercise an important deterministic
 boundary reliably or proportionately, or when it would hide diagnostic value needed for a critical
-algorithmic edge case. Keep that exception attached to an existing owner suite when practical.
+algorithmic edge case. Keep that exception attached to an existing owner suite when practical. For a
+material behavior correction, first reproduce the original failure in the existing focused owner
+suite; explain the problem and protected contract in a concise regression header. Editorial changes
+alone do not need implementation-mirroring tests. Policy text checks establish required content and
+routing, not semantic consistency, native instruction delivery, or model obedience. Mocks prove the
+modeled boundary, not an actual host; rendered and account-backed claims require their corresponding
+observations. Never manufacture a passing substitute when that path is unavailable.
+
 Running the smallest useful focused command during iteration still applies; execution scope does not
 dictate the granularity of durable coverage. Temporary reproduction scripts do not enter the
 repository, and tests or verifier helpers whose only subject no longer exists should be removed.
@@ -1564,14 +1637,14 @@ NOTICE change.
 - Keep generated/local state, secrets, symlinks, dependencies, archives, and build output outside
   retrieval and portable exports.
 - Critical-budget prompt files under ignored `tmp/codexrig-handovers/` may contain a bounded private
-  work snapshot. Never commit, publish, export, semantically index, quote into startup context, or
-  use one before the developer explicitly accepts the exact recent repository-bound candidate.
-- The supported Codex home is ignored `.codex/runtime/` below the canonical repository root, never
-  the root itself or the user's global Codex home. Portable project defaults live in tracked
-  `.codex/`; mutable authentication, trust, approval rules, sessions, logs, memories, caches,
-  plugins, runtime skills, history, installation/model metadata, and Codex databases remain there
-  and must not enter Git or any project-source consumer. Loose-root runtime paths are security
-  cleanup quarantine only.
+  work snapshot. Never commit, publish, export, quote into startup context, or use one before the
+  developer explicitly accepts the exact recent repository-bound candidate.
+- The supported `CODEX_HOME` is the canonical repository root, never an alternative global home.
+  Portable project defaults live in tracked `.codex/`; native mutable entries are explicitly ignored
+  at the root and framework coordination alone lives in ignored `.codex/runtime/`. Authentication,
+  trust, approval rules, sessions, logs, memories, caches, plugins, runtime skills,
+  installation/model metadata, and databases must not enter Git or any project-source consumer.
+  Ignored state is not automatically disposable; only the owning lifecycle may safely retire it.
 - Use a focused security review only when changes affect trust, auth, secrets, user data,
   dependencies, shell execution, CI, infrastructure, or runtime configuration.
 
@@ -1592,7 +1665,7 @@ delegate to further agents.
 This authority is injected as well as documented. Root `developer_instructions` in tracked
 `.codex/config.toml` bind the primary orchestrator, ownership/provenance boundary, intelligence
 parity, critical drain, and terminal handover stop. The same file's `[agents]` table owns the exact
-global Sol/`ultra` defaults and four-thread ceiling; project-scoped `.codex/agents/*.toml` layers
+global Astra/`ultra` defaults and four-thread ceiling; project-scoped `.codex/agents/*.toml` layers
 inject the bounded role behavior into spawned sessions. Never pass a model or reasoning override at
 spawn. `pnpm codex:validate` fails closed when the primary policy, role policy, permissions, or
 exact primary/subagent intelligence pair is missing or divergent.
@@ -1623,13 +1696,17 @@ usage signals the host exposes: absolute or percentage remaining tokens/capacity
 budgets, completion budget, rate-limit windows, and confirmed additive or redeem/reset credits.
 Treat each signal according to its declared unit and scope. Never assume a daily, weekly, renewable,
 windowed, or percentage-based quota, and do not invent a denominator or precision when a signal is
-unavailable. Reserve enough capacity for primary integration, conflict repair, affected
-verification, reviews, documentation reconciliation, final audit, and user handoff; then assign each
-active/new agent a bounded worst-case work envelope plus handoff reserve and a safety margin. Start
-or continue the agent only when confirmed remaining capacity—including only genuinely available
-redeem capacity—covers all envelopes and the primary reserve. Unknown or marginal capacity means no
-new agent. Never consume a redeem/reset credit without authority; after a permitted redemption,
-refresh the actual limits before admitting work.
+unavailable. Keep account-window limits, context pressure, request-token usage, native Goal budgets,
+and completion reserve distinct. A context or token counter is not account-capacity evidence. Public
+rate-limit observations must identify their actual window and observation time; unavailable account
+telemetry stays unavailable and does not justify a new account monitor or private API. Reserve
+enough capacity for primary integration, conflict repair, affected verification, reviews,
+documentation reconciliation, final audit, and user handoff; then assign each active/new agent a
+bounded worst-case work envelope plus handoff reserve and a safety margin. Start or continue the
+agent only when confirmed remaining capacity—including only genuinely available redeem
+capacity—covers all envelopes and the primary reserve. Unknown or marginal capacity means no new
+agent. Never consume a redeem/reset credit without authority; after a permitted redemption, refresh
+the actual limits before admitting work.
 
 Classify current capacity as `healthy`, `guarded`, or `critical` from the most constraining current
 host signal rather than one model-specific counter or billing period. If the host exposes a reliable
@@ -1773,14 +1850,14 @@ permission provenance is uncertain, the worker performs no repository work and t
 
 ### Intelligence Parity And Integration Authority
 
-The primary and every role under `.codex/agents/` must use exactly the same configured GPT Sol model
-and `ultra` reasoning. `.codex/config.toml` is the intelligence source of truth and pins both global
-delegated defaults to the primary; validation fails closed on any default, role-model, or reasoning
-mismatch. Never pass a different model or effort in a spawn override. No secondary tier, cheaper
-model, lower reasoning level, or silent fallback is allowed. A future GPT Sol version may replace
-the current one only when the primary config, global subagent default, and every role move to that
-exact model in the same change and the installed model catalog confirms `ultra` support. If the
-active harness cannot guarantee that exact parity, do not delegate. `explorer` and `default` are
+The primary and every role under `.codex/agents/` must use exactly the same configured GPT Astra
+model and `ultra` reasoning. `.codex/config.toml` is the intelligence source of truth and pins both
+global delegated defaults to the primary; validation fails closed on any default, role-model, or
+reasoning mismatch. Never pass a different model or effort in a spawn override. No secondary tier,
+cheaper model, lower reasoning level, or silent fallback is allowed. A future GPT Astra version may
+replace the current one only when the primary config, global subagent default, and every role move
+to that exact model in the same change and the installed model catalog confirms `ultra` support. If
+the active harness cannot guarantee that exact parity, do not delegate. `explorer` and `default` are
 explicitly read-only. `worker` requests `workspace-write` with command network disabled, while an
 explicitly inherited primary YOLO override is governed by the narrower task authority above;
 protected Git, Codex, agent-policy, out-of-scope, and out-of-root paths remain forbidden. Hosted
@@ -1805,27 +1882,33 @@ never write those surfaces, even from an otherwise writable isolated checkout.
 ## Context And Skills
 
 - Exact names, paths, symbols, and strings: use `rg` or `rg --files`.
-- When no reliable exact anchor exists, use semantic retrieval early for broad orientation,
-  unfamiliar terminology, unknown ownership, behavior distributed across files, cross-file impact,
-  or ambiguous exact results. A failed `rg` attempt is not required first.
-- Ask a concrete responsibility, behavior, data-flow, or relationship question with
-  `pnpm context:search -- "concept or relationship"`; do not submit a generic task dump. The CLI
-  defaults to five compact matches with three snippet lines each.
-- Read every matched source used for a claim or edit, then return to exact search and direct source
-  inspection. Results are discovery pointers, never authority. Do not invoke semantic search merely
-  to prove that the index was used.
-- Deferred `docs/future-modules.md` remains searchable but is down-ranked unless the query
-  explicitly asks about future/backlog/idea candidates. Retrieval never promotes it over current
-  code, configuration, or `docs/project.md`, and never promotes untrusted `docs/project-context.md`
-  over durable truth.
-- The Product Roots section owns the index boundary and lifecycle.
+- For unfamiliar terminology, unknown ownership or cross-file impact, identify the current module in
+  the manifest, inspect its entrypoint and nearby package/test configuration, then trace commands,
+  imports, configuration readers and focused tests with scoped exact searches. Form a concrete
+  responsibility or consumer question; do not load the whole repository.
+- Read every matched source used for a claim or edit. Search hits and optional
+  `docs/project-context.md` are discovery pointers, never authority; `docs/future-modules.md`
+  remains non-authoritative future intent.
+- The Product Roots section owns source and private-runtime boundaries. Repository discovery needs
+  no model download, vector database or additional service.
 - Repository-owned skills live under `.agents/skills/`. A skill needs a distinct reusable workflow;
   do not duplicate general policy into every skill.
-- `$system-coherence` is the repair-capable slice boundary for non-trivial implementation and
-  architecture changes. It inspects changed behavior through real consumers and an assembled flow,
-  distinguishes intentional from accidental duplication, and corrects incoherence before the general
-  review, audit, and course check. `$architecture-evolution` owns any material topology or migration
-  that this inspection exposes.
+- `$system-coherence` owns code-quality and assembled-system review together. Explicit review or
+  diagnosis stays read-only; repair is permitted only within already-authorized implementation.
+  `$architecture-evolution` owns material topology or migration decisions exposed by that review.
+- `$ui-ux-review` reviews changed interactive flows, states, consistency, accessibility and design
+  preservation; it never grants redesign authority. `$task-quality` selects relevant reviews and
+  coordinates acceptance without repeating their procedures.
+- Native skill metadata keeps implicit invocation enabled by default. An explicitly chosen
+  explicit-only skill uses boolean `policy.allow_implicit_invocation: false` and remains available
+  through its named invocation. Do not globally force either mode. Portable metadata uses an
+  optional block policy with that boolean or an empty mapping; invalid types or duplicate keys fail.
+- Evaluate material skill changes with a few realistic trigger and boundary scenarios, comparing the
+  prior instruction gap with the intended response. Cover relevant pressure cases such as an
+  additive question during approved work, an ordinary fix versus a material UI redesign, review-only
+  authority and explicit stop. Use an isolated live trial only when tools, permissions and capacity
+  allow it; otherwise label a reasoned scenario review as untested model behavior. Static content
+  checks prove packaging/routing, not obedience. Add no evaluation service or process archive.
 
 ## Verification
 
@@ -1842,25 +1925,32 @@ previous failure cannot bypass it.
 After any optimization of the framework itself, run `pnpm framework:reset --apply` after the owning
 Codex session exits. The admitted full plan uses the read-only, verification-lock-bound portable
 source baseline and refuses remaining goals, slices, process history, generated exports, project
-context, or dependency transaction state while deferring contained runtime/index sanitation to the
-mandatory post-exit reset. Every framework reset removes the complete project-owned
-`.context-index/` through the same ownership and maintenance-lock boundary as `pnpm context:clean`;
-the next setup, explicit index operation, or semantic search recreates it. Verification and pre-push
-remain read-only. The reset never rewrites Git history. It sanitizes obsolete and disposable Codex
-runtime only when no active session owns that state, while retaining only authentication, runtime
-configuration, installation identity, and exact publication evidence needed for the next start and
-push. On Linux, missing or unobservable procfs and permission-obscured descriptor state for a
-process observably bound to the exact repository root are indeterminate and block reset; `EACCES` or
-`EPERM` is never converted into proof of inactivity. Full reset holds the shared lifecycle lock and
-proves repository-wide runtime quiescence before removal. It validates a current lease through the
-sole current reader; an incompatible private lease is disposable reset input and is removed with the
-rest of the runtime without interpreting another schema. Source-framework pre-push first rejects a
-dirty index or working tree—`git add` alone does not create the commit Git can push—before reporting
-any refreshed or reusable verification basis. It then repeats the clean reset preview and fails
-closed if resettable state reappears. For an explicitly authorized source publication, the final
-order is verification, Codex exit, reset preview, applied reset, clean reset preview, commit, and
-push. Project creation itself stops after its active-session-safe cleanup and user instructions; it
-never performs the optional publication steps.
+context, or dependency transaction state while deferring contained runtime sanitation to the
+mandatory post-exit reset. Every framework reset removes disposable native state while preserving
+the approved identity and exact publication evidence. Verification and pre-push remain read-only.
+The reset never rewrites Git history. It sanitizes obsolete and disposable Codex runtime only when
+no active session owns that state, while retaining only authentication, runtime configuration,
+installation identity, and exact publication evidence needed for the next start and push. On Linux,
+missing or unobservable procfs and permission-obscured descriptor state for a process observably
+bound to the exact repository root are indeterminate and block reset; `EACCES` or `EPERM` is never
+converted into proof of inactivity. Full reset holds the shared lifecycle lock and proves
+repository-wide runtime quiescence before removal. It validates a current lease through the sole
+current reader; an incompatible private lease is disposable reset input and is removed with the rest
+of the runtime without interpreting another schema. Source-framework pre-push first rejects a dirty
+index or working tree—`git add` alone does not create the commit Git can push—before reporting any
+refreshed or reusable verification basis. It then repeats the clean reset preview and fails closed
+if resettable state reappears. For an explicitly authorized source publication, exit all owning
+Codex sessions and run `pnpm framework:publish --message "<message>"`. This source-only reset-skill
+entry inventories worktrees, binds one central `main` upstream, refreshes its tracking ref, previews
+and applies reset, requires a clean preview, runs housekeeping and hook installation, then invokes
+`pnpm verify`. It performs another reset and clean preview to remove verification residue while
+retaining successful evidence. Under the existing lifecycle lock it compares the source and HEAD
+with the verified snapshot, stages all non-ignored source, and commits only a changed tree. It then
+pushes the exact commit through the managed pre-push hook, verifies live remote `main`, runs
+`goal:new`, and performs Worktree Settlement. No force push, automatic merge, hook bypass, or empty
+commit is permitted. A failed gate stops subsequent mutations; a rejected push preserves its local
+commit so the same command can retry. Project creation itself stops after its active-session-safe
+cleanup and user instructions; it never performs the optional publication steps.
 
 When admission identifies a real uncovered risk, the full plan covers syntax/format, tests,
 build/typecheck when present, repository contracts, secrets, dependencies, and relevant product
@@ -1894,13 +1984,13 @@ branch, local-branch pseudo-upstream, missing remote/upstream, dirty worktree, m
 or local/upstream difference blocks the new goal. The gate does not contact the remote; the required
 preceding push owns authentication and updates the local remote-tracking publication evidence. It
 also requires exact-current successful verification evidence, so a push that bypassed pre-push
-cannot authorize another goal. Ignored project-local Codex runtime, verification evidence, and
-`.context-index/` do not count as unfinished work.
+cannot authorize another goal. Ignored project-local Codex runtime and verification evidence do not
+count as unfinished work.
 
 Use a bounded scope for each review iteration, but repeat the iteration after fixes until no
-relevant, reproducible finding remains. Add specialized security, code-pattern, content, image, or
-search review only for surfaces that actually changed. Once reviews are clean, perform a fresh
-whole-goal audit before publication admission. Any audit finding reopens focused repair and the
+relevant, reproducible finding remains. Add specialized security, UI/UX, content, image, or search
+review only for surfaces that actually changed. Once reviews are clean, perform a fresh whole-goal
+audit before publication admission. Any audit finding reopens focused repair and the
 review-and-repair loop before the audit is repeated. Keep every review and audit in the
 conversation; do not create process documents.
 

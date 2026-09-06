@@ -10,7 +10,6 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.auth/
-.context-index/
 .delivery/
 .project-state/
 backup/
@@ -18,9 +17,9 @@ backups/
 *.bak
 *.bak.*
 
-# Mutable Codex state is contained in ignored .codex/runtime/. Repository-root /tmp owns private
-# transient critical-budget handovers and process temporaries; /.tmp owns other local cache work.
-# The remaining root-bound entries quarantine unsafe loose-root runtime residue.
+# Native mutable Codex state belongs to ignored repository-root CODEX_HOME entries.
+# Only framework coordination lives in .codex/runtime/; /tmp holds private handovers and process
+# temporaries, while /.tmp holds native cache work. Full runtime reset requires all sessions to exit.
 /.tmp
 /cache
 /log
@@ -37,8 +36,10 @@ backups/
 /auth.json
 /config.toml
 /history.jsonl
+/hooks.json
 /installation_id
 /models_cache.json
+/session_index.jsonl
 /version.json
 /goals_*.sqlite*
 /logs_*.sqlite*

@@ -47,7 +47,7 @@ export function assertGeneratedWorkflowPolicyContract({
   assert.match(agents, /Identity and Access/i);
   assert.match(agents, /\$security-review/i);
   assert.match(agents, /at most four live subagents/i);
-  assert.match(agents, /exact same configured GPT Sol model/i);
+  assert.match(agents, /exact same configured GPT Astra model/i);
   assert.match(agents, /`ultra` reasoning/i);
   assert.match(agents, /one (?:physical )?host (?:represents|is) one developer/i);
   assert.match(agents, /never permits subagents to commit,\s+merge,\s+push,\s+publish/i);

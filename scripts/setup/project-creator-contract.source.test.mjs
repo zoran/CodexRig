@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { hasContradictoryStopHookIndexContract } from "../context/portable-context-contract.mjs";
 import {
   generatedPolicyProjectionLines,
   readPolicyProjection,
@@ -23,22 +22,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const projectCreatorSkill = ".agents/skills/create-project-from-framework/SKILL.md";
 const content = readFileSync(path.join(root, projectCreatorSkill), "utf8");
 
-test("the source-only project creator keeps the Stop-hook mutation contract", () => {
-  assert.equal(hasContradictoryStopHookIndexContract(content), false);
-  assert.equal(
-    hasContradictoryStopHookIndexContract(
-      `${content}\nProject hooks automatically update the context index.\n`,
-    ),
-    true,
-  );
-});
-
 test("the source-only project creator derives generated policy surfaces from one owner", () => {
   const projection = readPolicyProjection(root);
   assert.equal(projection.policies.length, 33);
   const projectedPolicy = projection.policies.map(({ statement }) => statement).join("\n");
   assert.match(projectedPolicy, /current-state inventory, never a roadmap/);
-  assert.match(projectedPolicy, /exact same configured GPT Sol model and `ultra` reasoning/);
+  assert.match(projectedPolicy, /exact same configured GPT Astra model and `ultra` reasoning/);
   assert.match(projectedPolicy, /account- or host-wide process listings are untrusted discovery/i);
   assert.match(projectedPolicy, /one stable SemVer owner/);
   assert.match(projectedPolicy, /Delivery targets are explicit: `dev` is the default/);
@@ -75,10 +64,8 @@ test("the project creator gives post-exit cleanup guidance and only conditional 
 
   const dirtyGuidance = postProjectCreationGuidance({ sourceHasChanges: true }).join("\n");
   assert.match(dirtyGuidance, /Optional Git publication/);
-  assert.match(dirtyGuidance, /pnpm verify/);
-  for (const command of ["git status --short", "git add --", "git commit -m", "git push"]) {
-    assert.match(dirtyGuidance, new RegExp(command.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&")));
-  }
+  assert.match(dirtyGuidance, /pnpm framework:publish --message "<message>"/);
+  assert.match(dirtyGuidance, /commits all non-ignored changes/);
 });
 
 test("the project creator accepts a bounded detailed manifest seed without making it mandatory", () => {

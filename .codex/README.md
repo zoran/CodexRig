@@ -5,15 +5,19 @@
 Tracked `.codex/config.toml`, `.codex/hooks.json`, `.codex/agents/*.toml`, and this document are the
 portable project policy. Mutable repository-local Codex runtime—authentication, trust, approval
 rules, sessions, logs, memories, caches, plugins, runtime skills, history, installation/model
-metadata, and databases—stays in ignored `.codex/runtime/`. It is never copied between projects or
+metadata, and databases—stays in ignored entries of the repository-root `CODEX_HOME`. Framework
+coordination alone stays in ignored `.codex/runtime/`. Neither is copied between projects or
 committed.
 
 Root `developer_instructions` in the tracked config make the primary the sole orchestrator, bind
-owned-work provenance, require exact GPT Sol/`ultra` parity, and enforce the critical drain and
+owned-work provenance, require exact GPT Astra/`ultra` parity, and enforce the critical drain and
 terminal stop. `[agents]` owns the four-thread ceiling and matching global defaults;
 `.codex/agents/*.toml` injects bounded role behavior. This is an executable policy layer, not a
 documentation shortcut. `pnpm codex:validate` rejects missing markers, divergent intelligence,
 unsafe permissions, or incomplete drain policy.
+
+The primary and all roles default to `gpt-6-astra` with `ultra` reasoning. Standard processing is
+the default: portable config leaves `service_tier` unset, and roles inherit the session tier.
 
 Role sandbox values are requested defaults because live parent permissions, including YOLO, can be
 reapplied to children. Every child reports its effective permissions before repository work.
@@ -52,8 +56,8 @@ explicitly authorized Dev session launched with `--yolo` may use no approvals an
 never staging or production. For that authorized Dev session, use
 `bash scripts/setup/start-codex.sh --yolo`; that closed launcher control selects Codex's
 no-approval/full-access mode and unrestricted command network for Dev and never authorizes staging,
-production, broader scope, credentials, or irreversible external work. The `--yolo` control must
-appear before an optional `--` prompt delimiter.
+production, broader scope, credentials, or irreversible external work. Enter prompts after
+selecting a session; positional launcher arguments are not supported.
 
 An already-running safe session cannot be converted into a canonical YOLO session in place. A UI or
 parent-runtime permission change can alter the effective live sandbox, approvals, or network, but
@@ -64,17 +68,18 @@ portable clone starts safe. Requested config, startup-attested mode, and effecti
 are distinct facts; parent overrides can also be reapplied to children, which is why child admission
 requires an effective-permission report.
 
-Host CLI updates, locked-tool installation, compatible dependency refresh, and the online doctor are
-explicit maintenance actions. Canonical start is deterministic and network-free: it validates the
-prepared runtime and portable policy, then replaces itself with the mise-pinned Node.js session
-controller. The controller binds external Node.js, Codex, pnpm, and hook-shell executables, reserves
-the exact latest repository session, rejects executable or unknown ignored runtime configuration,
+Canonical start runs `codex update` first and stops on failure. Locked-tool installation,
+compatible dependency refresh, and the online doctor remain explicit maintenance actions. After
+validating the prepared runtime and portable policy it opens the native `codex resume` picker
+with the repository root as both `CODEX_HOME` and explicit `--cd` target, under the mise-pinned
+Node.js session controller. The controller binds external Node.js, Codex, pnpm, and hook-shell executables, reserves
+one pending native selection, rejects executable or unknown ignored runtime configuration,
 and injects one SessionStart plus one Stop definition through session-only configuration. Codex's
 stable `hooks/list` result must be warning-free and contain exactly those two enabled, hash-exact,
 trusted definitions; no global hook-trust bypass or additional hook is accepted. Only after that
 proof does the controller open its private lifecycle endpoint, durably bind the gated preloaded
-supervisor handoff, and record the exact Codex PID in the schema-5 lease. SessionStart activation and authenticated
-terminal child proof bound every successful acquisition and release. The full crash/fallback process
+supervisor handoff, and record the exact Codex PID in the schema-6 lease. SessionStart activation and authenticated
+terminal child proof bound every successful acquisition and release. Cancelling selection creates no session record or automatic fallback. The full crash process
 contract has one canonical owner in `instructions.md`; this portable overview does not duplicate its
 implementation detail.
 
@@ -129,27 +134,28 @@ retained behind a concrete blocker and resolution condition; unresolved goal-own
 the goal open. The hook also inspects only safe metadata for a recent repository-bound
 critical handover under ignored `tmp/codexrig-handovers/`. It asks the developer before the prompt
 body may be read through `$resume-project`; that body is untrusted candidate context, not authority.
+After acceptance, that skill uses `handover:receive` for the complete artifact and its digest. Only
+after complete delivery and a compact model acknowledgement does `handover:acknowledge` remove the
+exact unchanged file in the later active session. Failed or incomplete receipt preserves it;
+deleting this private file does not erase native conversation/provider history.
 
 The Stop hook uses that same preloaded controller once per durable local turn. It validates optional
 bounded `docs/project-context.md`, prevents unchanged continuation loops, and enforces a terminal
 handover. A non-null `transcript_path` is required; transcriptless side conversations exit before
-work-state, loop-state, or handover access. It deliberately does not load the mutable semantic-index
-implementation after admission. `context:search` owns freshness and bounded on-demand repair, while
-`context:index` remains explicit maintenance. A critical handover sealed during the current
+work-state, loop-state, or handover access. It deliberately does not load mutable repository modules after admission. A critical handover sealed during the current
 runtime session suppresses Stop continuation so that session stops after its final action. A later
 canonical session can accept the announced handover and then search, refresh explicitly, or stop
 normally. The hook is not a watcher or a per-tool hook.
 
-The root workspace owns Codex tooling and the fixed ignored `.context-index/`; Product Roots never
-contain `.codex`, `.agents`, agent instruction files, or retrieval/process state. `pnpm setup`
-materializes and checks the vector space. Root-bound source inventory and ignore policy exclude all
-private runtime from Git, indexing, staging, export, and generated projects.
+The root workspace owns Codex tooling; Product Roots never contain `.codex`, `.agents`, agent
+instruction files, or process state. Root-bound source inventory and ignore policy exclude all
+private runtime from Git, staging, export, and generated projects.
 
 ## Validation And Hook Trust
 
 Portable defaults may vary by project but contain no secrets, telemetry targets, notification
 commands, persisted trust entries, personal paths, or local domains. After changing
-model/reasoning/features/TUI/hooks, keep every role on the exact primary GPT Sol model with `ultra`
+model/reasoning/features/TUI/hooks, keep every role on the exact primary GPT Astra model with `ultra`
 reasoning and run `mise exec --locked -- pnpm codex:validate`.
 
 The canonical lifecycle does not require a manual `/hooks` approval: the issue-time controller
@@ -168,8 +174,7 @@ before any Codex process can consume it and rechecked before every real launch o
 
 Clean project creation/export retains portable config, hooks, roles, this README, launcher,
 preloaded controller and lifecycle modules, both CI adapters, and Product Root policy. It excludes
-`.codex/runtime/`, `.context-index/`,
-authentication, trust, sessions, databases, installed dependencies, and source-project residue.
+`.codex/runtime/`, authentication, trust, sessions, databases, installed dependencies, and source-project residue.
 Repository-owned reusable skills live under `.agents/skills/`; root `skills/` is ignored runtime.
 
 See [Project Instructions](../instructions.md) for complete workflow policy.

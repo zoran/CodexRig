@@ -17,6 +17,7 @@ import { after, test } from "node:test";
 import { portableContextContractFiles } from "../context/portable-context-contract.mjs";
 import { repositoryRoot } from "../repository/source-inventory.mjs";
 import { stageProjectExport } from "./stage-project-export.mjs";
+import { copyPortableSetupFixture } from "./setup-regression-fixtures.mjs";
 
 const temporaryRoots = [];
 
@@ -28,7 +29,7 @@ function temporaryRoot(prefix) {
 
 function createStage(prefix) {
   const stage = path.join(temporaryRoot(prefix), "stage");
-  stageProjectExport({ includeUntracked: true, sourceRoot: repositoryRoot, targetRoot: stage });
+  copyPortableSetupFixture(stage);
   for (const relativePath of portableContextContractFiles) {
     const target = path.join(stage, relativePath);
     if (existsSync(target)) continue;

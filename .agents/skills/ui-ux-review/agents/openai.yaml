@@ -1,0 +1,6 @@
+interface:
+  display_name: "UI/UX Review"
+  short_description: "Review user flows and preserve design intent"
+  default_prompt:
+    "Use $ui-ux-review to review the affected experience and shared consumers without editing files
+    or redesigning the product. Distinguish rendered evidence from untested assumptions."

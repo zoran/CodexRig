@@ -87,11 +87,8 @@ export function postProjectCreationGuidance({ sourceHasChanges }) {
     lines.push(
       "",
       "Optional Git publication because the source worktree has changes (never performed automatically):",
-      "- Before exiting Codex, verify reviewed changes: mise exec --locked -- pnpm verify",
-      "- After the final clean reset preview, inspect: git status --short",
-      "- Stage only reviewed paths: git add -- <reviewed-paths>",
-      '- Commit if desired: git commit -m "<message>"',
-      "- Push if desired: git push",
+      '- After reviewing all source changes and exiting Codex, run: mise exec --locked -- pnpm framework:publish --message "<message>"',
+      "- This explicit command resets, verifies, commits all non-ignored changes, pushes central main through pre-push, and checks goal:new.",
     );
   }
   return lines;

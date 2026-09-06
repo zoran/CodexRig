@@ -1,22 +1,14 @@
 /** Owns policy projection behavior for the framework lifecycle and child upgrade boundary. */
-import { frameworkRoot, readRegularFrameworkFile } from "../contracts/framework-contract.mjs";
+import {
+  frameworkRoot,
+  readFrameworkContract,
+  readRegularFrameworkFile,
+  validateFrameworkContract,
+} from "../contracts/framework-contract.mjs";
 
 export const policyProjectionPath = ".codexrig/policy-projection.json";
 
 const allowedSurfaces = Object.freeze(["agents", "readme"]);
-const allowedReconciliationDocuments = new Set([
-  ".codex/README.md",
-  "AGENTS.md",
-  "README.md",
-  "config/delivery.json",
-  "config/localization.json",
-  "config/product.json",
-  "config/tenancy.json",
-  "docs/context-index.md",
-  "docs/future-modules.md",
-  "docs/project.md",
-  "instructions.md",
-]);
 const requiredPolicyIds = Object.freeze([
   "agent-orchestration",
   "architecture-evolution",
@@ -76,7 +68,11 @@ function uniqueStringArray(value, label, allowed) {
   return Object.freeze(entries);
 }
 
-export function validatePolicyProjection(value) {
+/** Reconciliation paths must be owned by the same current-schema framework snapshot. */
+export function validatePolicyProjection(value, contract) {
+  const allowedReconciliationDocuments = new Set(
+    validateFrameworkContract(contract).upgrade.projectOwnedDocuments,
+  );
   if (!plainObject(value) || value.schemaVersion !== 3 || !Array.isArray(value.policies)) {
     throw new Error("CodexRig policy projection is invalid.");
   }
@@ -133,16 +129,26 @@ export function readPolicyProjection(root = frameworkRoot) {
     if (/policy projection/u.test(error.message)) throw error;
     throw new Error("CodexRig policy projection must contain valid JSON.");
   }
-  return validatePolicyProjection(value);
+  return validatePolicyProjection(value, readFrameworkContract(root));
 }
 
 export function generatedPolicyProjectionLines(surface, root = frameworkRoot) {
   if (!allowedSurfaces.includes(surface)) {
     throw new Error(`Unsupported generated policy surface: ${surface}.`);
   }
+  // Stable policy IDs delimit readable groups without duplicating their normative statements.
+  const headings = new Map([
+    ["definition-intake", "Project Truth And Workflow"],
+    ["modular-boundaries", "Architecture And Product Boundaries"],
+    ["codex-runtime-permissions", "Runtime And Delivery"],
+    ["provider-parity", "Framework Lifecycle"],
+  ]);
   return readPolicyProjection(root)
     .policies.filter((policy) => policy.projectionSurfaces.includes(surface))
-    .map((policy) => `- ${policy.projectionStatement}`);
+    .flatMap((policy) => [
+      ...(headings.has(policy.id) ? ["", `### ${headings.get(policy.id)}`, ""] : []),
+      `- ${policy.projectionStatement}`,
+    ]);
 }
 
 export function policyProjectionChanges(installedProjection, sourceProjection) {

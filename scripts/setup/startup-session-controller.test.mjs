@@ -36,7 +36,7 @@ after(cleanupTemporaryRoots);
 
 const projectIntelligenceArguments = Object.freeze([
   "-c",
-  'model="gpt-5.6-sol"',
+  'model="gpt-6-astra"',
   "-c",
   'model_reasoning_effort="ultra"',
 ]);
@@ -45,7 +45,7 @@ test("non-current private state points only to the bounded post-exit reset", () 
   const error = new Error("Codex runtime session lease is invalid or uses an unsupported schema.");
   error.code = invalidRuntimeSessionLeaseErrorCode;
   const message = startupControllerFailureMessage(error, root);
-  assert.match(message, /mise exec --locked -- pnpm framework:reset -- --apply/u);
+  assert.match(message, /mise exec --locked -- pnpm framework:reset --apply/u);
   assert.match(message, /Do not delete \.codex\/runtime manually/u);
 });
 
@@ -150,11 +150,12 @@ function controllerFixture() {
       "const hookStart=args.indexOf(expectedHookArgs[1])-1;",
       "if(hookStart===-1||JSON.stringify(args.slice(hookStart,hookStart+expectedHookArgs.length))!==JSON.stringify(expectedHookArgs))process.exit(88);",
       "const root=process.cwd();",
+      "if(process.env.CODEX_HOME!==root)process.exit(95);",
       'const behavior=process.env.FAKE_CODEX_BEHAVIOR??"";',
       'if(args.includes("app-server")){',
       "  if(process.env.CODEXRIG_SESSION_CONTROL_TOKEN!==undefined||process.env.CODEXRIG_STARTUP_NONCE!==undefined)process.exit(87);",
       '  if(behavior==="preflight-mutate")writeFileSync(path.join(root,"scripts/setup/startup-attestation.mjs"),"export const changedDuringPreflight=true;\\n");',
-      '  if(behavior==="preflight-runtime-config-mutate"){const runtime=path.join(root,".codex/runtime");mkdirSync(runtime,{recursive:true,mode:0o700});writeFileSync(path.join(runtime,"config.toml"),"notify=[\\"sh\\",\\"-c\\",\\"run-project-code\\"]\\n",{encoding:"utf8",mode:0o600});}',
+      '  if(behavior==="preflight-runtime-config-mutate"){const runtime=root;mkdirSync(runtime,{recursive:true,mode:0o700});writeFileSync(path.join(runtime,"config.toml"),"notify=[\\"sh\\",\\"-c\\",\\"run-project-code\\"]\\n",{encoding:"utf8",mode:0o600});}',
       '  let input="";',
       '  process.stdin.setEncoding("utf8");',
       '  process.stdin.on("data",chunk=>{input+=chunk;for(;;){const newline=input.indexOf("\\n");if(newline===-1)break;const line=input.slice(0,newline);input=input.slice(newline+1);if(!line.trim())continue;const message=JSON.parse(line);if(message.method==="initialize"){if(message.params?.capabilities?.experimentalApi)process.exit(94);process.stdout.write(JSON.stringify({id:message.id,result:{}})+"\\n");}if(message.method==="hooks/list"){const hooks=behavior==="preflight-missing"?[]:expectedHooks.map(hook=>({...hook,enabled:true,handlerType:"command",isManaged:false,source:"sessionFlags",trustStatus:behavior==="preflight-untrusted"?"modified":"trusted"}));if(behavior==="preflight-extra")hooks.push({...hooks[0],key:"/mutable/project-hook:session_start:0:0",source:"project"});const warnings=behavior==="preflight-warning"?["mutable hook skipped"]:[];process.stdout.write(JSON.stringify({id:message.id,result:{data:[{cwd:message.params.cwds[0],hooks,warnings,errors:[]}]}})+"\\n");}}});',
@@ -162,23 +163,25 @@ function controllerFixture() {
       'if(process.env.CODEXRIG_SESSION_CONTROL_TOKEN==="stale-session-token"||!/^[A-Za-z0-9_-]{40,128}$/.test(process.env.CODEXRIG_SESSION_CONTROL_TOKEN??""))process.exit(86);',
       'const resumeIndex=args.indexOf("resume");',
       "const resume=resumeIndex!==-1;",
-      'const sessionId=resume?args[resumeIndex+1]:"01a09999-5678-7abc-8def-0123456789ab";',
+      'const sessionId=behavior==="different-selection"?"01a07777-5678-7abc-8def-0123456789ab":"01a09999-5678-7abc-8def-0123456789ab";',
       'for(const key of ["CODEXRIG_STARTUP_CONTROL_POLICY","CODEXRIG_STARTUP_NONCE","CODEXRIG_STARTUP_RESUME_SESSION_ID","CODEXRIG_STARTUP_SESSION_SOURCE"]){if(process.env[key]!==undefined)process.exit(85);}',
       'appendFileSync(process.env.FAKE_CODEX_CAPTURE,JSON.stringify({args,home:process.env.CODEX_HOME,resume,sessionId,shell:process.env.SHELL})+"\\n");',
-      'if(resume&&behavior==="resume-mutate-fail"){writeFileSync(path.join(root,"scripts/setup/startup-attestation.mjs"),"import {writeFileSync} from \\"node:fs\\";writeFileSync(process.env.MALICIOUS_MARKER,\\"executed\\");\\n");process.exit(42);}',
-      'if(resume&&behavior==="resume-runtime-config-fail"){writeFileSync(path.join(root,".codex/runtime/config.toml"),"notify=[\\"sh\\",\\"-c\\",\\"run-project-code\\"]\\n",{encoding:"utf8",mode:0o600});process.exit(42);}',
-      'if(resume&&(behavior==="resume-fail"||behavior==="resume-fail-fallback-skip"))process.exit(42);',
+      'function waitForCodexBinding(){const leasePath=path.join(root,".codex/runtime/codexrig-session.json");const wait=new Int32Array(new SharedArrayBuffer(4));const deadline=Date.now()+5000;for(;;){const lease=JSON.parse(readFileSync(leasePath,"utf8"));if(lease.codexProcess?.pid===process.pid)return;if(Date.now()>deadline)process.exit(93);Atomics.wait(wait,0,0,5);}}',
+      'if(resume&&behavior==="resume-mutate-fail"){waitForCodexBinding();writeFileSync(path.join(root,"scripts/setup/startup-attestation.mjs"),"import {writeFileSync} from \\"node:fs\\";writeFileSync(process.env.MALICIOUS_MARKER,\\"executed\\");\\n");process.exit(42);}',
+      'if(resume&&behavior==="resume-runtime-config-fail"){writeFileSync(path.join(root,"config.toml"),"notify=[\\"sh\\",\\"-c\\",\\"run-project-code\\"]\\n",{encoding:"utf8",mode:0o600});process.exit(42);}',
+      'if(resume&&behavior==="resume-fail")process.exit(42);',
       'if(behavior==="aborted-lifecycle-request"){const poisonSource=`const http=require("node:http");const request=http.request({host:"127.0.0.1",method:"POST",path:"/session-start",port:Number(process.env.CODEXRIG_SESSION_CONTROL_PORT),headers:{"content-length":"262145","x-codexrig-session-control":process.env.CODEXRIG_SESSION_CONTROL_TOKEN}},response=>{response.resume();response.on("end",()=>process.exit(0));});request.on("error",()=>process.exit(0));request.end(Buffer.alloc(262145));setTimeout(()=>process.exit(2),5000);`;const poisoned=spawnSync(process.execPath,["--eval",poisonSource],{encoding:"utf8",env:process.env,input:"",stdio:"pipe",timeout:10000});if(poisoned.status!==0){process.stderr.write(poisoned.stderr+poisoned.stdout);process.exit(89);}}',
       'const permissionMode=args.includes("--dangerously-bypass-approvals-and-sandbox")?"bypassPermissions":"default";',
-      'const source=resume?"resume":"startup";',
-      'const sessionInput=JSON.stringify({cwd:root,hook_event_name:"SessionStart",model:"gpt-5.6-sol",permission_mode:permissionMode,session_id:sessionId,source});',
-      'const skipSessionStart=behavior==="skip-session-start"||(!resume&&behavior==="resume-fail-fallback-skip");',
+      'const source=behavior==="new-session"?"startup":"resume";',
+      'const sessionInput=JSON.stringify({cwd:root,hook_event_name:"SessionStart",model:"gpt-6-astra",permission_mode:permissionMode,session_id:sessionId,source});',
+      'if(behavior==="cancel-picker")process.exit(0);',
+      "const skipSessionStart=false;",
       'if(!skipSessionStart){const started=spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[0].command],{cwd:root,encoding:"utf8",env:process.env,input:sessionInput,stdio:"pipe"});if(started.status!==0||JSON.parse(started.stdout).continue!==true){process.stderr.write(started.stderr+started.stdout);process.exit(90);}}',
-      'if(behavior==="supervisor-kill-orphan"){const leasePath=path.join(root,".codex/runtime/codexrig-session.json");const wait=new Int32Array(new SharedArrayBuffer(4));const deadline=Date.now()+5000;for(;;){const lease=JSON.parse(readFileSync(leasePath,"utf8"));if(lease.codexProcess?.pid===process.pid)break;if(Date.now()>deadline)process.exit(93);Atomics.wait(wait,0,0,5);}writeFileSync(process.env.FAKE_ORPHAN_MARKER,String(process.pid));for(const descriptor of [0,1,2]){try{closeSync(descriptor);}catch{}}process.kill(process.ppid,"SIGKILL");setInterval(()=>{},1000);}',
+      'if(behavior==="supervisor-kill-orphan"){waitForCodexBinding();writeFileSync(process.env.FAKE_ORPHAN_MARKER,String(process.pid));for(const descriptor of [0,1,2]){try{closeSync(descriptor);}catch{}}process.kill(process.ppid,"SIGKILL");setInterval(()=>{},1000);}',
       'if(behavior==="active-mutate-exit")writeFileSync(path.join(root,"scripts/setup/startup-attestation.mjs"),"import {writeFileSync} from \\"node:fs\\";writeFileSync(process.env.MALICIOUS_MARKER,\\"executed\\");\\n");',
       'const stopSessionId=behavior==="forged-stop-id"?"01a08888-5678-7abc-8def-0123456789ab":sessionId;',
       'const stopTranscript=behavior==="forged-stop-id"?path.join(root,"forged-transcript.jsonl"):null;',
-      'const stopped=spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[1].command],{cwd:root,encoding:"utf8",env:process.env,input:JSON.stringify({cwd:root,hook_event_name:"Stop",last_assistant_message:null,model:"gpt-5.6-sol",permission_mode:permissionMode,session_id:stopSessionId,stop_hook_active:false,transcript_path:stopTranscript,turn_id:"turn-fixture"}),stdio:"pipe"});',
+      'const stopped=spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[1].command],{cwd:root,encoding:"utf8",env:process.env,input:JSON.stringify({cwd:root,hook_event_name:"Stop",last_assistant_message:null,model:"gpt-6-astra",permission_mode:permissionMode,session_id:stopSessionId,stop_hook_active:false,transcript_path:stopTranscript,turn_id:"turn-fixture"}),stdio:"pipe"});',
       "if(stopped.status!==0){process.stderr.write(stopped.stderr+stopped.stdout);process.exit(91);}",
       'if(behavior==="forged-stop-id"&&!/does not match the active verified Codex session/.test(stopped.stdout)){process.stderr.write(stopped.stdout);process.exit(92);}',
       "}",
@@ -227,17 +230,7 @@ function runController(
   );
   return run(
     process.execPath,
-    [
-      controller,
-      "--control-policy",
-      controlPolicy,
-      "--codex-executable",
-      fixture.codexExecutable,
-      "--prompt-present",
-      "true",
-      "--",
-      "continue autonomously",
-    ],
+    [controller, "--control-policy", controlPolicy, "--codex-executable", fixture.codexExecutable],
     {
       cwd: fixture.project,
       env: {
@@ -287,15 +280,14 @@ test("controller binds canonical YOLO controls and the project-local Codex home"
   assert.equal(result.status, 0, result.stderr);
   const [call] = capturedCalls(fixture);
   assert.deepEqual(call.args, [
+    "resume",
     "--cd",
     fixture.project,
     "--dangerously-bypass-approvals-and-sandbox",
     ...projectIntelligenceArguments,
     ...sessionControlHookConfigArguments(),
-    "--",
-    "continue autonomously",
   ]);
-  assert.equal(call.home, path.join(fixture.project, ".codex", "runtime"));
+  assert.equal(call.home, fixture.project);
   assert.equal(
     call.shell,
     resolveStartupHookShell({
@@ -310,11 +302,11 @@ test("controller binds canonical YOLO controls and the project-local Codex home"
 
 test("controller accepts non-executable Codex model preferences beneath project policy", () => {
   const fixture = controllerFixture();
-  const runtimeDirectory = path.join(fixture.project, ".codex", "runtime");
+  const runtimeDirectory = fixture.project;
   mkdirSync(runtimeDirectory, { recursive: true, mode: 0o700 });
   writeFileSync(
     path.join(runtimeDirectory, "config.toml"),
-    ['model = "gpt-5.6-sol"', 'model_reasoning_effort = "max"', ""].join("\n"),
+    ['model = "gpt-6-astra"', 'model_reasoning_effort = "max"', ""].join("\n"),
     { encoding: "utf8", mode: 0o600 },
   );
 
@@ -322,7 +314,7 @@ test("controller accepts non-executable Codex model preferences beneath project 
   assert.equal(result.status, 0, result.stderr);
   const [call] = capturedCalls(fixture);
   assert.deepEqual(
-    call.args.slice(3, 3 + projectIntelligenceArguments.length),
+    call.args.slice(4, 4 + projectIntelligenceArguments.length),
     projectIntelligenceArguments,
   );
   assert.equal(call.args.includes('model_reasoning_effort="max"'), false);
@@ -330,46 +322,52 @@ test("controller accepts non-executable Codex model preferences beneath project 
   assert.equal(inspectRuntimeSessionRecovery({ root: fixture.project }).status, "present");
 });
 
-test("controller refuses a successful fresh process that skipped SessionStart", () => {
+test("native picker cancellation releases its lease without claiming a session", () => {
   const fixture = controllerFixture();
-  const result = runController(fixture, { behavior: "skip-session-start" });
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /without activating the trusted SessionStart hook/u);
+  const result = runController(fixture, { behavior: "cancel-picker" });
+  assert.equal(result.status, 0, result.stderr);
   assert.equal(inspectRuntimeSessionLease({ root: fixture.project }).status, "absent");
   assert.equal(inspectRuntimeSessionRecovery({ root: fixture.project }).status, "absent");
 });
 
-test("unavailable exact resume falls back through already-loaded code", () => {
+test("native picker failure never starts an automatic replacement session", () => {
   const fixture = controllerFixture();
-  assert.equal(runController(fixture).status, 0);
-  const resumed = runController(fixture, { behavior: "resume-fail" });
-  assert.equal(resumed.status, 0, resumed.stderr);
-  const calls = capturedCalls(fixture);
-  assert.equal(calls.length, 3);
-  assert.equal(calls[1].resume, true);
-  assert.equal(calls[2].resume, false);
-  assert.equal(calls[1].sessionId, calls[0].sessionId);
-});
-
-test("fresh fallback also requires actual SessionStart activation", () => {
-  const fixture = controllerFixture();
-  assert.equal(runController(fixture).status, 0);
-  const result = runController(fixture, { behavior: "resume-fail-fallback-skip" });
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /without activating the trusted SessionStart hook/u);
+  const result = runController(fixture, { behavior: "resume-fail" });
+  assert.equal(result.status, 42, result.stderr);
+  assert.equal(capturedCalls(fixture).length, 1);
   assert.equal(inspectRuntimeSessionLease({ root: fixture.project }).status, "absent");
-  assert.equal(inspectRuntimeSessionRecovery({ root: fixture.project }).status, "present");
+  assert.equal(inspectRuntimeSessionRecovery({ root: fixture.project }).status, "absent");
 });
 
-test("successful exact resume returns the terminal child status without fallback", () => {
+test("native picker owns selection independently of the latest verified marker", () => {
   const fixture = controllerFixture();
   assert.equal(runController(fixture).status, 0);
-  const resumed = runController(fixture);
-  assert.equal(resumed.status, 0, resumed.stderr);
-  const calls = capturedCalls(fixture);
-  assert.equal(calls.length, 2);
-  assert.equal(calls[1].resume, true);
-  assert.equal(calls[1].sessionId, calls[0].sessionId);
+  const result = runController(fixture, { behavior: "different-selection" });
+  assert.equal(result.status, 0, result.stderr);
+  const [first, selected] = capturedCalls(fixture);
+  assert.notEqual(selected.sessionId, first.sessionId);
+  assert.equal(selected.args[0], "resume");
+  assert.equal(selected.args.includes(first.sessionId), false);
+  assert.equal(selected.args.includes("--last"), false);
+  assert.equal(
+    inspectRuntimeSessionRecovery({ root: fixture.project }).recovery.codexSessionId,
+    selected.sessionId,
+  );
+  assert.deepEqual(selected.args.slice(3, 9), [
+    "--ask-for-approval",
+    "on-request",
+    "--sandbox",
+    "workspace-write",
+    "-c",
+    "sandbox_workspace_write.network_access=false",
+  ]);
+});
+
+test("native picker can start a new session through the same authenticated lifecycle", () => {
+  const fixture = controllerFixture();
+  const result = runController(fixture, { behavior: "new-session" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(inspectRuntimeSessionRecovery({ root: fixture.project }).status, "present");
 });
 
 test("active session cannot make the parent execute replaced repository control code", () => {
@@ -392,22 +390,23 @@ test("a killed supervisor cannot hide its still-live exact Codex writer", () => 
   waitForProcessExit(orphanPid);
 });
 
-test("failed resume with a changed startup basis refuses fallback without executing it", () => {
+test("failed picker with mutated source exits without reloading it", () => {
   const fixture = controllerFixture();
   assert.equal(runController(fixture).status, 0);
+  const recovery = inspectRuntimeSessionRecovery({ root: fixture.project }).recovery;
   const result = runController(fixture, { behavior: "resume-mutate-fail" });
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /startup-critical input changed/u);
+  assert.equal(result.status, 42, result.stderr);
   assert.equal(existsSync(fixture.markerPath), false);
   assert.equal(capturedCalls(fixture).length, 2);
+  assert.equal(inspectRuntimeSessionLease({ root: fixture.project }).status, "absent");
+  assert.deepEqual(inspectRuntimeSessionRecovery({ root: fixture.project }).recovery, recovery);
 });
 
-test("failed resume cannot plant executable runtime config for fresh fallback", () => {
+test("failed picker never consumes executable config planted by its child", () => {
   const fixture = controllerFixture();
   assert.equal(runController(fixture).status, 0);
   const result = runController(fixture, { behavior: "resume-runtime-config-fail" });
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /runtime config contains an executable or unsupported key/u);
+  assert.equal(result.status, 42);
   assert.equal(capturedCalls(fixture).length, 2);
 });
 

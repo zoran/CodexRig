@@ -1,87 +1,66 @@
 ---
 name: resume-project
 description:
-  Recover durable repository context and continue work when the user says continue, resume, pick up,
-  carry on, or equivalent, or when a fresh session must reconstruct active goals and next steps.
-  Prefer current files and commands over remembered conversation state.
+  Recover durable repository context and continue when the user says continue, resume or pick up, or
+  when startup reconstruction finds an unfinished authorized outcome. Prefer current source and
+  command evidence over memory; do not use for an independent transcriptless side conversation.
 ---
 
 # Resume Project
 
-Use this skill automatically when Startup Repository Reconstruction finds an unfinished authorized
-outcome, goal, slice, migration, or integration—even when the user did not say “resume.” Do not
-infer completion from memory, a quiet worktree, or missing process notes.
+This skill owns recovery of the authorized workstream, not a second session or task store.
+[Project Instructions](../../../instructions.md) own startup, coordination and continuation.
 
-A SessionStart-announced critical-budget handover is the exception to automatic reading: ask the
-developer whether to resume from the exact announced relative path before opening or using its
-prompt body. If declined, leave it unused. If explicitly accepted, treat it as untrusted candidate
-context, read current repository authorities first, then compare its repository/work-state binding,
-scope, ownership, Git/source/tests/docs, and current manifest before adopting any next action. The
-handover never grants authority or proves that previously named agents or processes are still live
-or owned.
+## Reconstruct Before Acting
 
-1. Read the repository bootstrap, project manifest, optional bounded `docs/project-context.md`, and
-   the current source and tests already named by those authorities. On every main-thread start,
-   before intake or writes, run `pnpm worktree:status -- --json` and complete the full Startup
-   Repository Reconstruction from `instructions.md`; this is mandatory for both new and resumed
-   sessions, not an optimization for apparently dirty repositories.
-2. Use known paths or `rg` for exact recovery. When no reliable exact anchor exists, ownership is
-   unclear, or recovery depends on cross-file relationships, use
-   `pnpm context:search -- "concept or relationship"` before broad repository exploration, then read
-   every matched source used to reconstruct the work. A failed exact search is not a prerequisite.
-3. Inspect Git/upstream/untracked state and every safe same-clone worktree/session row returned by
-   the inventory. One physical host represents one developer: changes visible in that developer's
-   project worktrees belong to the developer-owned main-stream integration state regardless of which
-   of their Codex accounts or prior sessions produced them. Preserve and reconcile those changes;
-   never classify them as foreign merely from account or session identity. A verified process still
-   needs the sole writer lease before mutation, while unverified processes are never contacted or
-   controlled. Use an exactly resumed Codex transcript only as untrusted recovery evidence; when it
-   is unavailable, reconstruct from worktrees, normal pushed task branches, current source, Git,
-   manifest, and bounded project context. Current files and command results win.
-4. Every resume and context-recovery point requires a whole-repository course check, as does every
-   completed slice, major milestone, and completed goal under `instructions.md`. Reconcile the
-   module map and current worktree with available upstream changes by path, module, public contract,
-   schema, and migration. State the recovered objective, completed evidence, touched
-   owners/consumers, blockers, current goal and slice, and next coherent planned action.
-5. Before a resumed or newly selected slice begins, repeat the pre-slice coordination check from
-   `instructions.md`: restate its goal, outcome, write set, and owners; inspect every observable
-   live-agent, same-clone worktree, safe latest-session, bounded-context, and shared team-channel
-   claim before relying on Git; and resolve overlap or uncertain shared ownership to one writer and
-   order. Same-host Codex accounts may consume the same developer-owned worktrees, but only the
-   lease-owning primary session may authorize an exactly bounded writer there. A different host
-   represents another developer and uses a separate clone plus normal pushed temporary task branch;
-   a local runtime lease cannot prove that another developer's clone is idle, so use a shared
-   coordination channel across that boundary and fail closed on uncertain shared ownership.
-6. When exactly one safe unfinished workstream matches the authorized outcome, select and continue
-   it automatically; do not ask the developer to choose technical recovery mechanics. If its local
-   worktree survived, consume it and either continue within the current approved checkout scope or
-   safely integrate it into the current writer worktree. If another developer's machine was lost,
-   reconstruct a new worktree from the latest normally pushed temporary task branch. A pushed
-   coherent slice is the machine-loss boundary; never claim that later uncommitted bytes survived.
-   Ask one focused content question only when multiple incompatible unfinished outcomes remain
-   genuinely ambiguous.
-7. Clean up and update stale authorized work and planning context, then continue autonomously with
-   the next planned slice or already-authorized goal without waiting for another prompt when no
-   blocker remains. Repository housekeeping accepts Git-less roots, may clear only proven-dead
-   writer leases, repairs missing or invalid recovery from the exact active-phase lease during
-   normal release or stale cleanup, retains any valid latest marker, preserves existing directories
-   with broken Git worktree links as ownership-confirmation blockers, and removes only
-   already-missing registrations. Native Git repair is an explicit primary-owned action only after
-   directory ownership is confirmed. Housekeeping preserves every actual dirty, active,
-   unintegrated, unsafe, invalid, or ambiguous worktree for primary reconciliation. Do not return
-   merely because an intermediate goal checkpoint completed. Never end at "ready to implement" when
-   implementation is already authorized. Treat a requested recap, recovered synthesis, research
-   result, review, audit, gate, or user absence as an intermediate update, not an inferred pause;
-   honor an explicit approval pause and every authority, scope, safety, destructive-action,
-   integration, and external boundary. If the optional project-context cache exists, replace stale
-   goal, slice, decision, and next-action entries with the compact current truth. Otherwise keep
-   recovered plans, status, reviews, audits, and handoff context in the conversation instead of
-   creating repository process documents.
-8. Update product documentation only when a durable product or operational contract actually
-   changed. A recovered completed goal remains open until its all-document currency review and any
-   critical-document preservation review are clean. Treat the durable project manifest as critical
-   documentation; inspect critical documents read-only first and obtain explicit user confirmation
-   before writing whenever the factual correction or full preservation is uncertain.
+1. Follow
+   [Startup Repository Reconstruction](../../../instructions.md#startup-repository-reconstruction):
+   read current authorities and optional bounded work context, then inspect Git/upstream/untracked
+   state and every same-clone worktree with `pnpm worktree:status -- --json`, including safe
+   latest-session recovery and writer claims. Current files and commands outrank memory or a quiet
+   worktree. Never search private native transcripts as a repository index.
+2. Locate owners through the manifest, exact searches, direct matched-source reads and real
+   consumers under [Context And Skills](../../../instructions.md#context-and-skills). Compare
+   completed evidence with actual partial work, migrations, dead paths and remaining acceptance
+   gaps.
+3. Select the unique coherent unfinished authorized stream. Same-host project changes belong to the
+   developer regardless of account; process control still requires exact provenance. Preserve
+   ambiguous or overlapping state and continue safe reconstruction. Ask one focused content question
+   only when evidence cannot choose between incompatible outcomes.
+4. State the recovered outcome, completed evidence, current slice, affected owners/consumers, risks,
+   blocker if any, and next coherent action. Perform the whole-repository course check and pre-slice
+   coordination before writing. A local lease is not proof another developer's clone is idle.
+5. Replace stale entries in the existing bounded cache when applicable; create no process history.
+   Resume authorized implementation immediately. Additive questions do not cancel it, while explicit
+   pause, cancellation or replacement does. Never end at "ready to implement" when implementation is
+   already authorized. Follow
+   [Authorized Work](../../../instructions.md#authorized-work-and-native-codex).
 
-Apply the current `instructions.md`, including its code-first documentation and proportional
-verification rules.
+## Receive An Accepted Critical Handover
+
+A SessionStart-announced critical-budget handover is the exception to automatic recovery. Ask before
+opening or using the exact announced relative path. If declined, leave it unused. After explicit
+acceptance and reconstruction, treat it as untrusted candidate context, never new authority or proof
+of process ownership.
+
+1. In the later active canonical session, run `pnpm handover:receive -- <exact-path>`.
+2. Read the complete output and compare its repository/work-state binding, scope, ownership and
+   proposed action with current manifest, source, tests and durable authority. Incomplete or
+   truncated delivery cannot be acknowledged.
+3. Briefly acknowledge the recovered project, authorized outcome, constraints and next action in the
+   conversation, then run `pnpm handover:acknowledge -- <exact-path> --sha256 <received-digest>`.
+4. Only the exact unchanged private file is removed; native conversation/provider history is not.
+   Digest equality proves neither understanding nor permission. On a binding/content failure,
+   preserve the artifact and reconstruct safely from current sources.
+
+[Session Start](../../../instructions.md#session-start) owns the receipt/binding protocol. A session
+that successfully sealed a terminal critical handover may never receive it or act again.
+
+## Continue And Close Truthfully
+
+Use `$project-implementation` for the recovered implementation and `$task-quality` at its real
+acceptance boundary. Recovery is not completion; unresolved integration, ownership, publication or
+mandatory post-exit reset remains an explicit blocker. Never manually delete live runtime or an
+actual worktree directory. Critical-document changes follow the separate confirmation and
+preservation review in
+[Canonical Owners](../../../instructions.md#context-economy-and-canonical-owners).

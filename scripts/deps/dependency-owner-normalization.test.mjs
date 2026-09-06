@@ -110,7 +110,7 @@ test("documented pnpm argument separator preserves dependency update options", (
     parseDependencyUpdateArgs([
       "--",
       "--select",
-      "package.json:devDependencies:@lancedb/lancedb",
+      "package.json:devDependencies:prettier",
       "--level",
       "major",
       "--allow-major",
@@ -120,7 +120,7 @@ test("documented pnpm argument separator preserves dependency update options", (
     ]),
     {
       level: "major",
-      select: ["package.json:devDependencies:@lancedb/lancedb"],
+      select: ["package.json:devDependencies:prettier"],
       yes: true,
       allowMajor: true,
       includePinned: false,

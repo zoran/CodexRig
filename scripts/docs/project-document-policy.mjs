@@ -4,7 +4,6 @@ import { frameworkRoot, readFrameworkContract } from "../contracts/framework-con
 const generatedDocumentPaths = [
   "AGENTS.md",
   "README.md",
-  "docs/context-index.md",
   "docs/future-modules.md",
   "docs/project.md",
   "instructions.md",

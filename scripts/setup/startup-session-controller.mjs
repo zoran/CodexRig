@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Owns the preloaded Codex process, exact-resume, SessionStart, and Stop control boundary. */
+/** Owns the preloaded Codex process, native resume selection, SessionStart, and Stop control boundary. */
 import { spawn } from "node:child_process";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import http from "node:http";
@@ -8,7 +8,6 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { runStopLifecycle } from "../context/session-stop-lifecycle.mjs";
 import { frameworkRoot } from "../contracts/framework-contract.mjs";
-import { repositoryCodexRuntimeDirectory } from "../repository/source-inventory.mjs";
 import {
   inspectRuntimeSessionLease,
   invalidRuntimeSessionLeaseErrorCode,
@@ -16,12 +15,10 @@ import {
 } from "../repository/runtime-session-lease.mjs";
 import { formatContextError } from "../terminal/terminal-output.mjs";
 import {
-  fallbackStartupAttestation,
   reserveStartupAttestation,
   runtimeSessionLaunchState,
   startupAttestationBasis,
   startupControlPolicies,
-  startupSessionSources,
   verifyStartupAttestation,
 } from "./startup-attestation.mjs";
 import { runStartupCodexProcess } from "./startup-codex-process.mjs";
@@ -65,36 +62,23 @@ const inheritedExecutionControlKeys = new Set([
 function controllerUsage() {
   return (
     "Usage: startup-session-controller.mjs --control-policy <policy> " +
-    "--codex-executable <absolute-path> --prompt-present <true|false> -- [prompt tokens]"
+    "--codex-executable <absolute-path>"
   );
 }
 
 /** Parses only the closed argument shape emitted by the canonical Bash launcher. */
 export function parseSessionControllerArguments(argv, root = frameworkRoot) {
-  if (
-    argv.length < 9 ||
-    argv[2] !== "--control-policy" ||
-    argv[4] !== "--codex-executable" ||
-    argv[6] !== "--prompt-present" ||
-    argv[8] !== "--"
-  ) {
+  if (argv.length !== 6 || argv[2] !== "--control-policy" || argv[4] !== "--codex-executable") {
     throw new Error(controllerUsage());
   }
   const controlPolicy = argv[3];
   if (!Object.values(startupControlPolicies).includes(controlPolicy)) {
     throw new Error("Canonical launcher control policy is unsupported.");
   }
-  if (!new Set(["true", "false"]).has(argv[7])) throw new Error(controllerUsage());
-  const promptPresent = argv[7] === "true";
-  const promptArguments = argv.slice(9);
-  if (!promptPresent && promptArguments.length > 0) throw new Error(controllerUsage());
-
   const codexExecutable = canonicalExternalExecutable(root, argv[5], "Canonical Codex");
   return Object.freeze({
     codexExecutable,
     controlPolicy,
-    promptArguments: Object.freeze(promptArguments),
-    promptPresent,
   });
 }
 
@@ -107,7 +91,16 @@ function codexControlArguments(controlPolicy) {
     controlPolicy === startupControlPolicies.yoloNoAltScreen;
   return [
     ...(noAltScreen ? ["--no-alt-screen"] : []),
-    ...(yolo ? ["--dangerously-bypass-approvals-and-sandbox"] : []),
+    ...(yolo
+      ? ["--dangerously-bypass-approvals-and-sandbox"]
+      : [
+          "--ask-for-approval",
+          "on-request",
+          "--sandbox",
+          "workspace-write",
+          "-c",
+          "sandbox_workspace_write.network_access=false",
+        ]),
   ];
 }
 
@@ -129,30 +122,15 @@ function codexIntelligenceArguments(model, reasoningEffort) {
 }
 
 /** Builds one canonical Codex CLI shape from the attested control and session selection. */
-export function codexArgumentsFor({
-  controlPolicy,
-  hookShellName,
-  model,
-  promptArguments,
-  promptPresent,
-  reasoningEffort,
-  root,
-  sessionSource,
-  resumeSessionId,
-}) {
+export function codexArgumentsFor({ controlPolicy, hookShellName, model, reasoningEffort, root }) {
   const args = [
+    "resume",
     "--cd",
     root,
     ...codexControlArguments(controlPolicy),
     ...codexIntelligenceArguments(model, reasoningEffort),
     ...sessionControlHookConfigArguments(hookShellName),
   ];
-  if (sessionSource === startupSessionSources.resume) {
-    args.push("resume", resumeSessionId);
-  } else if (sessionSource !== startupSessionSources.startup || resumeSessionId !== "") {
-    throw new Error("Canonical Codex session selection is invalid.");
-  }
-  if (promptPresent) args.push("--", ...promptArguments);
   return args;
 }
 
@@ -255,11 +233,10 @@ function createLifecycleServer({ controlToken, launch, root }) {
             expectedAttestation: launch.attestation,
             hookInput,
             nonce: launch.nonce,
-            resumeSessionId: launch.resumeSessionId,
             root,
             runtimeExecutables: launch.runtimeExecutables,
-            sessionSource: launch.sessionSource,
           });
+          launch.sessionStartFailure = null;
           writeControllerResponse(response, 200, sessionStartSuccess(attestation, { root }));
           return;
         }
@@ -277,6 +254,7 @@ function createLifecycleServer({ controlToken, launch, root }) {
         });
         writeControllerResponse(response, 200, Object.keys(output).length === 0 ? null : output);
       } catch (error) {
+        if (mode === "session-start") launch.sessionStartFailure = error;
         writeControllerResponse(
           response,
           200,
@@ -302,7 +280,7 @@ function baseCodexEnvironment(root, hookShell) {
     if (inheritedExecutionControlKeys.has(key.toUpperCase())) delete environment[key];
   }
   Object.assign(environment, {
-    CODEX_HOME: path.join(root, repositoryCodexRuntimeDirectory),
+    CODEX_HOME: root,
     CODEXRIG_PROJECT_ROOT: root,
     NPM_CONFIG_IGNORE_PNPMFILE: "true",
     PNPM_CONFIG_IGNORE_PNPMFILE: "true",
@@ -321,14 +299,6 @@ function codexEnvironment({ baseEnvironment, controlToken, nodeExecutable, port 
     CODEXRIG_SESSION_CONTROL_PORT: String(port),
     CODEXRIG_SESSION_CONTROL_TOKEN: controlToken,
   };
-}
-
-function verifiedFreshLaunchStatus(root, pid, outcome) {
-  if (outcome.status >= 128) return outcome.status;
-  if (runtimeSessionLaunchState(root, pid) !== "active") {
-    throw new Error("Project startup exited without activating the trusted SessionStart hook.");
-  }
-  return outcome.status;
 }
 
 function validateSessionControlHookListing(message, root, hookShellName) {
@@ -531,9 +501,8 @@ export async function runStartupSessionController({
       model: expectedBasis.model,
       nonce: reservation.nonce,
       reasoningEffort: expectedBasis.reasoningEffort,
-      resumeSessionId: reservation.lease.resumeSessionId ?? "",
       runtimeExecutables,
-      sessionSource: reservation.lease.sessionSource,
+      sessionStartFailure: null,
     };
     const controlToken = randomBytes(32).toString("base64url");
     server = createLifecycleServer({ controlToken, launch, root });
@@ -544,8 +513,6 @@ export async function runStartupSessionController({
       model: launch.model,
       reasoningEffort: launch.reasoningEffort,
       root,
-      resumeSessionId: launch.resumeSessionId,
-      sessionSource: launch.sessionSource,
     });
     const first = await runStartupCodexProcess({
       args: firstArguments,
@@ -560,52 +527,10 @@ export async function runStartupSessionController({
       root,
     });
     if (!first.safeToRelease) releaseLease = false;
-    if (launch.sessionSource !== startupSessionSources.resume) {
-      return verifiedFreshLaunchStatus(root, process.pid, first);
-    }
-    if (first.status >= 128) return first.status;
-    const launchState = runtimeSessionLaunchState(root, process.pid);
-    if (launchState === "active") return first.status;
-    if (launchState !== "launching") {
-      throw new Error("Project resume ended with an invalid controller state.");
-    }
-    if (first.status === 0) {
-      throw new Error(
-        "Project resume exited without activating the trusted SessionStart hook; refusing automatic fresh fallback.",
-      );
-    }
-    const fallback = fallbackStartupAttestation(root, process.pid, {
-      controlPolicy: launch.controlPolicy,
-      expectedAttestation: reservation.attestation,
-      nonce: launch.nonce,
-      runtimeExecutables: launch.runtimeExecutables,
-    });
-    launch.nonce = fallback.nonce;
-    launch.attestation = fallback.attestation;
-    launch.resumeSessionId = "";
-    launch.sessionSource = startupSessionSources.startup;
-    const second = await runStartupCodexProcess({
-      args: codexArgumentsFor({
-        ...options,
-        hookShellName: launch.hookShell.name,
-        model: launch.model,
-        reasoningEffort: launch.reasoningEffort,
-        root,
-        resumeSessionId: "",
-        sessionSource: startupSessionSources.startup,
-      }),
-      codexExecutable: options.codexExecutable,
-      environment: codexEnvironment({
-        baseEnvironment,
-        controlToken,
-        nodeExecutable: runtimeExecutables.node,
-        port,
-      }),
-      launch,
-      root,
-    });
-    if (!second.safeToRelease) releaseLease = false;
-    return verifiedFreshLaunchStatus(root, process.pid, second);
+    if (launch.sessionStartFailure !== null) throw launch.sessionStartFailure;
+    // A picker exit before SessionStart is cancellation, not a completed Codex session.
+    // Its exact terminal proof permits release, but creates no activation or recovery record.
+    return first.status;
   } catch (error) {
     if (error?.safeToReleaseRuntimeLease === false) releaseLease = false;
     throw error;
@@ -624,7 +549,8 @@ export function startupControllerFailureMessage(error, root = frameworkRoot) {
     "The private writer lease is not on the current runtime contract. Exit every Codex session " +
     "using this framework, then preview and apply the bounded framework reset:\n" +
     "  mise exec --locked -- pnpm framework:reset\n" +
-    "  mise exec --locked -- pnpm framework:reset -- --apply\n" +
+    "  mise exec --locked -- pnpm framework:reset --apply\n" +
+    "  mise exec --locked -- pnpm framework:reset\n" +
     "Do not delete .codex/runtime manually; the full reset discards incompatible disposable " +
     "runtime state only after repository-wide runtime quiescence is proven. Then retry " +
     "bash scripts/setup/start-codex.sh."

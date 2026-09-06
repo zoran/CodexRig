@@ -8,7 +8,6 @@ import {
   discoverProductLayout,
   isProductImplementationPath,
   isProductSurfacePath,
-  overlappingProductRoots,
   pnpmWorkspacePatterns,
   productSourceRootForPath,
 } from "./product-roots.mjs";
@@ -68,21 +67,4 @@ test("product layout activates only the default, declared workspace, and evidenc
     productSourceRootForPath("apps/web/public/logo.svg", layout, { surface: true }),
     "apps/web/src",
   );
-});
-
-test("logical roots protect missing descendants and nested unit ancestors from index overlap", (t) => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "product-roots-overlap-"));
-  t.after(() => rmSync(root, { force: true, recursive: true }));
-  const missingDefault = discoverProductLayout({ repositoryRoot: root });
-  assert.deepEqual(missingDefault.sourceRoots, ["src"]);
-  assert.deepEqual(overlappingProductRoots("src/vector-space", missingDefault), ["src"]);
-
-  write(root, "src/.gitkeep");
-  write(root, "pnpm-workspace.yaml", 'packages:\n  - "apps/*"\n');
-  write(root, "apps/web/package.json", '{"name":"web"}\n');
-  write(root, "apps/web/src/index.ts", "export const active = true;\n");
-  const layout = discoverProductLayout({ repositoryRoot: root });
-  assert.deepEqual(overlappingProductRoots(".context-index", layout), []);
-  assert.deepEqual(overlappingProductRoots("apps/web", layout), ["apps/web"]);
-  assert.deepEqual(overlappingProductRoots("apps/web/src/vector-space", layout), ["apps/web"]);
 });

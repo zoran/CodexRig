@@ -4,7 +4,6 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
-  hasContradictoryStopHookIndexContract,
   portableContextContractFindings,
   supportedCodexStartCommand,
 } from "../context/portable-context-contract.mjs";
@@ -87,10 +86,6 @@ if (packageJson) {
     "auth:check",
     "codex:start",
     "codex:validate",
-    "context:check",
-    "context:clean",
-    "context:index",
-    "context:search",
     "deps:install",
     "docs:check",
     "goal:new",
@@ -131,9 +126,6 @@ if (packageJson) {
   ) {
     failures.push("repo:housekeeping must use the canonical repository housekeeping entry point");
   }
-  if (!packageJson.scripts?.setup?.includes("node scripts/context/index-codebase.mjs --setup")) {
-    failures.push("setup must materialize and validate the root context vector space");
-  }
   if (!packageJson.scripts?.setup?.includes("node scripts/verify/identity-access.mjs")) {
     failures.push("setup must validate the Identity and Access boundary");
   }
@@ -143,25 +135,8 @@ if (packageJson) {
   if (!packageJson.scripts?.setup?.includes("node scripts/verify/localization.mjs")) {
     failures.push("setup must validate the localization contract");
   }
-  const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
-  const hasLance = Boolean(dependencies["@lancedb/lancedb"]);
-  const hasTransformers = Boolean(dependencies["@huggingface/transformers"]);
-  if (hasLance !== hasTransformers) {
-    failures.push("local retrieval dependencies must be installed or removed together");
-  }
-  if (
-    packageJson.dependencies?.["@lancedb/lancedb"] ||
-    packageJson.dependencies?.["@huggingface/transformers"]
-  ) {
-    failures.push("local retrieval packages belong in devDependencies");
-  }
 }
 
-requireContent("scripts/context/index-codebase.mjs", "await verifyUsableIndex()");
-requireContent("scripts/context/index-codebase.mjs", "Context vector space ready:");
-requireContent("scripts/context/context-index-lib.mjs", "maintainIndexUnlocked()");
-requireContent("scripts/context/context-maintenance.mjs", "maintainContextIndex");
-requireContent("scripts/context/check-context-index.mjs", "inspectIndexStatus()");
 requireContent("scripts/verify/image-assets.mjs", "listActiveFiles");
 requireContent(".codex/hooks.json", "no mutable project-file hook may execute");
 requireContent("scripts/setup/session-control-hook-command.mjs", 'require("node:http")');
@@ -172,11 +147,6 @@ requireContent(
 requireContent("scripts/setup/startup-codex-process.mjs", "codexProcessSupervisorSource");
 requireContent("scripts/setup/startup-session-controller.mjs", "verifyTrustedSessionControlHooks");
 requireContent("scripts/setup/startup-session-controller.mjs", "runStopLifecycle");
-requireContent(
-  "scripts/context/context-worker-output.mjs",
-  "sanitizeMultilineForTerminal(output, repositoryRoot)",
-);
-requireContent("scripts/context/context-worker-output.mjs", 'stdio: "pipe"');
 requireContent("scripts/context/session-stop-lifecycle.mjs", "sealedHandoverStop");
 requireContent("scripts/repository/source-inventory.mjs", "isRepositoryCodexHomePath");
 requireContent(
@@ -395,17 +365,10 @@ for (const [filePath, expected] of repositorySmokeContentExpectations(supportedC
   requireContent(filePath, expected);
 }
 if (packageJson?.scripts?.["framework:reset"]) {
-  requireContent("AGENTS.md", "Every `$reset-framework --apply` removes");
   requireContent("instructions.md", "Every framework reset removes");
-  requireContent("docs/context-index.md", "Every framework reset removes");
-  requireContent(".agents/skills/reset-framework/SKILL.md", "complete ignored `.context-index/`");
   requireContent(
     ".agents/skills/reset-framework/SKILL.md",
     "runtime identity required for the next session",
-  );
-  requireContent(
-    ".agents/skills/reset-framework/scripts/reset-framework.mjs",
-    "removeOwnedContextIndex",
   );
   requireContent(
     ".agents/skills/reset-framework/scripts/reset-framework.mjs",
@@ -416,11 +379,7 @@ if (packageJson?.scripts?.["framework:reset"]) {
 const projectCreatorSkill = ".agents/skills/create-project-from-framework/SKILL.md";
 if (existsSync(path.join(root, projectCreatorSkill))) {
   const projectCreatorSkillDirectory = projectCreatorSkill.slice(0, -"/SKILL.md".length);
-  requireContent(projectCreatorSkill, "Semantic search keeps changed sources current on demand");
   requireContent(projectCreatorSkill, "ephemeral side conversations");
-  requireContent(projectCreatorSkill, "repository-local FSMonitor");
-  requireContent(projectCreatorSkill, "root-owned Git metadata");
-  requireContent(projectCreatorSkill, "hidden index flags");
   requireContent(projectCreatorSkill, "caller-selected stage path");
   requireContent(projectCreatorSkill, "complete selected-source transfer manifest");
   requireContent(
@@ -431,11 +390,6 @@ if (existsSync(path.join(root, projectCreatorSkill))) {
     `${projectCreatorSkillDirectory}/scripts/create-project-from-framework.mjs`,
     "broad, realistic",
   );
-  requireContent(projectCreatorSkill, "no relevant finding");
-  requireContent(projectCreatorSkill, "fresh audit");
-  requireContent(projectCreatorSkill, "only durable integration branch");
-  requireContent(projectCreatorSkill, "every completed slice");
-  requireContent(projectCreatorSkill, "without waiting for another prompt");
   requireContent(
     `${projectCreatorSkillDirectory}/scripts/create-project-from-framework.mjs`,
     "reviewable slices",
@@ -453,10 +407,6 @@ if (existsSync(path.join(root, projectCreatorSkill))) {
     "changed outside declared project-specific transformations",
   );
   requireContent(
-    "scripts/setup/project-creator-contract.source.test.mjs",
-    "Project hooks automatically update",
-  );
-  requireContent(
     `${projectCreatorSkillDirectory}/scripts/source-git-state.mjs`,
     "isolatedGitArguments",
   );
@@ -466,9 +416,6 @@ if (existsSync(path.join(root, projectCreatorSkill))) {
     "scripts/setup/project-generator-state.test.mjs",
     "Git-less root nested below another repository",
   );
-  if (hasContradictoryStopHookIndexContract(readRelative(projectCreatorSkill))) {
-    failures.push(`${projectCreatorSkill}: contains a contradictory Stop-hook index contract`);
-  }
 }
 for (const filePath of [
   "AGENTS.md",
@@ -565,7 +512,6 @@ const gitignore = existsSync(path.join(root, ".gitignore"))
 for (const entry of [
   ...repositoryCodexHomeGitignorePatterns,
   ...portableCodexGitignorePatterns,
-  ".context-index/",
   ".delivery/",
   "node_modules/",
   ".env",

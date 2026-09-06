@@ -26,7 +26,7 @@ export const inactiveRuntimeSessionWriterErrorCode = "CODEXRIG_CODEX_PROCESS_INA
 export const invalidRuntimeSessionLeaseErrorCode = "CODEXRIG_RUNTIME_SESSION_LEASE_INVALID";
 
 const runtimeSessionLeaseKeys =
-  "codexProcess\ncodexSessionId\nphase\nprocess\nresumeSessionId\nroot\nschemaVersion\nsessionId\nsessionSource\nstartedAt\nwriterPhase\nwriterProcess";
+  "codexProcess\ncodexSessionId\nphase\nprocess\nroot\nschemaVersion\nsessionId\nstartedAt\nwriterPhase\nwriterProcess";
 
 const codexSessionIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/u;
 const runtimeSessionRecoveryKeys = "codexSessionId\nroot\nschemaVersion\nupdatedAt";
@@ -81,12 +81,6 @@ function validWriterBinding(lease) {
   );
 }
 
-function validSessionSelection(source, resumeSessionId) {
-  return source === "startup"
-    ? resumeSessionId === null
-    : source === "resume" && validCodexSessionId(resumeSessionId);
-}
-
 function invalidRuntimeSessionLease(message) {
   const error = new Error(message);
   error.code = invalidRuntimeSessionLeaseErrorCode;
@@ -116,18 +110,14 @@ function readRuntimeSessionLease(root) {
     !lease ||
     typeof lease !== "object" ||
     Array.isArray(lease) ||
-    lease.schemaVersion !== 5 ||
+    lease.schemaVersion !== 6 ||
     leaseKeys !== runtimeSessionLeaseKeys ||
     !validIsoInstant(lease.startedAt) ||
     !runtimeSessionIdPattern.test(lease.sessionId ?? "") ||
     !validProcessIdentity(lease.process) ||
     !["active", "launching"].includes(lease.phase) ||
-    !validSessionSelection(lease.sessionSource, lease.resumeSessionId) ||
     (lease.phase === "launching" && lease.codexSessionId !== null) ||
     (lease.phase === "active" && !validCodexSessionId(lease.codexSessionId)) ||
-    (lease.phase === "active" &&
-      lease.resumeSessionId !== null &&
-      lease.codexSessionId !== lease.resumeSessionId) ||
     !validWriterBinding(lease) ||
     (lease.phase === "active" && !["handoff", "bound", "completed"].includes(lease.writerPhase))
   ) {
@@ -227,24 +217,18 @@ function recordRuntimeSessionRecovery(root, codexSessionId, { now = Date.now } =
   return recovery;
 }
 
-function runtimeSessionLease(root, pid, sessionSource, resumeSessionId) {
+function runtimeSessionLease(root, pid) {
   const processIdentity = captureProcessIdentity(pid);
   if (!processIdentity) {
     throw new Error("Codex runtime session process is not active.");
   }
-  const normalizedResumeSessionId = resumeSessionId === "" ? null : resumeSessionId;
-  if (!validSessionSelection(sessionSource, normalizedResumeSessionId)) {
-    throw new Error("Codex runtime session selection is invalid.");
-  }
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     codexProcess: null,
     codexSessionId: null,
     phase: "launching",
     process: processIdentity,
-    resumeSessionId: normalizedResumeSessionId,
     sessionId: randomUUID(),
-    sessionSource,
     startedAt: new Date().toISOString(),
     writerPhase: "unbound",
     writerProcess: null,
@@ -347,32 +331,11 @@ function preserveExactRecoveryFromActiveLease(root, current) {
   return true;
 }
 
-function runtimeSessionPlan(current, recovery) {
+function runtimeSessionPlan(current) {
   if (current.status === "active" || current.status === "unknown") {
     throw new Error("Another Codex session already owns this repository runtime.");
   }
-  if (recovery.status === "present") {
-    return Object.freeze({
-      mode: "resume-id",
-      resumeSessionId: recovery.recovery.codexSessionId,
-    });
-  }
-  if (current.status === "absent") {
-    return Object.freeze({ mode: "startup", resumeSessionId: null });
-  }
-  if (current.lease.phase === "active") {
-    return Object.freeze({
-      mode: "resume-id",
-      resumeSessionId: current.lease.codexSessionId,
-    });
-  }
-  if (current.lease.sessionSource === "resume") {
-    return Object.freeze({
-      mode: "resume-id",
-      resumeSessionId: current.lease.resumeSessionId,
-    });
-  }
-  return Object.freeze({ mode: "startup", resumeSessionId: null });
+  return Object.freeze({ mode: "resume-picker" });
 }
 
 /** Reads the canonical next-session selection without reserving a writer lease. */
@@ -381,7 +344,7 @@ export function inspectRuntimeSessionPlan({ root = frameworkRoot } = {}) {
   try {
     const recovery = readRuntimeSessionRecovery(root);
     try {
-      return runtimeSessionPlan(current, recovery);
+      return runtimeSessionPlan(current);
     } finally {
       closeRuntimeFile(recovery);
     }
@@ -405,7 +368,7 @@ function createRuntimeSessionLease(root, lease, { testHooks } = {}) {
   }
 }
 
-/** Selects the latest safe repository session and reserves its writer lease under one capability. */
+/** Reserves the repository for native session selection under one capability. */
 export function reserveRuntimeSessionLeaseState({ root, pid, testHooks } = {}) {
   assertRuntimeSessionOwnerCaller(pid);
   const current = readRuntimeSessionLease(root);
@@ -413,7 +376,7 @@ export function reserveRuntimeSessionLeaseState({ root, pid, testHooks } = {}) {
     const recovery = readRuntimeSessionRecovery(root);
     let plan;
     try {
-      plan = runtimeSessionPlan(current, recovery);
+      plan = runtimeSessionPlan(current);
     } finally {
       closeRuntimeFile(recovery);
     }
@@ -421,12 +384,7 @@ export function reserveRuntimeSessionLeaseState({ root, pid, testHooks } = {}) {
       preserveExactRecoveryFromActiveLease(root, current);
       unlinkStableRuntimeSessionLease(root, current, { testHooks });
     }
-    const lease = runtimeSessionLease(
-      root,
-      pid,
-      plan.mode === "startup" ? "startup" : "resume",
-      plan.resumeSessionId ?? "",
-    );
+    const lease = runtimeSessionLease(root, pid);
     createRuntimeSessionLease(root, lease, { testHooks });
     return Object.freeze({ lease, plan });
   } finally {
@@ -451,13 +409,7 @@ export function clearStaleRuntimeSessionLeaseState({ root, testHooks } = {}) {
 }
 
 /** Creates state only while the caller holds the repository session-management capability. */
-export function issueRuntimeSessionLeaseState({
-  root,
-  pid,
-  sessionSource = "startup",
-  resumeSessionId = "",
-  testHooks,
-} = {}) {
+export function issueRuntimeSessionLeaseState({ root, pid, testHooks } = {}) {
   assertRuntimeSessionOwnerCaller(pid);
   const current = readRuntimeSessionLease(root);
   try {
@@ -471,7 +423,7 @@ export function issueRuntimeSessionLeaseState({
   } finally {
     closeRuntimeFile(current);
   }
-  const lease = runtimeSessionLease(root, pid, sessionSource, resumeSessionId);
+  const lease = runtimeSessionLease(root, pid);
   createRuntimeSessionLease(root, lease, { testHooks });
   return lease;
 }
@@ -542,37 +494,6 @@ export function transitionRuntimeSessionWriterProcessState({
   }
 }
 
-/** Atomically replaces an unactivated owned resume attempt with a fresh-start lease. */
-export function fallbackRuntimeSessionLeaseState({ root, pid, runtimeSessionId, testHooks } = {}) {
-  assertRuntimeSessionOwnerCaller(pid);
-  const current = readRuntimeSessionLease(root);
-  try {
-    if (
-      current.status !== "active" ||
-      current.lease.process.pid !== pid ||
-      current.lease.sessionId !== runtimeSessionId ||
-      current.lease.phase !== "launching" ||
-      current.lease.sessionSource !== "resume"
-    ) {
-      throw new Error("Fresh-session fallback does not match the unactivated resume lease.");
-    }
-    if (
-      current.lease.writerProcess !== null &&
-      inspectProcessIdentity(current.lease.writerProcess) !== "stale"
-    ) {
-      throw new Error("Fresh-session fallback cannot outlive an active or indeterminate writer.");
-    }
-    if (current.lease.writerPhase !== "completed") {
-      throw new Error("Fresh-session fallback requires a proven terminal Codex writer handoff.");
-    }
-    const lease = runtimeSessionLease(root, pid, "startup", "");
-    replaceStableRuntimeSessionLease(root, current, lease, { testHooks });
-    return lease;
-  } finally {
-    closeRuntimeFile(current);
-  }
-}
-
 /** Binds a verified Codex main thread to the active launcher-owned repository session. */
 export function activateRuntimeSessionLeaseState({
   root,
@@ -600,12 +521,6 @@ export function activateRuntimeSessionLeaseState({
       }
       recordRuntimeSessionRecovery(root, codexSessionId);
       return current.lease;
-    }
-    if (
-      current.lease.resumeSessionId !== null &&
-      current.lease.resumeSessionId !== codexSessionId
-    ) {
-      throw new Error("Codex runtime session differs from the planned exact resume session.");
     }
     if (
       current.lease.writerProcess === null ||

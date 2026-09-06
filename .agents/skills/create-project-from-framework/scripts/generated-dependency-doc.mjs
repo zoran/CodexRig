@@ -1,6 +1,6 @@
 /** Owns generated dependency doc behavior for the portable clean-project generation boundary. */
 export const generatedDependencyAgentPolicy = [
-  "- Canonical Codex start is deterministic and never mutates dependencies. Run",
+  "- Canonical Codex start updates the host CLI but never mutates dependencies. Run",
   "  `scripts/deps/install-compatible.mjs` explicitly before first use and whenever dependency",
   "  inputs or requested registry freshness change. It resolves the newest stable allowed graph",
   "  under strict peer/engine checks; range changes remain explicit dependency-maintenance work.",

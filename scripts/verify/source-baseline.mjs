@@ -34,7 +34,7 @@ if (testResult.error) {
 if (testResult.status !== 0) process.exit(testResult.status ?? 1);
 
 console.log(
-  "Validating the portable source baseline under the active verification lock; contained runtime/index sanitation remains mandatory after Codex exits.",
+  "Validating the portable source baseline under the active verification lock; contained runtime sanitation remains mandatory after Codex exits.",
 );
 const result = spawnSync(process.execPath, [resetScript, "--verification-source-baseline"], {
   cwd: root,

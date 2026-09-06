@@ -8,11 +8,10 @@ import { formatContextError } from "../terminal/terminal-output.mjs";
 import {
   repositoryCodexHomeGitignoreBehaviorFindings,
   repositoryCodexHomeGitignoreFindings,
-  repositoryCodexRuntimeDirectory,
 } from "../repository/source-inventory.mjs";
 import {
   closeOwnedDirectoryBinding,
-  openPrivateOwnedDirectory,
+  openOwnedDirectoryBinding,
   ownedDirectoryChildPath,
   readStableOwnedFile,
 } from "../filesystem/owned-path-safety.mjs";
@@ -26,7 +25,7 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(scriptDirectory, "..", "..");
 
 export const sharedAgentIntelligencePolicy = Object.freeze({
-  modelPattern: /^gpt-[a-z0-9]+(?:[.-][a-z0-9]+)*-sol$/u,
+  modelPattern: /^gpt-[a-z0-9]+(?:[.-][a-z0-9]+)*-astra$/u,
   reasoningEffort: "ultra",
 });
 
@@ -62,6 +61,7 @@ const portablePolicy = new Map([
   ],
   ["agents.max_concurrent_threads_per_session", { type: "integer", value: 4 }],
   ["agents.interrupt_message", { type: "boolean", value: true }],
+  ["features.goals", { type: "boolean", value: true }],
   ["features.hooks", { type: "boolean", value: true }],
   ["features.memories", { type: "boolean" }],
   ["features.network_proxy", { type: "boolean" }],
@@ -88,7 +88,7 @@ const runtimeModelPreferencePattern = /^[a-z0-9][a-z0-9._-]{0,127}$/u;
 const runtimeReasoningPreferencePattern = /^[a-z][a-z0-9_-]{0,63}$/u;
 const requiredAgentRoles = new Set(["default", "explorer", "worker"]);
 const requiredAgentInstructionFragments = Object.freeze([
-  "context:search",
+  "manifest-led discovery",
   "matched source",
   "whole-repository course check",
   "milestone",
@@ -111,7 +111,7 @@ const requiredPrimaryInstructionFragments = Object.freeze([
   "exactly one current internal contract",
   "at most four live",
   "never pass a model or reasoning override",
-  "exact GPT Sol model with ultra reasoning",
+  "exact GPT Astra model with ultra reasoning",
   "owned subagent and background task",
   "foreign or ambiguous processes",
   "5% or less",
@@ -280,6 +280,7 @@ function validateRuntimeConfigDocument(value, root) {
       "notice",
       "projects",
       "service_tier",
+      "tui",
     ],
     "config",
   );
@@ -336,14 +337,40 @@ function validateRuntimeConfigDocument(value, root) {
       throw new CodexConfigError("Repository-local Codex runtime notice state is invalid.");
     }
   }
+  if (value.tui !== undefined) {
+    for (const [key, entry] of Object.entries(
+      requireRuntimeTable(value.tui, "terminal preferences"),
+    )) {
+      if (key === "model_availability_nux") {
+        const state = requireRuntimeTable(entry, "model tooltip state");
+        if (
+          Object.entries(state).some(
+            ([model, count]) =>
+              !runtimeModelPreferencePattern.test(model) ||
+              !Number.isSafeInteger(count) ||
+              count < 0,
+          )
+        ) {
+          throw new CodexConfigError(
+            "Repository-local Codex runtime model tooltip state is invalid.",
+          );
+        }
+        continue;
+      }
+      const schema = portablePolicy.get(`tui.${key}`);
+      if (!schema || !valueMatchesSchema(entry, schema)) {
+        throw new CodexConfigError(
+          "Repository-local Codex runtime terminal preference is unsupported.",
+        );
+      }
+    }
+  }
 }
 
 /** Rejects executable user-runtime configuration before any Codex process can consume it. */
 export function validateRuntimeCodexConfig(projectRoot = defaultRoot) {
   const root = realpathSync(path.resolve(projectRoot));
-  const runtimeDirectory = path.join(root, repositoryCodexRuntimeDirectory);
-  if (!existsSync(runtimeDirectory)) return Object.freeze({ status: "absent" });
-  const binding = openPrivateOwnedDirectory(root, runtimeDirectory, "Codex runtime home");
+  const binding = openOwnedDirectoryBinding(root, root, "Codex runtime home");
   try {
     const basename = "config.toml";
     const target = ownedDirectoryChildPath(binding, basename, "Codex runtime config");
@@ -458,7 +485,7 @@ export function parseProjectAgentConfig(content, expectedName) {
     if (!valueMatchesSchema(value, schema)) {
       if (key === "model") {
         throw new CodexConfigError(
-          `Agent ${expectedName} must use a supported GPT Sol model matching the primary intelligence.`,
+          `Agent ${expectedName} must use a supported GPT Astra model matching the primary intelligence.`,
         );
       }
       throw new CodexConfigError(

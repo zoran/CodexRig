@@ -23,7 +23,11 @@ import {
 } from "../repository/git-runtime-isolation.mjs";
 import { isExcludedActivePath, listActiveFiles } from "../repository/source-inventory.mjs";
 import { formatContextError } from "../terminal/terminal-output.mjs";
-import { policyProjectionPath, validatePolicyProjection } from "./policy-projection.mjs";
+import {
+  policyProjectionChanges,
+  policyProjectionPath,
+  validatePolicyProjection,
+} from "./policy-projection.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, "..", "..");
@@ -410,33 +414,18 @@ function packageBump(baseline, current) {
   return "minor";
 }
 
-function policyBump(baselineContentValue, currentContent) {
+function policyBump(baselineContentValue, currentContent, baselineContract, currentContract) {
   const baselineValue = parseJson(baselineContentValue, "Published policy projection");
-  const current = validatePolicyProjection(parseJson(currentContent, "Current policy projection"));
+  const current = validatePolicyProjection(
+    parseJson(currentContent, "Current policy projection"),
+    currentContract,
+  );
   if (baselineValue.schemaVersion !== current.schemaVersion) return "major";
-  const baseline = validatePolicyProjection(baselineValue);
+  const baseline = validatePolicyProjection(baselineValue, baselineContract);
   if (baselineContentValue === currentContent) return "none";
-  const currentPolicies = new Map((current.policies ?? []).map((policy) => [policy.id, policy]));
-  let removedPolicy = false;
-  for (const before of baseline.policies ?? []) {
-    const after = currentPolicies.get(before.id);
-    if (!after) {
-      removedPolicy = true;
-      continue;
-    }
-    if (!Number.isSafeInteger(after.version) || after.version < before.version) {
-      throw new Error(`Policy ${before.id} cannot decrease from version ${before.version}.`);
-    }
-    const samePolicy =
-      before.statement === after.statement &&
-      before.projectionStatement === after.projectionStatement &&
-      JSON.stringify(before.projectionSurfaces) === JSON.stringify(after.projectionSurfaces) &&
-      JSON.stringify(before.reconcileDocuments) === JSON.stringify(after.reconcileDocuments);
-    if (before.version === after.version && !samePolicy) {
-      throw new Error(`Policy ${before.id} changed without increasing its policy version.`);
-    }
-  }
-  return removedPolicy ? "major" : "minor";
+  return policyProjectionChanges(baseline, current).some((policy) => policy.change === "retired")
+    ? "major"
+    : "minor";
 }
 
 function requiredChangeBump({
@@ -467,7 +456,10 @@ function requiredChangeBump({
   }
   if (changedPaths.includes(policyProjectionPath)) {
     handled.add(policyProjectionPath);
-    bump = highestBump(bump, policyBump(baselinePolicy, currentPolicy));
+    bump = highestBump(
+      bump,
+      policyBump(baselinePolicy, currentPolicy, baselineContract, currentContract),
+    );
   }
 
   for (const relativePath of changedPaths) {
@@ -546,12 +538,13 @@ export function frameworkVersionReconciliationPlan({ root = repositoryRoot } = {
   const currentPolicy = readRegularFrameworkFile(root, policyProjectionPath);
   const currentPolicyValue = validatePolicyProjection(
     parseJson(currentPolicy, "Current policy projection"),
+    currentContract,
   );
   const baselineContract = parseJson(baselineContractContent, "Published framework contract");
   const baselinePolicyValue = parseJson(baselinePolicy, "Published policy projection");
   if (baselineContract.schemaVersion === currentContract.schemaVersion) {
     validateFrameworkContract(baselineContract);
-    validatePolicyProjection(baselinePolicyValue);
+    validatePolicyProjection(baselinePolicyValue, baselineContract);
   } else {
     validateIncompatibleBaseline(baselineContract, baselinePolicyValue, {
       contract: currentContract,

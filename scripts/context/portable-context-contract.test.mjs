@@ -1,4 +1,4 @@
-/** Verifies portable context contract behavior for the repository-local semantic context boundary. */
+/** Verifies portable context contract behavior for the portable policy and durable project-context boundary. */
 import assert from "node:assert/strict";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -26,11 +26,6 @@ function stagedFixture() {
   return root;
 }
 
-function append(root, relativePath, content) {
-  const absolutePath = path.join(root, relativePath);
-  writeFileSync(absolutePath, `${readFileSync(absolutePath, "utf8")}\n${content}\n`, "utf8");
-}
-
 function flexibleTextPattern(value) {
   return new RegExp(
     value
@@ -41,55 +36,8 @@ function flexibleTextPattern(value) {
   );
 }
 
-function contradictionFindings(root) {
-  return portableContextContractFindings({ repositoryRoot: root }).filter((finding) =>
-    finding.includes("contradictory Stop-hook index contract"),
-  );
-}
-
 after(() => {
   for (const root of temporaryRoots) rmSync(root, { force: true, recursive: true });
-});
-
-test("the hook mutation contract permits explicit lifecycle non-mutation", () => {
-  const root = stagedFixture();
-  append(
-    root,
-    "README.md",
-    "Before bootstrap, the Stop hook does not update the context index. The Stop hook does not update the context index before bootstrap. During normal verification, the Stop hook does not update the context index. The Stop hook does not update the context index during normal verification. After each tool call, the Stop hook does not update the context index. The Stop hook does not update the context index after each tool call.",
-  );
-  assert.deepEqual(contradictionFindings(root), []);
-});
-
-test("the hook mutation contract rejects stale Stop-owned index assertions", () => {
-  for (const assertion of [
-    "Project hooks update the context index.",
-    "The context index is incrementally refreshed by the Stop hook.",
-    "The Stop hook automatically updates `.context-index/`.",
-    "The project-local Stop hook refreshes the index after a durable turn.",
-  ]) {
-    const root = stagedFixture();
-    append(root, "README.md", assertion);
-    assert.equal(
-      contradictionFindings(root).some((finding) => finding.endsWith("README.md")),
-      true,
-    );
-  }
-});
-
-test("portable verification rejects native in-place context runtime maintenance", () => {
-  const root = stagedFixture();
-  append(
-    root,
-    "scripts/context/context-storage.mjs",
-    "async function unsafe(table) { await table.optimize(); }",
-  );
-  assert.equal(
-    portableContextContractFindings({ repositoryRoot: root }).some((finding) =>
-      finding.includes("unsafe in-place maintenance"),
-    ),
-    true,
-  );
 });
 
 test("portable verification requires the active project Codex config", () => {
@@ -117,12 +65,12 @@ test("portable runtime content declarations are active for their existing owners
   );
   writeFileSync(
     absolutePath,
-    readFileSync(absolutePath, "utf8").replace("schemaVersion: 5", "schemaVersion: 9"),
+    readFileSync(absolutePath, "utf8").replace("schemaVersion: 6", "schemaVersion: 9"),
     "utf8",
   );
   assert.equal(
     portableContextContractFindings({ repositoryRoot: root }).some(
-      (finding) => finding.includes(relativePath) && finding.includes("schemaVersion: 5"),
+      (finding) => finding.includes(relativePath) && finding.includes("schemaVersion: 6"),
     ),
     true,
   );
@@ -144,11 +92,11 @@ test("the package contract permits additive sibling exports but protects its own
     false,
   );
 
-  packageJson.scripts["context:index"] = "node scripts/context/other-indexer.mjs";
+  packageJson.scripts["handover:receive"] = "node scripts/context/other-receiver.mjs";
   writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
   assert.equal(
     portableContextContractFindings({ repositoryRoot: root }).includes(
-      "portable context contract requires package.json script context:index",
+      "portable context contract requires package.json script handover:receive",
     ),
     true,
   );
@@ -159,8 +107,8 @@ test("portable workflow owners cannot lose the authorized implementation continu
     "AGENTS.md",
     "README.md",
     "instructions.md",
-    ".agents/skills/project-implementation/SKILL.md",
     ".agents/skills/resume-project/SKILL.md",
+    ".agents/skills/project-implementation/SKILL.md",
   ]) {
     const root = stagedFixture();
     const absolutePath = path.join(root, ...relativePath.split("/"));
@@ -193,8 +141,6 @@ test("portable workflow owners cannot lose the authorized implementation continu
 test("portable workflow owners cannot lose pre-slice goal and slice coordination", () => {
   for (const [relativePath, marker] of [
     ["instructions.md", "Immediately before every slice begins"],
-    [".agents/skills/project-implementation/SKILL.md", "Immediately before every slice begins"],
-    [".agents/skills/resume-project/SKILL.md", "Before a resumed or newly selected slice begins"],
     [".codex/agents/default.toml", "Before every assigned slice begins"],
   ]) {
     const root = stagedFixture();
@@ -215,12 +161,7 @@ test("portable workflow owners cannot lose pre-slice goal and slice coordination
 
 test("portable workflow owners cannot claim that local state observes other developers", () => {
   const marker = "cannot prove that another developer's clone is idle";
-  for (const relativePath of [
-    ".codex/README.md",
-    ".agents/skills/project-implementation/SKILL.md",
-    ".agents/skills/resume-project/SKILL.md",
-    ".agents/skills/task-quality/SKILL.md",
-  ]) {
+  for (const relativePath of [".codex/README.md"]) {
     const root = stagedFixture();
     const absolutePath = path.join(root, ...relativePath.split("/"));
     const content = readFileSync(absolutePath, "utf8");
@@ -267,11 +208,7 @@ test("portable verification identifies project-document reconciliation after an 
 });
 
 test("portable workflow owners cannot lose completed-goal documentation preservation", () => {
-  for (const [relativePath, marker] of [
-    ["instructions.md", "instead of appending history"],
-    [".agents/skills/project-implementation/SKILL.md", "all-document currency review"],
-    [".agents/skills/task-quality/SKILL.md", "consolidate or remove"],
-  ]) {
+  for (const [relativePath, marker] of [["instructions.md", "instead of appending history"]]) {
     const root = stagedFixture();
     const absolutePath = path.join(root, ...relativePath.split("/"));
     const content = readFileSync(absolutePath, "utf8");
@@ -289,12 +226,7 @@ test("portable workflow owners cannot lose completed-goal documentation preserva
 });
 
 test("portable workflow owners cannot weaken critical-manifest user confirmation", () => {
-  for (const [relativePath, marker] of [
-    ["instructions.md", "explicit user confirmation"],
-    [".agents/skills/project-implementation/SKILL.md", "durable project manifest"],
-    [".agents/skills/resume-project/SKILL.md", "explicit user confirmation"],
-    [".agents/skills/task-quality/SKILL.md", "durable project manifest"],
-  ]) {
+  for (const [relativePath, marker] of [["instructions.md", "explicit user confirmation"]]) {
     const root = stagedFixture();
     const absolutePath = path.join(root, ...relativePath.split("/"));
     const content = readFileSync(absolutePath, "utf8");
@@ -312,10 +244,7 @@ test("portable workflow owners cannot weaken critical-manifest user confirmation
 });
 
 test("portable workflow owners cannot replace current research with stale authority", () => {
-  for (const relativePath of [
-    "instructions.md",
-    ".agents/skills/project-implementation/SKILL.md",
-  ]) {
+  for (const relativePath of ["instructions.md"]) {
     const marker = "newest relevant primary or official sources";
     const root = stagedFixture();
     const absolutePath = path.join(root, ...relativePath.split("/"));
@@ -336,7 +265,6 @@ test("portable workflow owners cannot replace current research with stale author
 test("portable workflow owners protect replaceable components and assembled compatibility", () => {
   for (const [relativePath, marker] of [
     ["instructions.md", "assembled system is verified as one functioning unit"],
-    [".agents/skills/project-implementation/SKILL.md", "independently improvable or replaceable"],
   ]) {
     const root = stagedFixture();
     const absolutePath = path.join(root, ...relativePath.split("/"));
@@ -350,6 +278,27 @@ test("portable workflow owners protect replaceable components and assembled comp
       ),
       true,
       relativePath,
+    );
+  }
+});
+
+test("implementation policy routes to canonical authority without repeating its governance", () => {
+  for (const anchor of [
+    "authorized-work-and-native-codex",
+    "subagent-orchestration-and-integration-authority",
+    "ui-intent-and-change-boundaries",
+  ]) {
+    const root = stagedFixture();
+    const relativePath = ".agents/skills/project-implementation/SKILL.md";
+    const absolutePath = path.join(root, relativePath);
+    const content = readFileSync(absolutePath, "utf8");
+    const target = `../../../instructions.md#${anchor}`;
+    assert.ok(content.includes(target), target);
+    writeFileSync(absolutePath, content.replace(target, "../../../instructions.md"), "utf8");
+    assert.ok(
+      portableContextContractFindings({ repositoryRoot: root }).some(
+        (finding) => finding.includes(relativePath) && finding.includes(target),
+      ),
     );
   }
 });

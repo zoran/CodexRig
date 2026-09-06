@@ -14,8 +14,8 @@ upgradeable product repositories while deliberately defining no child product or
 
 - Target users: developers and teams operating Codex on production-oriented software repositories.
 - Problem and desired outcome: provide inspectable project policy, deterministic setup, bounded
-  orchestration, semantic retrieval, modular delivery, child updates, and risk-based verification
-  without imposing an application architecture before a product is defined.
+  orchestration, durable context recovery, modular delivery, child updates, and risk-based
+  verification without imposing an application architecture before a product is defined.
 - Success evidence: the framework doctor, project-generation lifecycle, managed-upgrade lifecycle,
   portable-source contracts, focused capability verifiers, and repository verification pass on the
   exact reviewed source state.
@@ -23,8 +23,9 @@ upgradeable product repositories while deliberately defining no child product or
 ## Scope
 
 - In scope: the reusable Codex harness, clean sibling-project generation, receipt-backed child
-  updates, portable GitHub/GitLab adapters, dependency and toolchain policy, semantic retrieval,
-  architecture evolution, environment-bound delivery policy, and deterministic verification.
+  updates, portable GitHub/GitLab adapters, dependency and toolchain policy, durable context
+  recovery, architecture evolution, environment-bound delivery policy, and deterministic
+  verification.
 - Non-goals: this source repository does not supply a child product, application runtime, public
   service, product data model, deployment destination, domain roadmap, or provider identity.
 
@@ -37,7 +38,7 @@ upgradeable product repositories while deliberately defining no child product or
   surface and an installation receipt; verification selects evidence from current repository risk
   and delivery identity.
 - Durable state: tracked source, configuration, contracts, documentation, tests, and lockfiles.
-  `.codex/runtime/`, `.context-index/`, and `.project-state/` are disposable local state.
+  `.codex/runtime/` and `.project-state/` are disposable local state.
 - Delivery state: no product deployment is integrated in this neutral source.
 - Product delivery state is maintained by the bounded inventory below; no deploy operation is part
   of repository housekeeping.
@@ -63,10 +64,12 @@ upgradeable product repositories while deliberately defining no child product or
 
 - Root: `.agents/skills`
 - Responsibility: Defines discoverable, reusable workflows for implementation, architecture,
-  slice-level whole-system coherence repair, retrieval, maintenance, generation, reset, and
-  specialist review.
+  combined code/system review, UI/UX preservation review, maintenance, generation, reset and
+  explicitly requested post-exit source publication through `framework:publish`. Discovery follows
+  canonical instructions rather than a separate skill; specialist reviews remain conditional on the
+  affected surface.
 - Runtime and technology: Markdown/YAML skill contracts with Node.js ESM for referenced automation.
-- Public contract: Each skill's `SKILL.md`, optional `agents/openai.yaml`, and referenced scripts,
+- Public contract: Each skill's `SKILL.md`, `agents/openai.yaml`, and referenced scripts,
   references, or assets.
 - Private internals: Skill-specific implementation detail not named by its `SKILL.md`.
 - Owned data and migrations: Tracked skill definitions only; no mutable data or migrations.
@@ -98,21 +101,21 @@ upgradeable product repositories while deliberately defining no child product or
 - Focused verifier: `pnpm codex:validate`
 - Steward: Primary framework maintainer.
 
-#### Context Retrieval
+#### Project Context And Recovery
 
 - Root: `scripts/context`
-- Responsibility: Builds, checks, searches, repairs on demand, and safely cleans the repository
-  semantic index; owns the preloaded durable Stop-continuation state; and seals/discovers private
-  critical-budget handovers used for explicit cross-session recovery.
-- Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
-- Public contract: `context:index`, `context:check`, `context:search`, `context:clean`,
-  `handover:create`, and the preloaded Stop lifecycle contract.
-- Private internals: Source classification, token-aware chunking, hybrid lexical/vector ranking,
-  implemented-versus-deferred intent weighting, embedding, locking, storage, and generation
-  maintenance.
-- Owned data and migrations: Disposable `.context-index/` generations, bounded
-  `.codex/runtime/stop-continuation/` state, and private transient prompts under ignored
-  `tmp/codexrig-handovers/`.
+- Responsibility: Owns durable work-state validation, preloaded Stop continuation, portable context
+  contracts, and private critical-budget handover creation, discovery, full receipt and exact-file
+  acknowledgement.
+- Runtime and technology: Node.js ESM and built-ins on the framework's mise-pinned toolchain.
+- Public contract: `handover:create`, `handover:receive`, `handover:acknowledge`, exported portable
+  context validators, and the preloaded Stop lifecycle. Receipt requires an active canonical session
+  distinct from the sealing session and the exact accepted repository-bound artifact;
+  acknowledgement removes only unchanged received bytes, not native conversation history.
+- Private internals: Work-marker validation, bounded continuation loop state, private prompt binding
+  and digest checks, and required portable-policy declarations.
+- Owned data and migrations: Bounded `.codex/runtime/stop-continuation/` state and private transient
+  prompts under ignored `tmp/codexrig-handovers/`; no search database or model cache.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/docs`, `scripts/filesystem`,
   `scripts/repository`, `scripts/security`, `scripts/terminal`.
@@ -153,7 +156,7 @@ upgradeable product repositories while deliberately defining no child product or
   plane.
 - Allowed dependencies: None.
 - Focused verifier:
-  `node --test scripts/context/context-maintenance.test.mjs scripts/framework/framework-lifecycle.test.mjs scripts/deps/dependency-policy.test.mjs`
+  `node --test scripts/framework/framework-lifecycle.test.mjs scripts/deps/dependency-policy.test.mjs`
 - Steward: Framework filesystem safety maintainer.
 
 #### Dependency Management
@@ -290,7 +293,7 @@ upgradeable product repositories while deliberately defining no child product or
   delivery-discovery, and snapshot APIs.
 - Private internals: Repository inventory, process-identity, session-lifecycle, isolated Git,
   launcher/writer liveness aggregation, per-root recovery classification, and Git/Git-less traversal
-  detail. The session lease accepts only current schema 5 with namespace-bound coordinator,
+  detail. The session lease accepts only current schema 6 with namespace-bound coordinator,
   supervisor, and exact Codex process identities. Lease mutation authenticates the exact controller
   caller, terminal child proof becomes a durable `completed` transition before release, and a
   crashed child-PID handoff, corrupt state, or any other mechanically indeterminate state fails
@@ -309,8 +312,8 @@ upgradeable product repositories while deliberately defining no child product or
 #### Secret Classification
 
 - Root: `scripts/security`
-- Responsibility: Owns reusable secret-pattern classification shared by indexing, terminal output,
-  and repository verification.
+- Responsibility: Owns reusable secret-pattern classification shared by terminal output and
+  repository verification.
 - Runtime and technology: Node.js ESM deterministic pattern contracts.
 - Public contract: Exported secret patterns and match helpers.
 - Private internals: Pattern ordering and false-positive guards.
@@ -323,25 +326,25 @@ upgradeable product repositories while deliberately defining no child product or
 #### Setup And Project Portability
 
 - Root: `scripts/setup`
-- Responsibility: Launches deterministic, network-free isolated Codex sessions against an explicitly
-  prepared host/toolchain/dependency state. It atomically selects and reserves the exact latest
-  verified repository-bound session with an unchanged original-basis pre-SessionStart fresh
-  fallback, preloads every lifecycle module, accepts bounded non-executable Codex model/reasoning
-  preferences beneath tracked project policy, rejects executable or unknown ignored runtime
-  configuration, projects the tracked Sol/`ultra` policy into every fresh or resumed CLI launch, and
-  injects exactly two session-owned hook definitions. Codex's stable `hooks/list` inventory must
-  contain only those exact trusted/enabled definitions; only afterward may the controller bind the
-  gated supervisor, durable handoff, and exact Codex PID. Lease release requires the exact
-  controller to authenticate the supervisor's terminal child-exit proof against its private
-  issue-time gate secret and persist completion; a wrapper exit code alone is insufficient, and
-  every non-signal fresh completion requires actual SessionStart activation. The embedded
+- Responsibility: Updates the host Codex CLI before admission and stops on update failure, then
+  opens the native resume picker with repository-root CODEX_HOME and explicit working directory. It
+  reserves the checkout before selection and binds the selected session only at authenticated
+  SessionStart, preloads every lifecycle module, accepts bounded non-executable Codex
+  model/reasoning preferences beneath tracked project policy, rejects executable or unknown ignored
+  runtime configuration, projects the tracked Astra/`ultra` policy into every fresh or resumed CLI
+  launch, and injects exactly two session-owned hook definitions. Codex's stable `hooks/list`
+  inventory must contain only those exact trusted/enabled definitions; only afterward may the
+  controller bind the gated supervisor, durable handoff, and exact Codex PID. Lease release requires
+  the exact controller to authenticate the supervisor's terminal child-exit proof against its
+  private issue-time gate secret and persist completion; a wrapper exit code alone is insufficient,
+  and cancellation before SessionStart creates no activation or recovery record. The embedded
   built-in-only client is bound to the controller's exact Node executable and token-bound loopback
   endpoint. The capability also validates portable configuration and staged white-label
   tenant-capable projects, installs hooks, initializes repositories, and exports the portable
   surface.
 - Runtime and technology: Node.js ESM and Bash on the mise-pinned framework toolchain.
 - Public contract: `codex:start`, `codex:validate`, `setup`, `hooks:install`, and `project:export`.
-- Private internals: Atomic session selection/reservation and immutable-basis fallback transitions,
+- Private internals: Atomic native-picker reservation and authenticated selected-session binding,
   preloaded session controller, private typed non-executable runtime-config validation, exact
   model/reasoning CLI projection, absolute external Node.js/Codex/pnpm/hook-shell executable
   binding, built-in gated supervisor, token-bound proof, and parent-liveness channel, exact
@@ -427,7 +430,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `2.1.0`.
+- Framework version: `3.0.0`.
 - Framework contract schema: `2`.
 
 <!-- codexrig:framework-version:end -->

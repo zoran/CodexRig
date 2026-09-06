@@ -27,7 +27,6 @@ import {
 } from "../filesystem/owned-path-safety.mjs";
 import {
   activateRuntimeSessionLease,
-  fallbackRuntimeSessionLease,
   inspectRuntimeSessionLease,
   inspectRuntimeSessionPlan,
   releaseRuntimeSessionLease,
@@ -43,16 +42,12 @@ import { parsePortableCodexConfig } from "./validate-codex-config.mjs";
 
 export const startupAttestationPath = `${repositoryCodexRuntimeCacheDirectory}/codexrig/startup-attestation.json`;
 const startupAttestationKeys =
-  "controlPolicySha256\nexpiresAt\nframeworkId\nframeworkVersion\ninputs\nissuedAt\nmodel\nnonceSha256\npermissionMode\nresumeSessionIdSha256\nroot\nruntimeSessionIdSha256\nschemaVersion\nsessionSource\nversions";
+  "controlPolicySha256\nexpiresAt\nframeworkId\nframeworkVersion\ninputs\nissuedAt\nmodel\nnonceSha256\npermissionMode\nroot\nruntimeSessionIdSha256\nschemaVersion\nsessionSelection\nversions";
 export const startupControlPolicies = Object.freeze({
   default: "interactive-v2:safe-defaults",
   noAltScreen: "interactive-v2:no-alt-screen",
   yolo: "dev-yolo-v1:default-screen",
   yoloNoAltScreen: "dev-yolo-v1:no-alt-screen",
-});
-export const startupSessionSources = Object.freeze({
-  resume: "resume",
-  startup: "startup",
 });
 const fixedStartupAttestedInputs = Object.freeze([
   ".codex/config.toml",
@@ -191,7 +186,7 @@ function readAttestation(root) {
     closeOwnedDirectoryBinding(directory);
   }
   if (
-    value?.schemaVersion !== 6 ||
+    value?.schemaVersion !== 7 ||
     Object.keys(value).sort().join("\n") !== startupAttestationKeys
   ) {
     throw new Error("Launcher attestation schema is unsupported.");
@@ -244,34 +239,17 @@ export function startupAttestationBasis({
   });
 }
 
-function startupSessionSelection(sourceValue, resumeSessionIdValue) {
-  if (!Object.values(startupSessionSources).includes(sourceValue)) {
-    throw new Error("Canonical launcher session source is missing or unsupported.");
-  }
-  const resumeSessionId = resumeSessionIdValue?.trim() ?? "";
-  if (
-    (sourceValue === startupSessionSources.startup && resumeSessionId !== "") ||
-    (sourceValue === startupSessionSources.resume && !validCodexSessionId(resumeSessionId))
-  ) {
-    throw new Error("Canonical launcher resume session is invalid.");
-  }
-  return { resumeSessionId, source: sourceValue };
-}
-
-/** Selects only the latest canonical repository main thread recorded by the prior launcher lease. */
+/** Inspects whether native session selection can reserve this repository. */
 export function startupSessionPlan({ root = frameworkRoot } = {}) {
   return inspectRuntimeSessionPlan({ root });
 }
 
 export function startupSessionPlanToken(plan) {
-  if (plan?.mode === "startup") return "startup";
-  if (plan?.mode === "resume-id" && validCodexSessionId(plan.resumeSessionId)) {
-    return `resume-id:${plan.resumeSessionId}`;
-  }
+  if (plan?.mode === "resume-picker") return "resume-picker";
   throw new Error("Canonical launcher session plan is invalid.");
 }
 
-/** Atomically reserves the latest safe session selection before attesting its launcher inputs. */
+/** Atomically reserves native session selection before attesting its launcher inputs. */
 export function reserveStartupAttestation(
   root,
   pid,
@@ -288,8 +266,6 @@ export function reserveStartupAttestation(
       controlPolicy,
       expectedBasis,
       runtimeExecutables,
-      sessionSource: reservation.lease.sessionSource,
-      resumeSessionId: reservation.lease.resumeSessionId ?? "",
     });
     return Object.freeze({ ...issued, lease: reservation.lease, plan: reservation.plan });
   } catch (error) {
@@ -321,16 +297,11 @@ function verifiedSessionTransition(
     throw new Error("Session transition does not match the owned launcher lease phase.");
   }
   const effectiveControlPolicy = startupControlPolicy(controlPolicy);
-  const selection = startupSessionSelection(
-    current.lease.sessionSource,
-    current.lease.resumeSessionId ?? "",
-  );
   const expectedBasis = validateCurrentAttestationBasis({
     root,
     runtimeLease: current,
     effectiveControlPolicy,
     expectedAttestation,
-    selection,
     nonce,
     now,
     runtimeExecutables,
@@ -411,76 +382,19 @@ export function bindStartupSessionCodexProcess(root, pid, codexPid, options = {}
   return transitionStartupSessionWriter(root, pid, codexPid, "codex", options);
 }
 
-export function fallbackStartupAttestation(
-  root,
-  pid,
-  {
-    controlPolicy = process.env.CODEXRIG_STARTUP_CONTROL_POLICY ?? "",
-    expectedAttestation,
-    nonce = process.env.CODEXRIG_STARTUP_NONCE ?? "",
-    now = Date.now,
-    runtimeExecutables,
-  } = {},
-) {
-  // Authenticate before cleanup-on-failure. A mismatched caller must not be able to retire another
-  // launcher's still-live reservation merely by forcing a basis validation error.
-  if (expectedAttestation === undefined) {
-    throw new Error("Fresh-session fallback requires its issue-time attestation basis.");
-  }
-  const { current, expectedBasis } = verifiedSessionTransition(root, pid, {
-    controlPolicy,
-    expectedAttestation,
-    nonce,
-    now,
-    runtimeExecutables,
-  });
-  if (current.lease.sessionSource !== startupSessionSources.resume) {
-    throw new Error("Fresh fallback requires an unactivated exact-resume lease.");
-  }
-  fallbackRuntimeSessionLease({
-    root,
-    pid,
-    runtimeSessionId: current.lease.sessionId,
-  });
-  try {
-    return issueStartupAttestation({
-      root,
-      controlPolicy,
-      expectedBasis,
-      now,
-      runtimeExecutables,
-      sessionSource: startupSessionSources.startup,
-      resumeSessionId: "",
-    });
-  } catch (error) {
-    releaseRuntimeSessionLease({ root, pid });
-    throw error;
-  }
-}
-
 export function issueStartupAttestation({
   root = frameworkRoot,
   now = Date.now,
   controlPolicy = process.env.CODEXRIG_STARTUP_CONTROL_POLICY ?? "",
-  sessionSource = startupSessionSources.startup,
-  resumeSessionId = "",
   expectedBasis,
   runtimeExecutables,
   testHooks,
 } = {}) {
   const contract = readFrameworkContract(root);
   const effectiveControlPolicy = startupControlPolicy(controlPolicy);
-  const selection = startupSessionSelection(sessionSource, resumeSessionId);
   const runtimeLease = inspectRuntimeSessionLease({ root });
   if (runtimeLease.status !== "active") {
     throw new Error("Startup attestation requires an active current-schema runtime session lease.");
-  }
-  if (
-    runtimeLease.lease.sessionSource !== selection.source ||
-    runtimeLease.lease.resumeSessionId !==
-      (selection.resumeSessionId === "" ? null : selection.resumeSessionId)
-  ) {
-    throw new Error("Startup attestation session selection differs from its runtime lease.");
   }
   const currentBasis = startupAttestationBasis({
     root,
@@ -501,7 +415,7 @@ export function issueStartupAttestation({
   const nonce = randomBytes(32).toString("base64url");
   const issuedAt = now();
   const attestation = {
-    schemaVersion: 6,
+    schemaVersion: 7,
     frameworkId: contract.frameworkId,
     frameworkVersion: contract.frameworkVersion,
     issuedAt,
@@ -510,11 +424,9 @@ export function issueStartupAttestation({
     model,
     nonceSha256: sha256(nonce),
     permissionMode,
-    resumeSessionIdSha256:
-      selection.resumeSessionId === "" ? null : sha256(selection.resumeSessionId),
     root: repositoryRuntimeRootIdentity(root),
     runtimeSessionIdSha256: sha256(runtimeLease.lease.sessionId),
-    sessionSource: selection.source,
+    sessionSelection: "resume-picker",
     inputs,
     versions,
   };
@@ -546,7 +458,6 @@ function validateCurrentAttestationBasis({
   runtimeLease,
   effectiveControlPolicy,
   expectedAttestation,
-  selection,
   nonce,
   now,
   runtimeExecutables,
@@ -585,12 +496,8 @@ function validateCurrentAttestationBasis({
   if (attestation.model !== runtimePolicy.model) {
     throw new Error("Codex model policy differs from the launcher attestation.");
   }
-  if (
-    attestation.sessionSource !== selection.source ||
-    attestation.resumeSessionIdSha256 !==
-      (selection.resumeSessionId === "" ? null : sha256(selection.resumeSessionId))
-  ) {
-    throw new Error("Codex session source differs from the launcher attestation.");
+  if (attestation.sessionSelection !== "resume-picker") {
+    throw new Error("Codex session selection differs from the launcher attestation.");
   }
   if (!equalHash(attestation.runtimeSessionIdSha256, runtimeLease.lease.sessionId)) {
     throw new Error("Codex runtime session lease differs from the launcher attestation.");
@@ -626,8 +533,6 @@ export function verifyStartupAttestation({
   expectedAttestation,
   nonce = process.env.CODEXRIG_STARTUP_NONCE ?? "",
   controlPolicy = process.env.CODEXRIG_STARTUP_CONTROL_POLICY ?? "",
-  sessionSource = startupSessionSources.startup,
-  resumeSessionId = "",
   runtimeExecutables,
   now = Date.now,
 } = {}) {
@@ -654,23 +559,15 @@ export function verifyStartupAttestation({
     throw new Error("Canonical launcher nonce is missing.");
   }
   const effectiveControlPolicy = startupControlPolicy(controlPolicy);
-  const selection = startupSessionSelection(sessionSource, resumeSessionId);
   const basis = validateCurrentAttestationBasis({
     root,
     runtimeLease,
     effectiveControlPolicy,
     expectedAttestation,
-    selection,
     nonce,
     now,
     runtimeExecutables,
   });
-  if (
-    input.source !== selection.source ||
-    (selection.resumeSessionId !== "" && input.session_id !== selection.resumeSessionId)
-  ) {
-    throw new Error("Codex session source differs from the launcher attestation.");
-  }
   if (input.permission_mode !== basis.permissionMode) {
     throw new Error("Codex effective permission mode differs from the launcher attestation.");
   }
@@ -683,5 +580,5 @@ export function verifyStartupAttestation({
     runtimeSessionId: runtimeLease.lease.sessionId,
     codexSessionId: input.session_id,
   });
-  return basis.attestation;
+  return { ...basis.attestation, sessionSource: input.source };
 }

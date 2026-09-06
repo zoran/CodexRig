@@ -1,261 +1,160 @@
 # AGENTS.md
 
-CodexRig is a production-ready, code-first Codex framework and reusable source base. The complete
-workflow authority is [Project Instructions](instructions.md); this file is the bounded safe-entry
-bootstrap. It stays below 24 KiB so descendant instructions retain room in Codex's project budget.
+CodexRig is a code-first native Codex framework and reusable source base. This bounded safe-entry
+bootstrap stays below 24 KiB; [Project Instructions](instructions.md) own complete workflow policy.
+The README owns startup/use, the manifest owns current reality, and skills own specialized
+procedures.
 
 ## Start And Reconstruct
 
-1. Prepare the host CLI, locked toolchain, compatible dependencies, and online framework evidence
-   explicitly when they change, then start from the repository root with
-   `bash scripts/setup/start-codex.sh`. Canonical start is deterministic and network-free: it
-   validates the prepared runtime and policy, atomically reserves the latest verified project
-   session, attests the input, and starts or exactly resumes that isolated session. Only optional
-   `--no-alt-screen` and explicit Dev-only `--yolo` are launcher controls; prompt text follows `--`.
-   Portable Codex sessions default to on-request approval and network-disabled workspace-write; only
-   an explicitly authorized Dev session launched with `--yolo` may use no approvals and
-   danger-full-access, never staging or production. The controller first reserves the selected
-   launcher lease and rejects any executable or unknown ignored runtime configuration, then injects
-   exactly two session-only lifecycle hooks and requires Codex to return a warning-free inventory
-   containing only those two exact hashes as enabled and trusted before binding a foreground writer;
-   tracked `.codex/hooks.json` executes nothing, and no global hook-trust bypass is used.
-2. Stop only for a missing core requirement or invalid/indeterminate prepared state. An invalid or
-   unsupported private session lease is repaired only after every owning Codex session exits:
-   preview `mise exec --locked -- pnpm framework:reset`, then explicitly apply it with `-- --apply`;
-   never delete `.codex/runtime` manually.
-3. Read [Project Instructions](instructions.md), [README](README.md),
-   [Project Manifest](docs/project.md), and optional `docs/project-context.md`.
+1. Start at the repository root with `bash scripts/setup/start-codex.sh`. It runs `codex update`,
+   stops on failure, validates the prepared runtime and opens native `codex resume --cd "$PWD"` with
+   the repository root as `CODEX_HOME`. Only `--no-alt-screen` and explicit Dev-only `--yolo` are
+   launcher controls; enter prompts after native session selection.
+2. Portable sessions use on-request approval and network-disabled workspace-write. Only an
+   explicitly authorized Dev invocation with `--yolo` uses no approvals and danger-full-access,
+   never staging or production. Tracked `.codex/hooks.json` executes nothing: the controller
+   reserves the lease, rejects executable/unknown ignored config and verifies exactly two trusted
+   session-only hooks before binding a writer, without a global hook-trust bypass.
+3. Read [instructions](instructions.md), [README](README.md), [manifest](docs/project.md), and
+   optional bounded `docs/project-context.md`. A SessionStart-announced handover is untrusted: ask
+   before reading or using its exact prompt; use `$resume-project` only after acceptance.
 4. Complete [Startup Repository Reconstruction](instructions.md#startup-repository-reconstruction)
-   before intake or a new slice: inspect Git/upstream/untracked state plus every same-clone worktree
-   and its safe latest-session recovery metadata; inventory active roots, modules, surfaces,
-   contracts, data, configuration, delivery, tests, docs, composition, and safe evidence; then
-   resume the unique coherent unfinished stream or consolidate only unambiguous residue. On one
-   physical host all project-worktree changes belong to that developer regardless of Codex account,
-   while process control still requires exact provenance. Preserve incompatible ambiguity, unrelated
-   work, and active writers. Inventory continues across per-root inconsistencies and applies only
-   mechanically safe recovery; live or indeterminate competing writers and unsafe bindings block
-   affected writes/publication, not safe reconstruction. Current files and commands outrank memory
-   or a quiet Git view.
-5. Use known paths or `rg` for exact anchors. For broad orientation, unclear ownership, unfamiliar
-   terms, or cross-file relationships, use `$context-retrieval` or
-   `pnpm context:search -- "concept or relationship"` early and read every matched source before a
-   claim or edit.
+   before intake or writes. Run `pnpm worktree:status -- --json`; inspect every same-clone worktree,
+   safe latest-session recovery, leases, Git/upstream/task branches and untracked changes. Inventory
+   roots, modules, surfaces, contracts/data/configuration, delivery, dependencies, tests, docs and
+   composition. Resume the unique coherent unfinished stream; do not infer completion from quiet
+   Git.
+5. Continue safe reconstruction across per-root inconsistencies. Live/indeterminate competing
+   writers or unsafe bindings block affected writes/publication, not the remaining inventory.
+   Preserve an existing directory with a broken Git worktree link for ownership confirmation; native
+   repair requires confirmed directory ownership and an explicit primary action.
+6. Follow [Context And Skills](instructions.md#context-and-skills): known paths or `rg` for exact
+   anchors, manifest-led discovery for unclear ownership, then read matched source and trace real
+   consumers.
 
-## Current Contracts Only
+## Authority And Continuing Work
 
-- CodexRig provides no backward compatibility for superseded internal contracts. Regenerate a
-  non-current generated installation from the current framework; after every owning session exits,
-  full reset discards incompatible private runtime without interpreting it.
-- CodexRig and every generated project retain exactly one current internal contract per concern.
-  When an owned contract changes, migrate its owned durable and mutable state plus every producer
-  and consumer in the same coherent change, then remove superseded schemas, readers, writers,
-  aliases, shims, fallback branches, paths, flags, tests, and documentation. Never dual-read,
-  dual-write, or carry a dormant compatibility implementation.
-- Robustness, resilience, fault tolerance, and lightweight operation come from strict validation,
-  atomic transitions, bounded recovery, and fail-closed handling of corrupt or indeterminate current
-  state—not parallel interpreters. No runtime, reset, or framework-upgrade path interprets a
-  superseded internal schema.
+- Follow [Authorized Work And Native Codex](instructions.md#authorized-work-and-native-codex).
+  Existing approvals persist within confirmed scope; additive questions and status requests return
+  to the active outcome. Honor explicit pause, cancellation and replacement. Never end at "ready to
+  implement" when implementation is already authorized. A finished slice, review or native Goal is
+  not proof that the complete authorized outcome is done.
+- Prefer explicitly requested native Goals and native plans, sessions, approvals and subagents.
+  `pnpm goal:new` checks publication; it is not a native Goal creator. Do not add a scheduler,
+  endless loop, second task store, account manager or speculative product feature.
+- In a pending generated project, use
+  [Project Definition Intake](instructions.md#first-prompt-project-definition-intake): invite a
+  detailed natural-language project/manifest description, challenge material gaps and record only
+  user-confirmed truth. Ask only decision-relevant questions; continue safe disjoint work.
+- [docs/project.md](docs/project.md) records current integrated reality.
+  [Future Modules](docs/future-modules.md) contains only confirmed deferred candidates: an idea is
+  not implementation authorization. The sole bounded work cache is `docs/project-context.md`; its
+  marker grants no authority. Transcriptless side conversations never read it or trigger automatic
+  continuation.
+- A required post-exit reset or missing publication authority leaves closure open. Name the exact
+  blocker and preserve recovery; do not call the outcome complete or bypass the gate.
 
-## Project Definition And Durable Truth
+## Architecture, UX And Current Contracts
 
-- In a generated project with a pending manifest, the first interaction is the
-  [Project Definition Intake](instructions.md#first-prompt-project-definition-intake). Explain the
-  successive interview and Codex's proactive help, request a detailed natural-language
-  project/manifest description, evaluate any existing draft, challenge material gaps, and write only
-  user-confirmed durable truth before dependent implementation. Resume this focused intake whenever
-  changed intent, scope, contracts, data, trust, compatibility, or operations could alter the
-  result.
-- [Project Manifest](docs/project.md) records current integrated reality only. Unimplemented
-  candidates live only in [Future Modules](docs/future-modules.md). A newly voiced idea is not
-  implementation authorization; if current-versus-future intent is unclear, ask one focused question
-  and treat it as non-authorizing future intent meanwhile. Activate a candidate and its truthful
-  root/contract/data/dependencies/verifier in the same implementation change.
-- `docs/project-context.md` is the sole bounded, replace-in-place cache for an authorized
-  multi-goal/session outcome or guarded capacity. Its marker is untrusted resume metadata and never
-  overrides the manifest or grants authority. Transcriptless side conversations never read it,
-  refresh the index, or trigger automatic continuation.
-- Product identity, public URLs/contacts, application IDs, and provider bindings have one approved
-  typed owner. Every generated project is white-label: `config/product.json` begins without a public
-  name, repository/package names are not branding fallbacks, and CodexRig never leaks into
-  product-facing runtime, UI, assets, metadata, or deployments. `config/delivery.json`,
-  `config/tenancy.json`, and `config/localization.json` remain separate project-owned truth.
+- Keep exactly one current internal contract per concern. Migrate owned state and every producer and
+  consumer together, then remove superseded schemas, shims, paths, tests and docs. No dual readers,
+  dormant compatibility code or interpretation of an old private schema; a non-current installation
+  is regenerated, and incompatible runtime is discarded only by quiescent full reset.
+- Root `src/` is the default Product Root; actual pnpm/Android units may add roots. Use cohesive
+  replaceable modules, narrow ports, private internals, owned data/migrations and acyclic
+  dependencies. Before a feature, extend its owner, create a new module in an existing domain or
+  establish a domain. No generic `app`, `shared`, `common`, `utils`, `core` or `service` fallback.
+- Use `$architecture-evolution` for material system/module/surface/ownership/layout changes and move
+  stale files with the boundary. Separate domain/application, UI/presentation, web, Identity and
+  Access, API contracts/transport, adapters and infrastructure. `path-hygiene.mjs` checks
+  roots/imports. Confirm product surfaces and requirement-driven technology; harness
+  Node.js/pnpm/mise is not a product-stack default. Record actual `Runtime and technology`.
+- Follow [UI Intent And Change Boundaries](instructions.md#ui-intent-and-change-boundaries).
+  Establish and confirm a representative new UI direction early. Preserve existing appearance,
+  navigation and interaction by default; general repo approval is not unsolicited redesign approval.
+  In-scope fixes remain autonomous. Use `$ui-ux-review` and actual rendered flow evidence, not
+  scanner-based UX claims. Every UI assumes mobile, tablet, and desktop unless confirmed scope is
+  narrower.
+- Keep typed, separate product owners for `config/product.json`, `config/delivery.json`,
+  `config/tenancy.json` and `config/localization.json`. Products remain white-label without a
+  repository-name branding fallback. Resolve tenant isolation and locales before product work.
+  Identity and Access owns auth, authorization, users, sessions and provider adapters behind ports;
+  material changes use `$security-review` and `pnpm auth:check`. Keep tenant isolation
+  deny-by-default.
+- Source, identifiers, filenames, tests and technical headers are English; user-facing locales are
+  confirmed separately and changed copy uses `$native-language-content-review`. Hand-authored text
+  has a format-native purpose/owner header; public types document invariants and Markdown has one
+  descriptive H1 with unique non-skipping headings.
+- Retain LICENSE and NOTICE, the Zoran Kikic author credit and CodexRig Framework Required Notice in
+  the framework and noncommercial children. Commercial use needs a separate express written license;
+  only it may permit removing credits from its specifically licensed child, never CodexRig itself.
 
-## Architecture And Product Boundaries
+## Delivery And Verification
 
-- Root `src/` is the default Product Root; real declared pnpm and evidenced Android units may add
-  roots. Default non-trivial product code to a modular monolith with cohesive replaceable modules,
-  narrow public contracts, private internals, owned data/migrations, explicit acyclic dependencies,
-  tenant isolation, and focused verifiers. Before each feature, decide whether it extends an owner,
-  creates a new module in an existing domain, or establishes a new domain. Generic `app`, `shared`,
-  `common`, `utils`, `core`, or `service` fallback placement is invalid.
-- Material purpose, domain, system, deployment, module, ownership, surface, or layout changes invoke
-  `$architecture-evolution` and move/remove stale files with the boundary. Every completed
-  non-trivial slice invokes `$system-coherence`, traces a representative assembled flow through real
-  consumers, removes competing truth or semantic duplication, and repairs drift at the canonical
-  owner before acceptance.
-- Derive and confirm web/PWA, mobile, desktop, CLI/TUI, API/service, worker, library/SDK,
-  embedded/realtime, or combined surfaces before stack choice. Every integrated surface owns an
-  interface directory or declared product package and composition/adapters/contracts. Keep
-  domain/application, UI/presentation, web, public API contracts/transport, Identity and Access, and
-  infrastructure/deployment in explicit separate directories; `scripts/verify/path-hygiene.mjs`
-  rejects mixed roots and cross-surface imports.
-- Identity and Access owns authentication/credentials, authorization/policy, user management,
-  sessions/tokens, audit/persistence, and provider adapters behind narrow ports. Other surfaces do
-  not own or deep-import those internals. Auth changes invoke `$architecture-evolution`,
-  `$security-review`, and `pnpm auth:check`. Tenant context is independently verified and deny by
-  default; `config/tenancy.json` becomes concrete before the first product slice, and every module
-  records and tests its Tenant isolation.
-- The root Node.js/pnpm/mise toolchain is harness tooling, not a product-stack default. After the
-  manifest and owner are clear, use current primary evidence to strongly recommend and confirm each
-  module's language/framework/runtime from platform, real-time/resources, safety/FFI, trust,
-  tenancy, team, operations, and maintenance needs. `pnpm stack:detect` ignores harness-only clues;
-  implemented modules record actual `Runtime and technology`.
-- Every UI assumes mobile, tablet, and desktop unless narrower durable scope is confirmed. Web uses
-  one accessible responsive feature-parity flow across viewport, input, zoom, orientation, media,
-  and constrained-device conditions. Source, identifiers, filenames, tests, and technical headers
-  are English; ask early about user-facing locales, keep them in `config/localization.json`, and use
-  `$native-language-content-review` for changed copy.
-- Every hand-authored textual file starts with a format-native purpose/owner description, and
-  non-trivial public types document their contract/invariants. Update those descriptions with owner
-  changes; Markdown has one descriptive H1 plus unique, referenceable, non-skipping headings.
-- Retain `LICENSE` and `NOTICE`, including the Zoran Kikic author credit and CodexRig Framework
-  Required Notice, in CodexRig and every noncommercial generated project. Commercial use needs a
-  separate express written license from Zoran Kikic; only that license may permit credits to be
-  removed from its specifically licensed generated project, never from CodexRig itself. Keep this
-  developer-/source-facing attribution outside product-facing white-label output.
+- Establish root cause, owner, real consumers and viable designs before material implementation.
+  Research primary/official evidence when it can change the decision. No quick fix, symptom patch,
+  first-plausible solution or undocumented mitigation. Additional work must improve an approved
+  outcome, acceptance blocker or material risk; no speculative hardening or cleanup treadmill.
+- `$project-implementation` owns implementation and rendered UI work. At every completed non-trivial
+  slice use `$system-coherence`, trace a representative assembled flow, repair relevant findings,
+  review to zero, audit and check the whole-project course. Keep review evidence in the
+  conversation.
+- Use risk-based focused owner/consumer evidence and `pnpm verify:changed -- --print-plan`; run
+  `pnpm verify` once on the actual stable integration state. Do not add a test for every edit,
+  mistake text-presence tests for model obedience, or rerun broad suites without new admission. Keep
+  maintained executable modules at or below 700 physical lines.
+- `dev` is the default. Within an already authorized YOLO dev session, avoid redundant approvals.
+  The newest developer build/deploy and manual feedback have priority; verification runs beside or
+  afterward. Dev is latest-wins; staging/prod require explicit selection and their stronger gates.
 
-## Delivery, Verification, And Continuation
+## Coordination, Cleanup And Publication
 
-- Never use a quick fix, symptom patch, or first-plausible implementation for material work. Before
-  writing, establish the root cause and owning boundary, compare viable designs in whole-project
-  context, and research current primary/official evidence when it could change the choice. Take the
-  time needed to implement the best-supported durable solution; explicitly reject materially worse
-  shortcuts. Dev feedback stays fast through isolated parallel or deferred verification, never by
-  lowering engineering quality or accumulating an undocumented workaround.
-- Follow
-  [Product-First Delivery And Verification Economy](instructions.md#product-first-delivery-and-verification-economy):
-  plan complex work into goals and reviewable slices, run focused owner/consumer evidence, repeat
-  review and repair to zero relevant findings, perform a fresh audit and course check, and invoke
-  `pnpm verify` once on the actual stable integration state. Inspect admission with
-  `pnpm verify:changed -- --print-plan`; failures never authorize broad reruns or cache bypass.
-- `dev` is the default unless staging or prod is explicitly selected. In an already authorized YOLO
-  dev session started explicitly with the canonical launcher's `--yolo`, do not add redundant
-  approval pauses. Never carry that full-access mode into staging or prod. The newest developer
-  build/deploy and manual feedback win; test generation/execution runs isolated in parallel or
-  afterward and yields shared capacity. Dev uses latest-wins replacement. Staging/prod require
-  explicit stronger artifact, security, migration, rollback, approval, observability, and health
-  gates.
-- Treat tests as risk-based evidence, not a test-per-change ritual. Prefer an existing realistic
-  system/lifecycle scenario; use narrow coverage only when it proves an important deterministic
-  boundary more proportionately. Keep maintained executable modules at or below 700 physical lines.
-- Never end at "ready to implement" when implementation is already authorized. Plans, recaps,
-  research, reviews, audits, and intermediate goals are checkpoints; continue the authorized outcome
-  until complete or a real authority, safety, integration, or external blocker remains.
+- One host represents one developer: all visible same-host project changes belong to that developer,
+  regardless of Codex account. Process control still requires exact provenance. Git transports
+  changes; same-host independent writers use separate worktrees/leases and different developers use
+  separate clones. A local lease cannot prove that another developer's clone is idle.
+- Declare the outcome, write set and exactly one writer before each slice or scope expansion.
+  Register each owned subagent/background task with repository/session/scope, returned identity,
+  checkpoint, safe boundary and cancellation provenance. Account-/host-wide process listings are
+  discovery only; foreign or ambiguous processes are never contacted, signalled, counted or closed.
+- Use at most four live subagents for substantial disjoint work. Primary, global delegated defaults
+  and roles use the exact same configured GPT Astra model with `ultra` reasoning; no spawn override.
+  Check effective permissions before child tools: read-only roles stop on broader overrides; an
+  explicit writer may accept this primary's authorized YOLO only for its exact disjoint write set.
+  That grants no network, credentials, external mutation, delegation, commit, push, publish or
+  deploy. The primary integrates and owns protected policy/skill/role files; shared-checkout
+  isolation is logical.
+- The primary accepts handoffs, actively closes completed owned agents and releases ownership/slots.
+  Mirror every direct peer message and response to the primary; otherwise route through the primary.
+  Reassess capacity without assuming a billing period or unit. A reliable binding percentage at 10%
+  is guarded; 5%, a host critical signal or uncovered completion reserve is critical. Keep account
+  windows distinct from context/token budgets; follow the canonical admission and heartbeat rules.
+- At every completed slice rerun `pnpm worktree:status -- --json` as Worktree Settlement. Deep
+  Orchestration Housekeeping at each goal settles task branches, worktrees, recovery and
+  coordination residue. Preservation is a safety state, never completion. Housekeeping never deletes
+  a worktree directory; clear only mechanically proven stale current runtime or already-missing
+  registrations.
+- Critical capacity starts no new work. Drain only provenance-bound owned agents/tasks, record the
+  exact Critical Budget Drain attestation in `docs/project-context.md`, and run
+  `pnpm handover:create -- --critical` as the final repository action. After a successful seal, stop
+  completely: no tool, check, agent contact or automatic continuation. A later accepted handover may
+  resume normally under current authority.
+- Keep portable `.codex/` policy tracked, native mutable state in ignored root CODEX_HOME entries,
+  and framework coordination in ignored `.codex/runtime/`. Do not manually delete runtime. Before
+  full reset every owning session must exit; preview `mise exec --locked -- pnpm framework:reset`,
+  apply explicitly with `--apply`, and require a clean preview. Active/dirty/unsafe/unintegrated
+  resources remain protected.
+- At completed goals run `mise exec --locked -- pnpm repo:housekeeping -- --apply`, review active
+  docs and give changed critical authorities a separate preservation review. Framework version,
+  compatibility and child-policy reconciliation stay in `.codexrig/`; project-owned upgrade
+  documents are never blindly replaced.
+- Central `main` is the only durable integration branch. Closure requires authorized publication and
+  rechecking actual main, then `mise exec --locked -- pnpm goal:new` before another goal. Source
+  publication uses the explicit post-exit `pnpm framework:publish --message "<message>"` command:
+  reset preview/apply/clean preview, housekeeping, verification, final reset, commit, push and
+  `goal:new`. No commit/push without authority; sibling creation never initializes Git. Never commit
+  secrets, local runtime, process history or generated handovers.
 
-## Coordination And Agent Ownership
-
-- Central `main` is the only durable integration branch. Git is persistence and transport, never the
-  writer-isolation layer: same-host parallel sessions use separate worktrees with one writer lease
-  each, while every permitted agent may read their developer-owned changes. Codex accounts do not
-  own changes; one physical host represents one developer. Different hosts/developers use separate
-  clones and ordinary short-lived task branches. Before each slice and expanded write scope, declare
-  goal/outcome, modules/contracts/data/configuration/files, and exactly one writer; inspect all
-  observable worktree/session/team claims and resolve overlap before writing. Shared contracts have
-  one integrator: migrate the contract, owned state, and all consumers within one coherent
-  integration, then remove superseded behavior before it becomes a stable dependency.
-- For host-loss recovery or transfer to another developer, the primary commits and pushes each
-  coherent resumable slice through the declared integration path: directly on `main` when work is
-  serialized and branch policy permits, otherwise through the short-lived task branch or protected
-  path. Existing authorization, secret-scan, and verification boundaries still apply. This is not a
-  WIP/checkpoint workflow; later uncommitted bytes remain recoverable only from the surviving host.
-- Use subagents only when substantial independent work shortens the critical path, with at most four
-  live subagents by default. The primary and every subagent use the exact same configured GPT Sol
-  model with `ultra` reasoning; global delegated defaults and roles must match, and no spawn
-  override may differ. A role's sandbox is only a requested default because live parent overrides
-  can be reapplied: before any child tool work, verify its effective permissions. Read-only roles
-  stop on a broader override; an explicit writer may accept this primary's already-authorized YOLO
-  override only for its exact disjoint repository write set and gains no network, credential,
-  external, commit, push, publish, deploy, or delegation authority. Any other mismatch stops
-  delegated work. Subagents never spawn another agent.
-- Register each owned subagent/background task before use with repository and primary-session
-  provenance, task/scope, returned identity, checkout, checkpoint, safe boundary, and cancellation.
-  Account-/host-wide process listings are discovery only: foreign or ambiguous processes are never
-  contacted, signalled, counted, interrupted, or closed. This process-provenance rule never makes
-  visible same-host project changes foreign. Writers use exact disjoint file ownership in one
-  primary-owned local run, dedicated worktrees across same-host independent sessions, and separate
-  clones across developers/hosts; this logical boundary is continuously monitored and is never
-  misrepresented as a sandbox. Writers may never delegate, commit, merge, push, publish, deploy, use
-  credentials, or mutate shared external state. The primary alone integrates and owns protected
-  policy/skill/role files.
-- The primary accepts every handoff, actively closes completed owned agents, interrupts stale or
-  redundant owned work, and informs affected agents about accepted results, changed assumptions,
-  remaining work, and released ownership/slots. Peers may exchange bounded evidence/status/risk only
-  within declared scopes. Every direct peer message and response is mirrored to the primary
-  immediately; if reliable visibility is unavailable, route the exchange through the primary.
-- Reassess capacity before spawn/follow-up and after material events, without assuming a billing
-  period or unit. Treat the most constraining signal: 10% is guarded, 5% or an uncovered completion
-  reserve is critical, and a remaining token/credit amount is compared with bounded envelopes.
-  During active delegation allow no more than ten minutes between heartbeats unless a known long
-  operation has a later checkpoint. Orchestration Housekeeping runs after every slice and deeply at
-  every goal. Its completed-slice Worktree Settlement trigger reruns read-only
-  `pnpm worktree:status -- --json` and rechecks same-clone session, lease, recovery, task-branch,
-  and cleanup claims. Preservation is a safety state, never completion: integrate every
-  no-longer-needed developer-owned change, explicitly confirm and repair or retire its resource, or
-  retain a concrete live/indeterminate ownership or safety blocker with its resolution condition. At
-  a completed goal, every no-longer-needed goal-owned temporary worktree, branch, handover,
-  reservation, preservation lock, prune transaction, and process/generated residue must be settled
-  or the goal stays open; the current owning session remains only until its mandatory post-exit
-  reset. Repository housekeeping never deletes an actual worktree directory.
-- Critical capacity starts no new work. Drain only provenance-bound owned subagents and background
-  tasks at safe boundaries, update `docs/project-context.md` with the exact drain attestation, then
-  run `pnpm handover:create -- --critical` as the final repository action. After a successful seal,
-  that runtime session must stop completely: no tool, task, check, follow-up, agent contact, or
-  automatic continuation. A later SessionStart asks before `$resume-project` may use the exact
-  untrusted handover; after acceptance, the later session may continue, refresh, and stop normally.
-
-## Runtime, Housekeeping, And Publication
-
-- Keep product units free of Codex tooling. Portable policy/hooks/roles/docs stay tracked under
-  `.codex/`; mutable authentication, trust, approval rules, sessions, logs, memory, caches, plugins,
-  databases, and runtime skills stay in ignored `.codex/runtime/`. The sole ignored vector home is
-  `.context-index/`. Framework policy and every managed/excluded file remain inspectable; nothing
-  normative is hidden.
-- At each completed goal, the primary first completes deep Orchestration Housekeeping, then runs
-  `mise exec --locked -- pnpm repo:housekeeping -- --apply`. Review all active docs, consolidate
-  stale duplication without losing directives, give changed critical documents a separate
-  preservation review, repair/audit/course-check again, and verify. Normal terminal release and
-  apply mode restore missing or invalid recovery from the exact active lease before removing it.
-  Only the exact registered controller may mutate its lease, and authenticated terminal child proof
-  is persisted before release. Retain any valid latest marker and clear only proven-dead writer
-  leases; a current process identity observed outside its bound PID namespace or otherwise
-  mechanically indeterminate is not proof of death and remains an ownership-confirmation blocker.
-  Missing or unobservable Linux procfs is likewise indeterminate. Full reset holds the lifecycle
-  lock, proves repository-wide runtime quiescence, and discards incompatible private runtime without
-  interpreting another schema. Apply mode preserves an existing directory with a broken Git worktree
-  link as an ownership-confirmation blocker, and removes only already-missing registrations held
-  through the native prune by process-bound reservations while process-bound locks preserve
-  non-missing siblings. A shared process-bound transaction in the Git common directory records every
-  reserved path and preservation reason before prune, so post-prune crashes remain discoverable.
-  After an interrupted cleanup, only unchanged current-contract artifacts whose exact owner is
-  proven dead are retired automatically; Git-less roots are valid. Native Git repair is an explicit
-  primary-owned action only after the directory's ownership is confirmed. Housekeeping preserves
-  every active, dirty, unsafe, invalid, or unintegrated worktree as main-stream input. It never
-  removes a worktree directory, deploys, commits, pushes, or mutates external state.
-- `.codexrig/framework.json`, `.codexrig/compatibility.json`, and `.codexrig/policy-projection.json`
-  own framework version/managed surfaces, compatible tool tracks, and stable child-policy
-  reconciliation. Use `pnpm framework:doctor -- --online` and the receipt-backed
-  `framework:upgrade`; project-owned documents are never blindly overwritten.
-- A goal closes only after the actual central `main` is published and rechecked. The primary alone
-  performs an authorized commit/push or integrates a temporary branch/provider queue. Then
-  `mise exec --locked -- pnpm goal:new` must prove clean publication before another
-  already-authorized goal begins. Creating a sibling project never initializes Git, commits, or
-  pushes.
-- After every framework optimization, exit all owning Codex sessions, preview the reset, then apply
-  it and require a clean preview before stage/review/commit/push. Every `$reset-framework --apply`
-  removes the complete disposable runtime and semantic-index state while retaining only approved
-  identity and exact publication evidence. Never commit secrets, machine-local state, process
-  history, private runtime, or generated handovers.
-
-Detailed source inventory, pre-descent masking, semantic-index lifecycle, staged export validation,
-course checks, publication evidence, and review routing remain in
-[Project Instructions](instructions.md).
+Detailed recovery, locks, trust, drain, publication and review procedures remain in
+[instructions.md](instructions.md); this bootstrap is not a second procedural authority.

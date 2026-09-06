@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { after, test } from "node:test";
-import { stageProjectExport } from "./stage-project-export.mjs";
+import { copyPortableSetupFixture } from "./setup-regression-fixtures.mjs";
 import {
   assertGeneratedProjectQuality,
   cleanupTemporaryRoots,
@@ -52,14 +52,12 @@ test("clean project initialization escapes and formats long project names", () =
 test("clean project initialization excludes untracked source drafts by default", () => {
   const sourceParent = temporaryRoot("tracked-project-source-");
   const source = path.join(sourceParent, "source");
-  stageProjectExport({ includeUntracked: true, sourceRoot: root, targetRoot: source });
+  copyPortableSetupFixture(source);
   for (const runtimeContract of [
     ".codex/hooks.json",
     "mise.lock",
     "mise.toml",
     "scripts/context/portable-context-contract.mjs",
-    "scripts/context/context-maintenance-safety.mjs",
-    "scripts/context/context-publication-policy.mjs",
     "scripts/context/session-stop-lifecycle.mjs",
     "scripts/setup/session-control-hook-command.mjs",
     "scripts/setup/startup-codex-process.mjs",

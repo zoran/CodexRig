@@ -1,6 +1,6 @@
 # Portable project-scoped Codex defaults and policy.
 #
-# Mutable state belongs in the ignored repository-local .codex/runtime CODEX_HOME, not this file.
+# Native state belongs in ignored root CODEX_HOME entries; .codex/runtime owns private coordination.
 # Keep trust, credentials, provider secrets, telemetry targets, notification commands,
 # absolute paths, and machine-local settings out of portable project configuration.
 
@@ -32,7 +32,7 @@ integrated or explicitly owner-confirmed and retired. A temporary mitigation req
 authorization or immediate safety containment, a recorded removal condition, and may never be
 represented as completion. Use
 subagents only for substantial disjoint work, keep at most four live, and never pass a model or
-reasoning override: every primary and spawned agent must use this config's exact GPT Sol model with
+reasoning override: every primary and spawned agent must use this config's exact GPT Astra model with
 ultra reasoning. Register each owned subagent and background task with repository/session/scope,
 returned identity, checkpoint, safe boundary, and cancellation provenance; never contact, signal,
 interrupt, close, or count foreign or ambiguous processes. Re-evaluate unit-agnostic capacity before
@@ -58,8 +58,8 @@ project_doc_fallback_filenames = ["instructions.md"]
 model_reasoning_effort = "ultra"
 model_verbosity = "medium"
 web_search = "cached"
-model = "gpt-5.6-sol"
-service_tier = "fast"
+model = "gpt-6-astra"
+# Leave service_tier unset for standard processing; delegated roles inherit the session tier.
 approvals_reviewer = "user"
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
@@ -70,12 +70,13 @@ network_access = false
 [agents]
 # Project-scoped .codex/agents/*.toml files provide the spawned-session developer instructions.
 enabled = true
-default_subagent_model = "gpt-5.6-sol"
+default_subagent_model = "gpt-6-astra"
 default_subagent_reasoning_effort = "ultra"
 max_concurrent_threads_per_session = 4
 interrupt_message = true
 
 [features]
+goals = true
 hooks = true
 # Reusable source disables this; clean generated projects enable isolated project-local memories.
 memories = false

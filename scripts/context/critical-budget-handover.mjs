@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Owns sealed critical-budget handover prompts for safe cross-account repository continuation. */
+/** Owns repository-bound critical handover sealing, full receipt, and exact-file acknowledgement. */
 import { randomBytes } from "node:crypto";
 import { existsSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
@@ -357,18 +357,125 @@ export function discoverRecentCriticalBudgetHandover({
     : null;
 }
 
+function receivingSession(root, metadata) {
+  const session = inspectRuntimeSessionLease({ root });
+  if (
+    session.status !== "active" ||
+    session.lease.phase !== "active" ||
+    session.lease.sessionId === metadata.sealingSessionId
+  ) {
+    throw new Error("Handover receipt requires a later active canonical session.");
+  }
+  return session.lease.sessionId;
+}
+
+function withReceivingPrompt({ root, relativePath, testHooks }, consume) {
+  if (
+    typeof relativePath !== "string" ||
+    !relativePath.startsWith(`${criticalHandoverDirectory}/`) ||
+    relativePath !== `${criticalHandoverDirectory}/${path.basename(relativePath)}` ||
+    !filenamePattern.test(path.basename(relativePath))
+  ) {
+    throw new Error("Handover receipt requires an exact repository-relative prompt path.");
+  }
+  const store = handoverStore(root, { testHooks });
+  if (!store) throw new Error("The selected handover is unavailable.");
+  try {
+    const filename = path.basename(relativePath);
+    const snapshot = readOwnedPrompt(store, filename);
+    const metadata = parsedHandover(snapshot.content);
+    if (metadata.repositoryBinding !== repositoryBinding(root)) {
+      throw new Error("The selected handover belongs to another repository.");
+    }
+    const sessionId = receivingSession(root, metadata);
+    return consume({ filename, metadata, sessionId, snapshot, store });
+  } finally {
+    closeOwnedDirectoryBinding(store);
+  }
+}
+
+/** Reads one explicitly accepted artifact in full; neither reading nor file equality proves cognition. */
+export function receiveCriticalBudgetHandover({
+  root = frameworkRoot,
+  relativePath,
+  testHooks,
+} = {}) {
+  return withReceivingPrompt({ root, relativePath, testHooks }, ({ snapshot }) =>
+    Object.freeze({ relativePath, content: snapshot.content, sha256: sha256(snapshot.content) }),
+  );
+}
+
+/** Acknowledges receipt by removing only the exact current artifact, never a directory or sibling.
+ * The primary calls this only after complete native tool delivery and its compact acknowledgement.
+ * The command verifies session/root/file identity, not model comprehension or transcript delivery.
+ */
+export function acknowledgeCriticalBudgetHandover({
+  root = frameworkRoot,
+  relativePath,
+  expectedSha256,
+  testHooks,
+} = {}) {
+  if (typeof expectedSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(expectedSha256)) {
+    throw new Error("Handover acknowledgement requires the received SHA-256 digest.");
+  }
+  return withReceivingPrompt(
+    { root, relativePath, testHooks },
+    ({ filename, metadata, sessionId, snapshot, store }) => {
+      if (sha256(snapshot.content) !== expectedSha256) {
+        throw new Error("Handover acknowledgement digest does not match the selected artifact.");
+      }
+      testHooks?.beforeHandoverAcknowledge?.();
+      if (receivingSession(root, metadata) !== sessionId) {
+        throw new Error("The receiving canonical session changed before acknowledgement.");
+      }
+      removeStableOwnedFile(
+        store,
+        filename,
+        snapshot.stats,
+        "acknowledged critical-budget handover",
+      );
+      return Object.freeze({ relativePath, sha256: expectedSha256 });
+    },
+  );
+}
+
 function usage() {
-  return "Usage: pnpm handover:create -- --critical";
+  return [
+    "Usage: pnpm handover:create -- --critical",
+    "       pnpm handover:receive -- <exact-repository-relative-prompt>",
+    "       pnpm handover:acknowledge -- <exact-repository-relative-prompt> --sha256 <received-digest>",
+  ].join("\n");
 }
 
 function main() {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
-  if (args.length !== 2 || args[0] !== "create" || args[1] !== "--critical") {
-    throw new Error(usage());
+  if (args.length === 2 && args[0] === "create" && args[1] === "--critical") {
+    const handover = createCriticalBudgetHandover();
+    console.log(`Critical-budget handover sealed: ${handover.relativePath}`);
+    console.log("Stop now. Do not run another task, tool, follow-up, or automatic continuation.");
+    return;
   }
-  const handover = createCriticalBudgetHandover();
-  console.log(`Critical-budget handover sealed: ${handover.relativePath}`);
-  console.log("Stop now. Do not run another task, tool, follow-up, or automatic continuation.");
+  if (args.length === 2 && args[0] === "receive") {
+    const received = receiveCriticalBudgetHandover({ relativePath: args[1] });
+    console.log(`Handover SHA-256: ${received.sha256}`);
+    console.log(received.content);
+    console.log(
+      "Read the complete output, acknowledge the project/outcome/next action, then acknowledge this exact digest.",
+    );
+    return;
+  }
+  if (args.length === 4 && args[0] === "acknowledge" && args[2] === "--sha256") {
+    const consumed = acknowledgeCriticalBudgetHandover({
+      relativePath: args[1],
+      expectedSha256: args[3],
+    });
+    console.log(`Acknowledged handover removed: ${consumed.relativePath}`);
+    console.log(
+      "The file is removed; copies in native conversation/provider history are not erased.",
+    );
+    return;
+  }
+  throw new Error(usage());
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

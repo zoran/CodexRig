@@ -18,7 +18,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { assertGeneratedProjectParity } from "../../.agents/skills/create-project-from-framework/scripts/generated-project-finalization.mjs";
 import { capturePortableProjectTransferManifest } from "../../.agents/skills/create-project-from-framework/scripts/project-copy.mjs";
-import { stageProjectExport } from "./stage-project-export.mjs";
+import { copyPortableSetupFixture } from "./setup-regression-fixtures.mjs";
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const temporaryRoots = [];
@@ -38,7 +38,7 @@ export function cleanupTemporaryRoots() {
 export function isolatedTrackedFrameworkSource(prefix) {
   const sourceParent = temporaryRoot(prefix);
   const source = path.join(sourceParent, "source");
-  stageProjectExport({ includeUntracked: true, sourceRoot: root, targetRoot: source });
+  copyPortableSetupFixture(source);
   initializeTrackedSource(source);
   return source;
 }
@@ -206,12 +206,12 @@ export function assertGeneratedDependencyFreshnessContract(generated) {
   assert.match(workspaceConfig, /strictPeerDependencies: true[\s\S]*engineStrict: true/);
 }
 
-export function assertGeneratedTransferParityContract(generated) {
-  const transferManifest = capturePortableProjectTransferManifest(root, {
+export function assertGeneratedTransferParityContract(source, generated) {
+  const transferManifest = capturePortableProjectTransferManifest(source, {
     includeUntracked: true,
   });
   assertGeneratedProjectParity({
-    sourceRoot: root,
+    sourceRoot: source,
     targetRoot: generated,
     transferManifest,
   });
@@ -224,7 +224,7 @@ export function assertGeneratedTransferParityContract(generated) {
     assert.throws(
       () =>
         assertGeneratedProjectParity({
-          sourceRoot: root,
+          sourceRoot: source,
           targetRoot: generated,
           transferManifest,
         }),
@@ -234,7 +234,7 @@ export function assertGeneratedTransferParityContract(generated) {
     assert.throws(
       () =>
         assertGeneratedProjectParity({
-          sourceRoot: root,
+          sourceRoot: source,
           targetRoot: generated,
           transferManifest,
         }),
@@ -248,22 +248,22 @@ export function assertGeneratedTransferParityContract(generated) {
   const originalPackage = readFileSync(packagePath, "utf8");
   try {
     const changedPackage = JSON.parse(originalPackage);
-    delete changedPackage.scripts["context:search"];
+    delete changedPackage.scripts["handover:receive"];
     writeFileSync(packagePath, `${JSON.stringify(changedPackage, null, 2)}\n`, "utf8");
     assert.throws(
       () =>
         assertGeneratedProjectParity({
-          sourceRoot: root,
+          sourceRoot: source,
           targetRoot: generated,
           transferManifest,
         }),
-      /Generated package exceeds the declared identity and source-reset transformation/,
+      /Generated package exceeds the declared identity and source-publication transformation/,
     );
   } finally {
     writeFileSync(packagePath, originalPackage, "utf8");
   }
   assertGeneratedProjectParity({
-    sourceRoot: root,
+    sourceRoot: source,
     targetRoot: generated,
     transferManifest,
   });

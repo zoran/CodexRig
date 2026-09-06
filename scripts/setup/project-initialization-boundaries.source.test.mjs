@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { after, test } from "node:test";
-import { stageProjectExport } from "./stage-project-export.mjs";
+import { copyPortableSetupFixture } from "./setup-regression-fixtures.mjs";
 import {
   cleanupTemporaryRoots,
   initializeTrackedSource,
@@ -28,14 +28,12 @@ function copyMissingRuntimeContracts(source, runtimeContracts) {
 test("clean project initialization preserves additional validated agent roles", () => {
   const sourceParent = temporaryRoot("additional-agent-source-");
   const source = path.join(sourceParent, "source");
-  stageProjectExport({ includeUntracked: true, sourceRoot: root, targetRoot: source });
+  copyPortableSetupFixture(source);
   copyMissingRuntimeContracts(source, [
     ".codex/hooks.json",
     "mise.lock",
     "mise.toml",
     "scripts/context/portable-context-contract.mjs",
-    "scripts/context/context-maintenance-safety.mjs",
-    "scripts/context/context-publication-policy.mjs",
     "scripts/context/session-stop-lifecycle.mjs",
     "scripts/setup/session-control-hook-command.mjs",
     "scripts/setup/startup-codex-process.mjs",
@@ -159,7 +157,7 @@ test("clean project initialization preserves a safe project folder and ends at c
 test("clean project initialization refuses a polluted source baseline", () => {
   const sourceParent = temporaryRoot("polluted-project-source-");
   const source = path.join(sourceParent, "source");
-  stageProjectExport({ includeUntracked: true, sourceRoot: root, targetRoot: source });
+  copyPortableSetupFixture(source);
   copyMissingRuntimeContracts(source, [
     ".codex/hooks.json",
     "mise.lock",
@@ -192,7 +190,7 @@ test("clean project initialization refuses a polluted source baseline", () => {
 test("clean project initialization refuses agent artifacts inside a product root", () => {
   const sourceParent = temporaryRoot("polluted-product-boundary-source-");
   const source = path.join(sourceParent, "source");
-  stageProjectExport({ includeUntracked: true, sourceRoot: root, targetRoot: source });
+  copyPortableSetupFixture(source);
   copyMissingRuntimeContracts(source, [
     ".codex/hooks.json",
     "mise.lock",

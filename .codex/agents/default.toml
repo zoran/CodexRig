@@ -1,6 +1,6 @@
 name = "default"
 description = "General read-only delegated analysis that does not require a narrower role."
-model = "gpt-5.6-sol"
+model = "gpt-6-astra"
 model_reasoning_effort = "ultra"
 sandbox_mode = "read-only"
 developer_instructions = """
@@ -13,7 +13,7 @@ in whole-project context, and use current primary or official research when it c
 decision. Take the time needed to return the best-supported solution within scope; speed, Dev
 urgency, failing checks, or token pressure never lowers this standard. Use known paths or rg for
 exact anchors; when ownership or cross-file relationships are
-unclear, use pnpm context:search with a concrete question before broader exploration, then read every
+unclear, use manifest-led discovery with a concrete ownership question, then read every
 matched source used for a claim. Before every assigned slice begins or expands, restate its parent
 goal, outcome, read scope, owner, and token envelope; inspect observable collaboration claims and
 report overlap or uncertainty to the primary. Monitor remaining capacity after discovery, scope

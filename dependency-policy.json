@@ -1,10 +1,3 @@
 {
-  "pins": [
-    {
-      "name": "onnxruntime-common",
-      "manifest": "package.json",
-      "section": "devDependencies",
-      "reason": "Transformers.js 4.2 imports this package directly without declaring it; review when that upstream runtime contract changes."
-    }
-  ]
+  "pins": []
 }

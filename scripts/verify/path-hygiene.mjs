@@ -48,7 +48,7 @@ const commonPathSegments = new Set([
   "var",
   "volumes",
 ]);
-const agentOnlyDirectoryNames = new Set([".agents", ".codex", ".context-index", ".project-state"]);
+const agentOnlyDirectoryNames = new Set([".agents", ".codex", ".project-state"]);
 const agentOnlyFileNames = new Set(["AGENTS.md", "AGENTS.override.md"]);
 const surfaceWrapperNames = new Set(["interfaces", "surfaces"]);
 const surfaceAliases = new Map([

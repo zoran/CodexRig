@@ -41,7 +41,6 @@ import {
   bindStartupSessionCodexProcess as bindStartupSessionCodexProcessWithRuntime,
   bindStartupSessionWriter as bindStartupSessionWriterWithRuntime,
   completeStartupSessionWriterHandoff as completeStartupSessionWriterHandoffWithRuntime,
-  fallbackStartupAttestation as fallbackStartupAttestationWithRuntime,
   issueStartupAttestation as issueStartupAttestationWithRuntime,
   reserveStartupAttestation as reserveStartupAttestationWithRuntime,
   runtimeSessionLaunchState,
@@ -49,7 +48,6 @@ import {
   startupControlPolicies,
   startupSessionPlan,
   startupSessionPlanToken,
-  startupSessionSources,
   verifyStartupAttestation as verifyStartupAttestationWithRuntime,
 } from "../setup/startup-attestation.mjs";
 import { sessionStartSuccess } from "../setup/startup-session-context.mjs";
@@ -159,10 +157,6 @@ function bindStartupSessionWriter(root, pid, writerPid, options = {}) {
   return bindStartupSessionCodexProcessWithRuntime(root, pid, writerPid, runtimeOptions);
 }
 
-function fallbackStartupAttestation(root, pid, options = {}) {
-  return fallbackStartupAttestationWithRuntime(root, pid, withRuntimeExecutables(options));
-}
-
 function verifyStartupAttestation(options = {}) {
   return verifyStartupAttestationWithRuntime(withRuntimeExecutables(options));
 }
@@ -173,9 +167,7 @@ function writeCurrentRuntimeSessionLease(
   codexSessionId,
   phase = "active",
   {
-    resumeSessionId = phase === "active" ? codexSessionId : null,
     sessionId = "10000000-0000-4000-8000-000000000001",
-    sessionSource = phase === "active" ? "resume" : "startup",
     startIdentity = captureProcessIdentity(process.pid)?.startIdentity ?? null,
     startedAt = "2026-08-01T00:00:00.000Z",
   } = {},
@@ -189,14 +181,12 @@ function writeCurrentRuntimeSessionLease(
     root,
     ".codex/runtime/codexrig-session.json",
     serializeCanonicalJson({
-      schemaVersion: 5,
+      schemaVersion: 6,
       codexProcess: phase === "active" ? processIdentity : null,
       codexSessionId: phase === "active" ? codexSessionId : null,
       phase,
       process: processIdentity,
-      resumeSessionId,
       sessionId,
-      sessionSource,
       startedAt,
       writerPhase: phase === "active" ? "bound" : "unbound",
       writerProcess: phase === "active" ? processIdentity : null,
@@ -242,7 +232,6 @@ function contract(version) {
         "config/localization.json",
         "config/product.json",
         "config/tenancy.json",
-        "docs/context-index.md",
         "docs/future-modules.md",
         "docs/project.md",
         "instructions.md",
@@ -537,7 +526,6 @@ test("versioned policy upgrade preserves project documents until explicit reconc
     ["AGENTS.md", "# Local bootstrap\n"],
     ["README.md", "# Local product\n"],
     ["config/delivery.json", '{"local":"delivery"}\n'],
-    ["docs/context-index.md", "# Local context-index operations\n"],
     ["docs/future-modules.md", "# Future Modules\n"],
     ["docs/project.md", "# Local project truth\n"],
     ["instructions.md", "# Local workflow authority\n"],
@@ -639,6 +627,21 @@ test("framework upgrade rejects source ownership of project policy documents", (
       (relativePath) => relativePath !== "instructions.md",
     );
   write(removingSource, ".codexrig/framework.json", serializeCanonicalJson(removingContract));
+  const removingProjection = JSON.parse(
+    readFileSync(path.join(removingSource, ".codexrig/policy-projection.json"), "utf8"),
+  );
+  for (const policy of removingProjection.policies) {
+    if (!policy.reconcileDocuments.includes("instructions.md")) continue;
+    policy.reconcileDocuments = policy.reconcileDocuments.filter(
+      (relativePath) => relativePath !== "instructions.md",
+    );
+    policy.version += 1;
+  }
+  write(
+    removingSource,
+    ".codexrig/policy-projection.json",
+    serializeCanonicalJson(removingProjection),
+  );
   assert.throws(
     () => buildFrameworkUpgradePlan({ sourceRoot: removingSource, targetRoot: target }),
     /must preserve installed project-owned document classifications: instructions\.md/,
@@ -1045,7 +1048,7 @@ function sessionStartHookInput(root, overrides = {}) {
   return {
     cwd: root,
     hook_event_name: "SessionStart",
-    model: "gpt-5.6-sol",
+    model: "gpt-6-astra",
     permission_mode: "default",
     session_id: "01a01234-5678-7abc-8def-0123456789ab",
     source: "startup",
@@ -1082,11 +1085,10 @@ function releaseCurrentRuntimeSession(root, pid = process.pid) {
   return releaseRuntimeSessionLease({ root, pid });
 }
 
-test("runtime session leases enforce one current schema and plan exact repository recovery", () => {
+test("runtime session leases enforce one current schema without choosing the native session", () => {
   const emptyRoot = temporaryRoot("codexrig-no-session-");
   assert.deepEqual(startupSessionPlan({ root: emptyRoot }), {
-    mode: "startup",
-    resumeSessionId: null,
+    mode: "resume-picker",
   });
 
   const unsupportedRoot = temporaryRoot("codexrig-unsupported-session-");
@@ -1100,15 +1102,6 @@ test("runtime session leases enforce one current schema and plan exact repositor
   assert.throws(
     () => inspectRuntimeSessionLease({ root: unsupportedRoot }),
     /invalid or uses an unsupported schema/u,
-  );
-  assert.throws(
-    () =>
-      issueRuntimeSessionLease({
-        root: temporaryRoot("codexrig-unbound-resume-session-"),
-        pid: process.pid,
-        sessionSource: "resume",
-      }),
-    /session selection is invalid/u,
   );
   for (const [name, overrides] of [
     ["noncanonical-time", { startedAt: "August 1, 2026" }],
@@ -1130,7 +1123,7 @@ test("runtime session leases enforce one current schema and plan exact repositor
 
   const issuanceRoot = emptyRoot;
   const issued = issueRuntimeSessionLease({ root: issuanceRoot, pid: process.pid });
-  assert.equal(issued.schemaVersion, 5);
+  assert.equal(issued.schemaVersion, 6);
   assert.equal(issued.phase, "launching");
   assert.equal(issued.codexSessionId, null);
   assert.equal(issued.process.pid, process.pid);
@@ -1202,15 +1195,13 @@ test("runtime session leases enforce one current schema and plan exact repositor
       indeterminateHandoffRoot,
       ".codex/runtime/codexrig-session.json",
       serializeCanonicalJson({
-        schemaVersion: 5,
+        schemaVersion: 6,
         codexProcess: null,
         codexSessionId: null,
         phase: "launching",
         process: deadCoordinator,
-        resumeSessionId: null,
         root: repositoryRuntimeRootIdentity(indeterminateHandoffRoot),
         sessionId: "10000000-0000-4000-8000-000000000004",
-        sessionSource: "startup",
         startedAt: "2026-08-01T00:00:00.000Z",
         writerPhase: "handoff",
         writerProcess: deadCoordinator,
@@ -1229,15 +1220,13 @@ test("runtime session leases enforce one current schema and plan exact repositor
       boundRoot,
       ".codex/runtime/codexrig-session.json",
       serializeCanonicalJson({
-        schemaVersion: 5,
+        schemaVersion: 6,
         codexProcess: currentProcess,
         codexSessionId,
         phase: "active",
         process: deadCoordinator,
-        resumeSessionId: codexSessionId,
         root: repositoryRuntimeRootIdentity(boundRoot),
         sessionId: "10000000-0000-4000-8000-000000000002",
-        sessionSource: "resume",
         startedAt: "2026-08-01T00:00:00.000Z",
         writerPhase: "bound",
         writerProcess: currentProcess,
@@ -1252,15 +1241,13 @@ test("runtime session leases enforce one current schema and plan exact repositor
       freshBoundRoot,
       ".codex/runtime/codexrig-session.json",
       serializeCanonicalJson({
-        schemaVersion: 5,
+        schemaVersion: 6,
         codexProcess: currentProcess,
         codexSessionId,
         phase: "active",
         process: deadCoordinator,
-        resumeSessionId: null,
         root: repositoryRuntimeRootIdentity(freshBoundRoot),
         sessionId: "10000000-0000-4000-8000-000000000003",
-        sessionSource: "startup",
         startedAt: "2026-08-01T00:00:00.000Z",
         writerPhase: "bound",
         writerProcess: currentProcess,
@@ -1308,13 +1295,9 @@ test("runtime session leases enforce one current schema and plan exact repositor
   const exactRoot = temporaryRoot("codexrig-exact-session-stale-");
   writeCurrentRuntimeSessionLease(exactRoot, definitelyStalePid, codexSessionId);
   assert.deepEqual(startupSessionPlan({ root: exactRoot }), {
-    mode: "resume-id",
-    resumeSessionId: codexSessionId,
+    mode: "resume-picker",
   });
-  assert.equal(
-    startupSessionPlanToken(startupSessionPlan({ root: exactRoot })),
-    `resume-id:${codexSessionId}`,
-  );
+  assert.equal(startupSessionPlanToken(startupSessionPlan({ root: exactRoot })), "resume-picker");
 
   const interruptedLaunchRoot = temporaryRoot("codexrig-interrupted-launch-");
   writeCurrentRuntimeSessionLease(
@@ -1324,8 +1307,7 @@ test("runtime session leases enforce one current schema and plan exact repositor
     "launching",
   );
   assert.deepEqual(startupSessionPlan({ root: interruptedLaunchRoot }), {
-    mode: "startup",
-    resumeSessionId: null,
+    mode: "resume-picker",
   });
 
   const interruptedResumeRoot = temporaryRoot("codexrig-interrupted-resume-");
@@ -1343,11 +1325,9 @@ test("runtime session leases enforce one current schema and plan exact repositor
     definitelyStalePid,
     codexSessionId,
     "launching",
-    { resumeSessionId: codexSessionId, sessionSource: "resume" },
   );
   assert.deepEqual(startupSessionPlan({ root: interruptedResumeRoot }), {
-    mode: "resume-id",
-    resumeSessionId: codexSessionId,
+    mode: "resume-picker",
   });
 });
 
@@ -1459,127 +1439,44 @@ test("terminal lease release repairs missing or invalid recovery without replaci
   }
 });
 
-test("an unavailable exact resume falls back only after its bound writer exits", async (t) => {
+test("native picker reservation preserves recovery evidence until authenticated selection", () => {
   const root = attestationFixture();
   const controlPolicy = startupControlPolicies.default;
-  const codexSessionId = "01a01234-5678-7abc-8def-0123456789ab";
-  const initialLease = issueRuntimeSessionLease({ root, pid: process.pid });
-  bindCurrentRuntimeSessionWriter(root, initialLease);
+  const previousId = "01a01234-5678-7abc-8def-0123456789ab";
+  const selectedId = "01a09999-5678-7abc-8def-0123456789ab";
+  const initial = issueRuntimeSessionLease({ root, pid: process.pid });
+  bindCurrentRuntimeSessionWriter(root, initial);
   activateRuntimeSessionLease({
     root,
     pid: process.pid,
-    runtimeSessionId: initialLease.sessionId,
-    codexSessionId,
+    runtimeSessionId: initial.sessionId,
+    codexSessionId: previousId,
   });
   assert.equal(releaseCurrentRuntimeSession(root), true);
-
   const reservation = reserveStartupAttestation(root, process.pid, { controlPolicy });
-  assert.deepEqual(reservation.plan, { mode: "resume-id", resumeSessionId: codexSessionId });
-  assert.equal(reservation.lease.sessionSource, startupSessionSources.resume);
-  assert.equal(reservation.lease.resumeSessionId, codexSessionId);
+  assert.deepEqual(reservation.plan, { mode: "resume-picker" });
+  assert.equal(reservation.lease.codexSessionId, null);
   assert.equal(runtimeSessionLaunchState(root, process.pid), "launching");
-
+  assert.equal(inspectRuntimeSessionRecovery({ root }).recovery.codexSessionId, previousId);
   assert.throws(
-    () =>
-      fallbackStartupAttestation(root, process.pid, {
-        controlPolicy,
-        expectedAttestation: reservation.attestation,
-        nonce: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-      }),
-    /nonce does not match/u,
+    () => reserveStartupAttestation(root, process.pid, { controlPolicy }),
+    /already owns/u,
   );
-  assert.equal(inspectRuntimeSessionLease({ root }).lease.sessionId, reservation.lease.sessionId);
-
-  const writer = spawn(
-    process.execPath,
-    ["--input-type=module", "--eval", "setInterval(() => {}, 1000)"],
-    {
-      stdio: "ignore",
-    },
-  );
-  t.after(() => terminateIfAlive(writer.pid));
-  bindStartupSessionWriter(root, process.pid, writer.pid, {
-    controlPolicy,
-    expectedAttestation: reservation.attestation,
-    nonce: reservation.nonce,
-  });
-  assert.equal(inspectRuntimeSessionLease({ root }).lease.writerProcess.pid, writer.pid);
-  assert.throws(
-    () =>
-      fallbackStartupAttestation(root, process.pid, {
-        controlPolicy,
-        expectedAttestation: reservation.attestation,
-        nonce: reservation.nonce,
-      }),
-    /cannot outlive an active or indeterminate writer/u,
-  );
-  writer.kill("SIGTERM");
-  await new Promise((resolve) => writer.once("exit", resolve));
-  completeStartupSessionWriterHandoffWithRuntime(
-    root,
-    process.pid,
-    withRuntimeExecutables({
-      controlPolicy,
-      expectedAttestation: reservation.attestation,
-      nonce: reservation.nonce,
-    }),
-  );
-
-  const fallback = fallbackStartupAttestation(root, process.pid, {
-    controlPolicy,
-    expectedAttestation: reservation.attestation,
-    nonce: reservation.nonce,
-  });
-  const fallbackLease = inspectRuntimeSessionLease({ root }).lease;
-  assert.equal(fallbackLease.phase, "launching");
-  assert.equal(fallbackLease.sessionSource, startupSessionSources.startup);
-  assert.equal(fallbackLease.resumeSessionId, null);
-  assert.equal(inspectRuntimeSessionRecovery({ root }).recovery.codexSessionId, codexSessionId);
   bindStartupSessionWriter(root, process.pid, process.pid, {
     controlPolicy,
-    expectedAttestation: fallback.attestation,
-    nonce: fallback.nonce,
+    expectedAttestation: reservation.attestation,
+    nonce: reservation.nonce,
   });
   const verified = verifyStartupAttestation({
     root,
-    hookInput: sessionStartHookInput(root, {
-      session_id: "01a09999-5678-7abc-8def-0123456789ab",
-    }),
-    nonce: fallback.nonce,
     controlPolicy,
+    expectedAttestation: reservation.attestation,
+    nonce: reservation.nonce,
+    hookInput: sessionStartHookInput(root, { session_id: selectedId, source: "resume" }),
   });
-  assert.equal(verified.sessionSource, startupSessionSources.startup);
-  assert.equal(releaseCurrentRuntimeSession(root), true);
-});
-
-test("fresh fallback never re-attests a changed basis or retires its live launcher lease", () => {
-  const root = attestationFixture();
-  const controlPolicy = startupControlPolicies.default;
-  const codexSessionId = "01a01234-5678-7abc-8def-0123456789ab";
-  issueRuntimeSessionLease({
-    root,
-    pid: process.pid,
-    sessionSource: startupSessionSources.resume,
-    resumeSessionId: codexSessionId,
-  });
-  const issued = issueStartupAttestation({
-    root,
-    controlPolicy,
-    sessionSource: startupSessionSources.resume,
-    resumeSessionId: codexSessionId,
-  });
-  write(root, "package.json", "{}\n");
-  assert.throws(
-    () =>
-      fallbackStartupAttestation(root, process.pid, {
-        controlPolicy,
-        expectedAttestation: issued.attestation,
-        nonce: issued.nonce,
-      }),
-    /startup-critical input changed/u,
-  );
-  assert.equal(inspectRuntimeSessionLease({ root }).status, "active");
-  assert.equal(inspectRuntimeSessionLease({ root }).lease.phase, "launching");
+  assert.equal(verified.sessionSource, "resume");
+  assert.equal(inspectRuntimeSessionLease({ root }).lease.codexSessionId, selectedId);
+  assert.equal(inspectRuntimeSessionRecovery({ root }).recovery.codexSessionId, selectedId);
   assert.equal(releaseCurrentRuntimeSession(root), true);
 });
 
@@ -1607,8 +1504,7 @@ test("exact recovery survives an interrupted lease activation", () => {
   assert.equal(inspectRuntimeSessionRecovery({ root }).recovery.codexSessionId, codexSessionId);
   assert.equal(releaseCurrentRuntimeSession(root), true);
   assert.deepEqual(startupSessionPlan({ root }), {
-    mode: "resume-id",
-    resumeSessionId: codexSessionId,
+    mode: "resume-picker",
   });
 });
 
@@ -1645,14 +1541,13 @@ test("lease activation never overwrites a concurrently changed reservation", () 
   assert.equal(releaseCurrentRuntimeSession(root), true);
 });
 
-test("invalid safe recovery metadata degrades to fresh startup and is replaced after verification", () => {
+test("invalid recovery metadata does not override native selection and is replaced after verification", () => {
   const root = temporaryRoot("codexrig-invalid-recovery-");
   ensureRuntimeDirectory(root);
   write(root, ".codex/runtime/codexrig-session-recovery.json", "{invalid\n", 0o600);
   assert.equal(inspectRuntimeSessionRecovery({ root }).status, "invalid");
   assert.deepEqual(startupSessionPlan({ root }), {
-    mode: "startup",
-    resumeSessionId: null,
+    mode: "resume-picker",
   });
 
   const codexSessionId = "01a01234-5678-7abc-8def-0123456789ab";
@@ -1686,14 +1581,11 @@ test("a valid latest-session marker outranks a mismatched stale active lease", (
   writeCurrentRuntimeSessionLease(root, definitelyStalePid, staleLeaseSessionId);
 
   assert.deepEqual(startupSessionPlan({ root }), {
-    mode: "resume-id",
-    resumeSessionId: latestSessionId,
+    mode: "resume-picker",
   });
   const replacement = issueRuntimeSessionLease({
     root,
     pid: process.pid,
-    sessionSource: startupSessionSources.resume,
-    resumeSessionId: latestSessionId,
   });
   assert.equal(inspectRuntimeSessionRecovery({ root }).recovery.codexSessionId, latestSessionId);
   assert.equal(releaseCurrentRuntimeSession(root, replacement.process.pid), true);
@@ -1738,7 +1630,7 @@ test("startup attestation binds nonce, root, lifetime, inputs, and tool versions
     now: () => now + 1,
     controlPolicy,
   });
-  assert.equal(verified.schemaVersion, 6);
+  assert.equal(verified.schemaVersion, 7);
   assert.equal(verified.sessionSource, "startup");
   const startupContext = sessionStartSuccess(verified, { root, now: () => now + 1 })
     .hookSpecificOutput.additionalContext;
@@ -1823,61 +1715,38 @@ test("startup attestation accepts only the YOLO permission mode for a YOLO launc
     controlPolicy,
   });
   assert.equal(verified.permissionMode, "bypassPermissions");
-  assert.equal(verified.model, "gpt-5.6-sol");
+  assert.equal(verified.model, "gpt-6-astra");
   assert.equal(releaseCurrentRuntimeSession(root), true);
 });
 
-test("startup attestation binds exact and repository-scoped resume selection", () => {
-  const exactRoot = attestationFixture();
-  const now = 1_000_000;
+test("picker attestation binds one authenticated session and rejects later identity changes", () => {
+  const root = attestationFixture();
   const controlPolicy = startupControlPolicies.default;
-  const codexSessionId = "01a01234-5678-7abc-8def-0123456789ab";
-  issueRuntimeSessionLease({
-    root: exactRoot,
-    pid: process.pid,
-    sessionSource: "resume",
-    resumeSessionId: codexSessionId,
-  });
-  const exact = issueStartupAttestation({
-    root: exactRoot,
-    now: () => now,
+  issueRuntimeSessionLease({ root, pid: process.pid });
+  const issued = issueStartupAttestation({ root, controlPolicy });
+  bindStartupSessionWriter(root, process.pid, process.pid, { controlPolicy, nonce: issued.nonce });
+  const selectedId = "01a01234-5678-7abc-8def-0123456789ab";
+  verifyStartupAttestation({
+    root,
     controlPolicy,
-    sessionSource: "resume",
-    resumeSessionId: codexSessionId,
-  });
-  bindStartupSessionWriter(exactRoot, process.pid, process.pid, {
-    controlPolicy,
-    nonce: exact.nonce,
-    now: () => now + 1,
+    nonce: issued.nonce,
+    hookInput: sessionStartHookInput(root, { session_id: selectedId, source: "resume" }),
   });
   assert.throws(
     () =>
       verifyStartupAttestation({
-        root: exactRoot,
-        hookInput: sessionStartHookInput(exactRoot, {
+        root,
+        controlPolicy,
+        nonce: issued.nonce,
+        hookInput: sessionStartHookInput(root, {
           session_id: "01b01234-5678-7abc-8def-0123456789ab",
           source: "resume",
         }),
-        nonce: exact.nonce,
-        now: () => now + 1,
-        controlPolicy,
-        sessionSource: "resume",
-        resumeSessionId: codexSessionId,
       }),
-    /session source differs/u,
+    /already bound to a different/u,
   );
-  verifyStartupAttestation({
-    root: exactRoot,
-    hookInput: sessionStartHookInput(exactRoot, {
-      session_id: codexSessionId,
-      source: "resume",
-    }),
-    nonce: exact.nonce,
-    now: () => now + 1,
-    controlPolicy,
-    sessionSource: "resume",
-    resumeSessionId: codexSessionId,
-  });
+  assert.equal(inspectRuntimeSessionLease({ root }).lease.codexSessionId, selectedId);
+  assert.equal(releaseCurrentRuntimeSession(root), true);
 });
 
 test("startup attestation rejects expired launcher state", () => {

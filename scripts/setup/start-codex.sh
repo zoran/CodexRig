@@ -18,17 +18,11 @@ unset BASH_ENV ENV NODE_OPTIONS NODE_PATH CODEXRIG_LAUNCHER_PID \
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 root="$(cd "$script_dir/../.." && pwd -P)"
 
-# The launcher owns every Codex control argument. Prompt tokens are accepted only after `--`, so a
-# future CLI option or subcommand cannot silently become a project-policy bypass.
-codex_prompt_arguments=()
+# The native resume picker owns session selection. Enter prompts after choosing a session; a
+# positional argument here would become a session ID and suppress the picker.
 seen_no_alt_screen=false
 seen_yolo=false
-after_delimiter=false
 for argument in "$@"; do
-  if [[ "$after_delimiter" == true ]]; then
-    codex_prompt_arguments+=("$argument")
-    continue
-  fi
   case "$argument" in
     --no-alt-screen)
       if [[ "$seen_no_alt_screen" == true ]]; then
@@ -44,11 +38,8 @@ for argument in "$@"; do
       fi
       seen_yolo=true
       ;;
-    --)
-      after_delimiter=true
-      ;;
     *)
-      echo "Refusing unsupported launcher control argument; pass prompt text only after --." >&2
+      echo "Only --no-alt-screen and explicit Dev --yolo are supported; enter prompts after selecting a session." >&2
       exit 64
       ;;
   esac
@@ -77,11 +68,15 @@ export PNPM_CONFIG_IGNORE_PNPMFILE=true
 export npm_config_ignore_pnpmfile=true
 export pnpm_config_ignore_pnpmfile=true
 
+# Match `codex update && CODEX_HOME="$PWD" codex resume --cd "$PWD"`: update failure
+# stops startup, and the update retains the caller's environment. Bind the new executable afterward.
+cd "$root"
+codex update
+hash -r
 (
-  cd "$root"
   env -u CODEX_HOME mise exec --locked -- node scripts/deps/verify-pnpm-execution-policy.mjs
   env -u CODEX_HOME mise exec --locked -- bash scripts/setup/check-prereqs.sh --codex
-  env -u CODEX_HOME mise exec --locked -- node scripts/setup/validate-codex-model-policy.mjs
+  CODEX_HOME="$root" mise exec --locked -- node scripts/setup/validate-codex-model-policy.mjs
   env -u CODEX_HOME mise exec --locked -- node scripts/verify/licensing.mjs
   env -u CODEX_HOME mise exec --locked -- node scripts/framework/framework-doctor.mjs
 )
@@ -91,6 +86,4 @@ exec env -u CODEX_HOME \
   CODEXRIG_STARTUP_CONTROL_POLICY="$startup_control_policy" \
   mise exec --locked -- node scripts/setup/startup-session-controller.mjs \
   --control-policy "$startup_control_policy" \
-  --codex-executable "$codex_executable" \
-  --prompt-present "$after_delimiter" \
-  -- "${codex_prompt_arguments[@]}"
+  --codex-executable "$codex_executable"

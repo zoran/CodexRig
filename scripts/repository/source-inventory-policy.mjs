@@ -6,7 +6,6 @@ export const repositoryCodexRuntimeCacheDirectory = `${repositoryCodexRuntimeDir
 
 const excludedActiveDirectoryNames = new Set([
   ".codex",
-  ".context-index",
   ".git",
   ".next",
   ".pnpm-store",
@@ -25,7 +24,6 @@ const excludedActiveDirectoryNames = new Set([
 ]);
 
 const nonPortableDirectoryNames = new Set([
-  ".context-index",
   ".git",
   ".next",
   ".pnpm-store",
@@ -59,8 +57,10 @@ export const repositoryCodexHomeRuntimeFileNames = Object.freeze([
   "auth.json",
   "config.toml",
   "history.jsonl",
+  "hooks.json",
   "installation_id",
   "models_cache.json",
+  "session_index.jsonl",
   "version.json",
 ]);
 export const repositoryCodexHomeRuntimeDatabasePrefixes = Object.freeze([
@@ -89,7 +89,6 @@ export const portableCodexGitignorePatterns = Object.freeze([
 export const sourceInventoryPreDescentExcludePatterns = Object.freeze([
   ...repositoryCodexHomeGitignorePatterns,
   ...portableCodexGitignorePatterns,
-  "/.context-index",
   "/.project-state",
 ]);
 export const gitlessPreDescentExcludePatterns = sourceInventoryPreDescentExcludePatterns;

@@ -4,9 +4,99 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { repositoryCodexHomeRuntimeProbePaths } from "../repository/source-inventory.mjs";
+import {
+  isRepositoryCodexHomePath,
+  repositoryCodexHomeRuntimeProbePaths,
+} from "../repository/source-inventory.mjs";
 import { buildPlan, completeVerificationCommands } from "./adaptive-runner.mjs";
+import {
+  consolidateFocusedTestOwners,
+  dedupeCommands,
+  focusedTestCommand,
+} from "./verification-admission-commands.mjs";
 import { internalDependencies, route, writeManifest } from "./adaptive-runner-test-helpers.mjs";
+
+// Combined edits used to select both an existing suite and its individual files. Keep the suite
+// once, rebind every affected path to that executed owner, and never broaden a standalone route.
+test("selected suites replace duplicate focused files without losing admission ownership", () => {
+  const cases = [
+    ["scripts/context/context-lifecycle.test.mjs", "context-regressions"],
+    ["scripts/setup/setup-regression.test.mjs", "setup-regressions"],
+    ["scripts/framework/framework-lifecycle.test.mjs", "framework-regressions"],
+  ];
+  const plan = route([
+    "scripts/context/portable-context-required-content.mjs",
+    ".agents/skills/create-project-from-framework/scripts/generated-codex-config.mjs",
+    ".codexrig/framework.json",
+    ...cases.map(([testPath]) => testPath),
+  ]);
+  const owners = new Map(
+    plan.admission.focusedCommandOwners.map((entry) => [entry.path, entry.ownerKeys]),
+  );
+  const selectedKeys = new Set(plan.readOnlyCommands.map((command) => command.key));
+  assert.equal(plan.admission.mode, "targeted");
+  for (const [testPath, suiteKey] of cases) {
+    assert.ok(selectedKeys.has(suiteKey), suiteKey);
+    assert.equal(
+      plan.readOnlyCommands.some(
+        (command) => command.key.startsWith("focused-test:") && command.args.includes(testPath),
+      ),
+      false,
+      testPath,
+    );
+    assert.ok(owners.get(testPath).includes(suiteKey), testPath);
+    const standalone = route([testPath]);
+    assert.ok(standalone.readOnlyCommands.some((command) => command.args.includes(testPath)));
+    assert.equal(
+      standalone.readOnlyCommands.some((command) => command.key === suiteKey),
+      false,
+    );
+  }
+  for (const ownerKeys of owners.values()) {
+    assert.ok(ownerKeys.every((key) => selectedKeys.has(key)));
+  }
+});
+
+test("focused ownership never treats filtered or different executions as complete coverage", () => {
+  const testPath = "scripts/deps/dependency-owner-normalization.test.mjs";
+  const focused = focusedTestCommand(testPath, testPath);
+  const ownersByPath = [{ path: testPath, ownerKeys: [focused.key] }];
+  const suite = {
+    ...focused,
+    key: "selected-suite",
+    args: ["--test", "--test-reporter=dot", "scripts/deps/dependency-policy.test.mjs"],
+    coveredTestPaths: [testPath],
+  };
+  const variants = [
+    ...[
+      "--test-name-pattern=one-case",
+      "--test-skip-pattern=one-case",
+      "--test-only",
+      "--test-isolation=none",
+      "--conditions=other",
+      "--import=other.mjs",
+    ].map((flag) => ({ ...suite, args: [...suite.args, flag] })),
+    { ...suite, executable: "another-node" },
+    { ...suite, phase: "broad" },
+    { ...suite, artifactOwners: ["dist"] },
+    { ...suite, coveredTestPaths: [] },
+    { ...suite, args: ["--test", "--test-reporter=dot"] },
+  ];
+  for (const variant of variants) {
+    const result = consolidateFocusedTestOwners({ commands: [variant, focused], ownersByPath });
+    assert.deepEqual(result.readOnlyCommands, [variant, focused]);
+    assert.deepEqual(result.ownersByPath, ownersByPath);
+  }
+  const specialized = { ...focused, args: [...focused.args, "--conditions=other"] };
+  assert.deepEqual(
+    consolidateFocusedTestOwners({ commands: [suite, specialized], ownersByPath }).readOnlyCommands,
+    [suite, specialized],
+  );
+  assert.throws(
+    () => dedupeCommands([suite, { ...suite, coveredTestPaths: [] }]),
+    /conflicting definitions/u,
+  );
+});
 
 test("complete verification executes the worktree recovery and reset boundaries", () => {
   const commands = completeVerificationCommands();
@@ -97,13 +187,38 @@ test("license and required-notice changes route to the licensing owner", () => {
   assert.ok(plan.readOnlyCommands.some((command) => command.key === "licensing"));
 });
 
-test("local runtime markers are ignored instead of becoming unknown paths", () => {
-  const paths = [
-    ...repositoryCodexHomeRuntimeProbePaths,
-    ".context-index/manifest.json",
-    ".project-state/active.json",
+test("native Codex home deltas retain an exclusion owner when source policy changes", () => {
+  const nativePaths = [
+    ...repositoryCodexHomeRuntimeProbePaths.filter(isRepositoryCodexHomePath),
+    "sessions/untrusted.test.mjs",
+    "skills/.system/untrusted.test.mjs",
+    ".codex/runtime/cache/untrusted.test.mjs",
   ];
-  const plan = route(paths);
+  assert.ok(nativePaths.includes("session_index.jsonl"));
+  const plan = route([...nativePaths, ".gitignore"]);
+  const owners = new Map(
+    plan.admission.focusedCommandOwners.map((entry) => [entry.path, entry.ownerKeys]),
+  );
+  assert.equal(plan.admission.mode, "targeted");
+  assert.deepEqual(plan.admission.fullRelevantPaths, [".gitignore"]);
+  assert.deepEqual(plan.admission.unknownPaths, []);
+  assert.equal(plan.admission.canAdvanceSuccessfulBasis, true);
+  for (const relativePath of nativePaths) {
+    assert.deepEqual(owners.get(relativePath), ["codex-config"], relativePath);
+  }
+  assert.ok(
+    plan.readOnlyCommands.every((command) =>
+      command.args.every((argument) => !nativePaths.includes(argument)),
+    ),
+  );
+  assert.equal(plan.workspaceCommands.length, 0);
+});
+
+test("non-Codex local runtime markers are ignored instead of becoming unknown paths", () => {
+  const plan = route([
+    ...repositoryCodexHomeRuntimeProbePaths.filter((entry) => !isRepositoryCodexHomePath(entry)),
+    ".project-state/active.json",
+  ]);
   assert.equal(plan.admission.mode, "targeted");
   assert.deepEqual(plan.admission.fullRelevantPaths, []);
   assert.deepEqual(plan.admission.unknownPaths, []);
@@ -129,21 +244,21 @@ test("repository ignore policy routes to exact focused consumers", () => {
   assert.equal(plan.admission.mode, "targeted");
   assert.deepEqual(plan.admission.unknownPaths, []);
   assert.deepEqual(plan.admission.uncoveredFullRelevantPaths, []);
-  for (const key of ["codex-config", "context-policy", "path-hygiene", "repository-smoke"]) {
+  for (const key of ["codex-config", "path-hygiene", "repository-smoke"]) {
     assert.ok(keys.has(key), key);
   }
 });
 
 test("portable policy text exposes the checks that own its successful evidence", () => {
   const plan = route([
-    ".agents/skills/code-pattern-review/SKILL.md",
+    ".agents/skills/ui-ux-review/SKILL.md",
     ".codex/config.toml",
     "instructions.md",
   ]);
   const owners = new Map(
     plan.admission.focusedCommandOwners.map((entry) => [entry.path, entry.ownerKeys]),
   );
-  assert.deepEqual(owners.get(".agents/skills/code-pattern-review/SKILL.md"), ["docs", "skills"]);
+  assert.deepEqual(owners.get(".agents/skills/ui-ux-review/SKILL.md"), ["docs", "skills"]);
   assert.deepEqual(owners.get(".codex/config.toml"), ["codex-config"]);
   assert.deepEqual(owners.get("instructions.md"), ["docs"]);
 });

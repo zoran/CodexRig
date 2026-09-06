@@ -455,8 +455,6 @@ function localInputPath(projectRoot, baseDirectory, value, label) {
   if (
     segments.includes(".git") ||
     segments.includes("node_modules") ||
-    relativePath === ".context-index" ||
-    relativePath.startsWith(".context-index/") ||
     relativePath === ".codex/runtime" ||
     relativePath.startsWith(".codex/runtime/") ||
     relativePath === ".project-state" ||

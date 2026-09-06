@@ -5,6 +5,7 @@ import { root } from "./adaptive-state.mjs";
 import {
   changedTestPath,
   commandsByKey,
+  consolidateFocusedTestOwners,
   dedupeCommands,
   directVerifierCommands,
   focusedManifestCommand,
@@ -71,7 +72,6 @@ const explicitTestConsumerRegistry = new Map([
     "scripts/filesystem/owned-path-safety.mjs",
     [
       ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
-      "scripts/context/context-maintenance.test.mjs",
       "scripts/deps/dependency-policy.test.mjs",
       "scripts/framework/framework-lifecycle.test.mjs",
       "scripts/verify/verification-session-lock.test.mjs",
@@ -537,7 +537,7 @@ function entryRouting({
     ownerKeys.add("surface-quality");
   }
   if (categories.includes("repository source-policy surface")) {
-    for (const key of ["codex-config", "context-policy", "path-hygiene", "repository-smoke"]) {
+    for (const key of ["codex-config", "path-hygiene", "repository-smoke"]) {
       if (available.has(key)) ownerKeys.add(key);
     }
   }
@@ -590,7 +590,17 @@ export function buildFocusedVerification({
 
   for (const entry of classifiedPaths) {
     if (entry.categories.includes("generated/cache/local-only files")) {
-      ownersByPath.push({ categories: entry.categories, ownerKeys: [], path: entry.path });
+      // Native-home entries remain excluded data. Their policy owner verifies that exclusion
+      // without reading or executing a changed runtime file, including an old basis-only path.
+      const isolationCommands = entry.categories.includes("Codex runtime boundary")
+        ? selectCommands(available, ownedCategoryConsumers.get("Codex runtime boundary") ?? [])
+        : [];
+      readOnlyCommands.push(...isolationCommands);
+      ownersByPath.push({
+        categories: entry.categories,
+        ownerKeys: isolationCommands.map((command) => command.key),
+        path: entry.path,
+      });
       continue;
     }
     hasRoutablePath = true;
@@ -613,16 +623,16 @@ export function buildFocusedVerification({
   }
 
   return {
-    ownersByPath,
-    readOnlyCommands: dedupeCommands(
-      readOnlyCommands.map((command) => ({
+    ...consolidateFocusedTestOwners({
+      ownersByPath,
+      commands: readOnlyCommands.map((command) => ({
         ...command,
         phase: "preflight",
         reason: command.reason.startsWith("targeted")
           ? command.reason
           : `targeted current-state coverage: ${command.reason}`,
       })),
-    ),
+    }),
     workspaceCommands: dedupeCommands(workspaceCommands),
   };
 }

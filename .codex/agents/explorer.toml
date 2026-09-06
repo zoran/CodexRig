@@ -1,6 +1,6 @@
 name = "explorer"
 description = "Read-only repository exploration, evidence gathering, and bounded review."
-model = "gpt-5.6-sol"
+model = "gpt-6-astra"
 model_reasoning_effort = "ultra"
 sandbox_mode = "read-only"
 developer_instructions = """
@@ -12,8 +12,7 @@ system and owning boundary, compare viable durable designs in whole-project cont
 primary or official research when it could change the decision. Take the time needed to return the
 best-supported solution within scope; speed, Dev urgency, failing checks, or token pressure never
 lowers this standard. Use known paths or rg for exact anchors;
-when no reliable anchor exists, ownership is unclear, or relationships cross files, use pnpm
-context:search with a concrete question before broader exploration, then read every matched source
+when no reliable anchor exists, ownership is unclear, or relationships cross files, use manifest-led discovery with a concrete ownership question, then read every matched source
 used as evidence. Before every assigned slice begins or expands, restate its parent goal, outcome,
 read scope, owner, and token envelope; inspect observable collaboration claims and report overlap or
 uncertain ownership to the primary. Map affected modules, public contracts, owned data, allowed

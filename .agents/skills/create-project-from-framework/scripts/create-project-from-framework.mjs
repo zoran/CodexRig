@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Owns create project from framework behavior for the portable clean-project generation boundary. */
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -49,9 +49,9 @@ import {
   initialDescriptionLines,
   markdown,
   markdownFence,
+  requiredInstructionSection,
   writeRelative,
 } from "./generated-document-helpers.mjs";
-import { adaptContextIndexDocForGeneratedProject } from "./generated-context-index-doc.mjs";
 import {
   enableGeneratedProjectMemories,
   writeGeneratedCodexReadme,
@@ -89,6 +89,8 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultSourceRoot = path.resolve(scriptDirectory, "..", "..", "..", "..");
 function writeIdentityDocs(targetRoot, projectName, projectDescription) {
   const fence = markdownFence;
+  // Reuse the selected source authority before replacing identity-specific documents.
+  const sourceInstructions = readFileSync(path.join(targetRoot, "instructions.md"), "utf8");
   const displayName = escapeMarkdownText(projectName);
   const deliveryConfiguration = initialDeliveryConfiguration();
   const tenancyConfiguration = initialTenancyConfiguration();
@@ -113,22 +115,25 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "1. Start Codex from this repository root with `" +
         supportedCodexStartCommand +
         "`. The launcher",
-      "   deterministically validates the explicitly prepared host/toolchain/dependency state, attests",
-      "   startup without network or lockfile mutation, and starts the isolated project session.",
-      "   Only optional `--no-alt-screen` and explicit Dev-only `--yolo` are launcher controls; prompt",
-      "   text must follow `--`. Portable defaults remain on-request, network-disabled workspace-write.",
+      "   runs `codex update` first and stops on failure, validates prepared tools/dependencies, then",
+      "   opens native `codex resume` with repository-root CODEX_HOME and explicit --cd.",
+      "   Only optional `--no-alt-screen` and explicit Dev-only `--yolo` are launcher controls; enter",
+      "   prompts after selection. Portable defaults remain on-request, network-disabled workspace-write.",
       "2. Stop only if startup reports a missing requirement or invalid prepared runtime/ownership state.",
       "3. Read `instructions.md`, the README, the manifest, and optional working context, then inspect",
-      "   task-relevant source, tests, manifests, and configuration. Current files and command output",
+      "   `pnpm worktree:status -- --json` and every same-clone worktree/session before intake or writes.",
+      "   Inspect task-relevant source, tests, manifests, and configuration. Current files and command output",
       "   outrank remembered context.",
-      "4. Use known paths or `rg` for exact anchors. When no reliable exact anchor exists, ownership is",
-      "   unclear, or cross-file relationships matter, use `$context-retrieval` or",
-      '   `pnpm context:search -- "concept or relationship"` early, then read every matched source used',
-      "   for a claim or edit. A failed `rg` attempt is not required.",
+      "4. Follow [Context And Skills](instructions.md#context-and-skills). When no reliable exact anchor exists, ownership is",
+      "   unclear, or cross-file relationships matter, use manifest-led discovery, then read every matched source",
+      "   used for a claim or edit and trace its real consumers.",
       "",
       "## Bootstrap Guardrails",
       "",
       ...generatedFrameworkAgentPolicy,
+      "",
+      "### Local Work And Verification",
+      "",
       "- Follow the Product-First Delivery And Verification Economy policy in `instructions.md`: plan",
       "  every new feature and every other complex task thoroughly before implementation, organize the",
       "  authorized outcome into goals and reviewable slices, run focused changed-path owners, and",
@@ -137,15 +142,16 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "  an evidenced Android Gradle module activates `<module>/src/main`. Arbitrary folders do not",
       "  activate, and a web package is created only when requested.",
       "- Keep Codex tooling and mutable state outside product units. Portable config, hooks, roles, and",
-      "  docs stay tracked under `.codex/`; private runtime and `.context-index/` remain ignored at root.",
+      "  docs stay tracked under `.codex/`; private runtime remains ignored at root.",
       "  Git and Git-less inventory use the same pre-descent mask.",
       "- Treat product identity and public contact or deployment data as configuration with one",
       "  user-approved machine-readable owner; use placeholders or RFC-reserved domains until configured.",
+      "  Locale decisions belong to `config/localization.json`; do not infer them from source language.",
       ...generatedDependencyAgentPolicy,
       "- Use subagents only when at least two substantial independent slices shorten the critical",
       "  path enough to justify coordination. Concurrency is a ceiling, not a target; keep small or",
       "  tightly coupled work with the primary and do not delegate deterministic shell gates. Every",
-      "  subagent uses the exact same configured GPT Sol model and `ultra` reasoning as the primary.",
+      "  subagent uses the exact same configured GPT Astra model and `ultra` reasoning as the primary.",
       "- Fix root causes at the owning boundary. Tests are risk-based evidence; do not add one",
       "  automatically for each fix or user instruction. When justified, default to extending",
       "  a broad, realistic end-to-end, system, or lifecycle scenario; do not create isolated one-off",
@@ -162,8 +168,8 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "  exact locally recorded remote `main` equality and current successful evidence; failure never",
       "  authorizes force-push.",
       "",
-      "All detailed boundaries—including repository course checks, pre-descent isolation, semantic-index",
-      "lifecycle, staged validation, evidence reuse, and publication—are owned by `instructions.md`.",
+      "All detailed boundaries—including course checks, pre-descent isolation, session recovery,",
+      "staged validation, evidence reuse and publication—are owned by `instructions.md`.",
     ]),
   );
   writeRelative(
@@ -173,7 +179,7 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "# " + displayName,
       "",
       "A code-first Codex project with isolated runtime, portable policy, compatible dependency",
-      "updates, semantic retrieval, modular architecture guardrails, and risk-based verification.",
+      "updates, durable context recovery, modular architecture guardrails, and risk-based verification.",
       "",
       ...generatedFrameworkReadmePolicy,
       "",
@@ -186,12 +192,11 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       supportedCodexStartCommand,
       fence,
       "",
-      "Host CLI update, locked-tool installation, compatible dependency refresh, and online diagnosis",
-      "are explicit maintenance actions. Canonical start deterministically validates that prepared",
-      "state without network or lockfile mutation, then attests startup; only the final process receives",
-      "ignored `.codex/runtime/` as `CODEX_HOME`.",
-      "Only optional `--no-alt-screen` and explicit Dev-only `--yolo` are launcher controls; prompt",
-      "text follows `--`. Portable defaults remain on-request, network-disabled workspace-write. Full",
+      "Canonical start runs `codex update` first and stops on failure, validates prepared state, then",
+      "opens the native `codex resume` picker with repository-root `CODEX_HOME` and explicit `--cd`.",
+      "Locked tools, dependencies, and online framework diagnosis remain explicit maintenance.",
+      "Only optional `--no-alt-screen` and explicit Dev-only `--yolo` are launcher controls; enter",
+      "prompts after selection. Portable defaults remain on-request, network-disabled workspace-write. Full",
       "Dev access requires exiting a safe session and running exactly",
       "`bash scripts/setup/start-codex.sh --yolo`.",
       "The launcher preloads one session controller before Codex starts and binds canonical Node.js,",
@@ -204,8 +209,8 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "Only after that proof does the controller bind a gated preloaded supervisor, persist the",
       "spawn handoff, and bind the exact Codex child PID. Lease release requires a terminal child-exit",
       "proof bound to the private issue-time gate secret; a wrapper exit code alone is insufficient.",
-      "Every non-signal fresh completion requires actual SessionStart lease activation. Runtime",
-      "configuration is revalidated before each real launch or fallback. Its",
+      "Authenticated SessionStart binds selection; cancellation creates no session record. Runtime",
+      "configuration is revalidated before the real launch. There is no automatic replacement session. Its",
       "embedded built-in-only hook client returns SessionStart and Stop input to that controller without",
       "executing mutable repository code after admission. SessionStart binds private ignored recovery",
       "state and injects the mandatory",
@@ -214,8 +219,7 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "",
       ...generatedDependencyReadmePolicy(fence),
       "",
-      "`pnpm setup` creates the ignored `.context-index/`, and semantic search refreshes and repairs it",
-      "on demand. The controller-injected Codex Stop lifecycle validates",
+      "The controller-injected Codex Stop lifecycle validates",
       "the bounded `docs/project-context.md` work-state marker through the preloaded controller",
       "only for durable local Stop events with a non-null `transcript_path`. Ephemeral side conversations",
       "and other transcriptless contexts exit before work-state access. Active multi-goal or",
@@ -224,7 +228,7 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "without autonomous continuation. SessionStart announces only safe metadata",
       "for a recent repository-bound sealed handover under ignored `tmp/codexrig-handovers/` and asks",
       "before `$resume-project` may read or use it. See",
-      "[Context Index](docs/context-index.md).",
+      "[Project Instructions](instructions.md#session-start).",
       "",
       "## White-Label Configuration",
       "",
@@ -257,7 +261,6 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "- [Project Instructions](instructions.md) own the complete workflow and safety contract.",
       "- [Project Manifest](docs/project.md) owns durable product truth and the current active module inventory.",
       "- [Future Modules](docs/future-modules.md) is the initialized, non-authoritative home for unimplemented module candidates.",
-      "- [Context Index](docs/context-index.md) owns semantic retrieval behavior.",
       "- `AGENTS.md` is the short safe-entry bootstrap; `.codex/` owns portable Codex configuration.",
       "- `.codexrig/` owns the installed framework version, compatibility, provider, and upgrade receipt.",
       "",
@@ -266,8 +269,8 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "This generated project includes CodexRig Framework material under the PolyForm Noncommercial License 1.0.0. Every noncommercial copy, distribution, and derivative work must retain `LICENSE` and `NOTICE`, including the Zoran Kikic author credit and CodexRig Framework credit. Commercial use requires a separate express written license from Zoran Kikic.",
       "A separate written commercial license may expressly permit complete removal of those credits from this generated project only. It does not permit their removal from CodexRig itself. See `LICENSE` and `NOTICE` for the controlling terms and public licensing contact.",
       "",
-      'Use known paths or `rg` for exact discovery and `pnpm context:search -- "query"` for semantic',
-      "discovery. Inspect `pnpm verify:changed -- --print-plan` while working and run `pnpm verify`",
+      "Use known paths or `rg` for exact anchors and manifest-led discovery to trace unclear ownership.",
+      "Inspect `pnpm verify:changed -- --print-plan` while working and run `pnpm verify`",
       "once after clean review and audit on the actual integration state.",
       "Use `pnpm framework:doctor -- --online` for framework health and `pnpm platform:detect` for",
       "the selected GitHub/GitLab provider. Use only a reviewed, trusted CodexRig checkout for a",
@@ -308,6 +311,8 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "constraints, and durable decisions.",
       "",
       ...generatedFrameworkInstructionsPolicy,
+      ...requiredInstructionSection(sourceInstructions, "Authorized Work And Native Codex"),
+      "",
       "## Product-First Delivery And Verification Economy",
       "",
       "Every new feature and every other complex task starts with a thorough, decision-ready plan before implementation.",
@@ -316,6 +321,8 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "After each slice, repeat focused verification, review, and repair until no relevant finding remains, then perform a fresh audit; an audit finding reopens the loop.",
       "After every completed slice and at every major milestone or completed goal, run a whole-repository course check against the current repository and available upstream state, clean up and update the authorized work and plan, and continue autonomously when unblocked.",
       "At that slice boundary, rerun the read-only Worktree Settlement trigger and drive every no-longer-needed worktree or related coordination claim to an explicit terminal disposition; preservation alone does not complete it.",
+      "",
+      "## Verification",
       "",
       "During implementation, run narrow owner checks. Use changed-path routing",
       "through `pnpm verify:changed` for applicable format, static, docs/content, package/export",
@@ -351,13 +358,11 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "deterministic behavior reliably or proportionately. Focused commands control execution cost,",
       "not test granularity. Temporary reproduction scripts do not enter the repository.",
       "",
-      "Continue autonomously within the user's authorized objective through planned slices, focused",
-      "evidence, review-and-repair loops, audits, course checks, cleanup, and publication. A goal is a",
-      "checkpoint, not a handoff: after integration and publication on `main`, run `pnpm goal:new`",
-      "immediately and continue the next already-authorized goal without waiting for another prompt.",
-      "Stop at the complete outcome, a real external blocker, or materially different scope; do not",
-      "invent another product goal. A failed publication or new-goal gate leaves the current goal and",
-      "the encompassing authorized outcome open.",
+      "For material behavior corrections, reproduce the original failing regression first and explain",
+      "its problem and contract in the existing suite. Editorial changes need no mirrored test.",
+      "Policy text checks prove required content/routing, not semantic consistency, native instruction",
+      "delivery or model obedience. Mocks do not qualify an actual host; rendered/account-backed",
+      "claims require corresponding observations. Report an unavailable path instead of simulating proof.",
       "",
       "## Product Roots",
       "",
@@ -368,13 +373,11 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "package then; do not pre-create an empty `apps/web` in a neutral project.",
       "",
       "Keep `.codex`, `.agents`, `AGENTS.md`, process state, and other Codex tooling outside every",
-      "product unit. The repo-wide semantic vector state is fixed at ignored root `.context-index/` and",
-      "cannot be redirected into product source. Product verification shares this one roots contract.",
+      "product unit.",
       "Git and Git-less inventory use a built-in pre-descent mask before entering private",
-      "`.codex/runtime` CODEX_HOME, loose-root runtime residue, index, or process-state trees. Repository-local",
+      "root CODEX_HOME entries, `.codex/runtime` coordination or process-state trees. Repository-local",
       "`.git/info/exclude` patterns are forbidden; tracked `.gitignore` is the local ignore authority.",
-      "Host and local Git excludes cannot hide active source. `pnpm setup` materializes and smoke-tests",
-      "that vector space, while semantic search owns incremental freshness and repair. The trusted",
+      "Host and local Git excludes cannot hide active source. The trusted",
       "preloaded project Stop lifecycle validates continuation only for a durable local Stop input with a",
       "non-null `transcript_path`; ephemeral side conversations and other transcriptless contexts exit",
       "first. Unrelated verification and pre-push remain read-only.",
@@ -385,20 +388,21 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "",
       ...generatedDependencyInstructionsPolicy,
       "",
+      ...requiredInstructionSection(sourceInstructions, "Context And Skills"),
+      "",
       "## Workflow",
       "",
       "1. Start with `" +
         supportedCodexStartCommand +
-        "`; the launcher validates the explicitly prepared runtime and policy",
-      "   without network or dependency mutation, then uses ignored `.codex/runtime/` as the repository-local Codex home.",
+        "`; the launcher runs `codex update` first and stops on failure, then validates",
+      "   the prepared runtime/policy and opens native resume with repository-root `CODEX_HOME`.",
       "2. Complete Startup Repository Reconstruction before new work: read README/manifest/optional work state, run `pnpm worktree:status -- --json`, inventory Git/Git-less root kind plus every same-clone worktree/session and roots/modules/surfaces/contracts/config/tests/docs, keep per-root inconsistencies visible, and resume or safely consolidate unfinished state before the course check.",
       "3. Use known paths or `rg` for exact names, symbols, and narrow questions. When no reliable exact",
       "   anchor exists, ownership is unclear, or work depends on broad orientation, unfamiliar",
-      "   terminology, or cross-file relationships, use `$context-retrieval` or",
-      '   `pnpm context:search -- "concept or relationship"` before broad repository exploration.',
-      "4. Treat retrieval results as discovery pointers: read every matched source used for a claim or",
-      "   edit. A failed `rg` attempt is not required first, and semantic search is not ceremony.",
-      "5. Local Codex state is repository/worktree-root-bound under ignored `.codex/runtime/`; memories, the short-lived writer lease, and exact latest-session recovery remain private there and no source or sibling runtime is inherited. Trust current files and command output. For every new feature and every other complex task, finish the thorough plan before implementation and keep it in the conversation.",
+      "   terminology, or cross-file relationships, use manifest-led discovery and trace current consumers.",
+      "4. Treat search results as discovery pointers: read every matched source used for a claim or",
+      "   edit and trace the real consumers.",
+      "5. Local Codex state and memories live in ignored repository-root CODEX_HOME entries; private writer leases and exact latest-session recovery stay under `.codex/runtime/`. No source or sibling runtime is inherited. Trust current files and command output. For every new feature and every other complex task, finish the thorough plan before implementation and keep it in the conversation.",
       "6. Organize the plan into goals with success conditions and ordered slices with concrete outcomes, owners, dependencies, risks, focused evidence, review surfaces, and audit criteria.",
       "7. Review the plan until no relevant finding remains, then perform a fresh plan audit; an audit finding reopens the loop.",
       "8. Before the slice begins, restate its goal, outcome, success condition, modules, contracts, schemas/migrations/shared configuration, repository-relative write set, and one writer. Inspect all observable live-agent assignments, same-clone worktrees, safe latest-session markers, bounded context, and shared team-channel claims before relying on Git. One host represents one developer regardless of Codex account; resolve overlap or uncertain shared ownership before implementation.",
@@ -408,7 +412,7 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "12. After every completed slice, rerun `pnpm worktree:status -- --json` as the read-only Worktree Settlement trigger, reconcile session/lease/recovery/task-branch and cleanup claims, and drive every no-longer-needed item to an explicit terminal disposition. Then at every slice, major milestone, or completed goal run the whole-repository course check against current worktree and available upstream changes; clean up and update code, tests, configuration, docs, bounded context, and the plan, then continue autonomously when unblocked.",
       "13. At every completed goal, after repository-mutating cleanup and before the final audit and publication, complete the all-document and critical-document gate in the Documentation section. Any resulting or later repository edit reopens affected checks, cleanup, that documentation gate, and the fresh audit; no later mutation may bypass this sequence.",
       "14. Fix the owning invariant, follow the detected stack, and prefer justified broad end-to-end coverage over an isolated test for each instruction.",
-      "15. Use subagents only when at least two substantial independent slices shorten the critical path; concurrency is not a target, shell gates stay primary-owned, and every role uses exactly the primary's configured GPT Sol model with `ultra` reasoning.",
+      "15. Use subagents only when at least two substantial independent slices shorten the critical path; concurrency is not a target, shell gates stay primary-owned, and every role uses exactly the primary's configured GPT Astra model with `ultra` reasoning.",
       "16. Use the declared integration path. Serialized direct-main work remains on current `main`; a temporary branch or protected-main flow commits and pushes only a bounded input for one integrator or the detected provider's merge serializer.",
       "17. After protected or parallel integration, refresh local `main` and repeat the course check, automatic review/repair, completed-goal all-document review, any critical-document confirmation and preservation review, fresh audit, and affected verification on the actual published commit without creating a marker commit.",
       "18. On actual target `main`, apply any reset and invoke adaptive final admission once; a prior failure never authorizes broad retry. In direct-main mode, commit and push exact attested changes afterward; under protected integration, the merge or squash is already the publication commit.",
@@ -442,7 +446,7 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "",
       'The trusted Stop hook returns `decision: "block"` to reopen active state only for a durable',
       "local Stop event with a non-null `transcript_path`. Ephemeral side conversations and other",
-      "transcriptless contexts exit before work-state or index access. If `stop_hook_active` says the",
+      "transcriptless contexts exit before work-state access. If `stop_hook_active` says the",
       "same durable turn was already continued, an unchanged revision is allowed to stop while a",
       "changed revision can continue again; private per-session state supplies that comparison. A",
       "failed publication gate leaves the current goal open.",
@@ -453,7 +457,9 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "the command seals it successfully, the primary stops completely and performs no later tool,",
       "task, check, housekeeping, follow-up, agent contact, or automatic continuation.",
       "",
-      "## Documentation Context Economy And Canonical Owners",
+      "## Documentation Has A High Bar",
+      "",
+      "### Context Economy And Canonical Owners",
       "",
       "Update docs only when the user requested documentation, externally consumed usage/API/operations changed, or a durable project decision cannot be recovered from code, tests, configuration, or an existing canonical document. Prefer the README or manifest; never create docs merely to record agent activity or prove a code change. Documentation has no general numeric line or word quota;",
       "only the always-loaded root `AGENTS.md` has a 24 KiB bootstrap cap within the configured 32 KiB project-instruction budget. This file owns complete workflow policy, the README owns setup/use, the manifest owns current reality, Future Modules owns confirmed deferred candidates, and each focused document needs a distinct audience and maintenance owner. Secondary surfaces summarize and link instead of repeating normative detail; skills expose selection metadata and load their full `SKILL.md` only when relevant. Larger context windows never authorize duplicated or stale policy, and the byte budget never authorizes hiding framework elements.",
@@ -498,12 +504,12 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       `Every generated project is tenant-capable from creation. ${tenancyConfigurationPath} is the visible project-owned invariant contract: tenant context is required, cross-tenant access is forbidden by default, and authorization, data, cache, files, messages/jobs, and operational correlation stay tenant-scoped. The initial pending resolution is truthful only while no product implementation exists. Before the first product slice, select trusted resolver sources and implement a dedicated tenancy boundary with separate context/resolution, policy/isolation, and public-contract concerns.`,
       "Never trust a tenant identifier merely because it came from a header, URL, query, body, UI selector, token presence, or network boundary. Resolve it through authenticated membership, a verified domain, a signed integration/job envelope, or an explicit control-plane capability; then authorize the current principal, tenant, action, and resource together. Keep tenant context request/job scoped and propagate it explicitly through commands, queries, repositories, messages, jobs, cache keys, storage paths, logs/metrics/traces, onboarding/offboarding, exports, retention, deletion, backup/restore, and migrations. Global or control-plane data and cross-tenant operations need an explicit separately owned boundary, least privilege, and audit; there is no implicit default tenant.",
       "Every active module records its tenant-isolation and global/control-plane exceptions in the manifest and owns realistic negative evidence that one tenant cannot read, list, infer, mutate, delete, cache-hit, download, or trigger work for another. Use database or infrastructure isolation as defense in depth, never as a replacement for application authorization. Material tenancy changes invoke both `$architecture-evolution` and `$security-review`; run `pnpm tenancy:check` plus the affected assembled lifecycle verifier.",
+      "",
+      "## Security And Privacy",
+      "",
       "Keep secrets, personal paths, local trust/runtime state, and private context out of Git. Preserve compatible user changes. Use specialized security or domain review only for changed surfaces.",
       "Keep review output in the conversation. Delegated agents never commit or push; the primary owns integration and goal publication without force-pushing or rewriting history.",
       "",
-      "The setup-created vector space is an ordinary discovery aid under the workflow above; semantic",
-      "search owns freshness and bounded repair, explicit indexing owns maintenance, and the preloaded",
-      "Stop lifecycle never loads mutable index code after session admission.",
     ]),
   );
   writeRelative(
@@ -632,7 +638,6 @@ function main() {
     });
     ensureProductSourceBoundary(stagingRoot);
     writeIdentityDocs(stagingRoot, projectName, projectDescription);
-    adaptContextIndexDocForGeneratedProject(stagingRoot);
     updateGeneratedPackage(stagingRoot, packageName);
     enableGeneratedProjectMemories(stagingRoot);
     formatGeneratedMarkdown(roots.sourceRoot, stagingRoot);
@@ -674,7 +679,7 @@ function main() {
   }
   console.log("Created the project successfully in its requested output workspace.");
   console.log("Source framework tracked and portable state remained unchanged and baseline-clean.");
-  console.log("Run pnpm setup in the generated project to create and validate .context-index/.");
+  console.log("Run pnpm setup in the generated project to validate its policy and tooling.");
   console.log(
     projectDescription
       ? "The supplied detailed description is stored as an intake draft; on first start Codex evaluates it and asks whether to refine it or begin from the confirmed decision-ready scope."

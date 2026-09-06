@@ -1,4 +1,4 @@
-/** Owns portable runtime required-content entries for the repository-local semantic context boundary. */
+/** Owns portable runtime required-content entries for the portable policy and durable project-context boundary. */
 export function portableRuntimeRequiredContent() {
   return [
     [
@@ -265,13 +265,12 @@ export function portableRuntimeRequiredContent() {
       [
         "activateRuntimeSessionLeaseState",
         "transitionRuntimeSessionWriterProcessState",
-        "fallbackRuntimeSessionLeaseState",
         "inspectRuntimeSessionLease",
         "inspectRuntimeSessionPlan",
         "inspectRuntimeSessionRecovery",
         "issueRuntimeSessionLeaseState",
         "runtimeSessionLeaseStatus",
-        "schemaVersion: 5",
+        "schemaVersion: 6",
         "reserveRuntimeSessionLeaseState",
         "codexrig-session-recovery.json",
         "releaseRuntimeSessionLeaseState",
@@ -289,14 +288,13 @@ export function portableRuntimeRequiredContent() {
       [
         "startupSessionPlan",
         "reserveStartupAttestation",
-        "resume-id",
+        "resume-picker",
         "sessionSource",
         "runtimeSessionIdSha256",
         "expectedBasis",
         "permissionMode",
         "permission_mode",
         "input.model",
-        "fallbackStartupAttestation",
         "bindStartupSessionWriter",
         "completeStartupSessionWriterHandoff",
         "runtimeExecutables",
@@ -355,7 +353,6 @@ export function portableRuntimeRequiredContent() {
       "scripts/setup/startup-session-controller.mjs",
       [
         "reserveStartupAttestation",
-        "fallbackStartupAttestation",
         "verifyStartupAttestation",
         "resolveStartupRuntimeExecutables",
         "verifyTrustedSessionControlHooks",
@@ -467,7 +464,7 @@ export function portableRuntimeRequiredContent() {
         "scripts/framework/framework-doctor.mjs",
         "startup-session-controller.mjs",
         "--codex-executable",
-        "--prompt-present",
+        "codex update",
         "--yolo",
         "NODE_OPTIONS",
         "NPM_CONFIG_SCRIPT_SHELL",
@@ -482,10 +479,6 @@ export function portableRuntimeRequiredContent() {
         "sealedHandoverStop",
         "critical-budget handover is sealed",
       ],
-    ],
-    [
-      "scripts/context/context-worker-output.mjs",
-      ["sanitizeMultilineForTerminal", "repositoryRoot"],
     ],
     [
       "scripts/terminal/terminal-output.mjs",
@@ -515,9 +508,9 @@ export function portableRuntimeRequiredContent() {
         "no more than ten minutes",
         "hard Orchestration Housekeeping gate",
         "docs/project-context.md",
-        "Housekeeping has two explicit layers",
-        "Mirror every direct peer message and response to the",
-        "primary immediately",
+        "#subagent-orchestration-and-integration-authority",
+        "Mirror every direct peer message and response to the primary immediately",
+        "### UI Intent And Change Boundaries",
         "## Delivery Environments",
         "### Product Surface Selection",
         "### Requirement-Driven Technology Selection",

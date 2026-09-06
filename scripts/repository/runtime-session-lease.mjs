@@ -40,7 +40,6 @@ import {
 import {
   activateRuntimeSessionLeaseState,
   clearStaleRuntimeSessionLeaseState,
-  fallbackRuntimeSessionLeaseState,
   issueRuntimeSessionLeaseState,
   releaseRuntimeSessionLeaseState,
   reserveRuntimeSessionLeaseState,
@@ -613,13 +612,7 @@ export function clearStaleRuntimeSessionLease({
   );
 }
 
-export function issueRuntimeSessionLease({
-  root = frameworkRoot,
-  pid,
-  sessionSource,
-  resumeSessionId,
-  testHooks,
-} = {}) {
+export function issueRuntimeSessionLease({ root = frameworkRoot, pid, testHooks } = {}) {
   if (!Number.isSafeInteger(pid) || pid <= 0) {
     throw new Error("Codex runtime session lease requires a positive process id.");
   }
@@ -627,13 +620,11 @@ export function issueRuntimeSessionLease({
     issueRuntimeSessionLeaseState({
       root,
       pid,
-      sessionSource,
-      resumeSessionId,
       testHooks,
     }),
   );
 }
-/** Atomically selects the latest safe repository thread and reserves its launcher-owned lease. */
+/** Atomically reserves the repository while the native resume picker selects a thread. */
 export function reserveRuntimeSessionLease({ root = frameworkRoot, pid, testHooks } = {}) {
   if (!Number.isSafeInteger(pid) || pid <= 0) {
     throw new Error("Codex runtime session reservation requires a positive process id.");
@@ -674,21 +665,6 @@ export function transitionRuntimeSessionWriterProcess({
       runtimeSessionId,
       transition,
       writerPid,
-      testHooks,
-    }),
-  );
-}
-export function fallbackRuntimeSessionLease({
-  root = frameworkRoot,
-  pid,
-  runtimeSessionId,
-  testHooks,
-} = {}) {
-  return withSessionManagementCapability(root, testHooks, () =>
-    fallbackRuntimeSessionLeaseState({
-      root,
-      pid,
-      runtimeSessionId,
       testHooks,
     }),
   );

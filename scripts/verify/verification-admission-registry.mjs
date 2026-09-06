@@ -30,7 +30,7 @@ export function categoryConsumerKeys(categories) {
     add("docs", "delivery-environments", "secrets", "language", "path-hygiene");
   if (has("script catalog")) add("scripts");
   if (has("context source-policy surface") || has("context workflow")) {
-    add("syntax-lint", "scripts", "context-policy", "context-regressions", "patterns");
+    add("syntax-lint", "scripts", "context-regressions", "patterns");
   }
   if (has("dependency workflow")) {
     add("syntax-lint", "scripts", "dependencies", "patterns");
@@ -91,7 +91,7 @@ export function categoryConsumerKeys(categories) {
     add("tenant-isolation", "identity-access", "api-security", "secrets", "patterns");
   }
   if (has("repository source-policy surface")) {
-    add("codex-config", "context-policy", "path-hygiene", "repository-smoke", "secrets");
+    add("codex-config", "path-hygiene", "repository-smoke", "secrets");
   }
   return [...keys];
 }
@@ -115,7 +115,7 @@ export const ownedCategoryConsumers = new Map([
 
 export const exactConsumerRegistry = new Map([
   [".gitattributes", ["path-hygiene", "repository-smoke"]],
-  [".gitignore", ["codex-config", "context-policy", "path-hygiene", "repository-smoke"]],
+  [".gitignore", ["codex-config", "path-hygiene", "repository-smoke"]],
   ["LICENSE", ["licensing"]],
   ["NOTICE", ["licensing"]],
   ["package.json", ["delivery-environments", "verification-entrypoints"]],

@@ -1,160 +1,71 @@
 ---
 name: task-quality
 description:
-  Verify, prepare for push, close, or hand off completed project work with proportional
-  deterministic checks, bounded review iterations until no relevant finding remains, and a fresh
-  audit. Also supports an explicitly read-only final review without changing files or planning
-  state. Use near completion of a planned slice or goal, not for ordinary implementation or a
-  specialized domain review.
+  Verify and hand off an authorized slice or goal, prepare publication, or perform an explicitly
+  read-only final review. Use near completion to select proportional evidence, coordinate relevant
+  reviews and audit acceptance; not for ordinary implementation or a specialized domain review.
 ---
 
 # Task Quality
 
-## Authority Mode
+This skill owns evidence and review selection at a slice or goal boundary.
+[Project Instructions](../../../instructions.md) own authority, coordination, cleanup and
+publication.
 
-Choose the mode from the user's request:
+## Select The Mode And Evidence
 
-- **Review-only:** when asked to inspect, review, audit, diagnose, or report without changes. Do not
-  edit files, accept risk for the owner, or perform external mutations. Run only checks needed to
-  support the review.
-- **Finish/handoff:** when completing an authorized implementation, preparing a push, or explicitly
-  closing work. Fix findings only inside the original change scope.
+- Review-only requests stay read-only: report defects and uncertainty, without editing files,
+  planning state, accepting risk or performing external mutations.
+- Finish/handoff mode repairs findings only within the authorized implementation scope.
+- Establish the requested outcome, acceptance criteria, changed owners/consumers and actual risks.
+  Inspect `pnpm verify:changed -- --print-plan`; use focused checks while iterating and the
+  [Test Strategy](../../../instructions.md#test-strategy). A failing check is not broad-rerun
+  authority.
+- Distinguish source/static checks, isolated fixtures, rendered flows, actual targets and native
+  model behavior. Claim only what the observed evidence proves. Missing coverage is a finding only
+  with a concrete recurrence path or material-risk invariant.
 
-## Workflow
+## Route Review Once Per Concern
 
-1. Identify the requested outcome, changed files, owning boundaries, and risk surfaces.
-2. Perform a whole-repository course check after every completed slice and at every major milestone
-   and completed goal: confirm the implemented scope still matches the requested outcome, plan,
-   durable project truth, and module map, and account for touched contracts, owners/consumers, risk
-   boundaries, tests, docs, remaining slices, and unrelated or concurrent worktree changes. At a
-   slice boundary, refresh available upstream state when a shared remote and network access exist,
-   then compare changes by path, module, public contract, schema, and migration. Disjoint work
-   continues; overlap reopens integration and affected verification before further writes. Keep this
-   comparison in the conversation; do not create a completion artifact.
-3. Run focused regressions and inspect adaptive changed-path admission first. A targeted review-only
-   request does not imply full coverage. Run network-dependent maintenance only when the task is a
-   release/dependency check.
+Use the applicable specialized procedure, not every available skill:
 
-4. Perform a bounded review iteration for regressions, root-cause quality, maintainability, docs
-   drift, acceptance criteria, and whole-system impact. In finish/handoff mode, invoke
-   `$system-coherence` for every non-trivial completed implementation, architecture,
-   configuration-boundary, or integration slice before accepting it; require an assembled-flow
-   trace, semantic-duplication search, and repair of material whole-project incoherence. In
-   review-only mode, apply the same criteria without editing. Invoke `$security-review` for affected
-   trust, authentication, authorization, secret, personal-data, dependency, shell, CI,
-   infrastructure, or runtime surfaces, `$code-pattern-review` for implementation/architecture
-   changes, and specialized content/image/search review only when those surfaces changed. Keep
-   findings in the conversation; do not create review, audit, or handoff documents. When research or
-   publications support a decision or claim, confirm that the newest relevant primary or official
-   sources were considered and that any older authority is used only for justified comparison,
-   historical, foundational, or controlling purposes after checking newer evidence.
-5. Classify findings by severity, relevance, reproducibility, and acceptance impact. In
-   finish/handoff mode, fix every relevant, reproducible finding within scope; only the owner or
-   documented project policy can accept material residual risk. Batch same-root-cause fixes and
-   rerun only affected owners; a previous failure does not authorize broad work. Repeat the bounded
-   review, repair, and focused-verification iteration until no relevant reproducible finding
-   remains. In review-only mode, report findings without changing or accepting them and do not claim
-   a clean state while relevant findings remain.
-6. Before the final fresh audit, complete all repository-mutating cleanup for the slice, milestone,
-   or goal: remove obsolete temporary or dead paths, reconcile code/tests/configuration/non-critical
-   docs, update or delete bounded project context as appropriate, and refresh the in-session plan.
-   Do not change critical documents through generic cleanup. Any repository edit reopens affected
-   focused checks and steps 4-6 before continuing. At a completed goal, the primary then runs its
-   current budget classification first without assuming a billing period. A reliable percentage of
-   the binding allocation is guarded at 10% or less and critical at 5% or less; compare an absolute
-   remaining token or credit amount directly with bounded work envelopes and the primary completion
-   reserve. A host critical/exhaustion signal or inability to cover that reserve is critical too. In
-   critical state admit no subagent, background task, new slice, or expanded follow-up. Gracefully
-   drain only provenance-bound owned agents/processes, record the exact Critical Budget Drain
-   attestation, and run `pnpm handover:create -- --critical` as the final repository action. Once it
-   seals successfully, stop completely without another tool, check, housekeeping step, follow-up,
-   agent contact, or automatic continuation. Never count unavailable or unauthorized redeem/reset
-   capacity. Budget/agent monitoring remains event-driven and every slice already received its
-   lightweight Orchestration Housekeeping gate; guarded/critical state must have a current,
-   revisioned `docs/project-context.md` plus any required shared-channel ownership update before
-   goal closure. Unless a critical seal has already ended the session, the primary then runs its
-   host-session agent housekeeping first: inventory live agents and background tasks, preserve or
-   accept each handoff, actively close completed/unneeded agents, interrupt stale or redundant owned
-   work, and tell affected remaining agents about accepted results, changed contracts/assumptions,
-   remaining work, and released ownership/slots. Confirm every direct peer message and response was
-   mirrored to the primary, then reconcile every reported peer exchange with the primary-owned
-   scope, ownership, contract, and integration plan; peers cannot authorize those changes.
-   Repository scripts cannot perform this conversation lifecycle. The primary then runs
-   `pnpm repo:housekeeping -- --apply`. It reconciles only unambiguous local repository facts and
-   its bounded delivery-manifest projection, formats the result, and runs the consolidated
-   repository health checks—including source/declaration-header and documentation-anchor
-   currency—without deploying, committing, pushing, or mutating external state. Ambiguous
-   environment evidence requires developer classification. Housekeeping changes reopen steps 4-6;
-   continue only after its idempotent rerun is clean.
-7. At every completed-goal boundary, after mutating cleanup and before the final fresh audit,
-   inventory every active documentation surface, including root and `docs/` documents,
-   workflow/bootstrap authorities, Codex guidance, and skill instructions. Compare each with current
-   behavior, code/configuration, manifest truth, public contracts, operations, and still-active
-   decisions. Update only where needed; consolidate or remove superseded, obsolete, and duplicate
-   material instead of appending history; preserve every active directive and audience-specific
-   requirement; and create no review artifact. Consolidation is not a shortening target. Treat the
-   durable project manifest as critical documentation. Inspect it and every critical workflow,
-   bootstrap, security/trust, operations/migration, or public-contract authority read-only first.
-   Change one automatically only when completed authorized work requires an unambiguous factual
-   correction and every directive and durable manifest decision is demonstrably preserved. Obtain
-   explicit user confirmation before any normative or interpretive change, consolidation/removal,
-   ambiguous conflict, uncertain replacement, or other doubtful write; do not let autonomous
-   continuation bypass that pause. After an authorized critical-document change, perform a dedicated
-   preservation review separate from the general review, preferably with an independent reviewer.
-   Trace removed or materially rewritten directives and durable manifest decisions to surviving
-   canonical text or explicit authorized retirement and preserve uncertain requirements. Any
-   documentation edit reopens affected checks and steps 4-7 before continuing. For a slice-only
-   checkpoint, retain the ordinary changed-contract documentation check without manufacturing an
-   all-document pass. Treat touched source and declaration descriptions as part of the same currency
-   review: compare their purpose, owner, public contract, invariants, and trust boundary with
-   current behavior, and repair stale or misleading text as a finding.
-8. Once no relevant finding remains and any goal documentation review is clean, perform a fresh
-   audit against the request, plan, goal or slice success condition, manifest, touched
-   owners/consumers, verification evidence, docs, and worktree scope. In finish/handoff mode, an
-   audit finding reopens focused repair and the review-and-repair loop before the audit is repeated.
-   In review-only mode, report audit findings without mutation.
-9. After a clean slice, milestone, or goal audit and course check, do not mutate repository content.
-   A newly required cleanup, context, documentation, or implementation edit reopens steps 4-8 and,
-   at a completed goal, the all-document and critical-document gates. Before a next slice begins,
-   repeat the goal/slice-based pre-slice coordination check against observable agent, session,
-   same-clone worktree, safe latest-session, and team-channel claims and resolve overlap or
-   uncertain shared ownership. One host represents one developer, so Codex accounts do not make its
-   visible project changes foreign; process control remains provenance-bound. A local runtime lease
-   or quiet worktree cannot prove that another developer's clone is idle; use a shared coordination
-   channel across hosts and fail closed on uncertain shared ownership. Continue autonomously with
-   the next planned slice or already-authorized goal when it remains inside the authorized outcome.
-10. When publication is required, use the declared integration path. Serialized direct-main work
-    remains on current `main` for final admission. For a temporary task branch or protected `main`,
-    commit and push only its bounded integration input under normal pre-push evidence; one
-    integrator or the detected provider's merge serializer publishes it. Refresh local `main`, then
-    repeat read-only repository housekeeping, the course check, affected review/repair and
-    verification, completed-goal all-document review, any critical-document confirmation and
-    preservation review, and fresh audit on the actual resulting commit. Do not create a marker
-    commit.
-11. On that actual target-`main` state, apply any required reset and invoke adaptive final admission
-    once. Full coverage is allowed only when the plan names a concrete admission reason: no trusted
-    successful basis, an uncovered risk, or an explicit owner instruction. In direct-main mode,
-    commit exactly the attested goal-owned changes and push `main` after admission. Under protected
-    integration, the merge or squash is already the publication commit. Treat unsafe scoping,
-    missing upstream/authentication, unresolved integration, or rejected publication as a visible
-    blocker. Never absorb unrelated changes, bypass hooks, force-push, rewrite history, or rerun an
-    unchanged broad suite to manufacture closure. Pre-push may rebind an exactly content-identical
-    dirty-to-commit transition without verifier commands, then must reuse exact-current successful
-    evidence while rerunning security and pushed-object checks; changed input fails closed.
-12. Immediately after publishing and verifying a green goal checkpoint, run `pnpm goal:new`. Do not
-    open a subsequent goal until its executable fail-closed publication precondition passes. The
-    gate must prove central `main` is current with a clean non-ignored worktree and exact equality
-    to its locally recorded configured remote-tracking `main` upstream. It binds root-owned Git
-    metadata, uses a fresh temporary index, and permits neither an active repository-local Git
-    exclude rule nor hidden index flags. It also requires exact-current successful verification
-    evidence; prose is not publication evidence, and the preceding push owns remote authentication.
-    When the gate passes and another goal is already authorized, continue it without waiting for
-    another prompt or returning a handoff.
+- `$system-coherence`: code quality, root cause, ownership, duplication and representative
+  assembled-flow integration for every non-trivial completed slice. It also supports read-only
+  review.
+- `$security-review`: changed trust, secrets, user data, dependencies, shell, CI or runtime
+  surfaces.
+- `$ui-ux-review`: changed interactive flows, shared visual components, navigation or styling.
+- `$native-language-content-review`: changed user-facing language and documentation.
+- `$generated-image-quality-review`: changed generated raster assets and their integration.
+- `$search-visibility`: affected public web/search surfaces.
 
-## Handoff
+Report findings in the conversation with location, failure mode, evidence and acceptance impact.
+Avoid duplicate findings across reviews. When external evidence supports a decision, check current
+primary-source applicability. Fix relevant reproducible findings in finish mode, batch by root
+cause, and repeat only affected review/evidence until none remains. In review-only mode, report
+rather than repair; do not call a known-defective state clean.
 
-Return a handoff only when the complete authorized outcome is done or a real blocker prevents safe
-continuation; an intermediate goal alone is not a handoff boundary. Lead with the outcome. Include
-verification, clean-review status, goal documentation and critical-document review status when
-applicable, audit result, important decisions, accepted residual risks, and the next useful step
-only when one remains.
+## Audit And Settle
+
+1. Reconcile changed-contract docs, source/declaration headers, dead paths and bounded work context
+   before auditing. Recheck the request, plan, manifest, owners/consumers, residual risks and
+   evidence. An audit finding reopens the owning repair and targeted review.
+2. Perform the whole-repository course check and Worktree Settlement from
+   [Slice Acceptance](../../../instructions.md#best-available-engineering-not-quick-fixes). A passed
+   check or finished intermediate slice is not the complete authorized outcome.
+3. At a completed goal, follow the single
+   [Closure And Repository Housekeeping](../../../instructions.md#completed-goal-closure-and-repository-housekeeping)
+   sequence, including orchestration housekeeping, `repo:housekeeping`, active-document currency,
+   critical-document preservation review and fresh audit. Do not copy or reorder that sequence here.
+4. Invoke final `pnpm verify` once on the stable actual integration state under
+   [Verification](../../../instructions.md#verification). Required post-exit reset, publication on
+   central `main` and `pnpm goal:new` remain real gates; never bypass them or manufacture
+   completion.
+5. Any later repository edit reopens affected evidence, review and audit. Follow
+   [Capacity And Drain](../../../instructions.md#guarded-and-critical-drain) before new work; a
+   successful critical seal ends all actions immediately.
+
+Continue the remaining authorized outcome under
+[Authorized Work](../../../instructions.md#authorized-work-and-native-codex). Return a final handoff
+only at the complete outcome or a real blocker: state the result, actual evidence, review/audit
+status, material limits and exact remaining action. Create no review or completion document.

@@ -3,7 +3,11 @@ import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-proce
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { sharedAgentIntelligencePolicy, validateCodexConfig } from "./validate-codex-config.mjs";
+import {
+  sharedAgentIntelligencePolicy,
+  validateCodexConfig,
+  validateRuntimeCodexConfig,
+} from "./validate-codex-config.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(scriptDirectory, "..", "..");
@@ -13,7 +17,7 @@ export function validateModelCatalog(catalog, primaryModel, primaryReasoningEffo
     throw new Error("Codex model catalog is missing its models array.");
   }
   if (!sharedAgentIntelligencePolicy.modelPattern.test(primaryModel)) {
-    throw new Error(`Configured primary model ${primaryModel} is not a supported GPT Sol model.`);
+    throw new Error(`Configured primary model ${primaryModel} is not a supported GPT Astra model.`);
   }
   if (primaryReasoningEffort !== sharedAgentIntelligencePolicy.reasoningEffort) {
     throw new Error(
@@ -52,6 +56,7 @@ export function validateModelCatalog(catalog, primaryModel, primaryReasoningEffo
 
 export function validateInstalledCodexModelPolicy(projectRoot = defaultRoot) {
   const policy = validateCodexConfig(projectRoot);
+  validateRuntimeCodexConfig(projectRoot);
   const result = spawnSync("codex", ["debug", "models", "--bundled"], {
     cwd: projectRoot,
     encoding: "utf8",

@@ -115,8 +115,9 @@ function assertDeclaredConfigurationTransformations({ sourceRoot, targetRoot, tr
   expectedPackage.name = targetPackage.name;
   expectedPackage.version = "0.1.0";
   delete expectedPackage.scripts["framework:reset"];
+  delete expectedPackage.scripts["framework:publish"];
   if (JSON.stringify(targetPackage) !== JSON.stringify(expectedPackage)) {
-    fail("Generated package exceeds the declared identity and source-reset transformation.");
+    fail("Generated package exceeds the declared identity and source-publication transformation.");
   }
 }
 
@@ -175,6 +176,7 @@ export function updateGeneratedPackage(targetRoot, packageName) {
   packageJson.name = packageName;
   packageJson.version = "0.1.0";
   delete packageJson.scripts["framework:reset"];
+  delete packageJson.scripts["framework:publish"];
   writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
 }
 
@@ -207,7 +209,6 @@ export function formatGeneratedMarkdown(sourceRoot, targetRoot) {
       "--write",
       "AGENTS.md",
       "README.md",
-      "docs/context-index.md",
       "docs/future-modules.md",
       "docs/project.md",
       "instructions.md",
@@ -229,7 +230,6 @@ export function assertGeneratedProjectClean(targetRoot, packageName) {
   for (const forbidden of [
     ".git",
     ".gitlab",
-    ".context-index",
     ".codex/runtime",
     "docs/planning",
     ".project-state",
@@ -249,7 +249,6 @@ export function assertGeneratedProjectClean(targetRoot, packageName) {
   const forbiddenSegments = new Set([
     ".git",
     ".gitlab",
-    ".context-index",
     ".next",
     ".pnpm-store",
     ".project-state",

@@ -8,6 +8,7 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -47,6 +48,7 @@ import {
 import {
   cleanupTemporaryRoots,
   configFixture,
+  copyPortableSetupFixture,
   root,
   run,
   temporaryRoot,
@@ -95,26 +97,56 @@ network_access = false
 
 after(cleanupTemporaryRoots);
 
+// Problem: portable skill validation rejected Codex's supported explicit-only activation policy.
+// Contract: the real verifier accepts either boolean or the native default, never an invalid type.
+test("skill metadata preserves native implicit and explicit activation choices", () => {
+  const fixture = path.join(temporaryRoot("codex-skill-policy-"), "code");
+  copyPortableSetupFixture(fixture);
+  symlinkSync(path.join(root, "node_modules"), path.join(fixture, "node_modules"), "dir");
+  const metadataPath = path.join(fixture, ".agents/skills/task-quality/agents/openai.yaml");
+  const metadata = readFileSync(metadataPath, "utf8");
+  for (const [policy, valid] of [
+    ["", true],
+    ["policy: {}\n", true],
+    ['"policy":\n  "allow_implicit_invocation": false\n', true],
+    ["policy:\n  allow_implicit_invocation: false # explicit\n", true],
+    ["policy:\n  allow_implicit_invocation: true\n", true],
+    ["policy:\n  allow_implicit_invocation: false\n", true],
+    ['policy:\n  allow_implicit_invocation: "false"\n', false],
+    ['"policy":\n  allow_implicit_invocation: "false"\n', false],
+    ["policy: false\n", false],
+    ["policy:\n  allow_implicit_invocation: null\n", false],
+    ["policy:\n  allow_implicit_invocation: 0\n", false],
+    ["policy:\n  allow_implicit_invocation: [false]\n", false],
+    ["policy:\n  allow_implicit_invocation: true\n  allow_implicit_invocation: false\n", false],
+  ]) {
+    writeFileSync(metadataPath, `${metadata}\n${policy}`);
+    const result = run(process.execPath, ["scripts/verify/skill-paths.mjs"], { cwd: fixture });
+    assert.equal(result.status, valid ? 0 : 1, `${policy || "native default"}\n${result.stderr}`);
+    if (!valid) assert.match(result.stderr, /allow_implicit_invocation|invalid YAML/);
+  }
+});
+
 test("Codex config parser accepts only the complete typed portable policy", () => {
   assert.deepEqual(validateCodexConfig(configFixture()), {
     developer_instructions:
-      "Act as the primary orchestrator. Retain exactly one current internal contract per concern. Keep at most four live agents and never pass a model or reasoning override; all use the exact GPT Sol model with ultra reasoning. Register every owned subagent and background task and leave foreign or ambiguous processes untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. After every completed slice, run pnpm worktree:status -- --json as the worktree settlement trigger; preservation is a safety state, never completion. At 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.\n",
+      "Act as the primary orchestrator. Retain exactly one current internal contract per concern. Keep at most four live agents and never pass a model or reasoning override; all use the exact GPT Astra model with ultra reasoning. Register every owned subagent and background task and leave foreign or ambiguous processes untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. After every completed slice, run pnpm worktree:status -- --json as the worktree settlement trigger; preservation is a safety state, never completion. At 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.\n",
     project_doc_max_bytes: 32_768,
     project_doc_fallback_filenames: ["instructions.md"],
     model_reasoning_effort: "ultra",
     model_verbosity: "medium",
     web_search: "cached",
-    model: "gpt-5.6-sol",
-    service_tier: "fast",
+    model: "gpt-6-astra",
     approvals_reviewer: "user",
     approval_policy: "on-request",
     sandbox_mode: "workspace-write",
     "sandbox_workspace_write.network_access": false,
     "agents.enabled": true,
-    "agents.default_subagent_model": "gpt-5.6-sol",
+    "agents.default_subagent_model": "gpt-6-astra",
     "agents.default_subagent_reasoning_effort": "ultra",
     "agents.max_concurrent_threads_per_session": 4,
     "agents.interrupt_message": true,
+    "features.goals": true,
     "features.hooks": true,
     "features.memories": true,
     "features.network_proxy": true,
@@ -198,17 +230,22 @@ test("Codex config parser accepts only the complete typed portable policy", () =
   );
 
   const customizedProjectDefaults = validPortableConfig
-    .replaceAll('model = "gpt-5.6-sol"', 'model = "gpt-6-sol"')
+    .replaceAll('model = "gpt-6-astra"', 'model = "gpt-7-astra"')
     .replace("memories = true", "memories = false")
     .replace('theme = "catppuccin-mocha"', 'theme = "light"');
   const customizedPolicy = parsePortableCodexConfig(customizedProjectDefaults);
-  assert.equal(customizedPolicy.model, "gpt-6-sol");
+  assert.equal(customizedPolicy.model, "gpt-7-astra");
   assert.equal(customizedPolicy.model_reasoning_effort, "ultra");
 
-  const standardTierPolicy = parsePortableCodexConfig(
-    validPortableConfig.replace('service_tier = "fast"\n', ""),
+  assert.equal(Object.hasOwn(parsePortableCodexConfig(validPortableConfig), "service_tier"), false);
+  assert.equal(Object.hasOwn(validateCodexConfig(root), "service_tier"), false);
+  const customTierPolicy = parsePortableCodexConfig(
+    validPortableConfig.replace(
+      'model = "gpt-6-astra"\n',
+      'model = "gpt-6-astra"\nservice_tier = "fast"\n',
+    ),
   );
-  assert.equal(Object.hasOwn(standardTierPolicy, "service_tier"), false);
+  assert.equal(customTierPolicy.service_tier, "fast");
 
   for (const [label, content, expected] of [
     [
@@ -268,15 +305,15 @@ test("Codex config parser accepts only the complete typed portable policy", () =
       /outside the portable project policy/,
     ],
     [
-      "unsupported non-Sol primary model",
-      validPortableConfig.replace('model = "gpt-5.6-sol"', 'model = "gpt-5.6-terra"'),
+      "unsupported non-Astra primary model",
+      validPortableConfig.replace('model = "gpt-6-astra"', 'model = "gpt-5.6-terra"'),
       /outside the portable project policy/,
     ],
     [
       "mismatched delegated default",
       validPortableConfig.replace(
-        'default_subagent_model = "gpt-5.6-sol"',
-        'default_subagent_model = "gpt-6-sol"',
+        'default_subagent_model = "gpt-6-astra"',
+        'default_subagent_model = "gpt-7-astra"',
       ),
       /agent defaults must use exactly the primary model and reasoning effort/,
     ],
@@ -316,12 +353,11 @@ test("malformed portable TOML diagnostics never echo source values", () => {
 
 test("runtime Codex config permits only non-executable repository-local metadata", () => {
   const fixture = configFixture();
-  const runtimeDirectory = path.join(fixture, ".codex", "runtime");
-  mkdirSync(runtimeDirectory, { mode: 0o700 });
+  const runtimeDirectory = fixture;
   const runtimeConfig = path.join(runtimeDirectory, "config.toml");
   const safe = [
     'approvals_reviewer = "user"',
-    'model = "gpt-5.6-sol"',
+    'model = "gpt-6-astra"',
     'model_reasoning_effort = "max"',
     'service_tier = "fast"',
     `[projects.${JSON.stringify(fixture)}]`,
@@ -331,6 +367,10 @@ test("runtime Codex config permits only non-executable repository-local metadata
     "",
     "[notice]",
     "hide_rate_limit_model_nudge = true",
+    "[tui]",
+    'theme = "codex"',
+    "[tui.model_availability_nux]",
+    "gpt-6-astra = 2",
     "",
   ].join("\n");
   writeFileSync(runtimeConfig, safe, { encoding: "utf8", mode: 0o600 });
@@ -355,6 +395,14 @@ test("runtime Codex config permits only non-executable repository-local metadata
   ]) {
     writeFileSync(runtimeConfig, invalidPreference, { encoding: "utf8", mode: 0o600 });
     assert.throws(() => validateRuntimeCodexConfig(fixture), /preference is invalid/u);
+  }
+  for (const [invalidTooltip, expected] of [
+    ['[tui.model_availability_nux]\ngpt-6-astra = "command"\n', /tooltip state is invalid/u],
+    ["[tui.model_availability_nux]\ngpt-6-astra = -1\n", /must contain valid TOML/u],
+    ["[tui.model_availability_nux]\n-invalid = 1\n", /tooltip state is invalid/u],
+  ]) {
+    writeFileSync(runtimeConfig, invalidTooltip, { encoding: "utf8", mode: 0o600 });
+    assert.throws(() => validateRuntimeCodexConfig(fixture), expected);
   }
 });
 
@@ -465,7 +513,7 @@ test("startup attestation binds the complete preloaded controller closure", () =
     runtimeExecutables,
   });
 
-  assert.equal(issued.attestation.schemaVersion, 6);
+  assert.equal(issued.attestation.schemaVersion, 7);
   for (const relativePath of [
     "scripts/contracts/framework-contract.mjs",
     "scripts/context/session-stop-lifecycle.mjs",
@@ -478,17 +526,14 @@ test("startup attestation binds the complete preloaded controller closure", () =
   ]) {
     assert.ok(Object.hasOwn(issued.attestation.inputs, relativePath), relativePath);
   }
-  assert.equal(
-    Object.hasOwn(issued.attestation.inputs, "scripts/context/context-index-lib.mjs"),
-    false,
-  );
+  assert.equal(Object.hasOwn(issued.attestation.inputs, "scripts/web/sitemap-files.mjs"), false);
   const attestation = path.join(fixture, ...startupAttestationPath.split("/"));
   assert.equal(statSync(attestation).mode & 0o777, 0o600);
 
   const hookInput = {
     cwd: fixture,
     hook_event_name: "SessionStart",
-    model: "gpt-5.6-sol",
+    model: "gpt-6-astra",
     permission_mode: "default",
     session_id: "01a01234-5678-7abc-8def-0123456789ab",
     source: "startup",
@@ -519,7 +564,7 @@ test("startup attestation binds the complete preloaded controller closure", () =
       root: fixture,
       runtimeExecutables,
     }).schemaVersion,
-    6,
+    7,
   );
 
   const changedHelper = path.join(fixture, "scripts", "contracts", "framework-contract.mjs");
@@ -542,25 +587,25 @@ test("startup attestation binds the complete preloaded controller closure", () =
   assert.equal(releaseRuntimeSessionLease({ root: fixture, pid: process.pid }), true);
 });
 
-test("project roles enforce exact Sol/ultra parity with the primary", () => {
+test("project roles enforce exact Astra/ultra parity with the primary", () => {
   const defaultAgent = readFileSync(path.join(root, ".codex", "agents", "default.toml"), "utf8");
   const parsedDefault = parseProjectAgentConfig(defaultAgent, "default");
-  assert.equal(parsedDefault.model, "gpt-5.6-sol");
+  assert.equal(parsedDefault.model, "gpt-6-astra");
   assert.equal(parsedDefault.model_reasoning_effort, sharedAgentIntelligencePolicy.reasoningEffort);
   assert.equal(
     parseProjectAgentConfig(
-      defaultAgent.replace('model = "gpt-5.6-sol"', 'model = "gpt-6-sol"'),
+      defaultAgent.replace('model = "gpt-6-astra"', 'model = "gpt-7-astra"'),
       "default",
     ).model,
-    "gpt-6-sol",
+    "gpt-7-astra",
   );
   assert.throws(
     () =>
       parseProjectAgentConfig(
-        defaultAgent.replace('model = "gpt-5.6-sol"', 'model = "gpt-5.6-luna"'),
+        defaultAgent.replace('model = "gpt-6-astra"', 'model = "gpt-5.6-luna"'),
         "default",
       ),
-    /supported GPT Sol model matching the primary intelligence/,
+    /supported GPT Astra model matching the primary intelligence/,
   );
   assert.throws(
     () =>
@@ -580,8 +625,11 @@ test("project roles enforce exact Sol/ultra parity with the primary", () => {
   );
   assert.throws(
     () =>
-      parseProjectAgentConfig(defaultAgent.replace("context:search", "semantic-search"), "default"),
-    /orchestration marker context:search/,
+      parseProjectAgentConfig(
+        defaultAgent.replace("manifest-led discovery", "unbounded-discovery"),
+        "default",
+      ),
+    /orchestration marker manifest-led discovery/,
   );
   assert.throws(
     () =>
@@ -620,14 +668,14 @@ test("project roles enforce exact Sol/ultra parity with the primary", () => {
   writeFileSync(
     mismatchedDefaultPath,
     readFileSync(mismatchedDefaultPath, "utf8").replace(
-      'model = "gpt-5.6-sol"',
-      'model = "gpt-6-sol"',
+      'model = "gpt-6-astra"',
+      'model = "gpt-7-astra"',
     ),
     "utf8",
   );
   assert.throws(
     () => validateCodexConfig(mismatchedFixture),
-    /Agent default must use exactly the primary intelligence gpt-5\.6-sol with ultra reasoning/,
+    /Agent default must use exactly the primary intelligence gpt-6-astra with ultra reasoning/,
   );
 
   const futureFixture = configFixture();
@@ -635,8 +683,8 @@ test("project roles enforce exact Sol/ultra parity with the primary", () => {
   writeFileSync(
     futureConfigPath,
     readFileSync(futureConfigPath, "utf8").replaceAll(
-      'model = "gpt-5.6-sol"',
-      'model = "gpt-6-sol"',
+      'model = "gpt-6-astra"',
+      'model = "gpt-7-astra"',
     ),
     "utf8",
   );
@@ -644,18 +692,18 @@ test("project roles enforce exact Sol/ultra parity with the primary", () => {
     const rolePath = path.join(futureFixture, ".codex", "agents", `${role}.toml`);
     writeFileSync(
       rolePath,
-      readFileSync(rolePath, "utf8").replace('model = "gpt-5.6-sol"', 'model = "gpt-6-sol"'),
+      readFileSync(rolePath, "utf8").replace('model = "gpt-6-astra"', 'model = "gpt-7-astra"'),
       "utf8",
     );
   }
-  assert.equal(validateCodexConfig(futureFixture).model, "gpt-6-sol");
+  assert.equal(validateCodexConfig(futureFixture).model, "gpt-7-astra");
 });
 
-test("installed model catalog requires the shared future-compatible Sol/ultra intelligence", () => {
+test("installed model catalog requires the shared future-compatible Astra/ultra intelligence", () => {
   const catalog = {
     models: [
       {
-        slug: "gpt-5.6-sol",
+        slug: "gpt-6-astra",
         priority: 1,
         visibility: "list",
         supported_reasoning_levels: [{ effort: "xhigh" }, { effort: "max" }, { effort: "ultra" }],
@@ -673,28 +721,28 @@ test("installed model catalog requires the shared future-compatible Sol/ultra in
         supported_reasoning_levels: [{ effort: "xhigh" }, { effort: "max" }, { effort: "ultra" }],
       },
       {
-        slug: "gpt-6-sol",
+        slug: "gpt-7-astra",
         priority: 4,
         visibility: "list",
         supported_reasoning_levels: [{ effort: "max" }, { effort: "ultra" }],
       },
     ],
   };
-  assert.equal(validateModelCatalog(catalog, "gpt-5.6-sol", "ultra").delegatedModel, "gpt-5.6-sol");
-  assert.equal(validateModelCatalog(catalog, "gpt-6-sol", "ultra").primaryModel, "gpt-6-sol");
+  assert.equal(validateModelCatalog(catalog, "gpt-6-astra", "ultra").delegatedModel, "gpt-6-astra");
+  assert.equal(validateModelCatalog(catalog, "gpt-7-astra", "ultra").primaryModel, "gpt-7-astra");
   assert.throws(
     () => validateModelCatalog(catalog, "gpt-5.6-terra", "ultra"),
-    /not a supported GPT Sol model/,
+    /not a supported GPT Astra model/,
   );
   assert.throws(
-    () => validateModelCatalog(catalog, "gpt-5.6-sol", "xhigh"),
+    () => validateModelCatalog(catalog, "gpt-6-astra", "xhigh"),
     /Primary and subagent reasoning must remain ultra/,
   );
   const primaryMissing = structuredClone(catalog);
-  primaryMissing.models[0].slug = "gpt-5.5-sol";
+  primaryMissing.models[0].slug = "unavailable-model";
   assert.throws(
-    () => validateModelCatalog(primaryMissing, "gpt-5.6-sol", "ultra"),
-    /Configured primary model gpt-5\.6-sol is unavailable/,
+    () => validateModelCatalog(primaryMissing, "gpt-6-astra", "ultra"),
+    /Configured primary model gpt-6-astra is unavailable/,
   );
   const ultraEffortMissing = structuredClone(catalog);
   ultraEffortMissing.models[0].supported_reasoning_levels = [
@@ -702,8 +750,8 @@ test("installed model catalog requires the shared future-compatible Sol/ultra in
     { effort: "max" },
   ];
   assert.throws(
-    () => validateModelCatalog(ultraEffortMissing, "gpt-5.6-sol", "ultra"),
-    /configured reasoning effort ultra.*gpt-5\.6-sol/i,
+    () => validateModelCatalog(ultraEffortMissing, "gpt-6-astra", "ultra"),
+    /configured reasoning effort ultra.*gpt-6-astra/i,
   );
 });
 

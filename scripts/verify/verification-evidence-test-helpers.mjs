@@ -55,15 +55,9 @@ export function fixture() {
   for (const [relativePath, content] of [
     [
       ".gitignore",
-      [
-        "/.codex/runtime/",
-        "/.context-index",
-        "/.delivery/",
-        "/node_modules",
-        "/tmp",
-        "/logs",
-        "",
-      ].join("\n"),
+      ["/.codex/runtime/", "/cache", "/.delivery/", "/node_modules", "/tmp", "/logs", ""].join(
+        "\n",
+      ),
     ],
     ["AGENTS.md", "# Agent bootstrap\n"],
     ["README.md", "# Fixture\n"],

@@ -199,7 +199,7 @@ function sealedHandoverStop(root, testHooks) {
 
   // A handover is terminal only for the runtime session that could have sealed it. A later
   // canonical session still discovers the handover at SessionStart, but must be able to resume,
-  // refresh the index, and stop normally after the developer accepts it.
+  // continue and stop normally after the developer accepts it.
   try {
     const session = inspectRuntimeSessionLease({ root });
     if (

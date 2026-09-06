@@ -1,5 +1,5 @@
-/** Owns portable context contract behavior for the repository-local semantic context boundary. */
-import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
+/** Owns portable context contract behavior for the portable policy and durable project-context boundary. */
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { isProjectOwnedUpgradeDocumentPath } from "../docs/project-document-policy.mjs";
 import {
@@ -15,10 +15,8 @@ export const portableContextContractFiles = Object.freeze([
   ".agents/skills/architecture-evolution/agents/openai.yaml",
   ".agents/skills/system-coherence/SKILL.md",
   ".agents/skills/system-coherence/agents/openai.yaml",
-  ".agents/skills/code-pattern-review/SKILL.md",
-  ".agents/skills/code-pattern-review/agents/openai.yaml",
-  ".agents/skills/context-retrieval/SKILL.md",
-  ".agents/skills/context-retrieval/agents/openai.yaml",
+  ".agents/skills/ui-ux-review/SKILL.md",
+  ".agents/skills/ui-ux-review/agents/openai.yaml",
   ".agents/skills/dependency-maintenance/SKILL.md",
   ".agents/skills/dependency-maintenance/agents/openai.yaml",
   ".agents/skills/generated-image-quality-review/SKILL.md",
@@ -49,34 +47,18 @@ export const portableContextContractFiles = Object.freeze([
   ".gitignore",
   "AGENTS.md",
   "README.md",
-  "docs/context-index.md",
   "docs/future-modules.md",
   "docs/project.md",
   "instructions.md",
   "package.json",
-  "scripts/context/check-context-index.mjs",
-  "scripts/context/clean-context-index.mjs",
-  "scripts/context/context-build.mjs",
-  "scripts/context/context-database.mjs",
-  "scripts/context/context-index-lib.mjs",
-  "scripts/context/context-maintenance-safety.mjs",
-  "scripts/context/context-maintenance.mjs",
-  "scripts/context/context-maintenance.test.mjs",
   "scripts/context/context-lifecycle.test.mjs",
-  "scripts/context/context-manifest.mjs",
-  "scripts/context/context-publication-policy.mjs",
-  "scripts/context/context-storage.mjs",
-  "scripts/context/context-worker-output.mjs",
   "scripts/context/critical-budget-handover.mjs",
-  "scripts/context/index-codebase.mjs",
   "scripts/context/project-work-state.mjs",
   "scripts/context/portable-context-contract.mjs",
   "scripts/context/portable-context-contract.test.mjs",
   "scripts/context/portable-context-required-content.mjs",
   "scripts/context/portable-context-required-runtime-content.mjs",
   "scripts/context/session-stop-lifecycle.mjs",
-  "scripts/context/search-context.mjs",
-  "scripts/context/source-policy.mjs",
   "scripts/terminal/terminal-output.mjs",
   "scripts/terminal/terminal-output.test.mjs",
   "scripts/docs/document-scope.mjs",
@@ -221,30 +203,9 @@ const exactStartCommandFiles = new Set([
   "scripts/setup/check-prereqs.sh",
 ]);
 
-const hookMutationContractFiles = new Set([
-  ".agents/skills/context-retrieval/SKILL.md",
-  ".agents/skills/project-implementation/SKILL.md",
-  ".codex/README.md",
-  "AGENTS.md",
-  "README.md",
-  "docs/context-index.md",
-  "docs/project.md",
-  "instructions.md",
-]);
-
-const contradictoryHookIndexContracts = [
-  /\b(?:the\s+)?(?:(?:project(?:-local)?|stop)\s+)?hooks?\s+(?:(?:automatically|incrementally)\s+)?(?:touch(?:es)?|modif(?:y|ies)|mutat(?:e|es)|write(?:s)?(?:\s+to)?|update(?:s)?|refresh(?:es)?|change(?:s)?)\s+(?:the\s+)?(?:(?:context\s+)?index|`?\.context-index\/?`?)(?![\p{L}\p{N}_])/iu,
-  /\b(?:the\s+)?(?:(?:context\s+)?index|`?\.context-index\/?`?)(?![\p{L}\p{N}_])[^.;!?]{0,36}\b(?:is|will\s+be|gets)\s+(?:automatically\s+|incrementally\s+)?(?:touched|modified|mutated|written(?:\s+to)?|updated|refreshed|changed)\s+by\s+(?:the\s+)?(?:(?:project(?:-local)?|stop)\s+)?hooks?\b/iu,
-];
-
 function projectDocumentFinding(relativePath, detail) {
   if (!isProjectOwnedUpgradeDocumentPath(relativePath)) return detail;
   return `project-document reconciliation required before verification: ${detail}`;
-}
-
-export function hasContradictoryStopHookIndexContract(content) {
-  const normalized = content.replace(/\s+/g, " ");
-  return contradictoryHookIndexContracts.some((pattern) => pattern.test(normalized));
 }
 
 export function portableContextContractFindings({ repositoryRoot }) {
@@ -281,17 +242,6 @@ export function portableContextContractFindings({ repositoryRoot }) {
       );
     }
     const normalizedContent = content.replace(/\s+/g, " ");
-    if (
-      hookMutationContractFiles.has(relativePath) &&
-      hasContradictoryStopHookIndexContract(content)
-    ) {
-      findings.push(
-        projectDocumentFinding(
-          relativePath,
-          `portable context contract rejects a contradictory Stop-hook index contract in ${relativePath}`,
-        ),
-      );
-    }
     for (const expected of requiredContent.get(relativePath) ?? []) {
       if (!normalizedContent.toLowerCase().includes(expected.replace(/\s+/g, " ").toLowerCase())) {
         findings.push(
@@ -303,39 +253,14 @@ export function portableContextContractFindings({ repositoryRoot }) {
       }
     }
   }
-  const contextRuntimeDirectory = path.join(repositoryRoot, "scripts", "context");
-  if (existsSync(contextRuntimeDirectory) && lstatSync(contextRuntimeDirectory).isDirectory()) {
-    const optimizeMethodPattern = new RegExp(`\\.${["opt", "imize"].join("")}\\s*\\(`, "u");
-    for (const entry of readdirSync(contextRuntimeDirectory, { withFileTypes: true })) {
-      if (!entry.isFile() || !entry.name.endsWith(".mjs") || entry.name.endsWith(".test.mjs")) {
-        continue;
-      }
-      const relativePath = `scripts/context/${entry.name}`;
-      const absolutePath = path.join(contextRuntimeDirectory, entry.name);
-      const stats = lstatSync(absolutePath);
-      if (stats.isSymbolicLink() || stats.nlink !== 1) {
-        findings.push(
-          `portable context runtime requires a single-link regular file: ${relativePath}`,
-        );
-        continue;
-      }
-      if (optimizeMethodPattern.test(readFileSync(absolutePath, "utf8"))) {
-        findings.push(
-          `portable context runtime contains unsafe in-place maintenance: ${relativePath}`,
-        );
-      }
-    }
-  }
   const packagePath = path.join(repositoryRoot, "package.json");
   if (existsSync(packagePath) && lstatSync(packagePath).isFile()) {
     try {
       const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
       for (const [name, command] of [
-        ["context:check", "node scripts/context/check-context-index.mjs"],
-        ["context:clean", "node scripts/context/clean-context-index.mjs"],
-        ["context:index", "node scripts/context/index-codebase.mjs"],
-        ["context:search", "node scripts/context/search-context.mjs"],
         ["handover:create", "node scripts/context/critical-budget-handover.mjs create"],
+        ["handover:receive", "node scripts/context/critical-budget-handover.mjs receive"],
+        ["handover:acknowledge", "node scripts/context/critical-budget-handover.mjs acknowledge"],
         ["goal:new", "node scripts/goals/goal-publication-precondition.mjs"],
       ]) {
         if (packageJson.scripts?.[name] !== command) {

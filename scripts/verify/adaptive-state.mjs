@@ -12,6 +12,7 @@ import {
 } from "../repository/product-roots.mjs";
 import {
   activeSourcePathClassification,
+  isRepositoryCodexHomePath,
   listActiveFiles,
 } from "../repository/source-inventory.mjs";
 import {
@@ -309,13 +310,10 @@ function isContextPolicy(filePath) {
     filePath === "AGENTS.md" ||
     filePath === "README.md" ||
     filePath === "instructions.md" ||
-    filePath === "docs/context-index.md" ||
-    filePath.startsWith(".agents/skills/context-retrieval/") ||
     filePath === ".agents/skills/project-implementation/SKILL.md" ||
     filePath === ".agents/skills/resume-project/SKILL.md" ||
     /^\.codex\/agents\/[a-z][a-z0-9_-]*\.toml$/.test(filePath) ||
-    filePath.startsWith("scripts/context/") ||
-    filePath === "scripts/verify/context-source-policy.mjs"
+    filePath.startsWith("scripts/context/")
   );
 }
 
@@ -344,7 +342,9 @@ function isCodexRuntimeConfig(filePath) {
 }
 
 function isCodexRuntimeBoundary(filePath) {
-  return filePath === ".codex" || filePath.startsWith(".codex/");
+  return (
+    isRepositoryCodexHomePath(filePath) || filePath === ".codex" || filePath.startsWith(".codex/")
+  );
 }
 
 function isCodexSystemSkillCache(filePath) {

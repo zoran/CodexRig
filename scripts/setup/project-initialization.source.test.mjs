@@ -35,10 +35,14 @@ import { assertGeneratedWorkflowPolicyContract } from "../../.agents/skills/crea
 
 after(cleanupTemporaryRoots);
 
+// Problem: an active primary's bounded work cache prevented constructing a clean generator fixture.
+// Contract: fixture selection excludes process state, preserves the source, and retains export gates.
 test("clean project initialization removes inherited state and source-specific text", () => {
-  const source = isolatedTrackedFrameworkSource("codexrig-source-");
-  const outputParent = temporaryRoot("codexrig-create-");
   const sourceStateBefore = gitState(root);
+  const source = isolatedTrackedFrameworkSource("codexrig-source-");
+  assert.equal(existsSync(path.join(source, "docs/project-context.md")), false);
+  assert.deepEqual(gitState(root), sourceStateBefore);
+  const outputParent = temporaryRoot("codexrig-create-");
   const isolatedSourceStateBefore = gitState(source, { includeIgnored: false });
   const result = runProjectGenerator([
     "--name",
@@ -65,10 +69,7 @@ test("clean project initialization removes inherited state and source-specific t
   assert.match(result.stdout, /After ending every Codex\/CodexRig session/);
   assert.match(result.stdout, /pnpm framework:reset --apply/);
   assert.match(result.stdout, /Optional Git publication/);
-  assert.match(result.stdout, /git status --short/);
-  assert.match(result.stdout, /git add -- <reviewed-paths>/);
-  assert.match(result.stdout, /git commit -m "<message>"/);
-  assert.match(result.stdout, /git push/);
+  assert.match(result.stdout, /pnpm framework:publish --message "<message>"/);
 
   const generated = path.join(outputParent, "generated-isolation-fixture", "code");
   const generatedAgents = readFileSync(path.join(generated, "AGENTS.md"), "utf8");
@@ -76,19 +77,15 @@ test("clean project initialization removes inherited state and source-specific t
   const generatedCodexReadme = readFileSync(path.join(generated, ".codex", "README.md"), "utf8");
   const generatedInstructions = readFileSync(path.join(generated, "instructions.md"), "utf8");
   const generatedManifest = readFileSync(path.join(generated, "docs", "project.md"), "utf8");
-  const generatedContextIndex = readFileSync(
-    path.join(generated, "docs", "context-index.md"),
-    "utf8",
-  );
-  const generatedRetrievalSkill = path.join(generated, ".agents/skills/context-retrieval/SKILL.md");
+  const generatedUiReviewSkill = path.join(generated, ".agents/skills/ui-ux-review/SKILL.md");
   const generatedCoherenceSkill = path.join(generated, ".agents/skills/system-coherence/SKILL.md");
   const generatedCoherenceMetadata = path.join(
     generated,
     ".agents/skills/system-coherence/agents/openai.yaml",
   );
-  const generatedRetrievalMetadata = path.join(
+  const generatedUiReviewMetadata = path.join(
     generated,
-    ".agents/skills/context-retrieval/agents/openai.yaml",
+    ".agents/skills/ui-ux-review/agents/openai.yaml",
   );
   assert.ok(
     Buffer.byteLength(generatedAgents, "utf8") <= 24 * 1024,
@@ -96,7 +93,6 @@ test("clean project initialization removes inherited state and source-specific t
   );
   for (const forbidden of [
     ".git",
-    ".context-index",
     ".codex/runtime",
     ".project-state",
     "node_modules",
@@ -146,7 +142,7 @@ test("clean project initialization removes inherited state and source-specific t
       path.join(generated, ".codex", "agents", requiredAgent),
       "utf8",
     );
-    assert.match(roleConfig, /model = "gpt-5\.6-sol"/);
+    assert.match(roleConfig, /model = "gpt-6-astra"/);
     assert.match(roleConfig, /model_reasoning_effort = "ultra"/);
     assert.match(roleConfig, /critical-drain request/);
     assert.match(roleConfig, /start no further tool or task/);
@@ -218,13 +214,12 @@ test("clean project initialization removes inherited state and source-specific t
   assert.equal(packageJson.scripts["auth:check"], "node scripts/verify/identity-access.mjs");
   assert.equal(packageJson.scripts["tenancy:check"], "node scripts/verify/tenant-isolation.mjs");
   assert.equal(packageJson.scripts["localization:check"], "node scripts/verify/localization.mjs");
-  assert.match(packageJson.scripts.setup, /node scripts\/context\/index-codebase\.mjs --setup$/);
-  assert.equal(
-    packageJson.scripts["context:check"],
-    "node scripts/context/check-context-index.mjs",
+  assert.ok(packageJson.scripts.setup.endsWith("bash scripts/setup/install-git-hooks.sh"));
+  assert.deepEqual(Object.keys(packageJson.devDependencies), ["prettier"]);
+  assert.deepEqual(
+    Object.keys(packageJson.scripts).filter((name) => name.startsWith("context:")),
+    ["context:test"],
   );
-  assert.equal(packageJson.scripts["context:index"], "node scripts/context/index-codebase.mjs");
-  assert.equal(packageJson.scripts["context:search"], "node scripts/context/search-context.mjs");
   assert.equal(
     packageJson.scripts["handover:create"],
     "node scripts/context/critical-budget-handover.mjs create",
@@ -241,6 +236,7 @@ test("clean project initialization removes inherited state and source-specific t
   );
   for (const removedCommand of [
     "framework:reset",
+    "framework:publish",
     "docs:sync",
     "goal:close",
     "planning:reset",
@@ -276,16 +272,10 @@ test("clean project initialization removes inherited state and source-specific t
   assert.match(generatedCodexReadme, /mutable repository-local Codex runtime/);
   assertGeneratedDependencyFreshnessContract(generated);
   assert.match(generatedReadme, /Root `src\/` is the default Product Root/);
-  assert.match(generatedReadme, /`pnpm setup` creates the ignored `\.context-index\/`/);
   assert.match(
     generatedReadme,
-    /semantic search refreshes and repairs[\s\S]{0,400}controller-injected Codex Stop lifecycle validates[\s\S]{0,300}non-null `transcript_path`/,
+    /controller-injected Codex Stop lifecycle validates[\s\S]{0,300}non-null `transcript_path`/,
   );
-  assert.match(
-    generatedContextIndex,
-    /Use `context:clean` when complete index deletion is intentional/,
-  );
-  assert.doesNotMatch(generatedContextIndex, /framework:reset|Every framework reset/);
   assert.match(generatedCodexReadme, /canonical lifecycle needs\s+no manual `\/hooks` approval/);
   assert.equal(
     readFileSync(path.join(generated, ".codex", "hooks.json"), "utf8"),
@@ -309,17 +299,11 @@ test("clean project initialization removes inherited state and source-specific t
     true,
   );
   assertGeneratedWorkflowRuntime(generated);
-  assertGeneratedTransferParityContract(generated);
+  assertGeneratedTransferParityContract(source, generated);
   assert.equal(
     existsSync(path.join(generated, "scripts/setup/project-initialization-test-helpers.mjs")),
     false,
   );
-  const generatedContextWorker = readFileSync(
-    path.join(generated, "scripts/context/context-worker-output.mjs"),
-    "utf8",
-  );
-  assert.match(generatedContextWorker, /sanitizeMultilineForTerminal\(output, repositoryRoot\)/);
-  assert.match(generatedContextWorker, /stdio: "pipe"/);
   assert.equal(existsSync(path.join(generated, "scripts/verify/format-project.mjs")), true);
   const focusedVerificationTests = spawnSync(
     process.execPath,
@@ -364,40 +348,6 @@ test("clean project initialization removes inherited state and source-specific t
   );
   assert.equal(generatedEvidenceTest.status, 0, generatedEvidenceTest.stderr);
   assert.equal(existsSync(path.join(generated, "scripts/terminal/terminal-output.test.mjs")), true);
-  assert.equal(existsSync(path.join(generated, "scripts/context/context-maintenance.mjs")), true);
-  assert.equal(
-    existsSync(path.join(generated, "scripts/context/context-maintenance-safety.mjs")),
-    true,
-  );
-  assert.equal(
-    existsSync(path.join(generated, "scripts/context/context-maintenance.test.mjs")),
-    true,
-  );
-  const generatedRuntimeSources = textFiles(path.join(generated, "scripts", "context")).filter(
-    (filePath) => filePath.endsWith(".mjs") && !filePath.endsWith(".test.mjs"),
-  );
-  const optimizeMethodPattern = new RegExp(`\\.${["opt", "imize"].join("")}\\s*\\(`, "u");
-  assert.equal(
-    generatedRuntimeSources.some((filePath) =>
-      optimizeMethodPattern.test(readFileSync(filePath, "utf8")),
-    ),
-    false,
-  );
-  const generatedStoragePath = path.join(generated, "scripts/context/context-storage.mjs");
-  const generatedStorage = readFileSync(generatedStoragePath, "utf8");
-  writeFileSync(
-    generatedStoragePath,
-    `${generatedStorage}\nasync function unsafe(table) { await table.optimize(); }\n`,
-    "utf8",
-  );
-  const unsafeRuntimeVerification = spawnSync(
-    process.execPath,
-    [path.join(generated, "scripts/verify/repository-smoke.mjs")],
-    { cwd: generated, encoding: "utf8", input: "", stdio: "pipe" },
-  );
-  assert.equal(unsafeRuntimeVerification.status, 1);
-  assert.match(unsafeRuntimeVerification.stderr, /unsafe in-place maintenance/);
-  writeFileSync(generatedStoragePath, generatedStorage, "utf8");
   assert.equal(existsSync(path.join(generated, "scripts/verify/image-assets.mjs")), true);
   assert.equal(existsSync(path.join(generated, "scripts/verify/image-assets.test.mjs")), true);
   assert.equal(
@@ -416,14 +366,13 @@ test("clean project initialization removes inherited state and source-specific t
   assert.match(generatedAgents, /`instructions\.md` owns the complete agent workflow/);
   assert.match(
     generatedAgents,
-    /validates the explicitly prepared host\/toolchain\/dependency state/,
+    /`codex update` first and stops on failure, validates prepared tools\/dependencies/,
   );
-  assert.match(generatedAgents, /Keep local Codex state repository\/worktree-bound/);
+  assert.match(generatedAgents, /Keep local Codex state in ignored repository-root CODEX_HOME/);
   for (const content of [generatedAgents, generatedInstructions]) {
     assert.match(content, /no reliable exact\s+anchor/);
     assert.match(content, /cross-file\s+relationships/);
-    assert.match(content, /read\s+every matched source/);
-    assert.match(content, /failed `rg` attempt is not\s+required/);
+    assert.match(content, /read\s+every\s+matched\s+source/);
     assert.match(content, /pnpm goal:new/);
     assert.match(content, /one\s+user-approved\s+machine-readable owner/);
     assert.match(content, /each fix or user\s+instruction/i);
@@ -433,7 +382,10 @@ test("clean project initialization removes inherited state and source-specific t
     assert.match(content, /(?:no\s+relevant\s+finding\s+remains|zero\s+relevant\s+findings)/i);
     assert.match(content, /fresh\s+audit/i);
   }
-  assert.match(generatedInstructions, /Local Codex state is repository\/worktree-root-bound/);
+  assert.match(
+    generatedInstructions,
+    /Local Codex state\/memories use ignored repository-root `CODEX_HOME` entries/,
+  );
   assert.match(generatedInstructions, /audit\s+finding.*reopen/is);
   assert.match(generatedInstructions, /branch\s+policy\s+permits/i);
   assert.match(generatedInstructions, /marker\s+commit/i);
@@ -491,28 +443,27 @@ test("clean project initialization removes inherited state and source-specific t
   assert.match(generatedInstructions, /pre-descent mask/);
   assert.match(generatedInstructions, /marker\s+commit/);
   assert.match(generatedInstructions, /major milestone/i);
-  assert.match(generatedReadme, /pnpm context:search.*semantic\s+discovery/s);
+  assert.match(generatedReadme, /manifest-led discovery/);
   assert.match(generatedInstructions, /replace-in-place\s+successful-evidence\s+record/i);
-  for (const filePath of [generatedRetrievalSkill, generatedRetrievalMetadata]) {
+  for (const filePath of [generatedUiReviewSkill, generatedUiReviewMetadata]) {
     const stats = lstatSync(filePath);
     assert.equal(stats.isFile(), true);
     assert.equal(stats.isSymbolicLink(), false);
   }
   assert.equal(
-    readFileSync(generatedRetrievalSkill, "utf8"),
-    readFileSync(path.join(root, ".agents/skills/context-retrieval/SKILL.md"), "utf8"),
+    readFileSync(generatedUiReviewSkill, "utf8"),
+    readFileSync(path.join(root, ".agents/skills/ui-ux-review/SKILL.md"), "utf8"),
   );
   assert.equal(
-    readFileSync(generatedRetrievalMetadata, "utf8"),
-    readFileSync(path.join(root, ".agents/skills/context-retrieval/agents/openai.yaml"), "utf8"),
+    readFileSync(generatedUiReviewMetadata, "utf8"),
+    readFileSync(path.join(root, ".agents/skills/ui-ux-review/agents/openai.yaml"), "utf8"),
   );
-  assert.match(readFileSync(generatedRetrievalMetadata, "utf8"), /allow_implicit_invocation: true/);
   for (const role of ["default", "explorer", "worker"]) {
     const roleContent = readFileSync(
       path.join(generated, ".codex", "agents", `${role}.toml`),
       "utf8",
     );
-    assert.match(roleContent, /context:search/, role);
+    assert.match(roleContent, /manifest-led discovery/, role);
     assert.match(roleContent, /matched source/, role);
     assert.match(roleContent, /whole-repository course check/, role);
     assert.match(roleContent, /context recovery/, role);
@@ -544,11 +495,6 @@ test("clean project initialization removes inherited state and source-specific t
     generatedManifest,
     /whole-repository course checks|Product-first delivery|pnpm goal:new|pre-descent mask|marker commit/i,
   );
-  assert.match(generatedContextIndex, /opportunistic maintenance/i);
-  assert.match(generatedContextIndex, /strictly read-only/i);
-  assert.match(generatedContextIndex, /source classifications/i);
-  assert.match(generatedContextIndex, /Portable `\.codex\/config\.toml`/i);
-  assert.match(generatedContextIndex, /future-modules\.md.*rank them below current evidence/is);
   assert.equal(
     readFileSync(generatedCoherenceSkill, "utf8"),
     readFileSync(path.join(root, ".agents/skills/system-coherence/SKILL.md"), "utf8"),
@@ -576,7 +522,6 @@ test("clean project initialization removes inherited state and source-specific t
   assert.deepEqual(projectMarkdown, [
     "AGENTS.md",
     "README.md",
-    "docs/context-index.md",
     "docs/future-modules.md",
     "docs/project.md",
     "instructions.md",
@@ -596,7 +541,6 @@ test("clean project initialization removes inherited state and source-specific t
     "AGENTS.md",
     "NOTICE",
     "README.md",
-    "docs/context-index.md",
     "docs/project.md",
     "instructions.md",
   ]);
@@ -607,6 +551,17 @@ test("clean project initialization removes inherited state and source-specific t
     .map((filePath) => path.relative(generated, filePath).split(path.sep).join("/"));
   assert.deepEqual(obsoleteIdentityFiles, []);
   provideGeneratedDependenciesForTest(generated);
+
+  // Skills delegate policy to local instructions; their references must survive real generation.
+  for (const verifier of ["scripts/verify/docs.mjs", "scripts/verify/skill-paths.mjs"]) {
+    const checked = spawnSync(process.execPath, [verifier], {
+      cwd: generated,
+      encoding: "utf8",
+      stdio: "pipe",
+      timeout: 30_000,
+    });
+    assert.equal(checked.status, 0, `${verifier}\n${checked.stdout}\n${checked.stderr}`);
+  }
 
   const generatedGitignore = readFileSync(path.join(generated, ".gitignore"), "utf8");
   assert.equal(generatedGitignore, readFileSync(path.join(root, ".gitignore"), "utf8"));

@@ -43,10 +43,6 @@ function isInsidePath(parent, candidate, { allowSame = true } = {}) {
   return candidate === parent ? allowSame : candidate.startsWith(`${parent}/`);
 }
 
-function pathsOverlap(left, right) {
-  return isInsidePath(left, right) || isInsidePath(right, left);
-}
-
 function realDirectoryState(root, relativePath) {
   const absolutePath = path.join(root, ...relativePath.split("/"));
   if (!existsSync(absolutePath)) return { exists: false, valid: false };
@@ -361,15 +357,4 @@ export function isProductImplementationPath(value, layout) {
 
 export function isProductSurfacePath(value, layout) {
   return Boolean(productUnitForPath(value, layout, { surface: true }));
-}
-
-export function overlappingProductRoots(value, layout) {
-  const candidate = normalizeProductPath(value);
-  if (!candidate) return [];
-  const protectedRoots = layout.units.flatMap((entry) =>
-    entry.root === "." ? entry.sourceRoots : [entry.root],
-  );
-  return [
-    ...new Set(protectedRoots.filter((rootPath) => pathsOverlap(rootPath, candidate))),
-  ].sort();
 }

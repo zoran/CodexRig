@@ -8,6 +8,15 @@ export function markdown(lines) {
   return `${lines.join("\n")}\n`;
 }
 
+/** Projects one required level-two source-policy section without rewriting its directives. */
+export function requiredInstructionSection(content, heading) {
+  const sections = content
+    .split(/(?=^## )/mu)
+    .filter((section) => section.startsWith(`## ${heading}\n`));
+  if (sections.length !== 1) throw new Error(`Source instructions require one ${heading} section.`);
+  return sections[0].trimEnd().split("\n");
+}
+
 export function escapeMarkdownText(value) {
   return String(value).replace(/[\\`*_{}\[\]<>()#+!|]/gu, "\\$&");
 }

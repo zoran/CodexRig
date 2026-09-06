@@ -13,8 +13,10 @@ Review the implemented change and report findings; do not edit files.
 
 ## Review
 
-1. Map changed inputs, outputs, principals, identity/account lifecycle, data flows, trust
-   boundaries, provider/federation boundaries, and operational powers.
+1. Map the changed inputs, outputs, principals, data flows, trust boundaries and operational powers.
+   Select only the relevant lanes below. Identity/account/session and tenant review applies when
+   those boundaries or their consumers changed; a shell-only change does not require an unrelated
+   full account-lifecycle audit. Trace any shared-boundary effect before ruling a lane out.
 2. Review authentication independently from authorization. Check authenticator enrollment, binding,
    recovery, reset, revocation, step-up/reauthentication, throttling and enumeration resistance;
    then check deny-by-default server-side policy decisions for every protected action and resource,

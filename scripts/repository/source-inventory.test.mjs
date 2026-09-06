@@ -213,14 +213,13 @@ test("Git-less inventory excludes private root Codex state before directory desc
   write(root, ".codex/auth.json", "private auth\n");
   write(root, "auth.json", "private auth\n");
   write(root, "sessions/deep/private-thread.jsonl", "private session\n");
-  write(root, ".context-index/model/private.bin", "private model\n");
+  write(root, "cache/private.bin", "private cache\n");
   write(root, ".project-state/private.json", "private process state\n");
 
   assert.equal(existsSync(path.join(root, ".git")), false);
   for (const pattern of [
     ...repositoryCodexHomeGitignorePatterns,
     ...portableCodexGitignorePatterns,
-    "/.context-index",
     "/.project-state",
   ]) {
     assert.equal(gitlessPreDescentExcludePatterns.includes(pattern), true, pattern);
@@ -615,13 +614,13 @@ test("stage validation rejects mutable project-file lifecycle hooks", async () =
   await assert.rejects(() => validateStagedProject(stage), /hook events must remain empty/);
 });
 
-test("stage validation requires the portable primary retrieval contract", async () => {
+test("stage validation requires portable skills and manifest-led discovery", async () => {
   const missingSkill = temporaryRoot("export-context-contract-missing-");
   writePortableCodexFiles(missingSkill);
-  rmSync(path.join(missingSkill, ".agents", "skills", "context-retrieval", "SKILL.md"));
+  rmSync(path.join(missingSkill, ".agents", "skills", "ui-ux-review", "SKILL.md"));
   await assert.rejects(
     () => validateStagedProject(missingSkill),
-    /portable context contract is missing \.agents\/skills\/context-retrieval\/SKILL\.md/,
+    /portable context contract is missing \.agents\/skills\/ui-ux-review\/SKILL\.md/,
   );
 
   const weakenedPrimary = temporaryRoot("export-context-contract-primary-");
@@ -645,46 +644,31 @@ test("stage validation requires the portable primary retrieval contract", async 
     weakenedRole,
     ".codex/agents/explorer.toml",
     readFileSync(path.join(repositoryRoot, ".codex/agents/explorer.toml"), "utf8").replace(
-      "context:search",
+      "manifest-led discovery",
       "broad file scan",
     ),
   );
   await assert.rejects(
     () => validateStagedProject(weakenedRole),
-    /orchestration marker context:search/,
+    /orchestration marker manifest-led discovery/,
   );
 
   const missingCommand = temporaryRoot("export-context-contract-command-");
   writePortableCodexFiles(missingCommand);
   const packageJson = JSON.parse(readFileSync(path.join(missingCommand, "package.json"), "utf8"));
-  delete packageJson.scripts["context:search"];
+  delete packageJson.scripts["handover:receive"];
   write(missingCommand, "package.json", `${JSON.stringify(packageJson, null, 2)}\n`);
   await assert.rejects(
     () => validateStagedProject(missingCommand),
-    /package\.json script context:search/,
+    /package\.json script handover:receive/,
   );
 
-  const missingWorker = temporaryRoot("export-context-contract-missing-worker-");
-  writePortableCodexFiles(missingWorker);
-  rmSync(path.join(missingWorker, "scripts/context/context-worker-output.mjs"));
+  const missingHandover = temporaryRoot("export-context-contract-missing-handover-");
+  writePortableCodexFiles(missingHandover);
+  rmSync(path.join(missingHandover, "scripts/context/critical-budget-handover.mjs"));
   await assert.rejects(
-    () => validateStagedProject(missingWorker),
-    /portable context contract is missing scripts\/context\/context-worker-output\.mjs/,
-  );
-
-  const weakenedWorker = temporaryRoot("export-context-contract-weakened-worker-");
-  writePortableCodexFiles(weakenedWorker);
-  write(
-    weakenedWorker,
-    "scripts/context/context-worker-output.mjs",
-    readFileSync(
-      path.join(repositoryRoot, "scripts/context/context-worker-output.mjs"),
-      "utf8",
-    ).replaceAll("sanitizeMultilineForTerminal", "unsafeMultiline"),
-  );
-  await assert.rejects(
-    () => validateStagedProject(weakenedWorker),
-    /scripts\/context\/context-worker-output\.mjs to include sanitizeMultilineForTerminal/,
+    () => validateStagedProject(missingHandover),
+    /portable context contract is missing scripts\/context\/critical-budget-handover\.mjs/,
   );
 });
 
@@ -713,7 +697,7 @@ test("stage validation sees a copied tracked .env even though the stage has no G
   stageProjectExport({ sourceRoot: source, targetRoot: target });
   for (const relativePath of [
     ".codex/hooks.json",
-    "scripts/context/context-worker-output.mjs",
+    "scripts/context/critical-budget-handover.mjs",
     "scripts/context/session-stop-lifecycle.mjs",
     "scripts/setup/session-control-hook-command.mjs",
     "scripts/setup/startup-codex-process.mjs",

@@ -159,7 +159,7 @@ function createFixture() {
   copyGoalGateRuntime(repository);
   writeFileSync(
     path.join(repository, ".gitignore"),
-    "/auth.json\n/.codex/runtime/\n/.context-index/\n",
+    "/auth.json\n/.codex/runtime/\n/cache/\n",
     "utf8",
   );
   writeFileSync(
@@ -223,8 +223,8 @@ after(() => {
 test("goal:new passes only for clean central main that exactly matches its upstream", () => {
   const { parent, repository } = createFixture();
   writeFileSync(path.join(repository, "auth.json"), "ignored local runtime\n", "utf8");
-  mkdirSync(path.join(repository, ".context-index"));
-  writeFileSync(path.join(repository, ".context-index", "manifest.json"), "{}\n", "utf8");
+  mkdirSync(path.join(repository, "cache"));
+  writeFileSync(path.join(repository, "cache", "manifest.json"), "{}\n", "utf8");
 
   const result = runGate(repository, { cwd: parent });
   assert.equal(result.status, 0, result.stderr);

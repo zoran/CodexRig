@@ -10,6 +10,7 @@ import {
   decideVerificationAdmission,
   isForbiddenFocusedOwner,
 } from "./verification-admission.mjs";
+import { dedupeCommands } from "./verification-admission-commands.mjs";
 import {
   discoverWorkspaceManifests,
   selectChangedWorkspaceManifests,
@@ -45,29 +46,6 @@ export function verificationCommand({
     reason,
     phase,
   };
-}
-function commandSignature(command) {
-  return JSON.stringify([
-    command.executable,
-    command.args,
-    command.phase,
-    command.artifactOwners ?? [],
-    command.coveredTestPaths ?? [],
-  ]);
-}
-export function dedupeCommands(commands) {
-  const deduped = new Map();
-  for (const command of commands) {
-    const existing = deduped.get(command.key);
-    if (!existing) {
-      deduped.set(command.key, command);
-      continue;
-    }
-    if (commandSignature(existing) !== commandSignature(command)) {
-      throw new Error(`Verification command key ${command.key} has conflicting definitions.`);
-    }
-  }
-  return [...deduped.values()];
 }
 function nodeCommand(key, label, script, reason, args = [], phase = "preflight") {
   return verificationCommand({
@@ -220,30 +198,18 @@ export function completeVerificationCommands() {
       "scripts/verify/patterns.mjs",
       "complete verification always checks maintainability and source-role policy",
     ),
-    nodeCommand(
-      "context-policy",
-      "context source policy",
-      "scripts/verify/context-source-policy.mjs",
-      "complete verification checks retrieval source boundaries without loading the model or index",
-    ),
     verificationCommand({
       key: "context-regressions",
-      label: "context retrieval regressions",
+      label: "project-context and recovery regressions",
       executable: process.execPath,
-      args: ["--test", "--test-reporter=dot", "scripts/context/context-regression.test.mjs"],
-      coveredTestPaths: [
-        "scripts/context/context-source-paths.test.mjs",
-        "scripts/context/context-chunks-build.test.mjs",
-        "scripts/context/context-storage.test.mjs",
-        "scripts/context/context-publication-policy.test.mjs",
-        "scripts/context/context-maintenance.test.mjs",
+      args: [
+        "--test",
+        "--test-reporter=dot",
         "scripts/context/context-lifecycle.test.mjs",
-        "scripts/context/context-lock-query.test.mjs",
-        "scripts/context/context-integration.test.mjs",
-        "scripts/terminal/terminal-output.test.mjs",
+        "scripts/context/portable-context-contract.test.mjs",
       ],
       reason:
-        "complete verification exercises retrieval behavior in isolated temporary index roots",
+        "complete verification exercises continuation, handover and portable-policy contracts in isolated roots",
     }),
     verificationCommand({
       key: "framework-regressions",
@@ -257,6 +223,7 @@ export function completeVerificationCommands() {
         "scripts/framework/framework-lifecycle.test.mjs",
         "scripts/platform/platform-lifecycle.test.mjs",
         ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
+        ".agents/skills/reset-framework/scripts/publish-framework.test.mjs",
       ],
       reason:
         "complete verification checks versioned upgrades, startup attestation, reset safety, compatibility tracks, provider detection, and GitHub/GitLab policy adapters",
@@ -294,7 +261,6 @@ export function completeVerificationCommands() {
         "scripts/docs/document-scope.test.mjs",
         "scripts/docs/project-manifest-contract.test.mjs",
         "scripts/goals/repository-housekeeping.test.mjs",
-        "scripts/context/portable-context-contract.test.mjs",
         "scripts/terminal/terminal-output.test.mjs",
         "scripts/repository/product-roots.test.mjs",
         "scripts/repository/source-inventory-git-environment.test.mjs",
@@ -338,7 +304,7 @@ export function completeVerificationCommands() {
         "source-baseline",
         "clean reusable source baseline",
         sourceBaselineScript,
-        "source-framework verification refuses goals, slices, process history, generated exports, project transactions, and context-index state",
+        "source-framework verification refuses goals, slices, process history, generated exports, and project transactions",
       ),
     );
   }

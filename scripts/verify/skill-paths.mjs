@@ -99,9 +99,9 @@ async function verifySkill(skillName) {
     }
   }
 
-  const metadata = readFileSync(metadataPath, "utf8");
+  let metadata;
   try {
-    await formatWithPrettier(metadata, { parser: "yaml" });
+    metadata = await formatWithPrettier(readFileSync(metadataPath, "utf8"), { parser: "yaml" });
   } catch (error) {
     failures.push(
       `${relativePath(metadataPath)} is invalid YAML: ${String(error.message).split("\n")[0]}`,
@@ -121,15 +121,29 @@ async function verifySkill(skillName) {
   if (defaultPrompt && !defaultPrompt.includes(`$${skillName}`)) {
     failures.push(`${relativePath(metadataPath)} default_prompt must mention $${skillName}`);
   }
-  const allowsImplicitInvocation = /^  allow_implicit_invocation:\s*true\s*$/m.test(metadata);
-  if (skillName === "context-retrieval" && !allowsImplicitInvocation) {
-    failures.push(
-      `${relativePath(metadataPath)} must explicitly allow implicit invocation for ordinary repository discovery`,
+  // Portable metadata uses a block policy with one optional native boolean, not a forced value.
+  // Check the normalized section, so a similarly named interface field cannot satisfy the policy.
+  const lines = metadata.split("\n").filter((line) => !/^\s*#/.test(line));
+  const policyIndex = lines.findIndex((line) => /^(?:policy|"policy"|'policy'):/.test(line));
+  if (policyIndex >= 0) {
+    const following = lines.slice(policyIndex + 1);
+    const nextSection = following.findIndex((line) => /^\S/.test(line));
+    const fields = (nextSection < 0 ? following : following.slice(0, nextSection)).filter((line) =>
+      line.trim(),
     );
-  } else if (/^policy:/m.test(metadata) && !allowsImplicitInvocation) {
-    failures.push(
-      `${relativePath(metadataPath)} policy.allow_implicit_invocation must be true when present`,
-    );
+    const policyHeader = lines[policyIndex].replace(/^(?:"policy"|'policy'):/, "policy:");
+    const emptyPolicy = /^policy: \{\}(?: #.*)?$/.test(policyHeader) && fields.length === 0;
+    const booleanPolicy =
+      /^policy:(?: #.*)?$/.test(policyHeader) &&
+      fields.length === 1 &&
+      /^  (?:allow_implicit_invocation|"allow_implicit_invocation"|'allow_implicit_invocation'): (?:true|false)(?: #.*)?$/.test(
+        fields[0],
+      );
+    if (!emptyPolicy && !booleanPolicy) {
+      failures.push(
+        `${relativePath(metadataPath)} policy must be an empty mapping or a block with boolean allow_implicit_invocation`,
+      );
+    }
   }
 }
 

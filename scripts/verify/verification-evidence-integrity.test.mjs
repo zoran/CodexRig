@@ -138,7 +138,7 @@ test("runtime identity canonicalizes locale and timezone across lifecycle caller
 test("runtime identity hashes every forwarded semantic child control", () => {
   const root = fixture();
   const unknownName = "VERIFICATION_UNBOUND_TEST_CONTROL";
-  const semanticName = "CONTEXT_INDEX_OFFLINE";
+  const semanticName = "IMAGE_ASSET_OFFLINE";
   const previousUnknown = process.env[unknownName];
   const previousSemantic = process.env[semanticName];
   try {
@@ -332,8 +332,8 @@ test("ignored cache and local runtime writes do not change source fingerprints",
     "{}\n",
     "utf8",
   );
-  mkdirSync(path.join(root, ".context-index"), { recursive: true });
-  writeFileSync(path.join(root, ".context-index", "manifest.json"), "{}\n", "utf8");
+  mkdirSync(path.join(root, "cache"), { recursive: true });
+  writeFileSync(path.join(root, "cache", "manifest.json"), "{}\n", "utf8");
   const after = validate(root).inputs;
   assert.equal(after.exactFingerprint, before.exactFingerprint);
   assert.equal(after.broadFingerprint, before.broadFingerprint);
