@@ -173,6 +173,12 @@ invent a subsequent product goal merely to stay busy. A failed publication or `g
 the current goal open; it cannot complete the encompassing outcome or erase its bounded working
 state.
 
+This continuation mandate applies throughout long sessions without another "continue" prompt. Use
+[Long-Session Course Checks](#long-session-course-checks) during ongoing work as well as at slice
+boundaries. After compaction or resume, recover the original outcome, later accepted steering,
+completed evidence, unresolved work and next safe action before continuing; the newest additive
+message does not replace the outcome. Native compaction manages context length, not account quota.
+
 A requested recap, research result, plan, documentation gate, review, audit, definition synthesis,
 or statement that work is ready is an intermediate commentary update when implementation or a larger
 outcome is already authorized. Never end at "ready to implement" when implementation is already
@@ -220,6 +226,51 @@ use the supported native instruction channel and a fresh session when needed. Re
 bounded Stop guard only after the installed native path proves the required continuation, user
 pause/cancellation, side-conversation, recovery, and terminal-handover behavior. Until then preserve
 that current contract; add no scheduler, watchdog, endless loop, or second task runtime.
+
+### Long-Session Course Checks
+
+Perform a whole-repository course check after initial planning/discovery, every completed slice,
+major milestone and completed goal, after compaction or resume before dependent work, before the
+final gate and after publication before another authorized goal begins. During an unfinished slice,
+use the same check at material evidence or assumption changes, repeated failed approaches, expanding
+research/refactoring, and long tool returns. Even with no subagents, allow no more than ten minutes
+of active work between brief course/capacity checkpoints; use the next safe boundary of an
+already-running atomic operation and declare its expected checkpoint in advance. This is one
+event-driven primary workflow, not a timer process, extra hook, or repeated full scan.
+
+Compare the original objective and current plan with the manifest and module map, implemented
+behavior, touched owners and consumers, remaining slices, risks, tests, documentation, runtime and
+publication boundaries, and unrelated or concurrent worktree state. Within a slice, inspect the
+changed evidence and affected relationships; reread broader context only when those facts warrant
+it. Ask whether the current activity still advances the highest-value unfinished acceptance
+condition, which downstream contracts/data/configuration or user flows it affects, and whether its
+complexity and evidence remain proportionate. Correct relevant problems at their owner. End
+speculative hardening, micro-optimization, redundant research, or cleanup that cannot name an
+authorized outcome, acceptance blocker, or material risk it improves. Never trade away correctness
+or durable design to save time or tokens.
+
+At a slice boundary, refresh the available upstream view when a shared remote and network access
+exist, then compare changes since the slice base by path, module, public contract, schema, and
+migration. Disjoint concurrent changes do not stop progress. An overlap at an owned module or shared
+contract pauses further writes until the change is integrated or ownership and order are reconciled;
+rerun only affected evidence. A remote refresh failure is visible uncertainty: isolated disjoint
+work may continue, but shared-boundary work waits for a trustworthy integration view. This course
+check does not itself authorize broad verification.
+
+At these safe checkpoints, remove proven-obsolete in-scope temporary files/directories and dead
+paths, consolidate superseded implementations with their consumers, and reconcile affected
+code/tests/configuration/docs at their existing owners. Check ownership, remaining consumers and
+recovery value before removal; being untracked, old, or quiet proves none of these. Worktree
+retirement and runtime cleanup use their existing settlement/reset owners. Preserve ambiguous
+directories and active state; never manually delete runtime or an actual worktree directory. Cleanup
+is incremental and outcome-driven, not a reason to restart repository-wide housekeeping or broad
+verification at every checkpoint.
+
+Refresh or delete the bounded project context as its lifecycle requires and update the in-session
+plan to current truth. Briefly report the outcome alignment, material finding or correction, and
+next concrete action in commentary, then continue the current or next authorized slice in the same
+run. No separate checkpoint log or permission ritual. At a completed-goal boundary, use the single
+closure sequence below; do not distribute, reorder, or silently omit its gates.
 
 ## Planning, Goals, Slices, Review Loops, And Audits
 
@@ -327,8 +378,9 @@ After every completed slice:
 6. Only from that clean reviewed state, perform a fresh audit against the plan, current goal,
    manifest, touched boundaries, and repository state. An audit finding reopens the slice: fix it,
    repeat the review loop to zero relevant findings, and audit again.
-7. Perform the slice-boundary course check defined below against the complete current repository and
-   available upstream state. Reconcile concurrent changes before beginning the next dependent slice.
+7. Perform [Long-Session Course Checks](#long-session-course-checks) against the complete current
+   repository and available upstream state. Reconcile concurrent changes before beginning the next
+   dependent slice.
 8. Run the lightweight Worktree Settlement trigger: rerun `pnpm worktree:status -- --json`, then
    compare every same-clone worktree, session, writer lease, latest recovery marker, task branch,
    handover, prune transaction, path reservation, and preservation lock with the slice ownership
@@ -341,24 +393,6 @@ criteria, correctness, safety, maintainability, documented behavior, or a touche
 False positives, duplicates, and unrelated suggestions do not block closure, but classify them
 explicitly in the conversation rather than silently ignoring them. Review and audit findings remain
 conversation state; do not create review logs, audit reports, or per-slice documents.
-
-At every completed slice, major milestone, and completed goal, perform a whole-repository course
-check. Compare the original objective and current plan with the manifest and module map, implemented
-behavior, touched owners and consumers, remaining slices, risks, tests, documentation, runtime and
-publication boundaries, and unrelated or concurrent worktree state. At a slice boundary, refresh the
-available upstream view when a shared remote and network access exist, then compare changes since
-the slice base by path, module, public contract, schema, and migration. Disjoint concurrent changes
-do not stop progress. An overlap at an owned module or shared contract pauses further writes until
-the change is integrated or ownership and order are reconciled; rerun only affected evidence. A
-remote refresh failure is visible uncertainty: isolated disjoint work may continue, but
-shared-boundary work waits for a trustworthy integration view. This course check does not itself
-authorize broad verification.
-
-Then clean up and update the authorized work: remove obsolete temporary work and dead paths,
-reconcile code/tests/configuration/docs, refresh or delete the bounded project context as
-appropriate, and update the in-session plan to the current truth. After a clean course check,
-continue autonomously with the next planned slice. At a completed-goal boundary, use the single
-closure sequence below; do not distribute, reorder, or silently omit its gates.
 
 ### Completed-Goal Closure And Repository Housekeeping
 
@@ -1322,14 +1356,9 @@ implementing further.
 
 - Trace behavior to the failed invariant, producer, state transition, or contract. Fix that owner
   instead of adding duplicate caller guards.
-- Whole-repository course checks are mandatory after initial planning/discovery and every completed
-  slice, at every major milestone and completed goal, at every resume or context-recovery point,
-  whenever scope or assumptions materially change, before the final gate, and after publication
-  before another authorized goal begins. Reconcile the objective and manifest module map with
-  touched contracts, owners and consumers, product/runtime boundaries, security and operational
-  effects, tests, documentation contracts, and unrelated or concurrent worktree state. Clean up and
-  update the authorized work and in-session plan after each check, then continue autonomously with
-  the next planned slice or already-authorized goal when no blocker remains.
+- Apply [Long-Session Course Checks](#long-session-course-checks) during ongoing work and at
+  acceptance/recovery boundaries; that section owns the shared cadence, effects review, cleanup and
+  continuation procedure.
 - Run `pnpm stack:detect` before selecting or changing an application stack. Existing project
   evidence wins; never add a framework, service, database, or provider speculatively.
 - Follow the active ecosystem's naming, layout, error, dependency, and test conventions.
@@ -1705,8 +1734,18 @@ documentation reconciliation, final audit, and user handoff; then assign each ac
 bounded worst-case work envelope plus handoff reserve and a safety margin. Start or continue the
 agent only when confirmed remaining capacity—including only genuinely available redeem
 capacity—covers all envelopes and the primary reserve. Unknown or marginal capacity means no new
-agent. Never consume a redeem/reset credit without authority; after a permitted redemption, refresh
-the actual limits before admitting work.
+agent. The standing continuation mandate authorizes the primary to use already available native
+redeem/reset entitlements for this authorized work when they add no cost, unless the user restricts
+that authority. Reuse that authorization without asking again. Before critical state, use only an
+actually exposed, supported host control whose entitlement and effect are confirmed; do not guess a
+command, access private account APIs, purchase credits, enable paid overage, switch accounts or
+models, or increase a user-set Goal budget. A request to use existing redeems grants none of those
+actions. If the host consumes available credits automatically, leave that consumption with the host.
+After a permitted redemption or host-confirmed reset, refresh actual limits and completion reserve
+before admitting work, then continue the same authorized outcome when capacity permits. An
+unavailable control or unconfirmed balance remains unavailable; state the concrete limit rather than
+promising uninterrupted operation. Once critical state is observed, the mandatory drain and terminal
+seal below take precedence over redemption or automatic continuation.
 
 Classify current capacity as `healthy`, `guarded`, or `critical` from the most constraining current
 host signal rather than one model-specific counter or billing period. If the host exposes a reliable
@@ -1722,14 +1761,13 @@ exhausted one, infer an unknown percentage, or assume a future reset will arrive
 
 Budget monitoring is event-driven and slice-gated. Re-evaluate before every spawn or follow-up,
 after every material tool or agent result, on a material scope or assumption change, after a long
-wait, and immediately when the host changes a usage counter or emits a budget warning. Every active
-subagent has a task-appropriate expected checkpoint. Unless a known long-running operation has an
-explicit later checkpoint, the primary allows no more than ten minutes of active delegation without
-a budget/agent heartbeat. At every completed slice, perform a hard budget, primary-reserve,
-live-agent, handoff, and ownership check before admitting the next slice. Completed-goal
-housekeeping performs the deeper lifecycle cleanup and documentation/audit gates, but it is not the
-first budget trigger. Stop/Resume validates preserved state; it must never be the first time low
-capacity is noticed.
+wait, and immediately when the host changes a usage counter or emits a budget warning. Use the same
+primary checkpoint as [Long-Session Course Checks](#long-session-course-checks), including work
+without subagents; each active subagent also has a task-appropriate expected checkpoint. At every
+completed slice, perform a hard budget, primary-reserve, live-agent, handoff, and ownership check
+before admitting the next slice. Completed-goal housekeeping performs the deeper lifecycle cleanup
+and documentation/audit gates, but it is not the first budget trigger. Stop/Resume validates
+preserved state; it must never be the first time low capacity is noticed.
 
 ### Guarded And Critical Drain
 

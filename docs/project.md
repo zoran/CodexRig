@@ -88,6 +88,8 @@ upgradeable product repositories while deliberately defining no child product or
   effective-permission admission that fails closed when parent runtime overrides defeat a role
   sandbox. The setup controller injects and narrowly trusts the two lifecycle hooks at issue time;
   SessionStart requires complete same-clone worktree/session reconstruction before intake or writes.
+  Native developer instructions carry long-session continuation, course/capacity checkpoints and
+  incremental cleanup guidance through the existing policy layer, including primary-only work.
 - Runtime and technology: Declarative TOML, JSON, and Markdown consumed by Codex, with lifecycle
   entrypoints implemented in the framework's Node.js/Bash harness.
 - Public contract: Root `developer_instructions` and `[agents]` defaults in `.codex/config.toml`,
@@ -106,7 +108,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Root: `scripts/context`
 - Responsibility: Owns durable work-state validation, preloaded Stop continuation, portable context
   contracts, and private critical-budget handover creation, discovery, full receipt and exact-file
-  acknowledgement.
+  acknowledgement. The existing continuation response reminds the primary to reconcile outcome,
+  whole-project effects, proportionality, cleanup and current documentation before further work.
 - Runtime and technology: Node.js ESM and built-ins on the framework's mise-pinned toolchain.
 - Public contract: `handover:create`, `handover:receive`, `handover:acknowledge`, exported portable
   context validators, and the preloaded Stop lifecycle. Receipt requires an active canonical session
@@ -430,7 +433,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `3.0.0`.
+- Framework version: `3.1.0`.
 - Framework contract schema: `2`.
 
 <!-- codexrig:framework-version:end -->

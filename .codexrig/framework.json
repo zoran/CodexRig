@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "frameworkId": "codexrig",
-  "frameworkVersion": "3.0.0",
+  "frameworkVersion": "3.1.0",
   "compatibilityFile": ".codexrig/compatibility.json",
   "startup": {
     "attestationMaxAgeSeconds": 1800

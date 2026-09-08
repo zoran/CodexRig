@@ -505,7 +505,7 @@ export function portableRuntimeRequiredContent() {
         "## Subagent Orchestration And Integration Authority",
         "never assume a daily, weekly",
         "remaining token or credit amount directly",
-        "no more than ten minutes",
+        "Long-Session Course Checks",
         "hard Orchestration Housekeeping gate",
         "docs/project-context.md",
         "#subagent-orchestration-and-integration-authority",

@@ -184,6 +184,12 @@ linked sections of [Project Instructions](instructions.md).
   interrupts it. Explicitly requested native Codex Goals provide multi-turn continuation;
   `pnpm goal:new` checks publication and does not create Goals. A finished slice is not the
   completed overall outcome.
+  [Long-Session Course Checks](instructions.md#long-session-course-checks) recover the outcome after
+  compaction/resume and check direction, downstream effects, useful cleanup and documentation during
+  long slices too. The primary gives a brief course update at least every ten minutes of active
+  work, subject to declared atomic safe boundaries, then keeps working. This also applies without
+  subagents. Overengineering, micro-optimizations and work without an acceptance benefit or material
+  risk are outside that mandate.
 - Existing UI appearance, navigation, and interactions are preserved unless a material redesign is
   approved. New UI gets an early representative-flow review; affected real rendered states provide
   evidence that source checks and screenshots of a different state cannot replace. These decisions
@@ -278,9 +284,18 @@ linked sections of [Project Instructions](instructions.md).
   primary.
 - Capacity uses the most constraining signal without assuming a billing period or unit. A remaining
   token/credit amount is compared with bounded envelopes/reserve; 10% is guarded and 5% or an
-  uncovered completion reserve is critical. Active delegation allows no more than ten minutes
-  between heartbeats unless a known long operation has a later checkpoint. Guarded state keeps
-  `docs/project-context.md` current and stops optional delegation.
+  uncovered completion reserve is critical. Active primary work, including delegation, allows no
+  more than ten minutes between heartbeats unless a known long operation has a later checkpoint.
+  This shares the long-session course checkpoint. Guarded state keeps `docs/project-context.md`
+  current and stops optional delegation.
+- The continuation mandate includes existing native redeem/reset entitlements that add no cost,
+  subject to user restrictions and confirmed host support. The primary can use those entitlements
+  before critical state without asking again, refresh the real limits and continue the same work.
+  Purchases, paid overage, account/model switches and increases to a user-set Goal budget need
+  separate authority. Native compaction only frees context; it does not replenish account quota.
+  Codex documents [available credits and usage visibility](https://learn.chatgpt.com/docs/pricing);
+  the installed CLI and tools must actually expose any claimed redemption control. CodexRig adds no
+  redemption API and cannot promise uninterrupted work across unavailable or exhausted capacity.
 - Critical state drains only owned work, then `pnpm handover:create -- --critical` seals one private
   English prompt in ignored `tmp/codexrig-handovers/` as the final repository action. Success means
   that runtime session must stop completely—no later tool, check, task, follow-up, agent contact, or

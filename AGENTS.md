@@ -40,6 +40,12 @@ procedures.
   to the active outcome. Honor explicit pause, cancellation and replacement. Never end at "ready to
   implement" when implementation is already authorized. A finished slice, review or native Goal is
   not proof that the complete authorized outcome is done.
+- Apply [Long-Session Course Checks](instructions.md#long-session-course-checks) without another
+  continue prompt: recover the outcome after compaction/resume, check effects and proportionality
+  during long slices even without subagents, remove proven-obsolete in-scope work and update its
+  docs, then continue. Use the same brief course/capacity checkpoint at least every ten minutes of
+  active work, subject to declared atomic safe boundaries. Existing no-additional-cost native
+  redeems use standing authority only through confirmed host controls before critical drain.
 - Prefer explicitly requested native Goals and native plans, sessions, approvals and subagents.
   `pnpm goal:new` checks publication; it is not a native Goal creator. Do not add a scheduler,
   endless loop, second task store, account manager or speculative product feature.

@@ -9,12 +9,18 @@ metadata, and databases—stays in ignored entries of the repository-root `CODEX
 coordination alone stays in ignored `.codex/runtime/`. Neither is copied between projects or
 committed.
 
-Root `developer_instructions` in the tracked config make the primary the sole orchestrator, bind
-owned-work provenance, require exact GPT Astra/`ultra` parity, and enforce the critical drain and
-terminal stop. `[agents]` owns the four-thread ceiling and matching global defaults;
+Root `developer_instructions` in the tracked config make the primary the sole orchestrator, inject
+the [long-session continuation and course contract](../instructions.md#long-session-course-checks),
+bind owned-work provenance, require exact GPT Astra/`ultra` parity, and enforce the critical drain
+and terminal stop. `[agents]` owns the four-thread ceiling and matching global defaults;
 `.codex/agents/*.toml` injects bounded role behavior. This is an executable policy layer, not a
 documentation shortcut. `pnpm codex:validate` rejects missing markers, divergent intelligence,
 unsafe permissions, or incomplete drain policy.
+
+Long-session guidance uses this native instruction layer and the existing bounded Stop reminder.
+It adds no scheduler, account monitor, or hook. Changed tracked instructions and preloaded Stop code
+take effect on the next canonical launch; editing them does not reload an already-running session.
+Static validation proves configuration and packaging, not model obedience over hours of work.
 
 The primary and all roles default to `gpt-6-astra` with `ultra` reasoning. Standard processing is
 the default: portable config leaves `service_tier` unset, and roles inherit the session tier.
