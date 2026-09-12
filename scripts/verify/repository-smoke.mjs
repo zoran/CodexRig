@@ -18,6 +18,8 @@ import {
 import { classifyPath, isFullRelevantPath } from "./adaptive-state.mjs";
 import { repositorySmokeContentExpectations } from "./repository-smoke-content.mjs";
 import { repositorySmokeRequiredFiles } from "./repository-smoke-inventory.mjs";
+import { futureModulesDocumentFindings } from "../docs/project-manifest-contract.mjs";
+import { frameworkInstallationFindings } from "../framework/framework-doctor.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const failures = [];
@@ -68,6 +70,12 @@ const activeFiles = listActiveFiles({ root });
 const productLayout = discoverProductLayout({ repositoryRoot: root, relativePaths: activeFiles });
 failures.push(...productLayout.findings);
 failures.push(...portableContextContractFindings({ repositoryRoot: root }));
+failures.push(...futureModulesDocumentFindings(readRelative("docs/future-modules.md")));
+failures.push(
+  ...frameworkInstallationFindings({ root }).errors.map(
+    ({ code, message }) => `[${code}] ${message}`,
+  ),
+);
 
 let packageJson;
 try {

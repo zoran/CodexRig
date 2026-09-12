@@ -1,6 +1,7 @@
 /** Owns delivery manifest behavior for the durable documentation contract boundary. */
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import {
   deliveryConfigurationFindings,
   deliveryConfigurationPath,
@@ -134,7 +135,8 @@ export function deliveryReconciliationPlan({
           );
         }
       }
-      if (currentContent !== expectedDeliveryContent) {
+      // The delivery owner compares validated state; the repository formatter owns whitespace.
+      if (currentContent === null || !isDeepStrictEqual(configuration, expectedConfiguration)) {
         driftFindings.push(
           currentContent === null
             ? `missing generated delivery owner: ${deliveryConfigurationPath}`

@@ -416,6 +416,12 @@ schemas. A non-current child is outside the upgrade contract and must be regener
 current framework. Child package versions remain independent product truth;
 `.codexrig/installation.json` records only the installed framework version.
 
+The repository smoke check used by `pnpm verify` and the startup doctor share the installation
+receipt validator. Unrecorded edits to managed framework files therefore block verification as well
+as startup. Repair reusable tooling in the source framework, reconcile its release version, then
+apply the reviewed child upgrade before handing the project over. Framework reset preserves these
+versioned source corrections; `framework:publish` publishes them after all source sessions exit.
+
 ## License And Attribution
 
 CodexRig is available under the [PolyForm Noncommercial License 1.0.0](LICENSE). Every noncommercial

@@ -275,6 +275,7 @@ export function completeVerificationCommands() {
         "scripts/verify/secrets.test.mjs",
         "scripts/verify/image-assets.test.mjs",
         "scripts/verify/localization.test.mjs",
+        "scripts/verify/language.test.mjs",
         "scripts/verify/surface-quality.test.mjs",
         "scripts/verify/white-label.test.mjs",
         "scripts/web/update-sitemap-lastmod.test.mjs",

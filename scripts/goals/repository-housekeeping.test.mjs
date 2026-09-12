@@ -19,6 +19,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { format } from "prettier";
 import {
   deliveryConfigurationPath,
   initialDeliveryConfiguration,
@@ -139,6 +140,26 @@ test("declared external targets are preserved while stale detected evidence is r
   assert.deepEqual(configuration.declaredTargets, ["prod"]);
   assert.deepEqual(configuration.detectedTargets, []);
   assert.match(readFileSync(path.join(root, "docs/project.md"), "utf8"), /`prod`/u);
+});
+
+test("formatting a declared environment does not recreate delivery drift", async (t) => {
+  const root = fixture(t);
+  const configuration = parseDeliveryConfiguration(initialDeliveryConfiguration());
+  configuration.declaredTargets = ["dev"];
+  write(root, deliveryConfigurationPath, JSON.stringify(configuration));
+  const relativePaths = [deliveryConfigurationPath, "docs/project.md", "src/.gitkeep"];
+  applyHousekeepingWrites({
+    root,
+    writes: deliveryReconciliationPlan({ root, relativePaths }).writes,
+  });
+  const target = path.join(root, deliveryConfigurationPath);
+  const formatted = await format(readFileSync(target, "utf8"), { parser: "json" });
+  write(root, deliveryConfigurationPath, formatted);
+  const plan = deliveryReconciliationPlan({ root, relativePaths });
+  assert.deepEqual(plan.blockingFindings, []);
+  assert.deepEqual(plan.driftFindings, []);
+  assert.deepEqual(plan.writes, []);
+  assert.equal(readFileSync(target, "utf8"), formatted);
 });
 
 test("ambiguous delivery hints fail closed until their target is explicitly classified", (t) => {

@@ -175,6 +175,42 @@ test("operator reset guidance executes preview, apply, and clean preview through
   }
 });
 
+test("reset preserves reusable startup repairs and their release metadata byte for byte", (t) => {
+  const root = fixture();
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  const preservedPaths = [
+    ".codexrig/framework.json",
+    "package.json",
+    "README.md",
+    "docs/project.md",
+    "scripts/docs/delivery-manifest.mjs",
+    "scripts/framework/framework-doctor.mjs",
+    "scripts/framework/framework-lifecycle.test.mjs",
+    "scripts/goals/repository-housekeeping.test.mjs",
+    "scripts/verify/language.mjs",
+    "scripts/verify/language.test.mjs",
+    "scripts/verify/repository-smoke-content.mjs",
+    "scripts/verify/repository-smoke.mjs",
+    "scripts/verify/adaptive-runner.mjs",
+    "scripts/verify/verification-admission.mjs",
+  ];
+  const expected = new Map(
+    preservedPaths.map((relativePath) => [
+      relativePath,
+      readFileSync(path.join(frameworkRoot, relativePath), "utf8"),
+    ]),
+  );
+  for (const [relativePath, content] of expected) write(root, relativePath, content);
+  write(root, "history.jsonl", "disposable session state\n");
+  const applied = run(root, ["--apply"]);
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.equal(existsSync(path.join(root, "history.jsonl")), false);
+  for (const [relativePath, content] of expected) {
+    assert.equal(readFileSync(path.join(root, relativePath), "utf8"), content, relativePath);
+  }
+  assert.equal(run(root).status, 0);
+});
+
 test("reset preserves current identity and removes all disposable framework runtime", (t) => {
   const root = fixture();
   t.after(() => rmSync(root, { force: true, recursive: true }));

@@ -2,6 +2,7 @@
 import { closeSync, openSync, readSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 import { listActiveFiles, repositoryRoot } from "../repository/source-inventory.mjs";
 
 const policyTextExtensions = new Set([".md", ".txt", ".toml", ".yaml", ".yml"]);
@@ -26,7 +27,6 @@ const germanMarkers = [
 ];
 const markerPattern = new RegExp("\\b(" + germanMarkers.join("|") + ")\\b", "i");
 const germanCharacterPattern = /[\u00c4\u00d6\u00dc\u00e4\u00f6\u00fc\u00df]/;
-const failures = [];
 
 function isPolicyText(relativePath) {
   const extension = path.extname(relativePath);
@@ -37,7 +37,9 @@ function isPolicyText(relativePath) {
   );
 }
 
-function inspectLine(relativePath, line, lineNumber) {
+function inspectLine(relativePath, line, lineNumber, failures) {
+  // Reference addresses are identifiers, not prose; translating them would break source links.
+  line = line.replace(/https?:\/\/[^\s<>"'`]+/gu, "");
   if (germanCharacterPattern.test(line)) {
     failures.push(`${relativePath}:${lineNumber}: contains a German-specific character`);
     return;
@@ -48,8 +50,8 @@ function inspectLine(relativePath, line, lineNumber) {
   }
 }
 
-function scanPolicyText(relativePath) {
-  const descriptor = openSync(path.join(repositoryRoot, relativePath), "r");
+function scanPolicyText(root, relativePath, failures) {
+  const descriptor = openSync(path.join(root, relativePath), "r");
   const buffer = Buffer.allocUnsafe(64 * 1024);
   const decoder = new TextDecoder("utf-8");
   let pending = "";
@@ -61,22 +63,31 @@ function scanPolicyText(relativePath) {
       const content = pending + decoder.decode(buffer.subarray(0, bytesRead), { stream: true });
       const lines = content.split(/\r?\n/);
       pending = lines.pop() ?? "";
-      for (const line of lines) inspectLine(relativePath, line, ++lineNumber);
+      for (const line of lines) inspectLine(relativePath, line, ++lineNumber, failures);
     }
     pending += decoder.decode();
-    if (pending) inspectLine(relativePath, pending, ++lineNumber);
+    if (pending) inspectLine(relativePath, pending, ++lineNumber, failures);
   } finally {
     closeSync(descriptor);
   }
 }
 
-for (const relativePath of listActiveFiles().filter(isPolicyText)) {
-  scanPolicyText(relativePath);
+/** Returns policy-prose findings for one repository, preserving original file and line locations. */
+export function languageVerificationFindings({ root = repositoryRoot } = {}) {
+  const failures = [];
+  for (const relativePath of listActiveFiles({ root }).filter(isPolicyText)) {
+    scanPolicyText(root, relativePath, failures);
+  }
+  return failures;
 }
 
-if (failures.length > 0) {
-  console.error("Language verification failed for framework policy and documentation:");
-  for (const failure of failures) console.error(`- ${failure}`);
-  process.exit(1);
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const failures = languageVerificationFindings();
+  if (failures.length > 0) {
+    console.error("Language verification failed for framework policy and documentation:");
+    for (const failure of failures) console.error(`- ${failure}`);
+    process.exitCode = 1;
+  } else {
+    console.log("Framework policy and documentation language verification passed.");
+  }
 }
-console.log("Framework policy and documentation language verification passed.");

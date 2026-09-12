@@ -221,7 +221,10 @@ const explicitTestConsumerRegistry = new Map([
   ],
   [
     "scripts/framework/framework-doctor.mjs",
-    ["scripts/framework/compatibility-integrity.test.mjs"],
+    [
+      "scripts/framework/compatibility-integrity.test.mjs",
+      "scripts/framework/framework-lifecycle.test.mjs",
+    ],
   ],
   [
     "scripts/repository/delivery-environment-discovery.mjs",

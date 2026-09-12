@@ -26,6 +26,7 @@ import {
   sha256,
 } from "../contracts/framework-contract.mjs";
 import { writeInstallationReceipt } from "./framework-installation-receipt.mjs";
+import { frameworkInstallationFindings } from "./framework-doctor.mjs";
 import { readFrameworkUpgradeTargetState } from "./framework-upgrade-target.mjs";
 import {
   acknowledgeFrameworkReconciliation,
@@ -361,6 +362,37 @@ test("framework semantic versions follow prerelease precedence and reject invali
   assert.equal(compareSemver("1.0.0+build.1", "1.0.0+build.2"), 0);
   assert.throws(() => parseSemver("1.0.0-alpha..1"), /semantic versioning/);
   assert.throws(() => parseSemver("1.0.0-alpha.01"), /semantic versioning/);
+});
+
+test("shared startup and verification diagnostics reject drift until a reviewed upgrade adopts the repair", () => {
+  const original = "export const repaired = false;\n";
+  const repaired = "export const repaired = true;\n";
+  const target = frameworkFixture("1.0.0", original, { reusable: false });
+  const source = frameworkFixture("2.0.0", repaired);
+  writeInstallationReceipt({ root: target });
+  write(target, "docs/project.md", "# Product Manifest\n\nKeep this product definition.\n");
+  assert.deepEqual(frameworkInstallationFindings({ root: target }).errors, []);
+
+  write(target, "managed/tool.mjs", repaired, 0o755);
+  assert.deepEqual(frameworkInstallationFindings({ root: target }).errors, [
+    {
+      code: "installation.managed-drift",
+      message: "Managed framework file has local changes: managed/tool.mjs.",
+    },
+  ]);
+
+  const plan = buildFrameworkUpgradePlan({ sourceRoot: source, targetRoot: target });
+  assert.deepEqual(plan.conflicts, []);
+  applyFrameworkUpgrade(plan, {
+    refreshDependencies: () => {},
+    repairDependencies: () => {},
+  });
+  assert.deepEqual(frameworkInstallationFindings({ root: target }).errors, []);
+  assert.equal(readFileSync(path.join(target, "managed/tool.mjs"), "utf8"), repaired);
+  assert.equal(
+    readFileSync(path.join(target, "docs/project.md"), "utf8"),
+    "# Product Manifest\n\nKeep this product definition.\n",
+  );
 });
 
 test("framework source identity cannot be borrowed by a receipted generated project", () => {

@@ -165,7 +165,6 @@ export function repositorySmokeContentExpectations(
     ["docs/project.md", "normative framework policy is never hidden"],
     ["docs/future-modules.md", "# Future Modules"],
     ["docs/future-modules.md", "single non-authoritative home"],
-    ["docs/future-modules.md", "No future module candidates are currently recorded"],
     [".codex/config.toml", 'approval_policy = "on-request"'],
     [".codex/config.toml", 'developer_instructions = """'],
     [".codex/config.toml", "primary orchestrator"],

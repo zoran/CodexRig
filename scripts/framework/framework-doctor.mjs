@@ -306,6 +306,17 @@ function validateInstallation({ contract, root, errors, warnings }) {
   return "project";
 }
 
+/** Checks the current installation receipt without tool probes, network access or repository writes. */
+export function frameworkInstallationFindings({
+  root = frameworkRoot,
+  contract = readFrameworkContract(root),
+} = {}) {
+  const errors = [];
+  const warnings = [];
+  const mode = validateInstallation({ contract, root, errors, warnings });
+  return { errors, mode, warnings };
+}
+
 async function registryLatest(fetchImpl, packageName) {
   const encoded = encodeURIComponent(packageName);
   const response = await fetchImpl(`https://registry.npmjs.org/${encoded}/latest`, {
@@ -382,7 +393,10 @@ export async function diagnoseFramework({
   validateToolchainOwners({ contract, matrix, root, errors });
   validateRuntimeVersions({ matrix, root, errors, versions });
   validateCiAdapters({ root, matrix, errors });
-  const mode = validateInstallation({ contract, root, errors, warnings });
+  const installation = frameworkInstallationFindings({ contract, root });
+  const mode = installation.mode;
+  errors.push(...installation.errors);
+  warnings.push(...installation.warnings);
   let platform = null;
   try {
     platform = detectGitProvider({ root, environment, contract });

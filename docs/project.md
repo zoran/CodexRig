@@ -198,9 +198,12 @@ upgradeable product repositories while deliberately defining no child product or
 - Responsibility: Diagnoses framework health, derives the source release version from every change
   since the unique live configured central-remote commit that matches the local tracking ref, and
   performs receipt-backed, transactional, policy-aware child updates and compatibility reporting.
+  Startup and repository verification consume the same local installation validator, so an
+  unrecorded managed-file edit cannot pass verification while preventing the next start.
 - Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
 - Public contract: `framework:doctor`, `framework:version`, `framework:upgrade`, and
-  `compatibility:matrix` commands.
+  `compatibility:matrix` commands; `frameworkInstallationFindings` provides local receipt
+  diagnostics to startup and verification consumers.
 - Private internals: Conservative SemVer classification, current-schema target validation, three-way
   planning, journals, ownership locks, rollback, receipt publication, dependency refresh, and policy
   reconciliation plans.
@@ -410,8 +413,8 @@ upgradeable product repositories while deliberately defining no child product or
   ignored `.codex/runtime/`; no product data or migrations.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/deps`, `scripts/docs`,
-  `scripts/filesystem`, `scripts/repository`, `scripts/security`, `scripts/stack`,
-  `scripts/terminal`, `scripts/web`.
+  `scripts/filesystem`, `scripts/framework`, `scripts/repository`, `scripts/security`,
+  `scripts/stack`, `scripts/terminal`, `scripts/web`.
 - Focused verifier: `node --test scripts/verify/adaptive-cli.test.mjs`
 - Steward: Verification capability maintainer.
 
@@ -433,7 +436,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `3.1.0`.
+- Framework version: `3.2.0`.
 - Framework contract schema: `2`.
 
 <!-- codexrig:framework-version:end -->
