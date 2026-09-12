@@ -74,9 +74,10 @@ portable clone starts safe. Requested config, startup-attested mode, and effecti
 are distinct facts; parent overrides can also be reapplied to children, which is why child admission
 requires an effective-permission report.
 
-Canonical start runs `codex update` first and stops on failure. Locked-tool installation,
-compatible dependency refresh, and the online doctor remain explicit maintenance actions. After
-validating the prepared runtime and portable policy it opens the native `codex resume` picker
+Canonical start first inventories every same-clone worktree and safe recovery marker. It then
+checks and maintains compatible packages, Node.js, pnpm, mise, Codex, and CI version pins through
+the transactional maintenance owner; registry, compatibility, ownership, or installation failure
+stops startup. After validating the resulting runtime and policy it opens the native `codex resume` picker
 with the repository root as both `CODEX_HOME` and explicit `--cd` target, under the mise-pinned
 Node.js session controller. The controller binds external Node.js, Codex, pnpm, and hook-shell executables, reserves
 one pending native selection, rejects executable or unknown ignored runtime configuration,
@@ -129,6 +130,12 @@ the mandatory full Startup Repository Reconstruction gate. Automatic cleanup req
 namespace-bound or otherwise mechanically proven dead writer; a current process identity observed
 outside its bound PID namespace or otherwise mechanically indeterminate remains an
 ownership-confirmation blocker.
+
+Native `/side` conversations are transcriptless. Within an already verified launcher session,
+their start is acknowledged without consuming another startup proof or changing parent ownership,
+recovery, or context. The initial attestation's 30-minute window therefore does not limit when a
+side conversation can open. Their Stop events do not run the parent's continuation lifecycle; see
+[the canonical session contract](../instructions.md#session-start).
 
 The primary then begins with `pnpm worktree:status -- --json`, which inventories every same-clone
 worktree and safe latest-session marker without spending the bounded attestation-hook runtime on a

@@ -166,9 +166,13 @@ upgradeable product repositories while deliberately defining no child product or
 
 - Root: `scripts/deps`
 - Responsibility: Resolves, installs, reports, and updates the newest compatible dependency graph
-  allowed by tracked ranges, pins, engines, peers, and supply-chain policy.
+  allowed by tracked ranges, pins, engines, peers, and supply-chain policy. Also reproduces an
+  existing lockfile offline for source housekeeping and toolchain maintenance, and stages complete
+  workspace inputs without changing their policy.
 - Runtime and technology: Node.js ESM orchestrating the pnpm and mise toolchain.
-- Public contract: `deps:install`, `deps:report`, and `deps:update*` commands.
+- Public contract: `deps:install`, `deps:report`, and `deps:update*` commands; the
+  lifecycle-delegated `install-compatible.mjs --reproduce-locked` and `--reproduce-toolchain`
+  boundaries for maintenance.
 - Private internals: Resolution transactions, input normalization, and rollback state.
 - Owned data and migrations: Managed changes to `package.json`, `pnpm-lock.yaml`, and approved
   dependency policy inputs; transient transaction state is disposable.
@@ -198,17 +202,23 @@ upgradeable product repositories while deliberately defining no child product or
 - Responsibility: Diagnoses framework health, derives the source release version from every change
   since the unique live configured central-remote commit that matches the local tracking ref, and
   performs receipt-backed, transactional, policy-aware child updates and compatibility reporting.
-  Startup and repository verification consume the same local installation validator, so an
-  unrecorded managed-file edit cannot pass verification while preventing the next start.
+  Before canonical startup it maintains compatible dependencies, Node.js, pnpm, mise, Codex and CI
+  tool/action pins through official release evidence and an isolated installation of the resolved
+  toolchain. Startup and repository verification consume the same local installation validator, so
+  an unrecorded managed-file edit cannot pass verification while preventing the next start.
 - Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
 - Public contract: `framework:doctor`, `framework:version`, `framework:upgrade`, and
   `compatibility:matrix` commands; `frameworkInstallationFindings` provides local receipt
-  diagnostics to startup and verification consumers.
+  diagnostics to startup and verification consumers. `maintain-toolchain.mjs --startup` inventories
+  all worktrees before mutations and blocks competing writers; its explicit mode permits authorized
+  current-slice maintenance.
 - Private internals: Conservative SemVer classification, current-schema target validation, three-way
   planning, journals, ownership locks, rollback, receipt publication, dependency refresh, and policy
   reconciliation plans.
 - Owned data and migrations: Child `.codexrig/installation.json` receipts and disposable
-  `.project-state/framework-upgrade/` transaction state.
+  `.project-state/framework-upgrade/` transaction state. Project-owned compatibility/mise/CI
+  metadata and package-manager selection survive framework upgrades; maintenance updates only the
+  two package-manager receipt fields and preserves all other managed-code proofs.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/deps`, `scripts/docs`, `scripts/filesystem`,
   `scripts/platform`, `scripts/repository`, `scripts/terminal`.
@@ -253,7 +263,10 @@ upgradeable product repositories while deliberately defining no child product or
   discovery after registration removal. Only unchanged current-contract cleanup artifacts with a
   proven-dead exact owner are recovered after a crash. Reset treats missing or unobservable Linux
   procfs and permission-obscured descriptor state for an exact-root-bound process as indeterminate
-  rather than inactive.
+  rather than inactive. After source release reconciliation, apply delegates offline frozen
+  reproduction of the unchanged lockfile to the dependency owner. A repeat repairs stale pnpm
+  installation metadata even when all version mirrors already agree; generated-project apply and
+  read-only checks do not install dependencies.
 - Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
 - Public contract: `repo:housekeeping` and `goal:new`.
 - Private internals: Atomic local reconciliation, health-check orchestration, Git publication,
@@ -262,7 +275,7 @@ upgradeable product repositories while deliberately defining no child product or
   `docs/project.md` projection; in reusable source only, synchronized framework/package/manifest
   release metadata; no external environment or product data.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
-- Allowed dependencies: `scripts/contracts`, `scripts/docs`, `scripts/filesystem`,
+- Allowed dependencies: `scripts/contracts`, `scripts/deps`, `scripts/docs`, `scripts/filesystem`,
   `scripts/framework`, `scripts/repository`, `scripts/terminal`, `scripts/verify`.
 - Focused verifier:
   `node --test scripts/goals/repository-housekeeping.test.mjs scripts/goals/goal-publication-precondition.test.mjs`
@@ -291,8 +304,10 @@ upgradeable product repositories while deliberately defining no child product or
   exact latest-session recovery markers, Git-less root classification, safe classification and
   preservation of broken worktree links, the shared crash-recoverable prune transaction, path
   reservations and preservation locks, stable snapshots, delivery-environment evidence discovery,
-  and transfer-source validation. Per-root inconsistencies remain visible without discarding other
-  safe inventory; orphan recovery corruption is advisory unless writer ownership is also unsafe.
+  and transfer-source validation. Owns the shared crash-recoverable file batch used by housekeeping
+  and startup maintenance, including synchronous install finalization and rollback. Per-root
+  inconsistencies remain visible without discarding other safe inventory; orphan recovery corruption
+  is advisory unless writer ownership is also unsafe.
 - Runtime and technology: Node.js ESM over filesystem and isolated Git process boundaries.
 - Public contract: `worktree:status` with current/unfinished/settled human markers plus exported
   inventory, path-policy, Product Root, worktree-recovery, runtime-lease/session-recovery,
@@ -308,7 +323,9 @@ upgradeable product repositories while deliberately defining no child product or
 - Owned data and migrations: Private ignored per-worktree writer lease and latest verified Codex
   session recovery marker under `.codex/runtime/`. Full reset holds the lifecycle lock, proves
   repository-wide runtime quiescence, and removes incompatible private runtime without interpreting
-  another lease schema. No product data.
+  another lease schema. The single current `.project-state/repository-housekeeping/` journal owns
+  repository maintenance batches; a complete interrupted batch is recovered atomically as current
+  state, while failed synchronous finalization rolls back. No product data.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/filesystem`.
 - Focused verifier:
@@ -332,22 +349,24 @@ upgradeable product repositories while deliberately defining no child product or
 #### Setup And Project Portability
 
 - Root: `scripts/setup`
-- Responsibility: Updates the host Codex CLI before admission and stops on update failure, then
-  opens the native resume picker with repository-root CODEX_HOME and explicit working directory. It
-  reserves the checkout before selection and binds the selected session only at authenticated
-  SessionStart, preloads every lifecycle module, accepts bounded non-executable Codex
-  model/reasoning preferences beneath tracked project policy, rejects executable or unknown ignored
-  runtime configuration, projects the tracked Astra/`ultra` policy into every fresh or resumed CLI
-  launch, and injects exactly two session-owned hook definitions. Codex's stable `hooks/list`
-  inventory must contain only those exact trusted/enabled definitions; only afterward may the
-  controller bind the gated supervisor, durable handoff, and exact Codex PID. Lease release requires
-  the exact controller to authenticate the supervisor's terminal child-exit proof against its
-  private issue-time gate secret and persist completion; a wrapper exit code alone is insufficient,
-  and cancellation before SessionStart creates no activation or recovery record. The embedded
-  built-in-only client is bound to the controller's exact Node executable and token-bound loopback
-  endpoint. The capability also validates portable configuration and staged white-label
-  tenant-capable projects, installs hooks, initializes repositories, and exports the portable
-  surface.
+- Responsibility: Inventories worktrees and invokes compatible tool/package/CI maintenance before
+  admission, then opens the native resume picker with repository-root CODEX_HOME and explicit
+  working directory. It reserves the checkout before selection and binds the selected session only
+  at authenticated SessionStart, preloads every lifecycle module, accepts bounded non-executable
+  Codex model/reasoning preferences beneath tracked project policy, rejects executable or unknown
+  ignored runtime configuration, projects the tracked Astra/`ultra` policy into every fresh or
+  resumed CLI launch, and injects exactly two session-owned hook definitions. Codex's stable
+  `hooks/list` inventory must contain only those exact trusted/enabled definitions; only afterward
+  may the controller bind the gated supervisor, durable handoff, and exact Codex PID. Lease release
+  requires the exact controller to authenticate the supervisor's terminal child-exit proof against
+  its private issue-time gate secret and persist completion; a wrapper exit code alone is
+  insufficient, and cancellation before SessionStart creates no activation or recovery record. The
+  embedded built-in-only client is bound to the controller's exact Node executable and token-bound
+  loopback endpoint. Transcriptless native side conversations are acknowledged only under the active
+  parent-bound launcher, without renewing its startup proof, acquiring writer ownership, replacing
+  recovery, or entering durable reconstruction and Stop continuation. The capability also validates
+  portable configuration and staged white-label tenant-capable projects, installs hooks, initializes
+  repositories, and exports the portable surface.
 - Runtime and technology: Node.js ESM and Bash on the mise-pinned framework toolchain.
 - Public contract: `codex:start`, `codex:validate`, `setup`, `hooks:install`, and `project:export`.
 - Private internals: Atomic native-picker reservation and authenticated selected-session binding,
@@ -436,7 +455,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `3.2.0`.
+- Framework version: `4.0.1`.
 - Framework contract schema: `2`.
 
 <!-- codexrig:framework-version:end -->

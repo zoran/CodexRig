@@ -156,11 +156,11 @@ export function portableRuntimeRequiredContent() {
       ],
     ],
     [
-      "scripts/goals/repository-housekeeping-transaction.mjs",
+      "scripts/repository/repository-housekeeping-transaction.mjs",
       ["applyHousekeepingWrites", "recoverInterruptedHousekeepingWrites", "journalSchemaVersion"],
     ],
     [
-      "scripts/goals/repository-housekeeping-files.mjs",
+      "scripts/repository/repository-housekeeping-files.mjs",
       [
         "openOwnedDirectoryBinding",
         "publishHousekeepingJournalLink",
@@ -464,7 +464,7 @@ export function portableRuntimeRequiredContent() {
         "scripts/framework/framework-doctor.mjs",
         "startup-session-controller.mjs",
         "--codex-executable",
-        "codex update",
+        "scripts/framework/maintain-toolchain.mjs --startup",
         "--yolo",
         "NODE_OPTIONS",
         "NPM_CONFIG_SCRIPT_SHELL",

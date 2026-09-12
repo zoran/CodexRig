@@ -266,6 +266,20 @@ test("sanitized pnpm children cannot inherit ambient preload or script-shell con
     PNPM_CONFIG_NODE_OPTIONS: `--require=${preload}`,
     PNPM_CONFIG_SCRIPT_SHELL: unsafeShell,
   });
+  // Exercise the same prepared, explicitly hook-free workspace contract as canonical consumers.
+  writeFileSync(path.join(fixtureRoot, "pnpm-workspace.yaml"), "packages: []\npnpmfile: []\n");
+  const install = spawnSync(
+    "pnpm",
+    ["install", "--offline", "--ignore-scripts", "--ignore-pnpmfile"],
+    {
+      cwd: fixtureRoot,
+      encoding: "utf8",
+      env: environment,
+      input: "",
+      stdio: "pipe",
+    },
+  );
+  assert.equal(install.status, 0, install.stderr || install.stdout);
   const result = spawnSync("pnpm", ["run", "probe"], {
     cwd: fixtureRoot,
     encoding: "utf8",
@@ -273,7 +287,7 @@ test("sanitized pnpm children cannot inherit ambient preload or script-shell con
     input: "",
     stdio: "pipe",
   });
-  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /probe/u);
   assert.equal(existsSync(preloadSentinel), false);
   assert.equal(existsSync(shellSentinel), false);

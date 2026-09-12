@@ -14,7 +14,7 @@ import { cleanupTemporaryRoots, root, run, temporaryRoot } from "./setup-regress
 
 after(cleanupTemporaryRoots);
 
-test("launcher updates first, fails closed, and admits only native picker controls", () => {
+test("launcher maintains before admission, fails closed, and admits only native picker controls", () => {
   const project = temporaryRoot("codex launcher with spaces ");
   const bin = path.join(project, "bin");
   const setup = path.join(project, "scripts/setup");
@@ -64,6 +64,17 @@ test("launcher updates first, fails closed, and admits only native picker contro
     ].join("\n"),
   );
   chmodSync(codex, 0o755);
+  const bootstrapNode = path.join(bin, "node");
+  writeFileSync(
+    bootstrapNode,
+    [
+      ...captureShell,
+      '[[ "$*" == "scripts/framework/maintain-toolchain.mjs --startup" ]] || exit 89',
+      'exit "${FAKE_UPDATE_STATUS:-0}"',
+      "",
+    ].join("\n"),
+  );
+  chmodSync(bootstrapNode, 0o755);
   const mise = path.join(bin, "mise");
   writeFileSync(
     mise,
@@ -117,10 +128,10 @@ test("launcher updates first, fails closed, and admits only native picker contro
     assert.equal(result.status, 0, result.stderr);
     const observed = calls();
     assert.deepEqual(observed[0], {
-      executable: "codex",
+      executable: "node",
       home: ambientHome,
       cwd: project,
-      args: ["update"],
+      args: ["scripts/framework/maintain-toolchain.mjs", "--startup"],
     });
     assert.deepEqual(
       observed.slice(1).map((call) => call.args.slice(3)),

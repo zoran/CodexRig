@@ -33,7 +33,7 @@ import {
 import {
   applyHousekeepingWrites,
   recoverInterruptedHousekeepingWrites,
-} from "./repository-housekeeping.mjs";
+} from "../repository/repository-housekeeping-transaction.mjs";
 
 function fixture(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), "repository-housekeeping-"));
@@ -239,7 +239,10 @@ function treeSnapshot(root) {
 }
 
 function crashChild({ crashIndex = null, hookName, root, writes }) {
-  const moduleUrl = new URL("./repository-housekeeping.mjs", import.meta.url).href;
+  const moduleUrl = new URL(
+    "../repository/repository-housekeeping-transaction.mjs",
+    import.meta.url,
+  ).href;
   const childSource = `
     import { applyHousekeepingWrites } from ${JSON.stringify(moduleUrl)};
     const hookName = ${JSON.stringify(hookName)};
@@ -262,7 +265,10 @@ function crashChild({ crashIndex = null, hookName, root, writes }) {
 }
 
 function recoveryCrashChild({ hookName, root }) {
-  const moduleUrl = new URL("./repository-housekeeping.mjs", import.meta.url).href;
+  const moduleUrl = new URL(
+    "../repository/repository-housekeeping-transaction.mjs",
+    import.meta.url,
+  ).href;
   const childSource = `
     import { recoverInterruptedHousekeepingWrites } from ${JSON.stringify(moduleUrl)};
     const hookName = ${JSON.stringify(hookName)};
@@ -317,7 +323,10 @@ test("housekeeping bounds journal scope and preserves exact modes under a restri
   const relativePath = "exact-mode.txt";
   write(root, relativePath, "before\n");
   chmodSync(path.join(root, relativePath), 0o644);
-  const moduleUrl = new URL("./repository-housekeeping.mjs", import.meta.url).href;
+  const moduleUrl = new URL(
+    "../repository/repository-housekeeping-transaction.mjs",
+    import.meta.url,
+  ).href;
   const childSource = `
     import { applyHousekeepingWrites } from ${JSON.stringify(moduleUrl)};
     process.umask(0o077);
@@ -610,7 +619,10 @@ test(
   async (t) => {
     const root = fixture(t);
     const readyPath = path.join(root, "owner-ready");
-    const moduleUrl = new URL("./repository-housekeeping.mjs", import.meta.url).href;
+    const moduleUrl = new URL(
+      "../repository/repository-housekeeping-transaction.mjs",
+      import.meta.url,
+    ).href;
     const before = readFileSync(path.join(root, "docs/project.md"), "utf8");
     const writes = [{ after: `${before}\n`, before, relativePath: "docs/project.md" }];
     const childSource = `

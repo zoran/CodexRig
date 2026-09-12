@@ -115,7 +115,7 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "1. Start Codex from this repository root with `" +
         supportedCodexStartCommand +
         "`. The launcher",
-      "   runs `codex update` first and stops on failure, validates prepared tools/dependencies, then",
+      "   inventories worktrees/recovery, maintains compatible tools/packages/CI, stops on failure, then",
       "   opens native `codex resume` with repository-root CODEX_HOME and explicit --cd.",
       "   Only optional `--no-alt-screen` and explicit Dev-only `--yolo` are launcher controls; enter",
       "   prompts after selection. Portable defaults remain on-request, network-disabled workspace-write.",
@@ -192,9 +192,9 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       supportedCodexStartCommand,
       fence,
       "",
-      "Canonical start runs `codex update` first and stops on failure, validates prepared state, then",
+      "Canonical start inventories worktrees/recovery and maintains compatible tools/packages/CI, then",
       "opens the native `codex resume` picker with repository-root `CODEX_HOME` and explicit `--cd`.",
-      "Locked tools, dependencies, and online framework diagnosis remain explicit maintenance.",
+      "Updates run at every start within declared compatibility lines; failures stop session admission.",
       "Only optional `--no-alt-screen` and explicit Dev-only `--yolo` are launcher controls; enter",
       "prompts after selection. Portable defaults remain on-request, network-disabled workspace-write. Full",
       "Dev access requires exiting a safe session and running exactly",
@@ -394,8 +394,8 @@ function writeIdentityDocs(targetRoot, projectName, projectDescription) {
       "",
       "1. Start with `" +
         supportedCodexStartCommand +
-        "`; the launcher runs `codex update` first and stops on failure, then validates",
-      "   the prepared runtime/policy and opens native resume with repository-root `CODEX_HOME`.",
+        "`; the launcher inventories worktrees, maintains compatible tools/packages/CI, and validates",
+      "   the resulting runtime/policy before native resume with repository-root `CODEX_HOME`.",
       "2. Complete Startup Repository Reconstruction before new work: read README/manifest/optional work state, run `pnpm worktree:status -- --json`, inventory Git/Git-less root kind plus every same-clone worktree/session and roots/modules/surfaces/contracts/config/tests/docs, keep per-root inconsistencies visible, and resume or safely consolidate unfinished state before the course check.",
       "3. Use known paths or `rg` for exact names, symbols, and narrow questions. When no reliable exact",
       "   anchor exists, ownership is unclear, or work depends on broad orientation, unfamiliar",

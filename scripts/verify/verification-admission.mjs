@@ -196,11 +196,11 @@ const explicitTestConsumerRegistry = new Map([
   ],
   ["scripts/goals/repository-housekeeping.mjs", ["scripts/goals/repository-housekeeping.test.mjs"]],
   [
-    "scripts/goals/repository-housekeeping-files.mjs",
+    "scripts/repository/repository-housekeeping-files.mjs",
     ["scripts/goals/repository-housekeeping.test.mjs"],
   ],
   [
-    "scripts/goals/repository-housekeeping-transaction.mjs",
+    "scripts/repository/repository-housekeeping-transaction.mjs",
     ["scripts/goals/repository-housekeeping.test.mjs"],
   ],
   ["scripts/framework/framework-version.mjs", ["scripts/framework/framework-version.test.mjs"]],

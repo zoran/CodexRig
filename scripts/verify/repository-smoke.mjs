@@ -355,12 +355,8 @@ for (const [tool, platformUrls] of Object.entries(officialArtifactUrls)) {
   }
 }
 
-if (miseVersions.node) {
-  requireContent("scripts/setup/check-prereqs.sh", `required_node_version="${miseVersions.node}"`);
-}
-if (miseVersions.pnpm) {
-  requireContent("scripts/setup/check-prereqs.sh", `required_pnpm_version="${miseVersions.pnpm}"`);
-}
+requireContent("scripts/setup/check-prereqs.sh", "stable.node.version");
+requireContent("scripts/setup/check-prereqs.sh", "stable.pnpm.version");
 if (/corepack/iu.test(readRelative("scripts/setup/check-prereqs.sh"))) {
   failures.push("the local prerequisite check must not install or activate Corepack shims");
 }
@@ -453,11 +449,11 @@ if (existsSync(path.join(root, ".github/workflows/ci.yml"))) {
   const githubCi = readRelative(".github/workflows/ci.yml");
   requireContent(".github/workflows/ci.yml", `version: ${miseVersions.pnpm}`);
   requireContent(".github/workflows/ci.yml", `node-version: ${miseVersions.node}`);
-  requireOccurrenceCount(
-    ".github/workflows/ci.yml",
-    "jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4",
-    2,
-  );
+  if ((githubCi.match(/jdx\/mise-action@[a-f0-9]{40} # v\d+\.\d+\.\d+\b/gu) ?? []).length !== 2) {
+    failures.push(
+      ".github/workflows/ci.yml must pin both mise actions to annotated stable commit identities",
+    );
+  }
   requireOccurrenceCount(".github/workflows/ci.yml", "install: false", 2);
   requireOccurrenceCount(".github/workflows/ci.yml", "cache: false", 2);
   requireOccurrenceCount(

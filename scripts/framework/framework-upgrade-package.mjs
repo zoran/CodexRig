@@ -11,7 +11,12 @@ export function frameworkUpgradeValuesEqual(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-export function packageUpdatePlan({ sourceManaged, targetRoot, receipt }) {
+export function packageUpdatePlan({
+  sourceManaged,
+  targetRoot,
+  receipt,
+  preservePackageManager = false,
+}) {
   const targetContent = readRegularFrameworkFile(targetRoot, "package.json");
   let targetPackage;
   try {
@@ -46,15 +51,16 @@ export function packageUpdatePlan({ sourceManaged, targetRoot, receipt }) {
     },
   );
 
-  mergeScalar(
-    "packageManager",
-    targetPackage.packageManager,
-    oldManaged.packageManager,
-    sourceManaged.packageManager,
-    (value) => {
-      desired.packageManager = value;
-    },
-  );
+  if (!preservePackageManager)
+    mergeScalar(
+      "packageManager",
+      targetPackage.packageManager,
+      oldManaged.packageManager,
+      sourceManaged.packageManager,
+      (value) => {
+        desired.packageManager = value;
+      },
+    );
 
   for (const section of ["scripts", "devDependencies"]) {
     const names = new Set([

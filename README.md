@@ -33,23 +33,35 @@ so every child still reports its effective runtime permissions before repository
 Dev-only and does not grant credentials, broaden task scope, authorize unrelated external mutations,
 or apply to staging or production.
 
-Canonical start follows `codex update && CODEX_HOME="$PWD" codex resume --cd "$PWD"`: it updates the
-host CLI first and stops if the update fails. It does not install the toolchain or change the
-dependency graph. It then validates the already prepared locked runtime, portable policy,
-model/license contract, and local framework health, then replaces itself with the mise-pinned
-session controller. The controller binds external executables, accepts only bounded non-executable
-runtime metadata and Codex-persisted model/reasoning preferences, rejects executable or unknown
-ignored runtime configuration, and explicitly projects the tracked Astra/`ultra` policy into the
-native resume picker without a fixed session ID or `--last`. Codex uses the repository root as
-`CODEX_HOME`; private framework coordination stays in ignored `.codex/runtime/`. It reserves one
-current-schema writer lease and uses Codex's stable `hooks/list` interface to require exactly the
-two session-owned, enabled, hash-exact trusted lifecycle hooks. Only then does it start the gated
+Every canonical start inventories all same-clone worktrees and recovery metadata, then checks and
+updates compatible workspace packages, Node.js, pnpm, mise, Codex, and the pinned CI tool/action
+versions. Node.js and pnpm stay inside the compatibility matrix ranges; CI actions stay on their
+annotated major lines. Official release metadata and changed archive digests are checked before host
+updates. The complete candidate dependency graph is installed in isolation with strict peer and
+Node.js engine checks. Project inputs are then published together and reproduced offline; failures
+stop startup and preserve or restore the prior inputs. Registry failures are reported as
+indeterminate freshness. An active or unsafe competing writer blocks startup maintenance.
+
+The launcher then validates the maintained runtime, portable policy, model/license contract, and
+local framework health before replacing itself with the mise-pinned session controller. The
+controller binds external executables, accepts only bounded non-executable runtime metadata and
+Codex-persisted model/reasoning preferences, rejects executable or unknown ignored runtime
+configuration, and explicitly projects the tracked Astra/`ultra` policy into the native resume
+picker without a fixed session ID or `--last`. Codex uses the repository root as `CODEX_HOME`;
+private framework coordination stays in ignored `.codex/runtime/`. It reserves one current-schema
+writer lease and uses Codex's stable `hooks/list` interface to require exactly the two
+session-owned, enabled, hash-exact trusted lifecycle hooks. Only then does it start the gated
 foreground supervisor and bind the exact Codex child. This gated preloaded supervisor keeps the
 repository controller immutable while the child is active. SessionStart activates the lease and
 recovery marker; terminal authenticated child proof is required before release. Cancelling the
 picker creates no session/recovery record and never triggers an automatic replacement session. The
 detailed process, crash, and ownership invariants have one canonical description in
 [Project Instructions](instructions.md#session-start).
+
+Use `/side` inside a running session for a separate temporary conversation. It keeps the main
+session's worktree ownership and recovery point intact, including when opened more than 30 minutes
+after launch. After a framework update that changes the preloaded controller, exit and restart
+through the canonical launcher so the updated lifecycle code takes effect.
 
 Portable TOML, project policy, and runtime-config validation have one constrained implementation;
 the launcher uses that same owner before it admits a session.
@@ -62,9 +74,10 @@ unambiguous residue, preserves incompatible ambiguity and active writers, and co
 result. Exact paths and `rg` handle known anchors; manifest-led discovery traces unclear ownership
 and cross-file relationships through actual source without loading the whole repository.
 
-Prepare or refresh the host and repository explicitly before first use and whenever the toolchain,
-dependency policy, or online compatibility evidence changes. Install or update Codex through the
-[official installer](https://developers.openai.com/codex/cli/), then run:
+Bootstrap Node.js and mise must be available before the launcher can inventory the repository. For a
+first installation, prepare the locked runtime with the following commands. Canonical starts
+thereafter perform freshness maintenance automatically; `install-compatible.mjs` remains the
+explicit dependency-only entry point:
 
 ```bash
 mise install --locked
@@ -340,21 +353,24 @@ pnpm framework:publish --message "<commit message>"  # after exiting Codex
 The handover command is not routine housekeeping. After it reports a sealed path, the Codex session
 must stop without another action.
 
-After reviewing all source changes, exit every Codex session for this framework and run one command
-from its root:
+To finish framework work, the existing `framework:publish` script runs the complete cleanup,
+verification, commit and push sequence. After reviewing all source changes, exit every Codex session
+for this framework and run this one command from its root:
 
 ```bash
-mise exec --locked -- pnpm framework:publish --message "GPT 6 Upgrade"
+mise exec --locked -- pnpm framework:publish --message "<commit message>"
 ```
 
-This explicitly authorizes publication of all non-ignored source changes on `main`. The command
-checks worktree ownership and the unique central upstream, refreshes its tracking ref, previews and
-applies the reset, confirms a clean preview, runs housekeeping, installs the managed Git hook, and
-invokes `pnpm verify`. It resets temporary verification residue, stages and commits the exact
-verified source, pushes through `pre-push`, confirms remote `main`, and checks `goal:new`. An
-unchanged source tree creates no empty commit; a rejected push preserves the local commit for a
-later retry. Any failed gate stops the sequence. Commit and push never run while a Codex session
-owns the runtime.
+The `mise exec --locked --` prefix only selects the repository's declared Node.js and pnpm versions;
+`framework:publish` owns the workflow. There is no need to run its reset or verification steps
+separately beforehand. Running this command explicitly authorizes publication of all non-ignored
+source changes on `main`. The command checks worktree ownership and the unique central upstream,
+refreshes its tracking ref, previews and applies the reset, confirms a clean preview, runs
+housekeeping, installs the managed Git hook, and invokes `pnpm verify`. It resets temporary
+verification residue, stages and commits the exact verified source, pushes through `pre-push`,
+confirms remote `main`, and checks `goal:new`. An unchanged source tree creates no empty commit; a
+rejected push preserves the local commit for a later retry. Any failed gate stops the sequence.
+Commit and push never run while a Codex session owns the runtime.
 
 Reset removes obsolete process/runtime state while retaining only approved runtime identity and
 exact publication evidence. It holds the lifecycle lock and proves repository-wide runtime
@@ -369,7 +385,13 @@ integration branch to one central remote branch, requires that branch's unique l
 the local remote-tracking ref, classifies committed-but-unpublished plus working-tree changes
 against that immutable published commit, and atomically reconciles the required SemVer across
 `.codexrig/framework.json`, root `package.json`, and the manifest version block. Preview with
-`pnpm framework:version`.
+`pnpm framework:version`. Source apply then reproduces the existing lockfile offline with scripts
+and pnpm hooks disabled, so a package-version change does not leave pnpm's dependency-state guard
+blocking the next command. This does not resolve newer dependency versions. If a run stops after
+writing version metadata, retry the same owner directly with
+`mise exec --locked -- node scripts/goals/repository-housekeeping.mjs --apply`; it also repairs the
+derived installation when the version mirrors already agree. Missing cached packages require the
+explicit compatible dependency installer before retrying.
 
 Do not count a preserved, unfinished, clean-but-unused, or already-integrated temporary worktree as
 settled merely because its bytes are recoverable. The slice trigger records its live owner and

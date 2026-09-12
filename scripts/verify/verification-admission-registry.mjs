@@ -145,11 +145,11 @@ export const exactConsumerRegistry = new Map([
     ["delivery-environments", "framework-regressions", "repository-smoke"],
   ],
   [
-    "scripts/goals/repository-housekeeping-files.mjs",
+    "scripts/repository/repository-housekeeping-files.mjs",
     ["framework-regressions", "repository-smoke"],
   ],
   [
-    "scripts/goals/repository-housekeeping-transaction.mjs",
+    "scripts/repository/repository-housekeeping-transaction.mjs",
     ["framework-regressions", "repository-smoke"],
   ],
   ["scripts/framework/framework-version.mjs", ["framework-version", "framework-regressions"]],

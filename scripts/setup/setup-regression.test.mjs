@@ -1,5 +1,6 @@
 /** Verifies setup regression behavior for the setup, launch, and portable project boundary. */
 import assert from "node:assert/strict";
+import { readCompatibilityMatrix } from "../contracts/framework-contract.mjs";
 import {
   chmodSync,
   copyFileSync,
@@ -31,6 +32,8 @@ import {
   sessionControlHookExpectations,
 } from "./session-control-hook-command.mjs";
 import {
+  inspectRuntimeSessionLease,
+  inspectRuntimeSessionRecovery,
   issueRuntimeSessionLease,
   releaseRuntimeSessionLease,
 } from "../repository/runtime-session-lease.mjs";
@@ -489,10 +492,11 @@ test("startup attestation binds the complete preloaded controller closure", () =
     copyFileSync(source, target);
   }
   const binDirectory = temporaryRoot("startup-executable-closure-bin-");
+  const current = readCompatibilityMatrix();
   for (const [name, version] of [
-    ["codex", "0.147.0"],
-    ["node", "v24.19.0"],
-    ["pnpm", "11.22.0"],
+    ["codex", current.ci.codexVersion],
+    ["node", `v${current.stable.node.version}`],
+    ["pnpm", current.stable.pnpm.version],
     ["shell", "unused"],
   ]) {
     const executable = path.join(binDirectory, name);
@@ -537,6 +541,7 @@ test("startup attestation binds the complete preloaded controller closure", () =
     permission_mode: "default",
     session_id: "01a01234-5678-7abc-8def-0123456789ab",
     source: "startup",
+    transcript_path: path.join(fixture, "session.jsonl"),
   };
   bindStartupSessionWriter(fixture, process.pid, process.pid, {
     controlPolicy: startupControlPolicies.default,
@@ -556,6 +561,32 @@ test("startup attestation binds the complete preloaded controller closure", () =
     nonce: issued.nonce,
     runtimeExecutables,
   });
+  const verification = {
+    controlPolicy: startupControlPolicies.default,
+    expectedAttestation: issued.attestation,
+    nonce: issued.nonce,
+    root: fixture,
+    runtimeExecutables,
+  };
+  const sideInput = {
+    ...hookInput,
+    session_id: "01a07777-5678-7abc-8def-0123456789ab",
+    transcript_path: null,
+  };
+  assert.throws(
+    () => verifyStartupAttestation({ ...verification, hookInput: sideInput }),
+    /requires its active verified launcher session/u,
+  );
+  for (const transcriptPath of [undefined, "", 42]) {
+    assert.throws(
+      () =>
+        verifyStartupAttestation({
+          ...verification,
+          hookInput: { ...hookInput, transcript_path: transcriptPath },
+        }),
+      /invalid transcript path/u,
+    );
+  }
   assert.equal(
     verifyStartupAttestation({
       controlPolicy: startupControlPolicies.default,
@@ -567,8 +598,34 @@ test("startup attestation binds the complete preloaded controller closure", () =
     7,
   );
 
+  const activeLease = inspectRuntimeSessionLease({ root: fixture }).lease;
+  const recovery = inspectRuntimeSessionRecovery({ root: fixture }).recovery;
+  const expiredNow = () => issued.attestation.expiresAt + 1;
+  verification.now = expiredNow;
+  assert.throws(
+    () => verifyStartupAttestation({ ...verification, hookInput }),
+    /stale or has an invalid lifetime/u,
+  );
+  assert.equal(verifyStartupAttestation({ ...verification, hookInput: sideInput }), null);
+  assert.throws(
+    () =>
+      verifyStartupAttestation({ ...verification, hookInput: sideInput, nonce: "A".repeat(43) }),
+    /requires its active verified launcher session/u,
+  );
+  assert.throws(
+    () =>
+      verifyStartupAttestation({
+        ...verification,
+        hookInput: { ...sideInput, cwd: path.dirname(fixture) },
+      }),
+    /root differs/u,
+  );
+  assert.deepEqual(inspectRuntimeSessionLease({ root: fixture }).lease, activeLease);
+  assert.deepEqual(inspectRuntimeSessionRecovery({ root: fixture }).recovery, recovery);
+
   const changedHelper = path.join(fixture, "scripts", "contracts", "framework-contract.mjs");
   writeFileSync(changedHelper, `${readFileSync(changedHelper, "utf8")}\n`, "utf8");
+  assert.equal(verifyStartupAttestation({ ...verification, hookInput: sideInput }), null);
   assert.throws(
     () =>
       verifyStartupAttestation({

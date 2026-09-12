@@ -26,17 +26,11 @@ import {
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..", "..");
 const matrixScript = fileURLToPath(new URL("./compatibility-matrix.mjs", import.meta.url));
-const reviewedIntegrities = {
-  arm64:
-    "sha512-MOg3B92G0c1xu2wZX5wuJXSpNagxCu9HAv+tfDn+Rp9UF2sO1CVC7UAPOMcp49UNvcLqH9PeoPsMxIy0dC9FNQ==",
-  x64: "sha512-FNEhITXrJmfmYfGsQTfldJGiqTXr3JEQlFMTPV0XJyFI7FP/3kOssgFgSkMOlNqJCT3qFqETi0kCO3PsYx9qUw==",
-};
+const currentMatrix = readCompatibilityMatrix();
+const reviewedIntegrities = currentMatrix.ci.miseNpmPackageIntegrities;
 const reviewedCodexIntegrities = {
-  arm64:
-    "sha512-SLC1JXw2TYfr/c3HhrJubyyLelq7vTOLWVmiThFA+z0+WgzCPmaseJ/kzDD3Gge/TO7fCnnj7UcPmC0d2c8XAg==",
-  wrapper:
-    "sha512-EQLEXecAG2ptxI7UpBMo2TR/ga5596/c/OsYF/0LoUDh5JANZ7IoGqlzBEWbuEVQ76JePIbtTW/ihCkp1a7Z3w==",
-  x64: "sha512-0W9MBxPpWW0cSkNqrTDN2jR7rzzT7oNMhQY5446lT2Lw5cz5yhDTck4Va9rjkQEm+HlFzP/dmEMSZbXfJsINmw==",
+  ...currentMatrix.ci.codexNpmPlatformIntegrities,
+  wrapper: currentMatrix.ci.codexNpmPackageIntegrity,
 };
 
 test("root and generated GitLab adapters share the exact reviewed mise verification block", () => {
@@ -76,7 +70,7 @@ test("root and generated GitLab adapters share the exact reviewed mise verificat
   ]);
   const unverifiedGitlab = rootGitlab.replace(
     "      npm pack --ignore-scripts",
-    '      npm install --global "${mise_package}@2026.8.6" --ignore-scripts\n      npm pack --ignore-scripts',
+    `      npm install --global "\${mise_package}@${matrix.ci.miseVersion}" --ignore-scripts\n      npm pack --ignore-scripts`,
   );
   assert.deepEqual(ciAdapterContractViolations("gitlab", unverifiedGitlab, matrix), [
     "verified-mise-install",
@@ -153,16 +147,17 @@ test("blocking CI uses the exact reviewed Codex wrapper and platform bytes", () 
 
 test("online freshness names the distinct stable and reviewed Codex versions", () => {
   const matrix = readCompatibilityMatrix();
+  const [major, minor, patch] = matrix.ci.codexVersion.split(".").map(Number);
+  const newerCodex = `${major}.${minor}.${patch + 1}`;
   assert.deepEqual(
     compatibilityFreshnessWarnings(matrix, {
-      codex: "0.149.0",
+      codex: newerCodex,
       pnpm: matrix.stable.pnpm.version,
     }),
     [
       {
         code: "online.codex.newer",
-        message:
-          "Codex stable 0.149.0 is newer than the reviewed blocking-CI version 0.147.0; keep host installations current through the official installer, and separately review and repin the exact CI archives.",
+        message: `Codex stable ${newerCodex} is newer than the reviewed blocking-CI version ${matrix.ci.codexVersion}; run canonical startup maintenance to review the official archives and update host and CI pins together.`,
       },
     ],
   );

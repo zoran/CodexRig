@@ -160,6 +160,7 @@ test("Stop lifecycle never touches active work from an ephemeral side conversati
   assert.deepEqual(
     await runStopLifecycle({
       root: project,
+      expectedSessionId: "a-different-durable-parent",
       hookInput: stopHookInput({ transcript_path: null }),
     }),
     {},

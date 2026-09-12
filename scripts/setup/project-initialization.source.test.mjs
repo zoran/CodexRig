@@ -366,7 +366,7 @@ test("clean project initialization removes inherited state and source-specific t
   assert.match(generatedAgents, /`instructions\.md` owns the complete agent workflow/);
   assert.match(
     generatedAgents,
-    /`codex update` first and stops on failure, validates prepared tools\/dependencies/,
+    /inventories worktrees\/recovery, maintains compatible tools\/packages\/CI, stops on failure/,
   );
   assert.match(generatedAgents, /Keep local Codex state in ignored repository-root CODEX_HOME/);
   for (const content of [generatedAgents, generatedInstructions]) {

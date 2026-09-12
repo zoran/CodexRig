@@ -11,16 +11,15 @@ import { formatContextError, sanitizeMultilineForTerminal } from "../terminal/te
 import { verificationChildEnvironment } from "../verify/verification-runtime-identity.mjs";
 import { acquireVerificationSessionLock } from "../verify/verification-session-lock.mjs";
 import { reconcileRepositoryWorktreeState } from "../repository/worktree-recovery.mjs";
+import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycle-process.mjs";
 import {
   applyHousekeepingWrites,
   housekeepingStateDirectory,
   recoverInterruptedHousekeepingWrites,
-} from "./repository-housekeeping-transaction.mjs";
+} from "../repository/repository-housekeeping-transaction.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, "..", "..");
-
-export { applyHousekeepingWrites, recoverInterruptedHousekeepingWrites };
 
 function parseArgs(argv) {
   const argumentsWithoutDelimiter = argv.filter((argument) => argument !== "--");
@@ -105,6 +104,50 @@ function failFromPlan(plan) {
   );
 }
 
+/** Reconciles source release metadata and its derived installation, including interrupted retries. */
+export function reconcileHousekeepingVersion({ root, apply, lifecycleCapability }) {
+  let plan = frameworkVersionReconciliationPlan({ root });
+  if (plan.blockingFindings.length > 0) failFromPlan(plan);
+  if (apply && plan.writes.length > 0) {
+    applyHousekeepingWrites({ root, writes: plan.writes });
+    plan = frameworkVersionReconciliationPlan({ root });
+  }
+  failFromPlan(plan);
+  if (apply && plan.applicable) {
+    try {
+      const result = spawnRuntimeLifecycleCommandSync({
+        command: process.execPath,
+        args: [
+          path.join(repositoryRoot, "scripts/deps/install-compatible.mjs"),
+          "--reproduce-locked",
+        ],
+        commandDelegation: { operation: "dependency", role: "housekeeping-dependency" },
+        lifecycleCapability,
+        repositoryRoot: root,
+        role: "housekeeping-deps-supervisor",
+        options: {
+          cwd: root,
+          encoding: "utf8",
+          env: verificationChildEnvironment(),
+          input: "",
+          stdio: "pipe",
+          timeout: 240_000,
+        },
+      });
+      if (result.error || result.status !== 0) {
+        throw new Error(
+          result.error?.message || result.stderr || "Dependency reproduction failed.",
+        );
+      }
+    } catch (error) {
+      throw new Error(
+        `${error.message} Source housekeeping is incomplete. Retry with mise exec --locked -- node scripts/goals/repository-housekeeping.mjs --apply; this also works when pnpm's pre-script guard rejects stale installation metadata.`,
+        { cause: error },
+      );
+    }
+  }
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) {
@@ -131,13 +174,11 @@ async function main() {
     }
     failFromPlan(worktreePlan);
     if (options.apply) recoverInterruptedHousekeepingWrites(repositoryRoot);
-    let versionPlan = frameworkVersionReconciliationPlan({ root: repositoryRoot });
-    if (versionPlan.blockingFindings.length > 0) failFromPlan(versionPlan);
-    if (options.apply && versionPlan.writes.length > 0) {
-      applyHousekeepingWrites({ root: repositoryRoot, writes: versionPlan.writes });
-      versionPlan = frameworkVersionReconciliationPlan({ root: repositoryRoot });
-    }
-    failFromPlan(versionPlan);
+    reconcileHousekeepingVersion({
+      root: repositoryRoot,
+      apply: options.apply,
+      lifecycleCapability: lock.lifecycleCapability,
+    });
 
     let plan = deliveryReconciliationPlan({ root: repositoryRoot });
     if (plan.blockingFindings.length > 0) failFromPlan(plan);

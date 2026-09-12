@@ -146,12 +146,27 @@ test("trusted dependency paths reject executable pnpm configuration before pnpm 
 
 test("trusted pnpm resolution rejects repository-local command shadowing", () => {
   const root = transactionFixture();
+  const current = JSON.parse(sourceCompatibility).stable;
   const decoy = path.join(root, "node_modules", ".bin", "pnpm");
   const toolRoot = mkdtempSync(path.join(os.tmpdir(), "trusted-pnpm-tool-"));
   transactionRoots.push(toolRoot);
-  const nodeExecutable = path.join(toolRoot, "installs", "node", "24.19.0", "bin", "node");
-  const trusted = path.join(toolRoot, "installs", "pnpm", "11.22.0", "pnpm");
-  const magicPathDecoy = path.join(toolRoot, "external", "installs", "pnpm", "11.22.0", "pnpm");
+  const nodeExecutable = path.join(
+    toolRoot,
+    "installs",
+    "node",
+    current.node.version,
+    "bin",
+    "node",
+  );
+  const trusted = path.join(toolRoot, "installs", "pnpm", current.pnpm.version, "pnpm");
+  const magicPathDecoy = path.join(
+    toolRoot,
+    "external",
+    "installs",
+    "pnpm",
+    current.pnpm.version,
+    "pnpm",
+  );
   mkdirSync(path.dirname(decoy), { recursive: true });
   mkdirSync(path.dirname(nodeExecutable), { recursive: true });
   mkdirSync(path.dirname(trusted), { recursive: true });
@@ -175,7 +190,7 @@ test("trusted pnpm resolution rejects repository-local command shadowing", () =>
     nodeExecutable,
     spawn(executable, args, options) {
       calls.push({ executable, args, environment: options.env });
-      return { status: 0, stdout: "11.22.0\n", stderr: "" };
+      return { status: 0, stdout: `${current.pnpm.version}\n`, stderr: "" };
     },
   });
   assert.equal(command.executable, trusted);

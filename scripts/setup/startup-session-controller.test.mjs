@@ -1,5 +1,6 @@
 /** Verifies the preloaded startup/session controller and repository-independent hook boundary. */
 import assert from "node:assert/strict";
+import { readCompatibilityMatrix } from "../contracts/framework-contract.mjs";
 import {
   chmodSync,
   copyFileSync,
@@ -144,7 +145,8 @@ function controllerFixture() {
       'const {appendFileSync,closeSync,existsSync,mkdirSync,readFileSync,writeFileSync}=require("node:fs");',
       'const path=require("node:path");',
       "const args=process.argv.slice(2);",
-      'if(args.length===1&&args[0]==="--version"){if(process.env.FAKE_CODEX_BEHAVIOR==="preflight-spawn-error"){const counter=process.argv[1]+".version-count";const count=(existsSync(counter)?Number(readFileSync(counter,"utf8")):0)+1;writeFileSync(counter,String(count));if(count===2)writeFileSync(process.argv[1],"#!/codexrig-missing-interpreter\\n");}process.stdout.write("codex-cli 0.147.0\\n");process.exit(0);}',
+      `const codexVersion=${JSON.stringify(readCompatibilityMatrix().ci.codexVersion)};`,
+      'if(args.length===1&&args[0]==="--version"){if(process.env.FAKE_CODEX_BEHAVIOR==="preflight-spawn-error"){const counter=process.argv[1]+".version-count";const count=(existsSync(counter)?Number(readFileSync(counter,"utf8")):0)+1;writeFileSync(counter,String(count));if(count===2)writeFileSync(process.argv[1],"#!/codexrig-missing-interpreter\\n");}process.stdout.write("codex-cli "+codexVersion+"\\n");process.exit(0);}',
       `const expectedHookArgs=${JSON.stringify(hookConfigArguments)};`,
       `const expectedHooks=${JSON.stringify(hookExpectations)};`,
       "const hookStart=args.indexOf(expectedHookArgs[1])-1;",
@@ -173,10 +175,23 @@ function controllerFixture() {
       'if(behavior==="aborted-lifecycle-request"){const poisonSource=`const http=require("node:http");const request=http.request({host:"127.0.0.1",method:"POST",path:"/session-start",port:Number(process.env.CODEXRIG_SESSION_CONTROL_PORT),headers:{"content-length":"262145","x-codexrig-session-control":process.env.CODEXRIG_SESSION_CONTROL_TOKEN}},response=>{response.resume();response.on("end",()=>process.exit(0));});request.on("error",()=>process.exit(0));request.end(Buffer.alloc(262145));setTimeout(()=>process.exit(2),5000);`;const poisoned=spawnSync(process.execPath,["--eval",poisonSource],{encoding:"utf8",env:process.env,input:"",stdio:"pipe",timeout:10000});if(poisoned.status!==0){process.stderr.write(poisoned.stderr+poisoned.stdout);process.exit(89);}}',
       'const permissionMode=args.includes("--dangerously-bypass-approvals-and-sandbox")?"bypassPermissions":"default";',
       'const source=behavior==="new-session"?"startup":"resume";',
-      'const sessionInput=JSON.stringify({cwd:root,hook_event_name:"SessionStart",model:"gpt-6-astra",permission_mode:permissionMode,session_id:sessionId,source});',
+      'const sessionInput=JSON.stringify({cwd:root,hook_event_name:"SessionStart",model:"gpt-6-astra",permission_mode:permissionMode,session_id:sessionId,source,transcript_path:path.join(root,"session.jsonl")});',
       'if(behavior==="cancel-picker")process.exit(0);',
       "const skipSessionStart=false;",
       'if(!skipSessionStart){const started=spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[0].command],{cwd:root,encoding:"utf8",env:process.env,input:sessionInput,stdio:"pipe"});if(started.status!==0||JSON.parse(started.stdout).continue!==true){process.stderr.write(started.stderr+started.stdout);process.exit(90);}}',
+      'if(behavior==="side-lifecycle"){',
+      '  const assert=require("node:assert/strict");',
+      '  const statePaths=[".codex/runtime/codexrig-session.json",".codex/runtime/codexrig-session-recovery.json"];',
+      '  const stateBefore=statePaths.map(file=>readFileSync(path.join(root,file),"utf8"));',
+      '  writeFileSync(path.join(root,"scripts/setup/startup-attestation.mjs"),"throw new Error(\\"Writable source must not be reloaded for a side conversation\\");\\n");',
+      '  const side={...JSON.parse(sessionInput),session_id:"01a06666-5678-7abc-8def-0123456789ab",source:"startup",transcript_path:null};',
+      '  const invoke=(index,input)=>spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[index].command],{cwd:root,encoding:"utf8",env:process.env,input:JSON.stringify(input),stdio:"pipe"});',
+      "  const started=invoke(0,side);assert.equal(started.status,0,started.stderr);assert.deepEqual(JSON.parse(started.stdout),{continue:true});",
+      "  const rejected=invoke(0,{...side,cwd:path.dirname(root)});assert.equal(JSON.parse(rejected.stdout).continue,false);",
+      '  const stopped=invoke(1,{...side,hook_event_name:"Stop",stop_hook_active:false});assert.equal(stopped.status,0,stopped.stderr);assert.equal(stopped.stdout,"");',
+      '  assert.deepEqual(statePaths.map(file=>readFileSync(path.join(root,file),"utf8")),stateBefore);',
+      '  assert.equal(existsSync(path.join(root,".codex/runtime/stop-continuation")),false);',
+      "}",
       'if(behavior==="supervisor-kill-orphan"){waitForCodexBinding();writeFileSync(process.env.FAKE_ORPHAN_MARKER,String(process.pid));for(const descriptor of [0,1,2]){try{closeSync(descriptor);}catch{}}process.kill(process.ppid,"SIGKILL");setInterval(()=>{},1000);}',
       'if(behavior==="active-mutate-exit")writeFileSync(path.join(root,"scripts/setup/startup-attestation.mjs"),"import {writeFileSync} from \\"node:fs\\";writeFileSync(process.env.MALICIOUS_MARKER,\\"executed\\");\\n");',
       'const stopSessionId=behavior==="forged-stop-id"?"01a08888-5678-7abc-8def-0123456789ab":sessionId;',
@@ -190,7 +205,11 @@ function controllerFixture() {
   );
   chmodSync(codexExecutable, 0o755);
   const pnpmExecutable = path.join(externalBin, "pnpm");
-  writeFileSync(pnpmExecutable, "#!/bin/sh\nprintf '%s\\n' 11.22.0\n", "utf8");
+  writeFileSync(
+    pnpmExecutable,
+    `#!/bin/sh\nprintf '%s\\n' ${readCompatibilityMatrix().stable.pnpm.version}\n`,
+    "utf8",
+  );
   chmodSync(pnpmExecutable, 0o755);
   // A child whose basename starts with `..` is still inside the project; prefix-only relative-path
   // checks have historically confused this shape with a parent traversal.
@@ -368,6 +387,17 @@ test("native picker can start a new session through the same authenticated lifec
   const result = runController(fixture, { behavior: "new-session" });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(inspectRuntimeSessionRecovery({ root: fixture.project }).status, "present");
+});
+
+test("side lifecycle preserves parent ownership after source edits and isolates a rejected side start", () => {
+  const fixture = controllerFixture();
+  const result = runController(fixture, { behavior: "side-lifecycle" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(inspectRuntimeSessionLease({ root: fixture.project }).status, "absent");
+  assert.equal(
+    inspectRuntimeSessionRecovery({ root: fixture.project }).recovery.codexSessionId,
+    capturedCalls(fixture)[0].sessionId,
+  );
 });
 
 test("active session cannot make the parent execute replaced repository control code", () => {

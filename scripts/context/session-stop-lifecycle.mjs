@@ -321,6 +321,7 @@ export async function runStopLifecycle({
 } = {}) {
   const prepared = prepareAutonomousContinuation(root, hookInput);
   if (prepared.errorOutput) return prepared.errorOutput;
+  if (!prepared.input?.hasDurableTranscript) return {};
   if (
     expectedSessionId !== null &&
     prepared.input !== null &&
@@ -328,8 +329,6 @@ export async function runStopLifecycle({
   ) {
     throw new Error("Stop hook session does not match the active verified Codex session");
   }
-  if (!prepared.input?.hasDurableTranscript) return {};
-
   // Sealing is a terminal session boundary; no later Stop work may run in this runtime session.
   const sealedStop = sealedHandoverStop(root, testHooks);
   if (sealedStop) return sealedStop;

@@ -15,6 +15,7 @@ import {
 } from "../repository/runtime-session-lease.mjs";
 import { formatContextError } from "../terminal/terminal-output.mjs";
 import {
+  parseSessionStartHookInput,
   reserveStartupAttestation,
   runtimeSessionLaunchState,
   startupAttestationBasis,
@@ -225,19 +226,28 @@ function createLifecycleServer({ controlToken, launch, root }) {
         return;
       }
       let hookInput;
+      let transcriptlessSessionStart = false;
       try {
         hookInput = await boundedRequestBody(request);
         if (mode === "session-start") {
+          const input = parseSessionStartHookInput(hookInput);
+          transcriptlessSessionStart = input.transcript_path === null;
           const attestation = verifyStartupAttestation({
             controlPolicy: launch.controlPolicy,
             expectedAttestation: launch.attestation,
-            hookInput,
+            hookInput: input,
             nonce: launch.nonce,
             root,
             runtimeExecutables: launch.runtimeExecutables,
           });
-          launch.sessionStartFailure = null;
-          writeControllerResponse(response, 200, sessionStartSuccess(attestation, { root }));
+          if (attestation !== null) {
+            launch.sessionStartFailure = null;
+          }
+          writeControllerResponse(
+            response,
+            200,
+            attestation === null ? { continue: true } : sessionStartSuccess(attestation, { root }),
+          );
           return;
         }
         if (runtimeSessionLaunchState(root, process.pid) !== "active") {
@@ -254,7 +264,9 @@ function createLifecycleServer({ controlToken, launch, root }) {
         });
         writeControllerResponse(response, 200, Object.keys(output).length === 0 ? null : output);
       } catch (error) {
-        if (mode === "session-start") launch.sessionStartFailure = error;
+        if (mode === "session-start" && !transcriptlessSessionStart) {
+          launch.sessionStartFailure = error;
+        }
         writeControllerResponse(
           response,
           200,

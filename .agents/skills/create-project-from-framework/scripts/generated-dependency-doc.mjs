@@ -1,15 +1,17 @@
 /** Owns generated dependency doc behavior for the portable clean-project generation boundary. */
 export const generatedDependencyAgentPolicy = [
-  "- Canonical Codex start updates the host CLI but never mutates dependencies. Run",
-  "  `scripts/deps/install-compatible.mjs` explicitly before first use and whenever dependency",
-  "  inputs or requested registry freshness change. It resolves the newest stable allowed graph",
-  "  under strict peer/engine checks; range changes remain explicit dependency-maintenance work.",
+  "- Every canonical start inventories worktrees and maintains compatible packages, Node.js, pnpm,",
+  "  mise, Codex and CI pins. It stages and installs the candidate under strict peers/engines, then",
+  "  atomically publishes unchanged inputs and reproduces offline. Failure stops admission.",
+  "  Tool ranges and annotated action majors remain the approved lines; side hooks never update.",
 ];
 
 export function generatedDependencyReadmePolicy(fence) {
   return [
-    "Canonical Codex start uses the already prepared locked runtime and dependency graph without",
-    "network or lockfile mutation. For first setup, explicit refresh, or repair, run:",
+    "Every canonical start checks official releases and maintains compatible packages, Node.js, pnpm,",
+    "mise, Codex and CI pins. The isolated candidate must pass strict peers/engines before a",
+    "recoverable input batch and offline installation; failure stops admission. Bootstrap Node.js",
+    "must be available before inventory. For first setup or dependency-only refresh, run:",
     "",
     fence + "bash",
     "mise install --locked",
@@ -28,9 +30,16 @@ export function generatedDependencyReadmePolicy(fence) {
 export const generatedDependencyInstructionsPolicy = [
   "## Dependency Installation And Freshness",
   "",
-  "Canonical Codex start never resolves or installs dependencies. Use",
-  "`mise exec --locked -- node scripts/deps/install-compatible.mjs` before first use and whenever",
-  "workspace dependency inputs or requested registry freshness change. The transaction resolves the",
+  "Every canonical Codex start checks official releases and maintains compatible packages, Node.js,",
+  "pnpm, mise, Codex and CI pins after worktree/recovery inventory and before session admission.",
+  "Tools stay within declared compatibility ranges and CI actions within annotated major lines.",
+  "Compatibility metadata, mise files and CI adapters are project-owned across framework upgrades.",
+  "A complete candidate is installed in isolation, then unchanged inputs permit one recoverable batch",
+  "and offline reproduction. Pending plans, unreconciled policies, unsafe writers, registry failure,",
+  "changed existing digests/tags or incompatible candidates stop startup. Side hooks never maintain.",
+  "Use `mise exec --locked -- node scripts/framework/maintain-toolchain.mjs` for explicit maintenance",
+  "inside an authorized slice, or `mise exec --locked -- node scripts/deps/install-compatible.mjs`",
+  "for dependency-only refreshes. The dependency transaction resolves the",
   "newest stable versions allowed by every manifest range, pin, override, and supply-chain rule.",
   "Strict peer and Node.js engine checks define compatibility. Only a successful, source-stable",
   "resolution may atomically replace `pnpm-lock.yaml`; installation then reproduces that lockfile",

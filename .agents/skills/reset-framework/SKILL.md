@@ -8,19 +8,8 @@ description:
 
 # Reset CodexRig Framework
 
-Use the deterministic reset boundary:
-
-```bash
-pnpm framework:reset
-pnpm framework:reset --apply
-```
-
-The first command is a read-only preview and exits non-zero while reset candidates exist. Review its
-exact list before using `--apply`. Runtime sanitation is allowed only after every Codex session for
-the repository has ended; the launcher-owned runtime lease makes the reset fail closed otherwise.
-
-For an explicitly requested commit and push of all reviewed source changes, the operator can run one
-command after exiting every owning Codex session:
+For a complete source-framework closure, lead with the existing publication orchestrator after every
+owning Codex session exits:
 
 ```bash
 mise exec --locked -- pnpm framework:publish --message "<commit message>"
@@ -34,6 +23,26 @@ through the managed pre-push hook, verifies remote `main`, and runs `goal:new` a
 Settlement. Every failure stops subsequent steps. A rejected push preserves the local commit;
 rerunning the command does not create an empty commit. This command and its implementation are
 excluded from generated projects. The command does not infer publication authority for an agent.
+
+Before a completion handoff, follow the command-selection rule in
+[Verification](../../../instructions.md#verification): confirm the current package script and README
+invocation, name its commit/push effects and post-exit prerequisite, and give the combined command.
+If publication is not authorized, explain that running it is the operator's explicit publication
+choice; do not silently substitute only reset steps. The `mise` prefix selects the declared runtime.
+
+For an explicitly reset-only/local outcome or a diagnosed recovery need, use the deterministic reset
+boundary and explain why publication is outside that action:
+
+```bash
+mise exec --locked -- pnpm framework:reset
+mise exec --locked -- pnpm framework:reset --apply
+mise exec --locked -- pnpm framework:reset
+```
+
+The first command is a read-only preview and exits non-zero while reset candidates exist. Review its
+exact list before using `--apply`, then require a clean preview. Runtime sanitation is allowed only
+after every Codex session for the repository has ended; the launcher-owned runtime lease makes the
+reset fail closed otherwise. The publication orchestrator already performs these reset steps.
 
 Project generation uses the internal `--post-project-creation --apply` mode after publishing a new
 target. That restricted mode may remove only reset-owned process/export residue that is safe during

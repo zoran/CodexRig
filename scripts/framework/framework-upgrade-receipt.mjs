@@ -16,6 +16,11 @@ export function buildUpgradedReceipt({ pendingReconciliation, sourceSnapshot, ta
   });
   receipt.managedFiles = structuredClone(sourceSnapshot.managedFiles);
   receipt.managedPackage = structuredClone(sourceSnapshot.managedPackage);
+  if (
+    installedContract.upgrade.projectOwnedDocuments.includes(installedContract.compatibilityFile)
+  ) {
+    receipt.managedPackage.packageManager = receipt.installedPackage.packageManager;
+  }
   receipt.pendingReconciliation = pendingReconciliation
     ? structuredClone(pendingReconciliation)
     : null;

@@ -226,6 +226,7 @@ function contract(version) {
     upgrade: {
       receiptFile: ".codexrig/installation.json",
       projectOwnedDocuments: [
+        ".codexrig/compatibility.json",
         ".codex/README.md",
         "AGENTS.md",
         "README.md",
@@ -237,12 +238,7 @@ function contract(version) {
         "docs/project.md",
         "instructions.md",
       ],
-      managedRoots: [
-        ".codexrig/compatibility.json",
-        ".codexrig/framework.json",
-        ".codexrig/policy-projection.json",
-        "managed",
-      ],
+      managedRoots: [".codexrig/framework.json", ".codexrig/policy-projection.json", "managed"],
       excludedPathReasons: {
         "managed/excluded.txt": "fixture-only managed exclusion",
       },
@@ -881,6 +877,9 @@ test("framework upgrade receipt uses the immutable planned source snapshot", () 
   const plan = buildFrameworkUpgradePlan({ sourceRoot: source, targetRoot: target });
   const plannedFiles = structuredClone(plan.sourceSnapshot.managedFiles);
   const plannedPackage = structuredClone(plan.sourceSnapshot.managedPackage);
+  plannedPackage.packageManager = JSON.parse(
+    readFileSync(path.join(target, "package.json"), "utf8"),
+  ).packageManager;
   const receipt = applyFrameworkUpgrade(plan, {
     refreshDependencies: () => {
       write(source, "managed/tool.mjs", "export const value = 'later';\n", 0o755);
@@ -1055,14 +1054,11 @@ test("compatibility matrix renders equivalent provider tracks", () => {
   assert.match(gitlab, /pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile/);
   assert.doesNotMatch(gitlab, /mise@latest/);
   const github = readFileSync(path.join(repositoryRoot, ".github", "workflows", "ci.yml"), "utf8");
-  assert.equal((github.match(/version: 2026\.8\.6/gu) ?? []).length, 2);
-  assert.equal(
-    (
-      github.match(/sha256: 96f6f1f416d868b78addd22746eefc7f4bf7820c6a3afa392a9f653f708c1644/gu) ??
-      []
-    ).length,
-    2,
+  const currentMatrix = JSON.parse(
+    readFileSync(path.join(repositoryRoot, ".codexrig/compatibility.json"), "utf8"),
   );
+  assert.equal(github.split(`version: ${currentMatrix.ci.miseVersion}`).length - 1, 2);
+  assert.equal(github.split(`sha256: ${currentMatrix.ci.miseLinuxX64Sha256}`).length - 1, 2);
 });
 
 function attestationFixture() {
@@ -1080,6 +1076,7 @@ function sessionStartHookInput(root, overrides = {}) {
   return {
     cwd: root,
     hook_event_name: "SessionStart",
+    transcript_path: path.join(root, "session.jsonl"),
     model: "gpt-6-astra",
     permission_mode: "default",
     session_id: "01a01234-5678-7abc-8def-0123456789ab",

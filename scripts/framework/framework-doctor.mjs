@@ -346,7 +346,7 @@ export function compatibilityFreshnessWarnings(matrix, latest) {
     pushFinding(
       warnings,
       "online.codex.newer",
-      `Codex stable ${latest.codex} is newer than the reviewed blocking-CI version ${matrix.ci.codexVersion}; keep host installations current through the official installer, and separately review and repin the exact CI archives.`,
+      `Codex stable ${latest.codex} is newer than the reviewed blocking-CI version ${matrix.ci.codexVersion}; run canonical startup maintenance to review the official archives and update host and CI pins together.`,
     );
   }
   return warnings;

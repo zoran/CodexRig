@@ -7,10 +7,10 @@ procedures.
 
 ## Start And Reconstruct
 
-1. Start at the repository root with `bash scripts/setup/start-codex.sh`. It runs `codex update`,
-   stops on failure, validates the prepared runtime and opens native `codex resume --cd "$PWD"` with
-   the repository root as `CODEX_HOME`. Only `--no-alt-screen` and explicit Dev-only `--yolo` are
-   launcher controls; enter prompts after native session selection.
+1. Start at the repository root with `bash scripts/setup/start-codex.sh`. It inventories worktrees,
+   automatically maintains compatible packages/tools/CI, stops on failure and opens native
+   `codex resume --cd "$PWD"` with the repository root as `CODEX_HOME`. Only `--no-alt-screen` and
+   explicit Dev-only `--yolo` are launcher controls; enter prompts after native session selection.
 2. Portable sessions use on-request approval and network-disabled workspace-write. Only an
    explicitly authorized Dev invocation with `--yolo` uses no approvals and danger-full-access,
    never staging or production. Tracked `.codex/hooks.json` executes nothing: the controller
@@ -159,8 +159,11 @@ procedures.
   rechecking actual main, then `mise exec --locked -- pnpm goal:new` before another goal. Source
   publication uses the explicit post-exit `pnpm framework:publish --message "<message>"` command:
   reset preview/apply/clean preview, housekeeping, verification, final reset, commit, push and
-  `goal:new`. No commit/push without authority; sibling creation never initializes Git. Never commit
-  secrets, local runtime, process history or generated handovers.
+  `goal:new`. When asked what remains after framework work, lead with this existing orchestrator,
+  its commit/push effects, and the requirement to exit all owning sessions; use the exact invocation
+  in the README. Individual reset commands are for reset-only intent or a diagnosed recovery need.
+  No commit/push without authority; sibling creation never initializes Git. Never commit secrets,
+  local runtime, process history or generated handovers.
 
 Detailed recovery, locks, trust, drain, publication and review procedures remain in
 [instructions.md](instructions.md); this bootstrap is not a second procedural authority.

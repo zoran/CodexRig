@@ -237,6 +237,9 @@ export function buildFrameworkUpgradePlan({ sourceRoot, targetRoot = frameworkRo
 
   const sourceManagedPackage = managedPackageSnapshot(source, sourceContract);
   const packagePlan = packageUpdatePlan({
+    preservePackageManager: sourceContract.upgrade.projectOwnedDocuments.includes(
+      sourceContract.compatibilityFile,
+    ),
     receipt,
     sourceManaged: sourceManagedPackage,
     targetRoot: target,

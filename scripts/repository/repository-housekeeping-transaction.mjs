@@ -1,4 +1,4 @@
-/** Owns crash-recoverable local file transactions for the repository housekeeping boundary. */
+/** Owns crash-recoverable repository maintenance transactions for housekeeping and startup. */
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
@@ -532,7 +532,7 @@ function recoverInterruptedHousekeepingWritesInternal(root, allowedOwnerPid = nu
       restorationTemporary,
     };
   });
-  if (inspected.every((entry) => entry.after)) {
+  if (allowedOwnerPid === null && inspected.every((entry) => entry.after)) {
     for (const entry of inspected) {
       removeTemporary(root, entry.afterTemporary, testHooks?.beforeRecoveryTemporaryRemove);
       removeTemporary(root, entry.restorationTemporary, testHooks?.beforeRecoveryTemporaryRemove);
@@ -625,10 +625,11 @@ export function recoverInterruptedHousekeepingWrites(root, { testHooks } = {}) {
   return recoverInterruptedHousekeepingWritesInternal(root, null, testHooks);
 }
 
-export function applyHousekeepingWrites({ root, testHooks, writes }) {
+/** Publishes one recoverable batch; synchronous finalization must succeed before sealing it. */
+export function applyHousekeepingWrites({ root, testHooks, writes, afterApply }) {
   recoverInterruptedHousekeepingWrites(root);
   const journal = plannedTransaction(root, writes);
-  if (!journal) return;
+  if (!journal) return afterApply?.();
   activeTransactionIds.add(journal.transactionId);
   try {
     const journalStats = persistJournal(root, journal, testHooks);
@@ -662,6 +663,10 @@ export function applyHousekeepingWrites({ root, testHooks, writes }) {
         },
       });
       testHooks?.afterTargetDirectorySync?.({ index, record });
+    }
+    const completion = afterApply?.();
+    if (completion && typeof completion.then === "function") {
+      throw new Error("Repository maintenance finalization must be synchronous.");
     }
     for (const record of journal.writes) {
       const current = readHousekeepingRegularState(root, record.relativePath);

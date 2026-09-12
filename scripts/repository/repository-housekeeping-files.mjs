@@ -1,4 +1,4 @@
-/** Owns held-parent, identity-checked filesystem I/O for repository housekeeping transactions. */
+/** Owns held-parent file I/O for repository maintenance transactions across lifecycle consumers. */
 import {
   closeSync,
   constants,

@@ -17,7 +17,7 @@ variables:
   pnpm_config_ignore_pnpmfile: "true"
 
 default:
-  image: node:24.19.0-bookworm
+  image: node:24.21.0-bookworm
   interruptible: true
 
 verify:
@@ -28,24 +28,24 @@ verify:
       /var/lib/apt/lists/*
     - |
       case "$(uname -m)" in
-        x86_64|amd64) mise_package='@jdxcode/mise-linux-x64'; mise_integrity='sha512-FNEhITXrJmfmYfGsQTfldJGiqTXr3JEQlFMTPV0XJyFI7FP/3kOssgFgSkMOlNqJCT3qFqETi0kCO3PsYx9qUw==' ;;
-        aarch64|arm64) mise_package='@jdxcode/mise-linux-arm64'; mise_integrity='sha512-MOg3B92G0c1xu2wZX5wuJXSpNagxCu9HAv+tfDn+Rp9UF2sO1CVC7UAPOMcp49UNvcLqH9PeoPsMxIy0dC9FNQ==' ;;
+        x86_64|amd64) mise_package='@jdxcode/mise-linux-x64'; mise_integrity='sha512-u5i30oDxZYJUh7y2K2bWz4n+p3YTa9y1htcSiJPdBTH9XCMzdNhmhHFEKspBrmxyb9qZju6s/FN0oGl42rLEyg==' ;;
+        aarch64|arm64) mise_package='@jdxcode/mise-linux-arm64'; mise_integrity='sha512-SkXAScilkoXsJVCDg/V5A+3koMAqZUDQeCcvsNxUv7AbVgwkAyDYH2fPIWO8K5WewrU3OJCzn90Zf4v2mB6W9w==' ;;
         *) echo "Unsupported GitLab runner architecture: $(uname -m)" >&2; exit 1 ;;
       esac
       mise_stage="$(umask 077 && mktemp -d)"
-      npm pack --ignore-scripts --pack-destination "$mise_stage" "${mise_package}@2026.8.6" >/dev/null
+      npm pack --ignore-scripts --pack-destination "$mise_stage" "${mise_package}@2026.9.5" >/dev/null
       mise_archive="$(node scripts/framework/compatibility-matrix.mjs --verify-mise-archive "$mise_stage" "$mise_integrity")"
       npm install --global "$mise_archive" --ignore-scripts --offline
-    - npm install --global pnpm@11.22.0 --ignore-scripts
+    - npm install --global pnpm@11.26.0 --ignore-scripts
     - |
       case "$(uname -m)" in
-        x86_64|amd64) codex_architecture='x64'; codex_platform_package='@openai/codex-linux-x64'; codex_platform_integrity='sha512-0W9MBxPpWW0cSkNqrTDN2jR7rzzT7oNMhQY5446lT2Lw5cz5yhDTck4Va9rjkQEm+HlFzP/dmEMSZbXfJsINmw==' ;;
-        aarch64|arm64) codex_architecture='arm64'; codex_platform_package='@openai/codex-linux-arm64'; codex_platform_integrity='sha512-SLC1JXw2TYfr/c3HhrJubyyLelq7vTOLWVmiThFA+z0+WgzCPmaseJ/kzDD3Gge/TO7fCnnj7UcPmC0d2c8XAg==' ;;
+        x86_64|amd64) codex_architecture='x64'; codex_platform_package='@openai/codex-linux-x64'; codex_platform_integrity='sha512-a4FI3A8sGtwGrOqltrPbrS2hajrHQG591EwmRfiRoLMb10VxdBtUGW4gu6IJVYENiYGA7k3P4jlRHEoCZU/s9Q==' ;;
+        aarch64|arm64) codex_architecture='arm64'; codex_platform_package='@openai/codex-linux-arm64'; codex_platform_integrity='sha512-KmTCB6ST484zeYlPpKP/K5P/gRaYmt6TihVD+zotoe6O9q0JSBP+FYvCz4A/zZXR7xDOHURTSjHp0sD8wWS0YQ==' ;;
         *) echo "Unsupported stable Codex CI architecture: $(uname -m)" >&2; exit 1 ;;
       esac
       codex_package='@openai/codex'
-      codex_version='0.147.0'
-      codex_wrapper_integrity='sha512-EQLEXecAG2ptxI7UpBMo2TR/ga5596/c/OsYF/0LoUDh5JANZ7IoGqlzBEWbuEVQ76JePIbtTW/ihCkp1a7Z3w=='
+      codex_version='0.154.0'
+      codex_wrapper_integrity='sha512-FV/x1OHXYv/ifjf3mXj9ThTTAWcUZN6cGIRQRhRxkKNOPuImu1WW0c8ev1vUkE9XGH90dEnYG1tBjIkxRikg0w=='
       codex_install_root="$(umask 077 && mktemp -d)"
       codex_stage="$codex_install_root/stage"
       codex_cache="$codex_install_root/cache"

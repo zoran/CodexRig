@@ -2,8 +2,18 @@
 # Owns check prereqs behavior for the setup, launch, and portable project boundary.
 set -euo pipefail
 
-required_node_version="24.19.0"
-required_pnpm_version="11.22.0"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+root="$(cd "$script_dir/../.." && pwd -P)"
+if ! command -v node >/dev/null 2>&1; then
+  echo "Bootstrap Node.js is unavailable. Run mise install --locked and use mise exec --locked." >&2
+  exit 1
+fi
+required_node_version="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).stable.node.version' "$root/.codexrig/compatibility.json")"
+required_pnpm_version="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).stable.pnpm.version' "$root/.codexrig/compatibility.json")"
+if [[ ! "$required_node_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || ! "$required_pnpm_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "The compatibility matrix has invalid runtime versions." >&2
+  exit 1
+fi
 missing_system=()
 runtime_issues=()
 optional_missing=()

@@ -22,6 +22,13 @@ description:
   dependency-graph refreshes. It resolves the newest stable versions allowed by workspace ranges and
   explicit pins under strict peer and Node.js engine compatibility, then installs the reviewed
   lockfile. A frozen install is a reproducibility command, not a freshness check.
+- Canonical startup invokes `scripts/framework/maintain-toolchain.mjs --startup` before session
+  admission. It checks official releases and updates Node.js/pnpm within matrix ranges, stable mise
+  and Codex, CI tool pins and action pins within annotated majors, plus compatible project packages.
+  It verifies changed archives, stages the complete candidate, publishes unchanged inputs together,
+  and reproduces offline. Failed freshness or installation stops startup; side hooks never update.
+  Project-owned toolchain metadata survives framework upgrades. Use the same command without
+  `--startup` for explicitly authorized current-slice maintenance.
 - Pre-push is read-only. Apply dependency changes before commit through an explicit maintenance
   command.
 

@@ -7,6 +7,7 @@ import {
   compatibleInstallArgs,
   compatibleUpdateArgs,
   installLatestCompatibleDependencies,
+  reproduceLockedDependencies,
 } from "./install-compatible.mjs";
 
 function compatibleInstallFixture(transactionFixture) {
@@ -70,6 +71,51 @@ function compatiblePnpmFixture(fixture, options = {}) {
 }
 
 export function registerCompatibleInstallationTests(transactionFixture) {
+  test("locked reproduction is offline, preserves inputs, and releases dependency ownership", () => {
+    const fixture = compatibleInstallFixture(transactionFixture);
+    const originalManifest = readFileSync(fixture.manifestPath, "utf8");
+    const originalLockfile = readFileSync(fixture.lockfilePath, "utf8");
+    const pnpm = compatiblePnpmFixture(fixture);
+    assert.deepEqual(
+      reproduceLockedDependencies({ projectRoot: fixture.root, spawnPnpm: pnpm.spawnPnpm }),
+      { lockfileUpdated: false, manifestCount: 1 },
+    );
+    assert.equal(pnpm.calls.length, 1);
+    assert.deepEqual(pnpm.calls[0].args, [...compatibleInstallArgs, "--offline"]);
+    assert.equal(pnpm.calls[0].ignorePnpmfile, "true");
+    assert.equal(pnpm.calls[0].cwd, fixture.root);
+    assert.equal(readFileSync(fixture.manifestPath, "utf8"), originalManifest);
+    assert.equal(readFileSync(fixture.lockfilePath, "utf8"), originalLockfile);
+    assert.equal(existsSync(path.join(fixture.root, ".project-state")), false);
+  });
+
+  test("locked reproduction reports failure without changing the lockfile or resolving versions", () => {
+    const fixture = compatibleInstallFixture(transactionFixture);
+    const originalLockfile = readFileSync(fixture.lockfilePath, "utf8");
+    const pnpm = compatiblePnpmFixture(fixture, { installStatus: 1 });
+    assert.throws(
+      () => reproduceLockedDependencies({ projectRoot: fixture.root, spawnPnpm: pnpm.spawnPnpm }),
+      /reproduction.*failed.*Installation is incomplete/u,
+    );
+    assert.equal(pnpm.calls.length, 1);
+    assert.equal(readFileSync(fixture.lockfilePath, "utf8"), originalLockfile);
+    assert.equal(existsSync(path.join(fixture.root, ".project-state")), false);
+  });
+
+  test("locked reproduction rejects concurrent manifest changes without overwriting them", () => {
+    const fixture = compatibleInstallFixture(transactionFixture);
+    const pnpm = compatiblePnpmFixture(fixture, { mutateSourceOnInstall: true });
+    assert.throws(
+      () => reproduceLockedDependencies({ projectRoot: fixture.root, spawnPnpm: pnpm.spawnPnpm }),
+      /plan is stale because package\.json changed/u,
+    );
+    assert.equal(
+      JSON.parse(readFileSync(fixture.manifestPath, "utf8")).description,
+      "edit during frozen install",
+    );
+    assert.equal(existsSync(path.join(fixture.root, ".project-state")), false);
+  });
+
   test("compatible installation stages registry freshness before a frozen install", () => {
     const fixture = compatibleInstallFixture(transactionFixture);
     const originalManifest = readFileSync(fixture.manifestPath, "utf8");

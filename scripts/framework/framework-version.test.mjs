@@ -7,7 +7,11 @@ import path from "node:path";
 import test from "node:test";
 import { serializeCanonicalJson } from "../contracts/framework-contract.mjs";
 import { cleanGitEnvironment } from "../repository/git-runtime-isolation.mjs";
-import { applyHousekeepingWrites } from "../goals/repository-housekeeping.mjs";
+import { reconcileHousekeepingVersion } from "../goals/repository-housekeeping.mjs";
+import { applyHousekeepingWrites } from "../repository/repository-housekeeping-transaction.mjs";
+import { trustedPnpmCommand } from "../deps/trusted-pnpm-command.mjs";
+import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
+import { acquireVerificationSessionLock } from "../verify/verification-session-lock.mjs";
 import {
   frameworkVersionEndMarker,
   frameworkVersionReconciliationPlan,
@@ -153,6 +157,88 @@ test("documentation-only change receives one idempotent patch release", (t) => {
   assert.equal(repeated.targetVersion, "2.1.1");
   assert.deepEqual(repeated.writes, []);
   assert.deepEqual(repeated.driftFindings, []);
+});
+
+for (const interrupted of [false, true]) {
+  test(`housekeeping leaves guarded pnpm usable after ${interrupted ? "an interrupted" : "a new"} version change`, (t) => {
+    const root = fixture(t);
+    write(root, ".gitignore", "node_modules/\n.codex/runtime/\n.project-state/\n");
+    write(
+      root,
+      ".codexrig/compatibility.json",
+      readFileSync(path.join(repositoryRoot, ".codexrig/compatibility.json"), "utf8"),
+    );
+    write(
+      root,
+      "pnpm-workspace.yaml",
+      "packages: []\nverifyDepsBeforeRun: error\nignorePnpmfile: true\npnpmfile: []\n",
+    );
+    const command = trustedPnpmCommand({ repositoryRoot: root });
+    const pnpm = (args) =>
+      spawnSync(command.executable, [...command.argsPrefix, ...args], {
+        cwd: root,
+        encoding: "utf8",
+        env: pnpmHooksDisabledEnvironment(process.env),
+        timeout: 30_000,
+      });
+    const initial = pnpm(["install", "--offline", "--ignore-scripts", "--ignore-pnpmfile"]);
+    assert.equal(initial.status, 0, initial.stderr);
+    const originalLockfile = readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8");
+    const plan = frameworkVersionReconciliationPlan({ root });
+    const probe = () => pnpm(["exec", "node", "-e", "process.exit(0)"]);
+    assert.equal(probe().status, 0);
+    if (interrupted) {
+      applyHousekeepingWrites({ root, writes: plan.writes });
+      assert.deepEqual(frameworkVersionReconciliationPlan({ root }).writes, []);
+      const blocked = probe();
+      assert.notEqual(blocked.status, 0);
+      assert.match(`${blocked.stdout}${blocked.stderr}`, /ERR_PNPM_VERIFY_DEPS_BEFORE_RUN/u);
+      reconcileHousekeepingVersion({ root, apply: false });
+      assert.notEqual(
+        probe().status,
+        0,
+        "check mode must leave stale installation state unchanged",
+      );
+    }
+    const reconcile = () => {
+      const lock = acquireVerificationSessionLock({ repositoryRoot: root });
+      try {
+        reconcileHousekeepingVersion({
+          root,
+          apply: true,
+          lifecycleCapability: lock.lifecycleCapability,
+        });
+      } finally {
+        lock.release();
+      }
+    };
+    if (interrupted) {
+      const pendingPlan = ".project-state/dependency-update/plan.json";
+      write(root, pendingPlan, "{}\n");
+      assert.throws(
+        reconcile,
+        /reviewed dependency update transaction.*housekeeping is incomplete/su,
+      );
+      assert.equal(readFileSync(path.join(root, pendingPlan), "utf8"), "{}\n");
+      assert.equal(readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8"), originalLockfile);
+      rmSync(path.join(root, pendingPlan));
+    }
+    reconcile();
+    assert.equal(probe().status, 0);
+    assert.equal(
+      JSON.parse(readFileSync(path.join(root, "package.json"))).version,
+      plan.targetVersion,
+    );
+    assert.deepEqual(frameworkVersionReconciliationPlan({ root }).writes, []);
+    assert.equal(readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8"), originalLockfile);
+  });
+}
+
+test("generated-project housekeeping does not install dependencies or alter product versions", (t) => {
+  const root = fixture(t, { reusable: false });
+  const manifest = readFileSync(path.join(root, "package.json"), "utf8");
+  reconcileHousekeepingVersion({ root, apply: true });
+  assert.equal(readFileSync(path.join(root, "package.json"), "utf8"), manifest);
 });
 
 test("deleting test-only coverage is patch-level while deleting production capability is major", (t) => {

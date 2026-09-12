@@ -434,7 +434,8 @@ export function issueStartupAttestation({
   return { attestation, nonce };
 }
 
-function parseHookInput(content) {
+/** Parses the native SessionStart shape; only explicit null denotes a transcriptless event. */
+export function parseSessionStartHookInput(content) {
   let input;
   try {
     input = JSON.parse(content);
@@ -449,6 +450,12 @@ function parseHookInput(content) {
   }
   if (!validCodexSessionId(input.session_id)) {
     throw new Error("SessionStart hook input has an invalid session identifier.");
+  }
+  if (
+    input.transcript_path !== null &&
+    (typeof input.transcript_path !== "string" || input.transcript_path.length === 0)
+  ) {
+    throw new Error("SessionStart hook input has an invalid transcript path.");
   }
   return input;
 }
@@ -527,6 +534,7 @@ function validateCurrentAttestationBasis({
   });
 }
 
+/** Activates a durable session; transcriptless events return null without acquiring ownership. */
 export function verifyStartupAttestation({
   root = frameworkRoot,
   hookInput,
@@ -538,8 +546,8 @@ export function verifyStartupAttestation({
 } = {}) {
   const input =
     typeof hookInput === "string"
-      ? parseHookInput(hookInput)
-      : parseHookInput(JSON.stringify(hookInput));
+      ? parseSessionStartHookInput(hookInput)
+      : parseSessionStartHookInput(JSON.stringify(hookInput));
   const runtimeLease = inspectRuntimeSessionLease({ root });
   if (runtimeLease.status !== "active") {
     throw new Error("Canonical launcher runtime session lease is missing or inactive.");
@@ -557,6 +565,21 @@ export function verifyStartupAttestation({
   }
   if (!/^[A-Za-z0-9_-]{40,128}$/u.test(nonce)) {
     throw new Error("Canonical launcher nonce is missing.");
+  }
+  if (input.transcript_path === null) {
+    // The authenticated controller already admitted the durable parent. Its in-memory forks
+    // neither consume a new startup attestation nor inherit the parent's recovery/continuation.
+    if (
+      runtimeLease.lease.phase !== "active" ||
+      runtimeLease.lease.process.pid !== process.pid ||
+      expectedAttestation === undefined ||
+      !equalHash(expectedAttestation.nonceSha256, nonce) ||
+      !equalHash(expectedAttestation.runtimeSessionIdSha256, runtimeLease.lease.sessionId) ||
+      JSON.stringify(expectedAttestation.root) !== JSON.stringify(identity)
+    ) {
+      throw new Error("Transcriptless SessionStart requires its active verified launcher session.");
+    }
+    return null;
   }
   const effectiveControlPolicy = startupControlPolicy(controlPolicy);
   const basis = validateCurrentAttestationBasis({

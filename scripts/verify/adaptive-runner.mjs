@@ -219,6 +219,7 @@ export function completeVerificationCommands() {
         "--test",
         "--test-reporter=dot",
         "scripts/framework/compatibility-integrity.test.mjs",
+        "scripts/framework/toolchain-maintenance.test.mjs",
         "scripts/framework/framework-version.test.mjs",
         "scripts/framework/framework-lifecycle.test.mjs",
         "scripts/platform/platform-lifecycle.test.mjs",

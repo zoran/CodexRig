@@ -68,10 +68,14 @@ export PNPM_CONFIG_IGNORE_PNPMFILE=true
 export npm_config_ignore_pnpmfile=true
 export pnpm_config_ignore_pnpmfile=true
 
-# Match `codex update && CODEX_HOME="$PWD" codex resume --cd "$PWD"`: update failure
-# stops startup, and the update retains the caller's environment. Bind the new executable afterward.
+# Inventory before mutation, then maintain tools, dependencies and CI together. Bootstrap Node
+# must already be available; the maintenance owner installs the reviewed candidate through mise.
 cd "$root"
-codex update
+if ! command -v node >/dev/null 2>&1; then
+  echo "Bootstrap Node.js is unavailable. Run mise install --locked, then retry inside mise exec --locked." >&2
+  exit 127
+fi
+node scripts/framework/maintain-toolchain.mjs --startup
 hash -r
 (
   env -u CODEX_HOME mise exec --locked -- node scripts/deps/verify-pnpm-execution-policy.mjs

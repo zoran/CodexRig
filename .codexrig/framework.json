@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "frameworkId": "codexrig",
-  "frameworkVersion": "3.2.0",
+  "frameworkVersion": "4.0.1",
   "compatibilityFile": ".codexrig/compatibility.json",
   "startup": {
     "attestationMaxAgeSeconds": 1800
@@ -38,6 +38,9 @@
     "receiptFile": ".codexrig/installation.json",
     "projectOwnedDocuments": [
       ".codex/README.md",
+      ".codexrig/compatibility.json",
+      ".github/workflows/ci.yml",
+      ".gitlab-ci.yml",
       "AGENTS.md",
       "README.md",
       "config/delivery.json",
@@ -46,7 +49,9 @@
       "config/tenancy.json",
       "docs/future-modules.md",
       "docs/project.md",
-      "instructions.md"
+      "instructions.md",
+      "mise.lock",
+      "mise.toml"
     ],
     "managedRoots": [
       ".agents/skills",
@@ -54,15 +59,10 @@
       ".codex/config.toml",
       ".codex/hooks.json",
       ".codexrig/framework.json",
-      ".codexrig/compatibility.json",
       ".codexrig/policy-projection.json",
-      ".github/workflows/ci.yml",
-      ".gitlab-ci.yml",
       "LICENSE",
       "NOTICE",
       "dependency-policy.json",
-      "mise.lock",
-      "mise.toml",
       "pnpm-workspace.yaml",
       "scripts"
     ],

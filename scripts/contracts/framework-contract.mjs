@@ -277,7 +277,6 @@ export function validateFrameworkContract(value) {
   );
   const frameworkControlledUpgradeInputs = new Set([
     frameworkContractPath,
-    contract.compatibilityFile,
     upgrade.receiptFile,
     "package.json",
     "pnpm-lock.yaml",
