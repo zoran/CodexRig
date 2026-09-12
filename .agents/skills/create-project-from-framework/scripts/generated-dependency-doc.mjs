@@ -6,27 +6,6 @@ export const generatedDependencyAgentPolicy = [
   "  Tool ranges and annotated action majors remain the approved lines; side hooks never update.",
 ];
 
-export function generatedDependencyReadmePolicy(fence) {
-  return [
-    "Every canonical start checks official releases and maintains compatible packages, Node.js, pnpm,",
-    "mise, Codex and CI pins. The isolated candidate must pass strict peers/engines before a",
-    "recoverable input batch and offline installation; failure stops admission. Bootstrap Node.js",
-    "must be available before inventory. For first setup or dependency-only refresh, run:",
-    "",
-    fence + "bash",
-    "mise install --locked",
-    "mise exec --locked -- node scripts/deps/install-compatible.mjs",
-    "mise exec --locked -- pnpm setup",
-    fence,
-    "",
-    "The compatible installer resolves registry versions in isolation, rejects invalid peer or Node.js",
-    "engine combinations, atomically refreshes `pnpm-lock.yaml`, and then installs that exact",
-    "resolution with lifecycle scripts disabled. Registry or installation failure leaves durable",
-    "dependency inputs unchanged. A frozen install reproduces a reviewed lockfile; it does not",
-    "establish registry freshness.",
-  ];
-}
-
 export const generatedDependencyInstructionsPolicy = [
   "## Dependency Installation And Freshness",
   "",

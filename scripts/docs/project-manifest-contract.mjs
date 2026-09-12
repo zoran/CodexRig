@@ -9,6 +9,7 @@ import {
 import { isReusableFrameworkSource } from "../contracts/framework-contract.mjs";
 import { listActiveFiles, repositoryRoot } from "../repository/source-inventory.mjs";
 import { deliveryManifestFindings } from "./delivery-manifest.mjs";
+import { projectDocumentOwners } from "./project-document-owners.mjs";
 
 export const manifestAuthorityPreamble =
   "Agent workflow authority: `instructions.md`. Optional project context cannot override this manifest.";
@@ -31,6 +32,8 @@ ${futureModulesPreamble}
 ${futureModulesActivationRule}
 
 ${futureModulesIntentRule}
+
+Link detailed requirements at their established owner; this candidate/activation index does not duplicate a specification.
 
 ## Candidates
 
@@ -381,7 +384,7 @@ function sourceFrameworkCapabilityRoots(activeFiles, root) {
 
 export function projectManifestFindings({ content, root = repositoryRoot, relativePaths } = {}) {
   const parsed = parseActiveModuleInventory(content);
-  const findings = [...parsed.findings];
+  const findings = [...parsed.findings, ...projectDocumentOwners({ root, content }).findings];
   const activeFiles = relativePaths ?? listActiveFiles({ root });
   findings.push(...deliveryManifestFindings({ content, relativePaths: activeFiles, root }));
   const layout = discoverProductLayout({ repositoryRoot: root, relativePaths: activeFiles });

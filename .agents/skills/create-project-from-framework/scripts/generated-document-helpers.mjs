@@ -21,18 +21,17 @@ export function escapeMarkdownText(value) {
   return String(value).replace(/[\\`*_{}\[\]<>()#+!|]/gu, "\\$&");
 }
 
-export function initialDescriptionLines(description) {
-  if (!description) return [];
-  return [
-    "",
-    "## Initial Project Description",
+export function initialRequirementsDocument(description) {
+  if (!description) throw new Error("A requirements draft requires a supplied description.");
+  return markdown([
+    "# Product Requirements",
     "",
     "This user-provided creation brief is input to the first-start Project Definition Intake. Codex",
-    "evaluates it with the user before converting it into confirmed durable manifest facts; it does",
+    "evaluates it with the user and refines requirements here, preserving this owner; it does",
     "not activate a module or authorize implementation by itself.",
     "",
     ...description.split("\n").map((line) => `> ${escapeMarkdownText(line)}`),
-  ];
+  ]);
 }
 
 export function writeRelative(targetRoot, relativePath, content) {

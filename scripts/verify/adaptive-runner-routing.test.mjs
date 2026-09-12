@@ -6,6 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import {
   isRepositoryCodexHomePath,
+  listActiveFiles,
   repositoryCodexHomeRuntimeProbePaths,
 } from "../repository/source-inventory.mjs";
 import { buildPlan, completeVerificationCommands } from "./adaptive-runner.mjs";
@@ -98,16 +99,17 @@ test("focused ownership never treats filtered or different executions as complet
   );
 });
 
-test("complete verification executes the worktree recovery and reset boundaries", () => {
+test("complete verification covers installed framework suites including source-only boundaries", () => {
   const commands = completeVerificationCommands();
-  const boundary = commands.find((command) => command.key === "verification-boundary-regressions");
-  assert.ok(boundary);
-  assert.ok(boundary.args.includes("scripts/repository/worktree-recovery.test.mjs"));
-  const framework = commands.find((command) => command.key === "framework-regressions");
-  assert.ok(framework);
-  assert.ok(
-    framework.args.includes(".agents/skills/reset-framework/scripts/reset-framework.test.mjs"),
+  const selected = commands
+    .flatMap((command) => command.args)
+    .filter((argument) => argument.endsWith(".test.mjs"));
+  const installed = listActiveFiles().filter(
+    (relativePath) =>
+      relativePath.endsWith(".test.mjs") &&
+      (relativePath.startsWith("scripts/") || relativePath.startsWith(".agents/skills/")),
   );
+  assert.deepEqual([...new Set(selected)].sort(), installed.sort());
 });
 
 test("successful basis plus a fully owned product delta stays targeted even at the full entry", () => {

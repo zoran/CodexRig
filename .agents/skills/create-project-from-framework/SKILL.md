@@ -2,10 +2,10 @@
 name: create-project-from-framework
 description:
   Create a clean sibling project from the CodexRig Framework after the user supplies a project name
-  and is proactively invited to develop a detailed product/manifest description with Codex. Exclude
-  Git history, local runtime/cache state, framework planning history, provider-specific
-  collaboration metadata, and framework-only material while preserving both portable CI adapters,
-  project policy, and reusable tooling.
+  and is proactively invited to develop a detailed product description with Codex. Exclude Git
+  history, local runtime/cache state, framework planning history, provider-specific collaboration
+  metadata, and framework-only material while preserving both portable CI adapters, project policy,
+  and reusable tooling.
 ---
 
 # Create Project From CodexRig Framework
@@ -14,21 +14,25 @@ Require a user-provided project name. Do not invent one.
 
 Immediately after receiving the name, ask what the product should actually do; a tagline or one- or
 two-sentence summary is not the full creation intake. Invite a detailed description in the user's
-own words and explain before asking that Codex will proactively structure it into the manifest,
-challenge ambiguities and contradictions, recommend missing decisions, and continue refining it with
-the user inside the generated project. Cover users/outcomes and critical workflows, scope and
-non-goals, likely domains/capabilities, data/integrations/trust, desired surfaces/devices, delivery
-constraints, and user-facing single- versus multi-locale needs without demanding jargon or a
-finished specification. Do not ask again for facts already supplied. Summarize sufficient input for
-correction; pass the confirmed detailed description with `--description`. If material creation input
-is missing, continue small focused questions. Only an explicit user choice to defer the description
-permits generation without it; silence or a short summary is not that choice.
+own words and explain before asking that Codex will proactively structure it at its requirements
+owner, challenge ambiguities and contradictions, recommend missing decisions, and continue refining
+it with the user inside the generated project. Cover users/outcomes and critical workflows, scope
+and non-goals, likely domains/capabilities, data/integrations/trust, desired surfaces/devices,
+delivery constraints, and user-facing single- versus multi-locale needs without demanding jargon or
+a finished specification. Do not ask again for facts already supplied. Summarize sufficient input
+for correction; pass the confirmed detailed description with `--description`. If material creation
+input is missing, continue small focused questions. Only an explicit user choice to defer the
+description permits generation without it; silence or a short summary is not that choice.
 
 Explain the handoff before generation: the description is stored as a visible intake draft, never as
-active module inventory. On the child's first start, Codex evaluates any draft or filled manifest,
-explains the successive Project Definition Intake, identifies strengths, gaps, and contradictions,
-and asks whether the user wants to refine it or—when decision-ready—begin from the confirmed scope.
-The manifest remains refinable when later learning changes durable truth.
+active module inventory. On the child's first start, Codex evaluates any draft or existing
+definition, explains the successive Project Definition Intake, identifies strengths, gaps, and
+contradictions, and asks whether the user wants to refine it or—when decision-ready—begin from the
+confirmed scope. Requirements stay refinable at that same owner; the manifest records current
+technical inventory. Follow
+[Documentation Ownership](../../../instructions.md#documentation-ownership). A supplied detailed
+brief creates `docs/requirements.md` as an unconfirmed draft linked from the manifest. Without a
+brief the product stays pending and no extra specification is generated.
 
 Treat the current prompt and current source tree as the only project-creation inputs. Local Codex
 memories are disabled in the reusable source: never retrieve, use, or preserve historical task,
@@ -71,11 +75,13 @@ explicitly asks to transfer a working-tree snapshot.
 Before publication, a complete selected-source transfer manifest must classify every inventoried
 path as either copied or excluded for a non-empty source-only reason. Every copied reusable file
 must remain byte-identical unless it is one of the explicit project identity/configuration
-transformations; the generated installation receipt is the only required project-only file, with an
-empty `src/.gitkeep` allowed only when the selected source has no file in its required Product Root.
-A missing, unexpected, or undeclared changed file fails project creation. This invariant carries
-every still-active framework capability, including work introduced in earlier framework revisions,
-without copying retired or source-only generator/reset behavior into a product repository.
+transformations; the installation receipt and initial typed configurations are required project-only
+files. A supplied description adds its declared requirements draft; no brief adds no specification.
+An empty `src/.gitkeep` is allowed only when the selected source has no file in its required Product
+Root. A missing, unexpected, or undeclared changed file fails project creation. This invariant
+carries every still-active framework capability, including work introduced in earlier framework
+revisions, without copying retired or source-only generator/reset behavior into a product
+repository.
 
 After publication, run `mise install --locked`,
 `mise exec --locked -- node scripts/deps/install-compatible.mjs`, and

@@ -10,10 +10,15 @@ import {
 import {
   isRepositoryProcessMarkdownPath,
   listDocumentationMarkdownFiles,
-  markdownBodyForHeadingValidation,
 } from "../docs/document-scope.mjs";
+import {
+  documentFragmentFindings,
+  markdownFileLinks,
+  markdownHeadingContract,
+} from "../docs/document-references.mjs";
 import { futureModuleBacklogHeading } from "../docs/project-manifest-contract.mjs";
-import { repositoryRoot } from "../repository/source-inventory.mjs";
+import { listActiveFiles, repositoryRoot } from "../repository/source-inventory.mjs";
+import { readmeDocumentationFindings } from "../docs/project-document-policy.mjs";
 
 const root = repositoryRoot;
 const manifestCheck = spawnSync(
@@ -24,8 +29,13 @@ const manifestCheck = spawnSync(
 if (manifestCheck.status !== 0) process.exit(manifestCheck.status ?? 1);
 
 const failures = [];
+failures.push(
+  ...readmeDocumentationFindings({
+    readme: readFileSync(path.join(root, "README.md"), "utf8"),
+    relativePaths: listActiveFiles({ root }),
+  }),
+);
 const agentsBootstrapByteLimit = 24 * 1024;
-const maximumSectionSpanLines = 200;
 const frameworkContract = readFrameworkContract(root);
 const installationReceipt = readInstallationReceipt(root, frameworkContract, { optional: true });
 if (installationReceipt?.pendingReconciliation) {
@@ -34,100 +44,7 @@ if (installationReceipt?.pendingReconciliation) {
   );
 }
 
-function markdownLinesAfterFrontmatter(content) {
-  const lines = String(content).split(/\r?\n/u);
-  if (lines[0] !== "---") return lines;
-  const end = lines.indexOf("---", 1);
-  if (end < 0) return lines;
-  return lines.slice(end + 1);
-}
-
-function headingLabel(raw) {
-  return raw
-    .replace(/\s+#+\s*$/u, "")
-    .replace(/!\[([^\]]*)\]\([^)]*\)/gu, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/gu, "$1")
-    .replace(/<[^>]+>/gu, "")
-    .replace(/[`*_~]/gu, "")
-    .trim();
-}
-
-function headingSlug(label) {
-  return label
-    .normalize("NFKC")
-    .toLocaleLowerCase("en-US")
-    .replace(/[^\p{L}\p{N}\s_-]/gu, "")
-    .trim()
-    .replace(/\s+/gu, "-");
-}
-
-function markdownHeadingContract(relativePath, content) {
-  const findings = [];
-  const headings = [];
-  const lines = markdownLinesAfterFrontmatter(
-    markdownBodyForHeadingValidation(relativePath, content),
-  );
-  let fenced = false;
-  for (const [index, line] of lines.entries()) {
-    if (/^\s*(?:```|~~~)/u.test(line)) {
-      fenced = !fenced;
-      continue;
-    }
-    if (fenced) continue;
-    const match = /^(#{1,6})\s+(.+?)\s*$/u.exec(line);
-    if (!match) continue;
-    const label = headingLabel(match[2]);
-    headings.push({ label, level: match[1].length, line: index + 1 });
-  }
-  if (headings.length === 0) {
-    findings.push(`${relativePath}: missing top-level title`);
-    return { anchors: new Set(), findings };
-  }
-  const firstContentLine = lines.find((line) => line.trim());
-  if (headings[0].level !== 1 || firstContentLine !== lines[headings[0].line - 1]) {
-    findings.push(`${relativePath}: the first document content must be one level-one title`);
-  }
-  const topLevel = headings.filter((heading) => heading.level === 1);
-  if (topLevel.length !== 1) {
-    findings.push(
-      `${relativePath}: expected exactly one level-one title, found ${topLevel.length}`,
-    );
-  }
-  let previousLevel = 0;
-  const anchors = new Set();
-  for (const heading of headings) {
-    if (!heading.label || /^(?:section|title|todo|tbd|untitled)$/iu.test(heading.label)) {
-      findings.push(`${relativePath}:${heading.line}: heading is empty or non-descriptive`);
-    }
-    if (previousLevel > 0 && heading.level > previousLevel + 1) {
-      findings.push(
-        `${relativePath}:${heading.line}: heading level jumps from ${previousLevel} to ${heading.level}`,
-      );
-    }
-    previousLevel = heading.level;
-    const slug = headingSlug(heading.label);
-    if (!slug) {
-      findings.push(`${relativePath}:${heading.line}: heading has no referenceable anchor`);
-    } else if (anchors.has(slug)) {
-      findings.push(`${relativePath}:${heading.line}: duplicate heading anchor #${slug}`);
-    } else {
-      anchors.add(slug);
-    }
-  }
-  for (const [index, heading] of headings.entries()) {
-    const nextHeadingLine = headings[index + 1]?.line ?? lines.length + 1;
-    const span = nextHeadingLine - heading.line;
-    if (span > maximumSectionSpanLines) {
-      findings.push(
-        `${relativePath}:${heading.line}: section #${headingSlug(heading.label)} spans ${span} lines; split it into meaningful referenceable subsections`,
-      );
-    }
-  }
-  return { anchors, findings };
-}
-
 const documentationPaths = listDocumentationMarkdownFiles();
-const headingContracts = new Map();
 for (const relativePath of documentationPaths) {
   const content = readFileSync(path.join(root, relativePath), "utf8");
   if (
@@ -139,7 +56,6 @@ for (const relativePath of documentationPaths) {
     );
   }
   const headingContract = markdownHeadingContract(relativePath, content);
-  headingContracts.set(relativePath, headingContract);
   failures.push(...headingContract.findings);
 }
 for (const relativePath of documentationPaths) {
@@ -156,8 +72,7 @@ for (const relativePath of documentationPaths) {
       `${relativePath}: future module candidates belong only in docs/future-modules.md (${futureHeading.trim()})`,
     );
   }
-  for (const match of content.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
-    const raw = match[1].trim().replace(/^<|>$/gu, "");
+  for (const raw of markdownFileLinks(content)) {
     if (/^(?:https?:|mailto:)/u.test(raw)) continue;
     const [encodedTarget, encodedFragment = ""] = raw.split("#", 2);
     let targetPart;
@@ -181,12 +96,13 @@ for (const relativePath of documentationPaths) {
       failures.push(`${relativePath}: link escapes repository: ${raw}`);
     } else if (!existsSync(target)) {
       failures.push(`${relativePath}: broken link ${raw}`);
-    } else if (fragment && /\.mdx?$/iu.test(target)) {
+    } else if (fragment && /\.(?:mdx?|html?)$/iu.test(target)) {
       const normalizedTarget = relativeTarget.split(path.sep).join("/");
-      const targetContract = headingContracts.get(normalizedTarget);
-      if (!targetContract?.anchors.has(fragment)) {
-        failures.push(`${relativePath}: broken heading reference ${raw}`);
-      }
+      failures.push(
+        ...documentFragmentFindings(normalizedTarget, readFileSync(target, "utf8"), fragment).map(
+          (finding) => `${relativePath}: ${finding}`,
+        ),
+      );
     }
   }
 }

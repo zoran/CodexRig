@@ -40,23 +40,41 @@ function plan(commands) {
   };
 }
 
-function delayedCommand({ artifactOwner, key, lockPath, orderPath }) {
+function artifactCommand({
+  artifactOwner,
+  key,
+  lockPath,
+  orderPath,
+  peerKey,
+  startupDelayMilliseconds = 0,
+}) {
   const source = `
-    import { appendFileSync, closeSync, openSync, rmSync } from "node:fs";
+    import { appendFileSync, closeSync, openSync, readFileSync, rmSync } from "node:fs";
+    import { performance } from "node:perf_hooks";
+    import { setTimeout as delay } from "node:timers/promises";
     let descriptor;
     try {
+      ${startupDelayMilliseconds ? `await delay(${startupDelayMilliseconds});` : ""}
       ${lockPath ? `descriptor = openSync(${JSON.stringify(lockPath)}, "wx");` : ""}
       appendFileSync(${JSON.stringify(orderPath)}, ${JSON.stringify(`start:${key}\n`)});
-      setTimeout(() => {
-        if (descriptor !== undefined) {
-          closeSync(descriptor);
-          rmSync(${JSON.stringify(lockPath)});
-        }
-        appendFileSync(${JSON.stringify(orderPath)}, ${JSON.stringify(`end:${key}\n`)});
-      }, 80);
-    } catch {
-      appendFileSync(${JSON.stringify(orderPath)}, ${JSON.stringify(`collision:${key}\n`)});
+      ${
+        peerKey
+          ? `const deadline = performance.now() + 5000;
+      while (!readFileSync(${JSON.stringify(orderPath)}, "utf8").split("\\n").includes(${JSON.stringify(`start:${peerKey}`)})) {
+        if (performance.now() >= deadline) throw new Error(${JSON.stringify(`Timed out waiting for artifact peer ${peerKey} in ${key}.`)});
+        await delay(5);
+      }`
+          : "await delay(80);"
+      }
+      appendFileSync(${JSON.stringify(orderPath)}, ${JSON.stringify(`end:${key}\n`)});
+    } catch (error) {
+      console.error(error.stack ?? error);
       process.exitCode = 2;
+    } finally {
+      if (descriptor !== undefined) {
+        closeSync(descriptor);
+        rmSync(${JSON.stringify(lockPath)});
+      }
     }
   `;
   return {
@@ -78,13 +96,13 @@ test("same artifact owners serialize while disjoint owners run in parallel", asy
   const sharedLock = path.join(fixtureRoot, "shared.lock");
   await runLockedPlan(
     plan([
-      delayedCommand({
+      artifactCommand({
         artifactOwner: "workspace:alpha",
         key: "shared-a",
         lockPath: sharedLock,
         orderPath: sharedOrder,
       }),
-      delayedCommand({
+      artifactCommand({
         artifactOwner: "workspace:alpha",
         key: "shared-b",
         lockPath: sharedLock,
@@ -99,27 +117,33 @@ test("same artifact owners serialize while disjoint owners run in parallel", asy
     "start:shared-b",
     "end:shared-b",
   ]);
+  assert.equal(existsSync(sharedLock), false);
 
+  // Readiness, rather than matching process startup times, proves disjoint commands overlap.
+  // Deliberate startup skew exceeds the shared fixture's hold without changing executor limits.
   const disjointOrder = path.join(fixtureRoot, "disjoint-order.txt");
   await runLockedPlan(
     plan([
-      delayedCommand({
+      artifactCommand({
         artifactOwner: "workspace:alpha",
         key: "disjoint-a",
         orderPath: disjointOrder,
+        peerKey: "disjoint-b",
       }),
-      delayedCommand({
+      artifactCommand({
         artifactOwner: "workspace:beta",
         key: "disjoint-b",
         orderPath: disjointOrder,
+        peerKey: "disjoint-a",
+        startupDelayMilliseconds: 200,
       }),
     ]),
     fixtureRoot,
   );
-  assert.deepEqual(
-    new Set(readFileSync(disjointOrder, "utf8").trim().split("\n").slice(0, 2)),
-    new Set(["start:disjoint-a", "start:disjoint-b"]),
-  );
+  const events = readFileSync(disjointOrder, "utf8").trim().split("\n");
+  assert.equal(events.length, 4);
+  assert.deepEqual(new Set(events.slice(0, 2)), new Set(["start:disjoint-a", "start:disjoint-b"]));
+  assert.deepEqual(new Set(events.slice(2)), new Set(["end:disjoint-a", "end:disjoint-b"]));
 });
 
 test("verification children use the runtime-bound environment owner", () => {

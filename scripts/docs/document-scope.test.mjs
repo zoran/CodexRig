@@ -10,6 +10,7 @@ import {
   listManagedMarkdownFiles,
   markdownBodyForHeadingValidation,
 } from "./document-scope.mjs";
+import { readmeDocumentationFindings } from "./project-document-policy.mjs";
 
 test("sync and verification scope includes Markdown in arbitrary active project roots", () => {
   for (const relativePath of [
@@ -84,4 +85,42 @@ test("canonical active inventory feeds the shared Markdown scope", (t) => {
   writeFileSync(path.join(root, "src", "notes.txt"), "not Markdown\n", "utf8");
   writeFileSync(path.join(root, ".agents", "skills", "fixture", "SKILL.md"), "# Skill\n", "utf8");
   assert.deepEqual(listManagedMarkdownFiles({ root }), ["README.md", "src/README.md"]);
+});
+
+test("README discovery follows new and moved documents without treating examples as links", () => {
+  const initial = [
+    "docs/project.md",
+    "docs/future-modules.md",
+    "docs/project-context.md",
+    "docs/assets/diagram.svg",
+  ];
+  const readme =
+    "# Project\n\n[Inventory](docs/project.md) and [Candidates](docs/future-modules.md).\n";
+  assert.deepEqual(readmeDocumentationFindings({ readme, relativePaths: initial }), []);
+  const expanded = [...initial, "docs/operations.html"];
+  assert.match(
+    readmeDocumentationFindings({ readme, relativePaths: expanded }).join("\n"),
+    /must link to docs\/operations.html/,
+  );
+  const examples =
+    readme + "\n`[Example](docs/operations.html)`\n```md\n[Example](docs/operations.html)\n```\n";
+  assert.equal(
+    readmeDocumentationFindings({ readme: examples, relativePaths: expanded }).length,
+    1,
+  );
+  const referenceLinks =
+    readme + '\n[Operations][ops]\n\n[ops]: docs/operations.html "Operations"\n';
+  assert.deepEqual(
+    readmeDocumentationFindings({ readme: referenceLinks, relativePaths: expanded }),
+    [],
+  );
+  const linked = readme + "\n[Operations and\nrecovery](docs/operations.html#recovery)\n";
+  assert.deepEqual(readmeDocumentationFindings({ readme: linked, relativePaths: expanded }), []);
+  assert.equal(
+    readmeDocumentationFindings({
+      readme: linked,
+      relativePaths: [...initial, "docs/operating-guide.html"],
+    }).length,
+    1,
+  );
 });

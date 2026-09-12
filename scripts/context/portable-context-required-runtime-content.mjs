@@ -213,7 +213,15 @@ export function portableRuntimeRequiredContent() {
     ],
     [
       "scripts/verify/docs.mjs",
-      ["duplicate heading anchor", "broken heading reference", "pendingReconciliation"],
+      ["documentFragmentFindings", "markdownHeadingContract", "pendingReconciliation"],
+    ],
+    [
+      "scripts/docs/document-references.mjs",
+      ["duplicate heading anchor", "broken heading reference"],
+    ],
+    [
+      "scripts/docs/project-document-owners.mjs",
+      ["projectDocumentOwners", "Requirements owner", "UI reference"],
     ],
     [
       "scripts/verify/adaptive-options.mjs",

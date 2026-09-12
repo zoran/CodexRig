@@ -136,6 +136,16 @@ export function generatedPolicyProjectionLines(surface, root = frameworkRoot) {
   if (!allowedSurfaces.includes(surface)) {
     throw new Error(`Unsupported generated policy surface: ${surface}.`);
   }
+  const policies = readPolicyProjection(root).policies.filter((policy) =>
+    policy.projectionSurfaces.includes(surface),
+  );
+  if (surface === "readme") {
+    // The README exposes canonical document destinations, never their policy prose.
+    return [...new Set(policies.flatMap((policy) => policy.reconcileDocuments))]
+      .filter((relativePath) => relativePath !== "README.md")
+      .sort()
+      .map((relativePath) => `- [${relativePath}](${relativePath})`);
+  }
   // Stable policy IDs delimit readable groups without duplicating their normative statements.
   const headings = new Map([
     ["definition-intake", "Project Truth And Workflow"],
@@ -143,12 +153,10 @@ export function generatedPolicyProjectionLines(surface, root = frameworkRoot) {
     ["codex-runtime-permissions", "Runtime And Delivery"],
     ["provider-parity", "Framework Lifecycle"],
   ]);
-  return readPolicyProjection(root)
-    .policies.filter((policy) => policy.projectionSurfaces.includes(surface))
-    .flatMap((policy) => [
-      ...(headings.has(policy.id) ? ["", `### ${headings.get(policy.id)}`, ""] : []),
-      `- ${policy.projectionStatement}`,
-    ]);
+  return policies.flatMap((policy) => [
+    ...(headings.has(policy.id) ? ["", `### ${headings.get(policy.id)}`, ""] : []),
+    `- ${policy.projectionStatement}`,
+  ]);
 }
 
 export function policyProjectionChanges(installedProjection, sourceProjection) {

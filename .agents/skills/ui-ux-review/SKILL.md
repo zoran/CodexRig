@@ -14,10 +14,10 @@ change product decisions, run destructive user actions or create a new design sy
 
 ## Establish Intent And Evidence
 
-1. Read the request, current manifest or linked design decisions, affected components/tokens/copy,
-   and their real consumers. Identify the user task, requested change and what should stay intact.
-   Distinguish confirmed decisions from observed existing appearance; neither general repo approval
-   nor the absence of a design document authorizes a redesign.
+1. Read the request, current inventory and established requirements/design decisions, affected
+   components/tokens/copy, and their real consumers. Identify the user task, requested change and
+   what should stay intact. Distinguish confirmed decisions from observed existing appearance;
+   neither general repo approval nor the absence of a design document authorizes a redesign.
 2. Apply [UI Intent](../../../instructions.md#ui-intent-and-change-boundaries). An in-scope bug fix,
    consistency correction or accessibility improvement within the existing direction needs no new
    approval ritual. A material change in visual language, information architecture, navigation,

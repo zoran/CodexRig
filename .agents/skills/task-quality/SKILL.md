@@ -49,7 +49,11 @@ rather than repair; do not call a known-defective state clean.
 
 1. Reconcile changed-contract docs, source/declaration headers, dead paths and bounded work context
    before auditing. Recheck the request, plan, manifest, owners/consumers, residual risks and
-   evidence. An audit finding reopens the owning repair and targeted review.
+   evidence. Apply [Documentation Ownership](../../../instructions.md#documentation-ownership):
+   preserve unique requirements, stable links and evidence limits at their established owners; do
+   not treat structural checks as semantic preservation proof. Check README discovery for both
+   existing and newly created documents and reject copied requirements or document summaries. An
+   audit finding reopens the owning repair and targeted review.
 2. Perform the whole-repository course check and Worktree Settlement from
    [Slice Acceptance](../../../instructions.md#best-available-engineering-not-quick-fixes). A passed
    check or finished intermediate slice is not the complete authorized outcome.

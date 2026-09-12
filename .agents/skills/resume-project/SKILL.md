@@ -22,7 +22,9 @@ This skill owns recovery of the authorized workstream, not a second session or t
 2. Locate owners through the manifest, exact searches, direct matched-source reads and real
    consumers under [Context And Skills](../../../instructions.md#context-and-skills). Compare
    completed evidence with actual partial work, migrations, dead paths and remaining acceptance
-   gaps.
+   gaps. Follow [Documentation Ownership](../../../instructions.md#documentation-ownership): read
+   existing specifications and separate UI references before intake; preserve their decisions and
+   approvals without copying requirements into the manifest, README or temporary context.
 3. Select the unique coherent unfinished authorized stream. Same-host project changes belong to the
    developer regardless of account; process control still requires exact provenance. Preserve
    ambiguous or overlapping state and continue safe reconstruction. Ask one focused content question

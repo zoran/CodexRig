@@ -41,7 +41,7 @@ export function assertGeneratedWorkflowPolicyContract({
 }) {
   const generatedText = (relativePath) =>
     readFileSync(path.join(generated, ...relativePath.split("/")), "utf8");
-  assert.match(agents, /current-state inventory, never a roadmap/i);
+  assert.match(agents, /indexes current technical facts/i);
   assert.match(agents, /docs\/future-modules\.md/i);
   assert.match(agents, /\$architecture-evolution/i);
   assert.match(agents, /Identity and Access/i);
@@ -57,9 +57,9 @@ export function assertGeneratedWorkflowPolicyContract({
   assert.match(agents, /config\/product\.json/i);
   assert.match(agents, /config\/tenancy\.json/i);
   assert.match(readme, /config\/localization\.json/i);
-  assert.match(readme, /mobile, tablet, and desktop/i);
-  assert.match(readme, /Runtime and technology/i);
-  assert.match(readme, /hand-authored textual file/i);
+  assert.match(instructions, /mobile, tablet, and desktop/i);
+  assert.match(instructions, /Runtime and technology/i);
+  assert.match(instructions, /hand-authored textual file/i);
   const patterns = generatedText("scripts/verify/patterns.mjs");
   const housekeeping = generatedText("scripts/goals/repository-housekeeping.mjs");
   assert.match(patterns, /fileHeaderFindings/);
@@ -98,11 +98,7 @@ export function assertGeneratedWorkflowPolicyContract({
     instructions,
     /repository\/package\s+names\s+are\s+never\s+runtime\s+brand\s+fallbacks/i,
   );
-  assert.match(readme, /## White-Label Configuration/i);
-  assert.match(readme, /## Identity And Access Boundary/i);
-  assert.match(readme, /## Tenant Isolation Boundary/i);
-  assert.match(readme, /## Localization And Source Language/i);
-  assert.match(readme, /asks whether to refine it further/i);
+  assert.match(instructions, /Ask\s+whether\s+the\s+user\s+wants\s+to\s+refine\s+it\s+further/i);
   assert.match(manifest, /Public product identity and brand: not configured/i);
   assert.match(manifest, /Product surface decision: pending/i);
   assert.match(manifest, /Tenant isolation runtime: no product tenant resolver/i);
@@ -114,7 +110,7 @@ export function assertGeneratedWorkflowPolicyContract({
     assert.match(content, /directly\s+on\s+`main`/i);
     assert.match(content, /short-lived\s+task\s+branch\s+or\s+protected\s+path/i);
   }
-  for (const content of [readme, instructions]) {
+  for (const content of [instructions]) {
     assert.match(content, /broken\s+Git\s+worktree\s+link.*ownership-confirmation\s+blocker/is);
     assert.match(
       content,
@@ -125,12 +121,12 @@ export function assertGeneratedWorkflowPolicyContract({
       /(?:never|instead\s+of)\s+repair(?:ing|s)?.*automatically|native\s+Git\s+repair\s+is\s+explicit/is,
     );
   }
-  for (const content of [readme, codexReadme, instructions]) {
+  for (const content of [codexReadme, instructions]) {
     assert.match(content, /gated\s+(?:preloaded|foreground)\s+supervisor/i);
     assert.match(content, /terminal\s+child-exit\s+proof.*private\s+issue-time\s+gate\s+secret/is);
     assert.match(content, /exact\s+(?:spawned\s+)?Codex\s+(?:child\s+)?PID/i);
   }
-  for (const content of [agents, readme, instructions]) {
+  for (const content of [agents, instructions]) {
     assert.match(content, /modular monolith/i);
     assert.match(content, /(?:replaceable modules|independently improvable or replaceable)/i);
     assert.match(content, /exactly\s+one\s+current\s+internal\s+contract/i);
@@ -158,11 +154,9 @@ export function assertGeneratedWorkflowPolicyContract({
   assert.match(instructions, /Regenerate\s+a\s+non-current\s+framework\s+installation/i);
   assert.doesNotMatch(instructions, /--allow-same|pre-1\.2|obsolete preview/i);
   assert.match(readme, /## Framework Updates/i);
-  assert.match(readme, /config\/product\.json.*never overwritten/is);
+  assert.match(readme, /instructions\.md#framework-lifecycle-compatibility-and-git-platforms/u);
+  assert.match(readme, /\(config\/product\.json\)/u);
   assert.match(readme, /--source <new-codexrig-root>/i);
-  assert.match(readme, /--target <child-root>/i);
-  assert.match(readme, /changed stable policy IDs/i);
-  assert.match(readme, /normative\s+behavior\s+is\s+never\s+hidden/i);
   assert.match(manifest, /### Active Module Inventory/i);
   assert.match(manifest, /No active product modules\./i);
   assert.match(manifest, /docs\/future-modules\.md/i);

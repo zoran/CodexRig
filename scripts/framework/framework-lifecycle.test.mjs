@@ -37,6 +37,7 @@ import {
 } from "./framework-upgrade.mjs";
 import { authorizePlannedLockfile } from "./refresh-upgrade-dependencies.mjs";
 import { ciCompatibilityTracks, gitlabChildPipeline } from "./compatibility-matrix.mjs";
+import { projectDocumentOwners } from "../docs/project-document-owners.mjs";
 import {
   beginStartupSessionWriterHandoff as beginStartupSessionWriterHandoffWithRuntime,
   bindStartupSessionCodexProcess as bindStartupSessionCodexProcessWithRuntime,
@@ -616,6 +617,109 @@ test("versioned policy upgrade preserves project documents until explicit reconc
   }
   assert.equal(acknowledgeFrameworkReconciliation(target, plan.digest), plan.digest);
   assert.equal(readInstallationReceipt(target).pendingReconciliation, null);
+});
+
+// Ownership migration is explicit local reconciliation: the updater preserves authored bytes,
+// binds references to the preview, and cannot infer semantic preservation from a policy receipt.
+test("repeated upgrades preserve HTML owners and a conservatively reconciled mixed manifest", () => {
+  const source = frameworkFixture("2.0.0", "export const value = 'new';\n");
+  const target = frameworkFixture("1.0.0", "export const value = 'old';\n", {
+    projection: earlierPolicyProjection(),
+    reusable: false,
+  });
+  writeInstallationReceipt({ root: target });
+  const uniqueRequirement =
+    "Offline inspections must survive restart, except explicitly discarded drafts.";
+  const evidenceLimit =
+    "No authentication runtime is implemented; the configured policy and fictional UI prove no account-backed operation.";
+  const owners =
+    "- Requirements owner: [Requirements](specification.html#offline).\n- UI reference: [Reference](../design/reference.html#preview).";
+  const mixed = `# Project Manifest\n\n## Definition\n\nAn inspection product.\n\n${owners}\n\n${uniqueRequirement}\n\n## System Shape\n\n${evidenceLimit}\n`;
+  const originalSpecification =
+    '<!doctype html><title>Product requirements</title><h1 id="offline">Offline inspections</h1><p>Encrypt local inspection data.</p>';
+  const reference =
+    '<!doctype html><title>UI reference</title><h1 id="preview">Fictional sign-in preview</h1>';
+  write(target, "docs/project.md", mixed);
+  write(target, "docs/specification.html", originalSpecification);
+  write(target, "design/reference.html", reference);
+  write(
+    target,
+    "README.md",
+    "# Inspection project\n\nSee [requirements](docs/specification.html#offline).\n",
+  );
+  const plan = buildFrameworkUpgradePlan({ sourceRoot: source, targetRoot: target });
+  assert.ok(plan.projectDocumentReconciliation.paths.includes("docs/specification.html"));
+  assert.ok(plan.projectDocumentReconciliation.paths.includes("design/reference.html"));
+  assert.equal(
+    plan.publicOperations.some(({ path: value }) =>
+      ["docs/project.md", "docs/specification.html", "design/reference.html", "README.md"].includes(
+        value,
+      ),
+    ),
+    false,
+  );
+  // A reference changing after preview invalidates the plan instead of silently changing its basis.
+  write(target, "docs/specification.html", originalSpecification + "<p>Changed after preview.</p>");
+  assert.throws(
+    () => applyFrameworkUpgrade(plan, { refreshDependencies: () => {} }),
+    /target changed after planning/,
+  );
+  write(target, "docs/specification.html", originalSpecification);
+  applyFrameworkUpgrade(plan, { refreshDependencies: () => {}, repairDependencies: () => {} });
+  assert.equal(readFileSync(path.join(target, "docs/project.md"), "utf8"), mixed);
+  assert.equal(
+    readFileSync(path.join(target, "docs/specification.html"), "utf8"),
+    originalSpecification,
+  );
+  assert.equal(readFileSync(path.join(target, "design/reference.html"), "utf8"), reference);
+  // Model the reviewed local migration, preserving the exception and evidence qualification.
+  const reconciledSpecification = originalSpecification + `<p>${uniqueRequirement}</p>`;
+  write(target, "docs/specification.html", reconciledSpecification);
+  const reconciled = mixed.replace(`\n\n${uniqueRequirement}`, "");
+  write(target, "docs/project.md", reconciled.replace("#offline", "#missing"));
+  assert.throws(
+    () => acknowledgeFrameworkReconciliation(target, plan.digest),
+    /ownership reconciliation is unresolved/,
+  );
+  assert.ok(readInstallationReceipt(target).pendingReconciliation);
+  write(target, "docs/project.md", reconciled);
+  acknowledgeFrameworkReconciliation(target, plan.digest);
+  assert.deepEqual(projectDocumentOwners({ root: target }).findings, []);
+  const nextSource = frameworkFixture("3.0.0", "export const value = 'newer';\n");
+  const next = buildFrameworkUpgradePlan({ sourceRoot: nextSource, targetRoot: target });
+  applyFrameworkUpgrade(next, { refreshDependencies: () => {}, repairDependencies: () => {} });
+  assert.equal(readFileSync(path.join(target, "docs/project.md"), "utf8"), reconciled);
+  assert.equal(
+    readFileSync(path.join(target, "docs/specification.html"), "utf8"),
+    reconciledSpecification,
+  );
+  assert.equal(readFileSync(path.join(target, "design/reference.html"), "utf8"), reference);
+  assert.ok(reconciled.includes(evidenceLimit));
+  assert.ok(reconciledSpecification.includes(uniqueRequirement));
+  assert.ok(
+    readFileSync(path.join(target, "README.md"), "utf8").includes("specification.html#offline"),
+  );
+  assert.equal(readInstallationReceipt(target).frameworkVersion, "3.0.0");
+});
+
+test("upgrade refuses ambiguous or managed documentation owners without writing", () => {
+  const source = frameworkFixture("2.0.0", "export const value = 'new';\n");
+  const target = frameworkFixture("1.0.0", "export const value = 'old';\n", { reusable: false });
+  writeInstallationReceipt({ root: target });
+  const receipt = readFileSync(path.join(target, ".codexrig/installation.json"), "utf8");
+  for (const declarations of [
+    "- Requirements owner: [Missing](missing.html).",
+    "- Requirements owner: [First](spec.html).\n- Requirements owner: [Second](spec.html).",
+    "- Requirements owner: [Managed policy](../.codexrig/policy-projection.json).",
+  ]) {
+    write(target, "docs/spec.html", "<h1>Requirements</h1>");
+    write(target, "docs/project.md", `# Project Manifest\n\n${declarations}\n`);
+    assert.throws(
+      () => buildFrameworkUpgradePlan({ sourceRoot: source, targetRoot: target }),
+      /documentation ownership|Documentation owner conflicts/,
+    );
+    assert.equal(readFileSync(path.join(target, ".codexrig/installation.json"), "utf8"), receipt);
+  }
 });
 
 test("version-2 command boundary rejects ambiguous source and target selection", () => {

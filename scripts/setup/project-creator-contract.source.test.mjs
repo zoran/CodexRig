@@ -26,7 +26,7 @@ test("the source-only project creator derives generated policy surfaces from one
   const projection = readPolicyProjection(root);
   assert.equal(projection.policies.length, 33);
   const projectedPolicy = projection.policies.map(({ statement }) => statement).join("\n");
-  assert.match(projectedPolicy, /current-state inventory, never a roadmap/);
+  assert.match(projectedPolicy, /technical current-state index/);
   assert.match(projectedPolicy, /exact same configured GPT Astra model and `ultra` reasoning/);
   assert.match(projectedPolicy, /account- or host-wide process listings are untrusted discovery/i);
   assert.match(projectedPolicy, /one stable SemVer owner/);
@@ -68,7 +68,7 @@ test("the project creator gives post-exit cleanup guidance and only conditional 
   assert.match(dirtyGuidance, /commits all non-ignored changes/);
 });
 
-test("the project creator accepts a bounded detailed manifest seed without making it mandatory", () => {
+test("the project creator accepts a bounded detailed requirements draft without making it mandatory", () => {
   assert.equal(parseArgs(["--name", "Example"]).description, "");
   assert.equal(
     parseArgs(["--name", "Example", "--description", "Detailed product intent"]).description,

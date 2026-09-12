@@ -38,6 +38,8 @@ import { buildUpgradedReceipt } from "./framework-upgrade-receipt.mjs";
 import { frameworkUpgradeValuesEqual, packageUpdatePlan } from "./framework-upgrade-package.mjs";
 import { policyProjectionChanges, readPolicyProjection } from "./policy-projection.mjs";
 import { projectOwnedUpgradeDocumentPaths } from "../docs/project-document-policy.mjs";
+import { planUpgradeDocuments } from "./framework-upgrade-documents.mjs";
+import { projectDocumentOwners } from "../docs/project-document-owners.mjs";
 import {
   createExclusiveOwnedDirectory,
   removeOwnedArtifact,
@@ -119,7 +121,12 @@ export function buildFrameworkUpgradePlan({ sourceRoot, targetRoot = frameworkRo
 
   const installedProjection = targetState.policyProjection;
   const sourceProjection = readPolicyProjection(source);
-  const policyChanges = policyProjectionChanges(installedProjection, sourceProjection);
+  const { ownerPaths, policyChanges } = planUpgradeDocuments({
+    target,
+    receipt,
+    targetInputSnapshots,
+    changes: policyProjectionChanges(installedProjection, sourceProjection),
+  });
 
   const desiredPaths = listManagedFrameworkFiles(source, sourceContract);
   const removedProjectDocumentClassifications = targetContract.upgrade.projectOwnedDocuments.filter(
@@ -137,6 +144,7 @@ export function buildFrameworkUpgradePlan({ sourceRoot, targetRoot = frameworkRo
       ...projectOwnedUpgradeDocumentPaths,
       ...targetContract.upgrade.projectOwnedDocuments,
       ...sourceContract.upgrade.projectOwnedDocuments,
+      ...ownerPaths,
     ]),
   ].sort();
   const projectOwnedDocumentPathSet = new Set(projectOwnedDocumentPaths);
@@ -533,6 +541,12 @@ export function acknowledgeFrameworkReconciliation(targetRoot, planDigest) {
     }
     if (receipt.pendingReconciliation.planDigest !== planDigest) {
       throw new Error("Framework reconciliation digest does not match the pending plan.");
+    }
+    const ownership = projectDocumentOwners({ root: target });
+    if (ownership.findings.length) {
+      throw new Error(
+        `Documentation ownership reconciliation is unresolved: ${ownership.findings.join("; ")}`,
+      );
     }
     receipt.pendingReconciliation = null;
     atomicWriteUpgradeFile(

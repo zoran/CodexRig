@@ -65,12 +65,13 @@ test("license, required notice, package metadata, and upgrade ownership fail clo
 test("the public summary preserves the commercial project-only credit exception", (t) => {
   const root = fixture(t);
   const readmePath = path.join(root, "README.md");
+  const readme = readFileSync(readmePath, "utf8");
+  const protectedStatement =
+    /It\s+does\s+not\s+permit\s+their\s+removal\s+from\s+CodexRig\s+itself/u;
+  assert.match(readme, protectedStatement);
   writeFileSync(
     readmePath,
-    readFileSync(readmePath, "utf8").replace(
-      "It does not permit their removal from CodexRig itself",
-      "Credits may also be removed from CodexRig",
-    ),
+    readme.replace(protectedStatement, "Credits may also be removed from CodexRig"),
   );
   assert.ok(
     licensingFindings({ root }).some((finding) =>

@@ -41,12 +41,64 @@ test("clean project initialization escapes and formats long project names", () =
   const generated = path.join(outputParent, "long-project-name-fixture", "code");
   assert.match(readFileSync(path.join(generated, "README.md"), "utf8"), /^# A \\\[linked/m);
   const manifest = readFileSync(path.join(generated, "docs/project.md"), "utf8");
-  assert.match(manifest, /## Initial Project Description/u);
-  assert.match(manifest, /Field technicians document offline equipment inspections/u);
+  const requirements = readFileSync(path.join(generated, "docs/requirements.md"), "utf8");
+  assert.match(manifest, /Requirements owner: \[Product requirements\]\(requirements\.md\)/u);
+  assert.doesNotMatch(manifest, /Field technicians|Initial Project Description/u);
+  assert.match(requirements, /Field technicians document offline equipment inspections/u);
+  assert.match(requirements, /billing is only a later idea/u);
   assert.match(manifest, /pending intake validation of the supplied creation brief/u);
   assert.doesNotMatch(manifest, /^# Not a manifest heading$/mu);
   assert.match(result.stdout, /stored as an intake draft/u);
   assertGeneratedProjectQuality(generated);
+  const verificationPlan = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      `import { existsSync } from 'node:fs';
+import { completeVerificationCommands } from './scripts/verify/adaptive-runner.mjs';
+const missing = completeVerificationCommands().flatMap(command => command.args)
+  .filter(argument => argument.endsWith('.test.mjs') && !existsSync(argument));
+console.log(JSON.stringify(missing));`,
+    ],
+    { cwd: generated, encoding: "utf8" },
+  );
+  assert.equal(verificationPlan.status, 0, verificationPlan.stderr);
+  assert.deepEqual(
+    JSON.parse(verificationPlan.stdout),
+    [],
+    "child verification must use installed suites",
+  );
+  for (let pass = 0; pass < 2; pass += 1) {
+    const ensure = spawnSync(process.execPath, ["scripts/docs/ensure-project-manifest.mjs"], {
+      cwd: generated,
+      encoding: "utf8",
+    });
+    assert.equal(ensure.status, 0, ensure.stderr);
+    assert.equal(readFileSync(path.join(generated, "docs/project.md"), "utf8"), manifest);
+    assert.equal(readFileSync(path.join(generated, "docs/requirements.md"), "utf8"), requirements);
+  }
+  // Later documentation becomes discoverable through a link, without copying its contents.
+  writeFileSync(
+    path.join(generated, "docs/operations.html"),
+    '<!doctype html><title>Operations</title><h1 id="recovery">Recovery</h1><p>Restore inspections from the operator backup.</p>',
+  );
+  const docsCheck = () =>
+    spawnSync(process.execPath, ["scripts/verify/docs.mjs"], { cwd: generated, encoding: "utf8" });
+  const missingDiscovery = docsCheck();
+  assert.equal(missingDiscovery.status, 1);
+  assert.match(missingDiscovery.stderr, /README.md must link to docs\/operations.html/);
+  const readmePath = path.join(generated, "README.md");
+  writeFileSync(
+    readmePath,
+    readFileSync(readmePath, "utf8") + "\n[Operations](docs/operations.html#recovery)\n",
+  );
+  const discovered = docsCheck();
+  assert.equal(discovered.status, 0, discovered.stderr);
+  assert.doesNotMatch(
+    readFileSync(readmePath, "utf8"),
+    /Restore inspections from the operator backup|Field technicians document/u,
+  );
 });
 
 test("clean project initialization excludes untracked source drafts by default", () => {

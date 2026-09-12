@@ -223,8 +223,10 @@ export function completeVerificationCommands() {
         "scripts/framework/framework-version.test.mjs",
         "scripts/framework/framework-lifecycle.test.mjs",
         "scripts/platform/platform-lifecycle.test.mjs",
-        ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
-        ".agents/skills/reset-framework/scripts/publish-framework.test.mjs",
+        ...existingTestFiles([
+          ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
+          ".agents/skills/reset-framework/scripts/publish-framework.test.mjs",
+        ]),
       ],
       reason:
         "complete verification checks versioned upgrades, startup attestation, reset safety, compatibility tracks, provider detection, and GitHub/GitLab policy adapters",
@@ -276,6 +278,7 @@ export function completeVerificationCommands() {
         "scripts/verify/secrets.test.mjs",
         "scripts/verify/image-assets.test.mjs",
         "scripts/verify/localization.test.mjs",
+        "scripts/verify/licensing.test.mjs",
         "scripts/verify/language.test.mjs",
         "scripts/verify/surface-quality.test.mjs",
         "scripts/verify/white-label.test.mjs",

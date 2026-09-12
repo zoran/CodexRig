@@ -23,7 +23,10 @@ Materially new boundaries use `$architecture-evolution` before dependent repair.
 
 1. Read `docs/project.md`, the diff, affected source/tests, public contracts and composition points.
    Identify the intended invariant, real producers/consumers, data/lifecycle owner and selected
-   delivery/surface constraints. Future candidates are not active capabilities.
+   delivery/surface constraints. Read established requirements and separate design-reference owners
+   under [Documentation Ownership](../../../instructions.md#documentation-ownership); distinguish
+   configured policy, implemented adapters, deployment and observed testing. Future candidates are
+   not active capabilities.
 2. Follow [Context And Skills](../../../instructions.md#context-and-skills): scoped exact searches,
    direct matched-source reads, and a representative assembled flow from entry through owned
    behavior/state or adapter to result and failure handling.

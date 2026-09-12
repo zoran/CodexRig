@@ -76,6 +76,12 @@ test("clean project initialization removes inherited state and source-specific t
   const generatedReadme = readFileSync(path.join(generated, "README.md"), "utf8");
   const generatedCodexReadme = readFileSync(path.join(generated, ".codex", "README.md"), "utf8");
   const generatedInstructions = readFileSync(path.join(generated, "instructions.md"), "utf8");
+  // CodexRig's child-maintenance workflow is source-only, not generated product policy.
+  assert.match(
+    readFileSync(path.join(source, "instructions.md"), "utf8"),
+    /## Repository Update Scope/,
+  );
+  assert.doesNotMatch(generatedInstructions, /## Repository Update Scope/);
   const generatedManifest = readFileSync(path.join(generated, "docs", "project.md"), "utf8");
   const generatedUiReviewSkill = path.join(generated, ".agents/skills/ui-ux-review/SKILL.md");
   const generatedCoherenceSkill = path.join(generated, ".agents/skills/system-coherence/SKILL.md");
@@ -271,11 +277,8 @@ test("clean project initialization removes inherited state and source-specific t
   }
   assert.match(generatedCodexReadme, /mutable repository-local Codex runtime/);
   assertGeneratedDependencyFreshnessContract(generated);
-  assert.match(generatedReadme, /Root `src\/` is the default Product Root/);
-  assert.match(
-    generatedReadme,
-    /controller-injected Codex Stop lifecycle validates[\s\S]{0,300}non-null `transcript_path`/,
-  );
+  assert.match(generatedInstructions, /Root `src\/` is the required default Product Root/);
+  assert.match(generatedInstructions, /non-null `transcript_path`/);
   assert.match(generatedCodexReadme, /canonical lifecycle needs\s+no manual `\/hooks` approval/);
   assert.equal(
     readFileSync(path.join(generated, ".codex", "hooks.json"), "utf8"),
@@ -397,7 +400,7 @@ test("clean project initialization removes inherited state and source-specific t
   assert.match(generatedInstructions, /pnpm handover:create -- --critical/u);
   assert.match(generatedInstructions, /final repository action/u);
   assert.match(generatedInstructions, /stop completely/u);
-  assert.match(generatedReadme, /ignored `tmp\/codexrig-handovers\//u);
+  assert.match(generatedInstructions, /ignored `tmp\/codexrig-handovers\//u);
   assert.doesNotMatch(generatedReadme, /`\.tmp\/codexrig-handovers\//u);
   assert.match(generatedInstructions, /every\s+completed\s+slice/i);
   assert.match(generatedInstructions, /without\s+waiting\s+for\s+another\s+prompt/i);
@@ -423,10 +426,7 @@ test("clean project initialization removes inherited state and source-specific t
   assert.match(generatedReadme, /## First Prompt: Define The Project/i);
   assert.match(generatedInstructions, /Begin\s+the\s+first\s+response/i);
   assert.match(generatedInstructions, /final\s+opportunity\s+to\s+correct/i);
-  assert.match(
-    generatedReadme,
-    /resume\s+the\s+intake\s+whenever\s+a\s+material.*decision\s+changes/is,
-  );
+  assert.match(generatedInstructions, /Resume the same focused intake later whenever/u);
   assert.match(generatedAgents, /short safe-entry bootstrap/);
   assert.equal(generatedAgents.length < generatedInstructions.length, true);
   assert.match(generatedInstructions, /## Product-First Delivery And Verification Economy/);
@@ -443,7 +443,7 @@ test("clean project initialization removes inherited state and source-specific t
   assert.match(generatedInstructions, /pre-descent mask/);
   assert.match(generatedInstructions, /marker\s+commit/);
   assert.match(generatedInstructions, /major milestone/i);
-  assert.match(generatedReadme, /manifest-led discovery/);
+  assert.match(generatedInstructions, /manifest-led discovery/);
   assert.match(generatedInstructions, /replace-in-place\s+successful-evidence\s+record/i);
   for (const filePath of [generatedUiReviewSkill, generatedUiReviewMetadata]) {
     const stats = lstatSync(filePath);
@@ -482,7 +482,7 @@ test("clean project initialization removes inherited state and source-specific t
     assert.match(roleContent, /never delegate or spawn another\s+agent/i, role);
   }
   assert.match(generatedReadme, /## Project Authority/);
-  assert.match(generatedReadme, /\$system-coherence/);
+  assert.match(generatedReadme, /\(instructions\.md\)/);
   assert.match(generatedReadme, /Documentation Context Economy/);
   assert.match(generatedInstructions, /single committed workflow authority/);
   assert.match(generatedInstructions, /Documentation has no general numeric line or word quota/);

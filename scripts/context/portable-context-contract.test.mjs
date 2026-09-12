@@ -50,6 +50,30 @@ test("portable verification requires the active project Codex config", () => {
   );
 });
 
+test("an established project's README can link its owners without repeating intake instructions", () => {
+  const root = stagedFixture();
+  const readmePath = path.join(root, "README.md");
+  const content = `# Existing Project
+
+Use bash scripts/setup/start-codex.sh and preview pnpm framework:upgrade.
+
+- [Current inventory](docs/project.md)
+- [Candidates](docs/future-modules.md)
+- [Workflow](instructions.md)
+- [Agent entry](AGENTS.md)
+- [Codex setup](.codex/README.md)
+- [Documentation ownership](instructions.md#documentation-ownership)
+`;
+  writeFileSync(readmePath, content);
+  const findings = () =>
+    portableContextContractFindings({ repositoryRoot: root }).filter((finding) =>
+      finding.includes("README.md to include"),
+    );
+  assert.deepEqual(findings(), []);
+  writeFileSync(readmePath, content.replace("bash scripts/setup/start-codex.sh", "start"));
+  assert.ok(findings().some((finding) => finding.includes("bash scripts/setup/start-codex.sh")));
+});
+
 test("portable runtime content declarations are active for their existing owners", () => {
   const root = stagedFixture();
   const relativePath = "scripts/repository/runtime-session-state.mjs";
@@ -105,7 +129,6 @@ test("the package contract permits additive sibling exports but protects its own
 test("portable workflow owners cannot lose the authorized implementation continuation invariant", () => {
   for (const relativePath of [
     "AGENTS.md",
-    "README.md",
     "instructions.md",
     ".agents/skills/resume-project/SKILL.md",
     ".agents/skills/project-implementation/SKILL.md",

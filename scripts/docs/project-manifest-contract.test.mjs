@@ -1,6 +1,6 @@
 /** Verifies project manifest contract behavior for the durable documentation contract boundary. */
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -9,6 +9,8 @@ import {
   initialDeliveryConfiguration,
 } from "../contracts/delivery-configuration.mjs";
 import { renderDeliveryManifestProjection } from "./delivery-manifest.mjs";
+import { projectDocumentOwners } from "./project-document-owners.mjs";
+import { initialProjectManifest } from "./initial-project-manifest.mjs";
 import {
   activeFutureModuleOverlapFindings,
   futureModulesDocumentFindings,
@@ -94,6 +96,16 @@ test("initialized current and future inventories are explicit and valid", (t) =>
     [],
   );
   assert.deepEqual(futureModulesDocumentFindings(initialFutureModulesDocument()), []);
+  const initial = initialProjectManifest({
+    deliveryProjection: renderDeliveryManifestProjection({
+      configuration: JSON.parse(initialDeliveryConfiguration()),
+    }),
+  });
+  assert.deepEqual(
+    projectManifestFindings({ root, content: initial, relativePaths: ["src/.gitkeep"] }),
+    [],
+  );
+  assert.deepEqual(projectDocumentOwners({ root, content: initial }).entries, []);
 
   const missingIntentBoundary = initialFutureModulesDocument().replace(
     /Record only explicitly confirmed future candidates\.[\s\S]*?either inventory\.\n\n/u,
@@ -221,5 +233,112 @@ test("one module cannot remain active and future-only at the same time", () => {
     [
       "module Orders cannot be both active in docs/project.md and future-only in docs/future-modules.md",
     ],
+  );
+});
+
+// Documentation ownership regression: specifications and prototypes are distinct artifacts,
+// and neither can activate illustrated operations or silently authorize a prose migration.
+test("separate HTML requirements and UI reference preserve current inventory and activation", (t) => {
+  const root = fixture(t);
+  const specification =
+    '<!doctype html><title>Requirements</title><h1 id="requirements">Requirements</h1><p>Users must retain offline access; billing is proposed.</p>';
+  write(root, "docs/specification.html", specification);
+  write(
+    root,
+    "design/reference.html",
+    "<!doctype html><title>Reference</title><h1 id=flow>Static fictional sign-in</h1>",
+  );
+  const definition = `## Definition
+
+Inspection product. No runtime is implemented.
+
+- Requirements owner: [Requirements](specification.html#requirements).
+- UI reference: [Reference](../design/reference.html#flow).
+
+`;
+  const current = manifest("No active product modules.").replace(
+    "## System Shape",
+    definition + "## System Shape",
+  );
+  assert.deepEqual(projectDocumentOwners({ root, content: current }).entries, [
+    { concern: "Requirements owner", path: "docs/specification.html", fragment: "requirements" },
+    { concern: "UI reference", path: "design/reference.html", fragment: "flow" },
+  ]);
+  for (let pass = 0; pass < 2; pass += 1) {
+    assert.deepEqual(projectManifestFindings({ root, content: current, relativePaths: [] }), []);
+    assert.equal(readFileSync(path.join(root, "docs/specification.html"), "utf8"), specification);
+  }
+  write(root, "src/inspections/index.mjs", "export const inspections = true;\n");
+  const activated = current.replace(
+    "No active product modules.",
+    moduleEntry("Inspections", "src/inspections"),
+  );
+  assert.deepEqual(
+    projectManifestFindings({
+      root,
+      content: activated,
+      relativePaths: ["src/inspections/index.mjs"],
+    }),
+    [],
+  );
+  assert.equal(
+    activeFutureModuleOverlapFindings(activated, futureCandidate("Inspections")).length,
+    1,
+  );
+  assert.deepEqual(
+    activeFutureModuleOverlapFindings(activated, initialFutureModulesDocument()),
+    [],
+  );
+});
+
+test("pending and minimal definitions need no extra documentation or declaration", (t) => {
+  const root = fixture(t);
+  for (const content of [
+    "# Project Manifest\n\nProduct definition: pending.\n",
+    "# Project Manifest\n\n## Definition\n\nA local calculator.\n",
+    "# Project Manifest\n\n## Definition\n\nA local calculator.\n\n- Requirements owner: [Definition](#definition).\n",
+  ]) {
+    assert.deepEqual(projectDocumentOwners({ root, content }).findings, []);
+  }
+});
+
+test("invalid or ambiguous document owners fail without changing project content", (t) => {
+  const root = fixture(t);
+  const specification =
+    "# Product Requirements\n\n## Offline Access\n\nKeep inspections offline.\n";
+  write(root, "docs/spec.md", specification);
+  write(
+    root,
+    "docs/reference.html",
+    '<h1 id="flow">Reference</h1><script>const text = \'<div id="invented">\';</script>',
+  );
+  symlinkSync(path.join(root, "docs/spec.md"), path.join(root, "docs/alias.md"));
+  for (const declaration of [
+    "- Requirements owner: [Missing](missing.html).",
+    "- Requirements owner: [Missing anchor](spec.md#missing).",
+    "- Requirements owner: [Invalid](%ZZ).",
+    "- Requirements owner: [Outside](../../outside.md).",
+    "- Requirements owner: [Outside](%2Ftmp/outside.md).",
+    "- Requirements owner: [Symlink](alias.md).",
+    "- Requirements owner: [Remote](https://example.invalid/spec).",
+    "- Requirements owner: pending.",
+    "- Requirements owner: [First](spec.md).\n- Requirements owner: [Second](reference.html).",
+    "- Requirements owner: [Both](spec.md) and [Second](reference.html).",
+    "- Requirements owner: [Requirements](reference.html).\n- UI reference: [Same artifact](reference.html#flow).",
+    "- UI reference: [Script literal](reference.html#invented).",
+  ]) {
+    const result = projectDocumentOwners({
+      root,
+      content: `# Project Manifest\n\n${declaration}\n`,
+    });
+    assert.ok(result.findings.length > 0, declaration);
+    assert.equal(readFileSync(path.join(root, "docs/spec.md"), "utf8"), specification);
+  }
+  assert.deepEqual(
+    projectDocumentOwners({
+      root,
+      content: "- Requirements owner: [Offline](spec.md#offline-access).",
+    }).findings,
+    [],
   );
 });

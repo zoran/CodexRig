@@ -46,28 +46,32 @@ framework-upgrade path interprets a superseded internal schema.
 When creating a child project, a name and short description are not a sufficient product definition.
 Immediately after receiving the name, ask what the product should actually do and invite the user to
 describe it in detail in ordinary language. Explain that Codex will proactively structure the
-description into a manifest, challenge gaps and contradictions, make recommendations, and that the
-generated project can refine the manifest later. If the user supplies enough detail, synthesize it
-for correction and pass it to the generator as an intake draft; do not treat mentioned modules as
-active. If the user explicitly defers the description, generation may continue with a visibly
-pending manifest, but silence or a short tagline is not a decision to skip this invitation.
+description at its canonical requirements owner, challenge gaps and contradictions, make
+recommendations, and that the generated project can refine those requirements later. If the user
+supplies enough detail, synthesize it for correction and pass it to the generator as an intake
+draft; do not treat mentioned modules as active. If the user explicitly defers the description,
+generation may continue with a visibly pending manifest, but silence or a short tagline is not a
+decision to skip this invitation.
 
 In a generated product repository, when `docs/project.md` still contains a pending product
 definition, the first user interaction is a definition intake, not an implementation prompt. Begin
-the first response by telling the user that the project must be understood and its durable manifest
-established before product implementation. The deliberately neutral source framework itself may be
-maintained without inventing a product definition; the intake starts when work is intended to define
-or implement a product. Do not infer a product, stack, users, domain model, data policy, provider,
+the first response by explaining that the requirements and current inventory must be understood
+before product implementation. The deliberately neutral source framework itself may be maintained
+without inventing a product definition; the intake starts when work is intended to define or
+implement a product. Do not infer a product, stack, users, domain model, data policy, provider,
 deployment shape, or trust boundary from the framework or from a vague request.
 
-Read and evaluate the entire current manifest before asking questions. If it contains a creation
-brief or filled definition, begin by explaining the successive interview and Codex's active support,
-then summarize what is already usable, what remains ambiguous or contradictory, and which
-recommendations follow. Ask whether the user wants to refine it further or—only when it is
+Read the current manifest and follow its links to existing requirements and design owners before
+asking questions, applying [Documentation Ownership](#documentation-ownership). Discover and read an
+existing specification even when it uses HTML or another project-owned format. If a creation brief
+or confirmed definition already exists, begin by explaining the successive interview and Codex's
+active support, then summarize what is already usable, what remains ambiguous or contradictory, and
+which recommendations follow. Ask whether the user wants to refine it further or—only when it is
 decision-ready—start from the confirmed scope. An empty or materially incomplete definition still
 requires focused questions before dependent implementation; in that case, “start” means begin the
 interview or safe disjoint work, not guess the missing decisions. Remind the user that later
-material learning can reopen and improve the manifest through the same process.
+material learning can reopen the requirements through the same process; preserve earlier approvals
+and ask only about genuinely changed or unresolved decisions.
 
 Interview the user iteratively in small, decision-focused batches. Challenge vague terms,
 contradictions, implicit scope, and premature solution choices, and follow each answer with the next
@@ -93,13 +97,14 @@ Regularly restate the current understanding and distinguish user-confirmed facts
 open decisions. The intake is complete only when the agent can explain the intended product, system
 shape, candidate capability and module topology, constraints, non-goals, risks, and acceptance
 evidence precisely enough to produce a decision-ready plan, and the user has had a final opportunity
-to correct that synthesis. Then replace the pending product entries in `docs/project.md` with
-concise user-confirmed durable truth and proceed to planning and autonomous delivery. Do not present
-a candidate as active: the manifest's Active Module Inventory remains limited to implemented,
-integrated roots. Record user-confirmed but unimplemented module candidates only in
-`docs/future-modules.md`; activate and remove each candidate in the same change that implements it.
-Ask no ceremonial question whose answer cannot affect a decision, and do not repeat resolved
-questions.
+to correct that synthesis. Then update the established requirements owner with confirmed
+requirements, intended architecture and acceptance criteria. Update only the short definition,
+discovery links and honest current status in `docs/project.md`, and proceed to planning and
+autonomous delivery. Do not present a candidate as active: the manifest's Active Module Inventory
+remains limited to implemented, integrated roots. Index user-confirmed but unimplemented module
+candidates in `docs/future-modules.md`, linking their requirements rather than duplicating them;
+activate and remove each candidate in the same change that implements it. Ask no ceremonial question
+whose answer cannot affect a decision, and do not repeat resolved questions.
 
 Resume the same focused intake later whenever a request, discovery, or concurrent change creates a
 material ambiguity, contradiction, or possible change to product intent, scope, acceptance, module
@@ -568,11 +573,11 @@ or shows that an existing boundary has become incohesive.
 ### Product Surface Selection
 
 As soon as the intake establishes the users, environment, and critical workflows well enough, derive
-the intended product surfaces from manifest truth: browser/web or PWA, installed mobile, installed
-desktop, CLI/TUI, public or private API/service, background worker, library/SDK, embedded/native or
-real-time component, or a justified combination. Never infer a web app from the harness, a
-repository name, or familiarity, and do not postpone the surface question until after framework
-selection.
+the intended product surfaces from confirmed requirements: browser/web or PWA, installed mobile,
+installed desktop, CLI/TUI, public or private API/service, background worker, library/SDK,
+embedded/native or real-time component, or a justified combination. Never infer a web app from the
+harness, a repository name, or familiarity, and do not postpone the surface question until after
+framework selection.
 
 If surface intent is materially unclear, ask the developer promptly in outcome language rather than
 requiring platform jargon: where and on which devices the work happens; whether installation,
@@ -583,19 +588,19 @@ Use that evidence to give one strong surface-topology recommendation, explain it
 delivery/operations cost, and at most one genuinely close alternative, then explicitly ask the user
 to confirm, override, or delegate it.
 
-Record the confirmed surface topology and controlling constraints in the manifest's System Shape,
-clearly distinguishing a selected but not-yet-integrated decision from real interface roots and
-deployed surfaces. If no surface is needed, record the relevant service/library/embedded shape
-instead. The Active Module Inventory and public/deployed inventory change only when implementation
-exists. UI/web/mobile/desktop/runtime technology selection follows this checkpoint; a later change
-to user context or platform capabilities invokes `$architecture-evolution` and reshapes modules,
-files, delivery, and verification together.
+Record the confirmed surface topology and controlling constraints at the established requirements or
+design owner. Manifest System Shape links that decision and records real interface roots, integrated
+artifacts and deployment evidence separately. If no surface is needed, record the relevant
+service/library/embedded shape instead. The Active Module Inventory and public/deployed inventory
+change only when implementation exists. UI/web/mobile/desktop/runtime technology selection follows
+this checkpoint; a later change to user context or platform capabilities invokes
+`$architecture-evolution` and reshapes modules, files, delivery, and verification together.
 
 ### Requirement-Driven Technology Selection
 
 The Node.js/pnpm/mise stack at repository root is the visible Codex harness, not a default product
 stack and never evidence that product code should use TypeScript or Node.js. After the Project
-Definition Intake and feature-to-domain placement, interpret the confirmed manifest outcome and
+Definition Intake and feature-to-domain placement, interpret the confirmed requirements and
 constraints before creating the first implementation root or changing a module's runtime. For each
 independently owned module or deployable component compare:
 
@@ -613,12 +618,13 @@ intake, but do not ask the user to choose from unexplained technology names befo
 forces are understood. As soon as those facts make comparison meaningful—and before
 implementation—check current primary/official ecosystem evidence, present one strong primary
 recommendation per materially different runtime component, explain why it fits the confirmed
-manifest facts and what costs or risks it introduces, and name at most one close alternative when
-the tradeoff is genuinely material. Explicitly ask the user to confirm or override the
-recommendation. A user may expressly delegate the final selection, but silence, YOLO, or a broad
-implementation request is not confirmation of an unexplained stack choice. Record the confirmed
-selection and controlling constraints as a durable manifest decision with its not-yet-integrated
-status; the Active Module Inventory remains unchanged until real code and toolchain evidence land.
+requirements and what costs or risks it introduces, and name at most one close alternative when the
+tradeoff is genuinely material. Explicitly ask the user to confirm or override the recommendation. A
+user may expressly delegate the final selection, but silence, YOLO, or a broad implementation
+request is not confirmation of an unexplained stack choice. Record the confirmed selection and
+controlling constraints at the established requirements/design owner, preserving its
+not-yet-integrated status; the Active Module Inventory remains unchanged until real code and
+toolchain evidence land.
 
 Choose the least complex language, framework, and runtime that demonstrably satisfies those forces;
 do not start from a preferred or recently used stack. For hard or near-real-time, low-jitter,
@@ -643,10 +649,10 @@ must not promote framework scripts or the root harness package into product-stac
 the first implementation it may correctly report no product stack. In the same change that creates
 real module code and toolchain files, record the actually selected language/runtime/framework under
 that module's `Runtime and technology` manifest field and record any durable selection constraint or
-tradeoff without speculative alternatives. A later material requirement or measured mismatch invokes
-`$architecture-evolution`, re-runs this selection, and migrates code/files/tooling together.
-Completed-goal housekeeping runs stack standards and manifest checks so source/manifest drift cannot
-silently preserve an obsolete choice.
+tradeoff at its established requirements/design owner without duplicating it in the inventory. A
+later material requirement or measured mismatch invokes `$architecture-evolution`, re-runs this
+selection, and migrates code/files/tooling together. Completed-goal housekeeping runs stack
+standards and manifest checks so source/manifest drift cannot silently preserve an obsolete choice.
 
 ### Physical Surface Boundaries
 
@@ -988,6 +994,9 @@ and relationship analysis, not a requirement to load every file byte into the mo
    `docs/project-context.md`. Inventory all active Product Roots, implemented domains/modules and
    surfaces, public contracts, owned data/migrations, configuration and delivery targets,
    dependencies/toolchains, focused tests/verifiers, active documentation, and composition paths.
+   Follow requirements and UI-reference links under
+   [Documentation Ownership](#documentation-ownership) before treating a pending inventory as an
+   absent product definition.
 2. Run `pnpm worktree:status -- --json`; inspect its Git, Git-less, or inconsistent root kind, every
    same-clone worktree, writer-lease status, and each safe latest-session recovery marker. Then
    inspect Git status and diff, the current branch/upstream, untracked files, and all available
@@ -1225,6 +1234,36 @@ current registry freshness. Version ranges and explicit pins define the automati
 line. Moving beyond them requires the dependency-maintenance review appropriate to the change,
 followed by affected consumer regression evidence.
 
+## Repository Update Scope
+
+This section governs work performed from the CodexRig source repository when updating another
+repository. It is source-only workflow policy: do not project it into generated projects, managed
+child configuration or skills, child policy concepts, or project-owned documents. It places no
+restriction on a child's product capabilities, development scope or independently authorized work.
+An instruction correcting CodexRig's update behavior belongs here; it does not authorize installing
+new restrictions in the target project.
+
+A request to update a child repository from CodexRig authorizes its selected framework changes,
+necessary local policy/documentation reconciliation, and repairs to integration regressions caused
+by that update. Establish this boundary before writing and retain it through reconstruction,
+verification, review, audit and handoff. Broad inspection and review-to-zero apply to the authorized
+outcome; they do not turn an update into general product, infrastructure or security remediation.
+
+Before modifying a child's product code, infrastructure, permissions, configuration or tests,
+establish the causal link to the selected update or a separately authorized task. Existing findings,
+work-context notes, deferred candidates and newly discovered unrelated defects are evidence, not
+implementation authority. Writing reproduction tests or starting a repair investigation for such a
+defect already expands the task. Report it briefly and continue the unblocked update; do not pursue
+the separate repair without the user's instruction. Existing authority for independent work still
+applies, but its scope must be explicit rather than inferred from an upgrade request.
+
+When verification fails, determine whether the update caused the failure before changing its owner.
+Repair an update regression at the canonical framework or required integration owner. For an
+unrelated pre-existing blocker, preserve the result and report the exact blocked acceptance gate;
+never weaken a check, claim a clean overall project, or silently repair the unrelated component to
+make the update green. Ask only for a decision needed to resolve that real boundary. Preserve the
+project's product, UI, deployment and external-mutation approval gates throughout the update.
+
 ## Framework Lifecycle, Compatibility, And Git Platforms
 
 `.codexrig/framework.json` is the versioned machine contract. It owns the CodexRig version, complete
@@ -1384,10 +1423,11 @@ an `active` work marker. A later canonical session still receives the candidate 
 `SessionStart`, but after explicit acceptance it may continue the authorized outcome, and stop
 normally.
 
-`docs/project.md` is different: it is the always-read central truth for product intent, scope,
-system shape, constraints, and durable decisions. Working context can specialize the current goal
-but cannot override the manifest. If they disagree, resolve the durable truth in the manifest before
-implementing further.
+`docs/project.md` is the always-read technical current-state index. Requirements and intended
+architecture stay at their established owners under
+[Documentation Ownership](#documentation-ownership). Working context cannot override those owners,
+configuration, or observed integration evidence. Resolve disagreement at the relevant canonical
+owner before dependent implementation.
 
 ## Implementation
 
@@ -1441,6 +1481,66 @@ Running the smallest useful focused command during iteration still applies; exec
 dictate the granularity of durable coverage. Temporary reproduction scripts do not enter the
 repository, and tests or verifier helpers whose only subject no longer exists should be removed.
 
+## Documentation Ownership
+
+`docs/project.md` is the technical current-state index: a short product definition and discovery
+links, real roots/modules, configuration owners, integrated interfaces/adapters/infrastructure, and
+honest evidence limits. Its Users And Outcome and Scope sections orient readers and link detailed
+requirements; System Shape records actual composition; Constraints And Decisions records current
+constraints and links accepted decisions. None is a second detailed specification or design history.
+
+Detailed product requirements, intended architecture, proposed or confirmed choices and acceptance
+criteria belong to the established requirements/design owner. Read that owner before intake, resume,
+architecture, implementation or review. Keep proposed choices, confirmed requirements, integrated
+implementation, deployment and observed testing distinguishable. Configuration files own exact
+settings; validated manifest projections may summarize them. A configured policy, an integrated
+adapter, a deployed service and successful account-backed testing are different facts. A static HTML
+UI reference is an existing artifact, not proof that its illustrated operations are implemented. The
+product specification describes what the product must do; the interactive UI reference shows
+appearance and interaction. Preserve their separate roles even when both are HTML.
+
+Use existing links and focused discovery first. Do not require another registry, specification,
+format or parser stack. A small product may keep its entire short definition in the manifest's
+Definition section; an undefined product stays visibly pending with no invented modules or extra
+specification. When a supplied detailed creation brief needs a durable home and none exists, the
+generator creates `docs/requirements.md` as an explicitly unconfirmed intake draft and links it from
+the manifest. Later intake edits that same owner in place; it never copies the brief back. Markdown,
+HTML or another explicit project-owned file may own requirements; no filename is imposed on an
+established project. Never regenerate project-authored content from a fresh template.
+
+When an explicit discovery declaration is useful, the manifest is its sole owner. Use at most one
+`- Requirements owner: [label](relative-file-or-fragment)` and, independently, at most one
+`- UI reference: [label](relative-file-or-fragment)`. Targets resolve relative to `docs/project.md`,
+stay inside the repository and name existing regular files; static Markdown/HTML fragments must
+exist. For a minimal definition the requirements link may be `#definition`. Requirements and UI
+references name distinct artifacts. No declaration is required for a pending/minimal project or an
+already unambiguous set of ordinary discovery links. A missing, invalid or conflicting reference
+never licenses invented scope, owner selection or content deletion: surface the bounded conflict,
+retain the content, resolve ownership from evidence or a focused question, and continue safe
+independent work. Structural checks prove link/inventory consistency, not semantic completeness,
+model obedience or whether every prose claim is implemented.
+
+README owns setup/use and discovery links, not summaries or copies of documentation content. When a
+durable document is added, renamed, moved or retired during the project, update its README link in
+the same change. Keep existing and later requirements, design, operations and other focused
+documents discoverable there without retelling them. Every durable document under `docs/` requires a
+README link; the temporary `docs/project-context.md` is excluded. For focused documents elsewhere,
+maintain the same discovery discipline. Checks validate coverage and links, not semantic
+duplication. Future Modules owns only the confirmed candidate and activation index, linking
+requirements rather than retelling them. Project context owns bounded temporary work, never durable
+product authority. Framework workflow stays in `instructions.md` and its bounded projections; the
+source framework retains its real active capability inventory.
+
+Before removing or moving substantive manifest/README content, map each requirement, exception,
+constraint and evidence qualification to surviving canonical text or an explicitly superseded
+decision. Move unique valid requirements to their proper owner first; retain stable anchors and
+update affected links. Matching headings/keywords do not prove preservation. Do not promote obsolete
+experiments to current decisions. Supported upgrades preserve project-authored specifications,
+inventory and links, then reconcile changed policy concepts locally. Ordinary already-approved
+migrations need no repeated approval; unresolved semantic conflicts need bounded reconciliation.
+Give critical changes a separate preservation review and a fresh system audit; retain uncertainty
+when losslessness cannot be established.
+
 ## Documentation Has A High Bar
 
 Update an existing document, or create the smallest new one, only when at least one condition holds:
@@ -1450,18 +1550,18 @@ Update an existing document, or create the smallest new one, only when at least 
 - a durable product, architecture, security, data, provider, or deployment decision cannot be
   recovered reliably from code, tests, configuration, or an existing canonical document.
 
-Prefer `docs/project.md` for project intent and constraints, the root README for setup/use, and an
-existing focused document for an established surface. A new document needs a distinct audience,
-owner, and maintenance reason.
+Follow [Documentation Ownership](#documentation-ownership): use the established requirements/design
+owner for product intent and decisions, `docs/project.md` for technical inventory, and the root
+README for setup/use. A new document needs a distinct audience, owner, and maintenance reason.
 
 `docs/project.md` contains current implemented reality only: real integrated modules and roots,
 public contracts or ports, private boundaries, owned data and migrations, allowed dependencies,
 focused verifiers, actual external systems, and actually configured or deployed environments. It is
 not a policy projection, roadmap, option catalogue, or wish list. The same implementation change
 that activates, retires, splits, merges, or relocates a module updates its manifest entry.
-Repository checks enforce this relationship without writing documentation. All unimplemented module
-ideas are consolidated in the initialized `docs/future-modules.md` candidate inventory and nowhere
-else.
+Repository checks enforce this relationship without writing documentation. Confirmed unimplemented
+modules are indexed in the initialized `docs/future-modules.md`; detailed requirements remain at
+their existing owner and are linked from the candidate, not copied.
 
 Never create repository documentation merely to record a task plan, agent activity, command output,
 review checklist, audit pass, progress update, implementation diary, handoff, or completion summary.
@@ -1497,9 +1597,9 @@ Root `AGENTS.md` is the always-loaded safe-entry bootstrap and must remain at or
 leaving room under Codex's configured 32 KiB project-instruction budget for repository descendants.
 This file owns complete workflow policy; the README owns human setup and use; `docs/project.md` owns
 current implemented reality; `docs/future-modules.md` owns confirmed deferred candidates; and a
-focused document exists only for a distinct audience and maintenance owner. Secondary surfaces
-provide the minimum safe summary and link to the canonical owner instead of copying its normative
-detail.
+focused document exists only for a distinct audience and maintenance owner. Bootstrap safety
+projections provide the minimum safe summary and link to the canonical owner. The README links
+documentation without summarizing or copying its contents.
 
 Repository skills use progressive disclosure: their name and description make selection possible,
 while the full `SKILL.md` workflow is read only when relevant. Do not preload every skill into entry

@@ -200,7 +200,10 @@ export function assertGeneratedDependencyFreshnessContract(generated) {
     generatedReadme,
     /mise install --locked\nmise exec --locked -- node scripts\/deps\/install-compatible\.mjs/,
   );
-  assert.match(generatedReadme, /frozen install.*does not\s+establish\s+registry\s+freshness/is);
+  assert.match(
+    generatedInstructions,
+    /frozen\s+install\s+proves\s+reproducibility,\s+not\s+registry\s+freshness/i,
+  );
   assert.match(generatedInstructions, /## Dependency Installation And Freshness/);
   assert.equal(existsSync(path.join(generated, "scripts/deps/install-compatible.mjs")), true);
   assert.match(workspaceConfig, /strictPeerDependencies: true[\s\S]*engineStrict: true/);

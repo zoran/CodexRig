@@ -186,10 +186,17 @@ upgradeable product repositories while deliberately defining no child product or
 - Root: `scripts/docs`
 - Responsibility: Enforces document scope, current-state manifest ownership, the separate deferred
   module inventory, delivery-inventory projection, and project-document reconciliation requirements.
-- Runtime and technology: Node.js ESM with deterministic Markdown parsing.
+  Optional manifest links identify requirements and distinct UI-reference artifacts, with contained
+  file and static Markdown/HTML anchor checks. README discovery validates links to all active
+  durable Markdown/HTML documents under `docs/`; these checks do not certify prose meaning or
+  duplication.
+- Runtime and technology: Node.js ESM with deterministic Markdown and static HTML reference
+  inspection.
 - Public contract: `docs:check`, manifest and delivery-projection parsers, document classification,
-  and initialization.
-- Private internals: Markdown section parsing and repository-to-manifest discovery.
+  and initialization. Supplied creation briefs are linked requirements drafts, separate from current
+  technical inventory.
+- Private internals: Markdown section parsing, local reference validation and repository-to-manifest
+  discovery.
 - Owned data and migrations: No mutable data; validates tracked documentation.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/repository`.
@@ -211,7 +218,9 @@ upgradeable product repositories while deliberately defining no child product or
   `compatibility:matrix` commands; `frameworkInstallationFindings` provides local receipt
   diagnostics to startup and verification consumers. `maintain-toolchain.mjs --startup` inventories
   all worktrees before mutations and blocks competing writers; its explicit mode permits authorized
-  current-slice maintenance.
+  current-slice maintenance. Workflow authority:
+  [Repository Update Scope](../instructions.md#repository-update-scope), linked from the source
+  bootstrap and excluded from child policy and document generation.
 - Private internals: Conservative SemVer classification, current-schema target validation, three-way
   planning, journals, ownership locks, rollback, receipt publication, dependency refresh, and policy
   reconciliation plans.
@@ -455,7 +464,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `4.0.1`.
+- Framework version: `4.4.1`.
 - Framework contract schema: `2`.
 
 <!-- codexrig:framework-version:end -->

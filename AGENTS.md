@@ -51,8 +51,13 @@ procedures.
   endless loop, second task store, account manager or speculative product feature.
 - In a pending generated project, use
   [Project Definition Intake](instructions.md#first-prompt-project-definition-intake): invite a
-  detailed natural-language project/manifest description, challenge material gaps and record only
-  user-confirmed truth. Ask only decision-relevant questions; continue safe disjoint work.
+  detailed natural-language project description, challenge material gaps and record only
+  user-confirmed truth at its established requirements/design owner. Ask only decision-relevant
+  questions; continue safe disjoint work.
+- Follow [Documentation Ownership](instructions.md#documentation-ownership) in every project: keep
+  the manifest a technical inventory and UI references distinct from specifications. README links
+  existing and newly added documents without repeating their contents; maintain those links as
+  documents move or retire.
 - [docs/project.md](docs/project.md) records current integrated reality.
   [Future Modules](docs/future-modules.md) contains only confirmed deferred candidates: an idea is
   not implementation authorization. The sole bounded work cache is `docs/project-context.md`; its
@@ -60,6 +65,12 @@ procedures.
   continuation.
 - A required post-exit reset or missing publication authority leaves closure open. Name the exact
   blocker and preserve recovery; do not call the outcome complete or bypass the gate.
+- When updating other repositories from CodexRig, follow the source-only
+  [Repository Update Scope](instructions.md#repository-update-scope): updates cover the selected
+  framework changes, required local reconciliation and regressions caused by the update. Existing or
+  unrelated product/infrastructure/security findings do not authorize repairs or new reproduction
+  tests. Report a separate finding or acceptance blocker and retain the user's scope. Do not
+  transfer this CodexRig workflow correction into child rules or product restrictions.
 
 ## Architecture, UX And Current Contracts
 

@@ -170,11 +170,41 @@ const explicitTestConsumerRegistry = new Map([
       "scripts/deps/dependency-owner-normalization.test.mjs",
     ],
   ],
+  [
+    "scripts/setup/portable-project-contract.mjs",
+    [
+      "scripts/repository/source-inventory.test.mjs",
+      "scripts/setup/staged-project-validator.test.mjs",
+    ],
+  ],
   ["scripts/docs/delivery-manifest.mjs", ["scripts/goals/repository-housekeeping.test.mjs"]],
   ["scripts/docs/document-scope.mjs", ["scripts/docs/document-scope.test.mjs"]],
   [
+    "scripts/docs/document-references.mjs",
+    [
+      "scripts/docs/document-scope.test.mjs",
+      "scripts/docs/project-manifest-contract.test.mjs",
+      "scripts/repository/source-inventory.test.mjs",
+    ],
+  ],
+  [
+    "scripts/docs/project-document-owners.mjs",
+    [
+      "scripts/docs/project-manifest-contract.test.mjs",
+      "scripts/framework/framework-lifecycle.test.mjs",
+    ],
+  ],
+  [
+    "scripts/docs/initial-project-manifest.mjs",
+    [
+      "scripts/docs/project-manifest-contract.test.mjs",
+      "scripts/repository/source-inventory.test.mjs",
+    ],
+  ],
+  [
     "scripts/docs/project-document-policy.mjs",
     [
+      "scripts/docs/document-scope.test.mjs",
       "scripts/context/portable-context-contract.test.mjs",
       "scripts/framework/framework-lifecycle.test.mjs",
     ],

@@ -14,9 +14,11 @@ This skill owns architecture decisions and coherent cutovers.
 
 ## Reconstruct And Place The Change
 
-1. Read the manifest and affected source: real roots, composition, public entrypoints, state and
-   migrations, adapters, delivery, focused verifiers and actual dependency direction. Trace a
-   representative assembled flow. A folder name or future candidate is not an implemented module.
+1. Read the manifest and its established requirements/design owners under
+   [Documentation Ownership](../../../instructions.md#documentation-ownership), then affected
+   source: real roots, composition, public entrypoints, state and migrations, adapters, delivery,
+   focused verifiers and actual dependency direction. Trace a representative assembled flow. A
+   folder name or future candidate is not an implemented module.
 2. State the failed invariant or new requirement, affected owners/consumers, current constraints and
    acceptance evidence. Classify affected modules as `keep`, `split`, `merge`, `rename`, `retire` or
    `replace`; identify dead roots and competing truth.
@@ -84,7 +86,8 @@ Plan one single-current-contract cutover:
 5. Activate the real module and its root, responsibility, public contract, private internals,
    data/migrations, tenant isolation, runtime, dependencies, focused verifier and steward in
    `docs/project.md`. Remove its matching future candidate in that same change. Retired modules
-   leave the active inventory; selected but unimplemented topology remains a decision, not a root.
+   leave the active inventory; selected but unimplemented topology stays at its requirements/design
+   owner, linked from the inventory.
 
 ## Prove The Shape
 

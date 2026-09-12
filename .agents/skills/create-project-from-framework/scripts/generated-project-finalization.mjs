@@ -17,6 +17,7 @@ import { productConfigurationPath } from "../../../../scripts/contracts/product-
 import { tenancyConfigurationPath } from "../../../../scripts/contracts/tenancy-configuration.mjs";
 import { localizationConfigurationPath } from "../../../../scripts/contracts/localization-configuration.mjs";
 import { fail } from "./project-options.mjs";
+import { initialRequirementsPath } from "../../../../scripts/docs/project-document-policy.mjs";
 import { generatedProjectDocuments } from "./project-transfer-policy.mjs";
 
 const transformedProjectPaths = new Set([
@@ -121,7 +122,12 @@ function assertDeclaredConfigurationTransformations({ sourceRoot, targetRoot, tr
   }
 }
 
-export function assertGeneratedProjectParity({ sourceRoot, targetRoot, transferManifest }) {
+export function assertGeneratedProjectParity({
+  sourceRoot,
+  targetRoot,
+  transferManifest,
+  projectDescription = "",
+}) {
   validateTransferManifest(transferManifest);
   const includedPaths = transferManifest.files.map(({ relativePath }) => relativePath);
   const includedPathSet = new Set(includedPaths);
@@ -138,7 +144,11 @@ export function assertGeneratedProjectParity({ sourceRoot, targetRoot, transferM
 
   const targetPaths = listPortableTransferFiles({ root: targetRoot, includeUntracked: true });
   const targetPathSet = new Set(targetPaths);
-  const requiredPaths = new Set([...includedPaths, ...requiredGeneratedProjectPaths]);
+  const requiredPaths = new Set([
+    ...includedPaths,
+    ...requiredGeneratedProjectPaths,
+    ...(projectDescription ? [initialRequirementsPath] : []),
+  ]);
   const allowedPaths = new Set([...requiredPaths, ...allowedGeneratedProjectPaths]);
   const missingPaths = [...requiredPaths].filter(
     (relativePath) => !targetPathSet.has(relativePath),
@@ -212,6 +222,9 @@ export function formatGeneratedMarkdown(sourceRoot, targetRoot) {
       "docs/future-modules.md",
       "docs/project.md",
       "instructions.md",
+      ...(existsSync(path.join(targetRoot, initialRequirementsPath))
+        ? [initialRequirementsPath]
+        : []),
     ],
     {
       cwd: targetRoot,
@@ -226,7 +239,11 @@ export function formatGeneratedMarkdown(sourceRoot, targetRoot) {
   }
 }
 
-export function assertGeneratedProjectClean(targetRoot, packageName) {
+export function assertGeneratedProjectClean(
+  targetRoot,
+  packageName,
+  { projectDescription = "" } = {},
+) {
   for (const forbidden of [
     ".git",
     ".gitlab",
@@ -310,7 +327,10 @@ export function assertGeneratedProjectClean(targetRoot, packageName) {
     fail("Generated project must retain the portable GitLab CI adapter.");
   }
   const projectDocuments = listManagedMarkdownFiles({ root: targetRoot });
-  const expectedDocuments = [...generatedProjectDocuments].sort();
+  const expectedDocuments = [
+    ...generatedProjectDocuments,
+    ...(projectDescription ? [initialRequirementsPath] : []),
+  ].sort();
   if (projectDocuments.join("\n") !== expectedDocuments.join("\n")) {
     fail(
       `Generated project documentation must stay code-first and minimal. Expected ${expectedDocuments.join(", ")}; found ${projectDocuments.join(", ")}.`,

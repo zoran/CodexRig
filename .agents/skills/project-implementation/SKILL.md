@@ -33,8 +33,10 @@ without new evidence. Before extra work, identify the outcome, blocker or materi
 Complete
 [Startup Repository Reconstruction](../../../instructions.md#startup-repository-reconstruction) and
 the pre-slice coordination check before writing or expanding the write set. One primary owns
-integration; every writer has an exact disjoint scope. Read current source, nearest
-package/build/test configuration and relevant durable decisions. Use
+integration; every writer has an exact disjoint scope. Read the established requirements and design
+owners linked from the manifest under
+[Documentation Ownership](../../../instructions.md#documentation-ownership), then current source,
+nearest package/build/test configuration and relevant durable decisions. Use
 [Context And Skills](../../../instructions.md#context-and-skills) for manifest-led discovery, scoped
 exact searches and direct matched-source reads before acting.
 
@@ -86,8 +88,9 @@ alternative updater.
    invariants with each move or contract change.
 6. Migrate an owned contract, its state and every producer/consumer together, then remove the
    superseded schema, path, alias, test and documentation. Keep exactly one current interpretation.
-   Verify a representative assembled flow across actual boundaries; a locally passing module is
-   insufficient when consumers no longer agree.
+   Update README discovery links when durable documents are added, moved or retired; keep their
+   substantive content at the canonical owner. Verify a representative assembled flow across actual
+   boundaries; a locally passing module is insufficient when consumers no longer agree.
 
 ## Debug From Evidence
 
@@ -137,7 +140,7 @@ mandate or existing visuals as retrospectively approved.
    framework work without product UI. In Dev, run relevant evidence beside or after the newest
    developer deploy.
 
-Keep confirmed durable UX decisions in the existing manifest or linked design owner; do not mirror
+Keep confirmed durable UX decisions at their established requirements/design owner; do not mirror
 tokens/components into a new registry. Changed user-facing copy uses
 `$native-language-content-review`; changed interactive flows use `$ui-ux-review` before acceptance.
 
