@@ -2,6 +2,7 @@
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 import { listActiveFiles } from "./source-inventory.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -357,4 +358,18 @@ export function isProductImplementationPath(value, layout) {
 
 export function isProductSurfacePath(value, layout) {
   return Boolean(productUnitForPath(value, layout, { surface: true }));
+}
+
+/** Product configuration is required for every real product workspace, including an empty default src. */
+export function hasProductWorkspace({ root = repositoryRoot, relativePaths } = {}) {
+  if (existsSync(path.join(root, ".codex/tooling.json")))
+    return readToolingConfiguration(root).productConfigurationRequired;
+  const layout = discoverProductLayout({
+    repositoryRoot: root,
+    relativePaths: relativePaths ?? listActiveFiles({ root }),
+  });
+  return layout.sourceRoots.some(
+    (relativePath) =>
+      lstatSync(path.join(root, relativePath), { throwIfNoEntry: false }) !== undefined,
+  );
 }

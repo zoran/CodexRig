@@ -12,7 +12,12 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { after, test } from "node:test";
-import { cleanupTemporaryRoots, root, run, temporaryRoot } from "./setup-regression-fixtures.mjs";
+import {
+  cleanupTemporaryRoots,
+  root,
+  run,
+  temporaryRoot,
+} from "./setup-regression-test-helpers.mjs";
 import { startupAttestedInputPaths, startupControlPolicies } from "./startup-attestation.mjs";
 import {
   inspectRuntimeSessionLease,

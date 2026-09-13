@@ -4,7 +4,7 @@ import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { frameworkRoot, serializeCanonicalJson } from "../contracts/framework-contract.mjs";
+import { toolingRoot, serializeCanonicalJson } from "../filesystem/repository-files.mjs";
 import {
   closeOwnedDirectoryBinding,
   createExclusiveOwnedFile,
@@ -103,7 +103,7 @@ function readOwner(directory) {
   return Object.freeze({ owner, stats: snapshot.stats, status: processStatus(owner.pid) });
 }
 
-export function inspectVerificationSessionLock({ repositoryRoot = frameworkRoot } = {}) {
+export function inspectVerificationSessionLock({ repositoryRoot = toolingRoot } = {}) {
   const root = realpathSync.native(path.resolve(repositoryRoot));
   const directory = openVerificationState(root);
   if (!directory) return Object.freeze({ status: "absent" });
@@ -119,7 +119,7 @@ function releaseLifecycle(root, owner, testHooks, finalize) {
   releaseRuntimeLifecycleLock({ root, owner, finalize, testHooks });
 }
 
-export function acquireVerificationSessionLock({ repositoryRoot = frameworkRoot, testHooks } = {}) {
+export function acquireVerificationSessionLock({ repositoryRoot = toolingRoot, testHooks } = {}) {
   const root = realpathSync.native(path.resolve(repositoryRoot));
   if (capabilities.has(root)) throw new Error(lockedMessage);
 
@@ -247,7 +247,7 @@ export function acquireVerificationSessionLock({ repositoryRoot = frameworkRoot,
   }
 }
 
-export function assertVerificationSessionLockOwned({ repositoryRoot = frameworkRoot } = {}) {
+export function assertVerificationSessionLockOwned({ repositoryRoot = toolingRoot } = {}) {
   const root = realpathSync.native(path.resolve(repositoryRoot));
   const directory = openVerificationState(root);
   if (!directory) {
@@ -289,7 +289,7 @@ function parseHeldCommand(args) {
     "Usage: node scripts/verify/verification-session-lock.mjs --hold [--root <repository-root>] <command> [args...]";
   if (args[0] !== "--hold") throw new Error(usage);
   let index = 1;
-  let repositoryRoot = frameworkRoot;
+  let repositoryRoot = toolingRoot;
   if (args[index] === "--root") {
     if (!args[index + 1]) throw new Error(usage);
     repositoryRoot = path.resolve(args[index + 1]);

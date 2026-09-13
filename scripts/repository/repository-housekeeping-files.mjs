@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { resolveFrameworkPath, sha256 } from "../contracts/framework-contract.mjs";
+import { resolveRepositoryPath, sha256 } from "../filesystem/repository-files.mjs";
 import {
   ensureOwnedDirectoryChain,
   removeOwnedEmptyDirectory,
@@ -46,7 +46,7 @@ export function decodeStableUtf8(buffer, label) {
 
 export function assertHousekeepingDirectory(root, relativeDirectory) {
   const directory = relativeDirectory
-    ? resolveFrameworkPath(root, relativeDirectory)
+    ? resolveRepositoryPath(root, relativeDirectory)
     : path.resolve(root);
   const binding = openOwnedDirectoryBinding(root, directory, "repository housekeeping directory");
   closeOwnedDirectoryBinding(binding);
@@ -73,7 +73,7 @@ export function syncHousekeepingDirectory(
 }
 
 export function readHousekeepingRegularState(root, relativePath) {
-  const target = resolveFrameworkPath(root, relativePath);
+  const target = resolveRepositoryPath(root, relativePath);
   const binding = openOwnedDirectoryBinding(
     root,
     path.dirname(target),
@@ -104,7 +104,7 @@ export function readHousekeepingRegularState(root, relativePath) {
 }
 
 export function writeHousekeepingTemporary(root, relativePath, content, mode) {
-  const target = resolveFrameworkPath(root, relativePath);
+  const target = resolveRepositoryPath(root, relativePath);
   const label = `repository housekeeping temporary ${relativePath}`;
   const binding = openOwnedDirectoryBinding(root, path.dirname(target), `${label} parent`);
   let descriptor;
@@ -143,8 +143,8 @@ export function replaceHousekeepingRegularFile({
   if (path.posix.dirname(sourceRelativePath) !== path.posix.dirname(targetRelativePath)) {
     throw new Error(`Repository housekeeping refused a cross-directory replacement in ${label}.`);
   }
-  const source = resolveFrameworkPath(root, sourceRelativePath);
-  const target = resolveFrameworkPath(root, targetRelativePath);
+  const source = resolveRepositoryPath(root, sourceRelativePath);
+  const target = resolveRepositoryPath(root, targetRelativePath);
   const binding = openOwnedDirectoryBinding(root, path.dirname(target), `${label} parent`);
   try {
     const boundSource = ownedDirectoryChildPath(binding, path.basename(source), label);
@@ -203,10 +203,10 @@ export function restoreHousekeepingContent({
 
 export function housekeepingStatePaths(root) {
   return {
-    journal: resolveFrameworkPath(root, housekeepingJournalPath),
-    projectState: resolveFrameworkPath(root, path.posix.dirname(housekeepingStateDirectory)),
+    journal: resolveRepositoryPath(root, housekeepingJournalPath),
+    projectState: resolveRepositoryPath(root, path.posix.dirname(housekeepingStateDirectory)),
     repositoryRoot: root,
-    root: resolveFrameworkPath(root, housekeepingStateDirectory),
+    root: resolveRepositoryPath(root, housekeepingStateDirectory),
   };
 }
 

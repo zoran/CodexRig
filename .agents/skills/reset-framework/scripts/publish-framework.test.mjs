@@ -42,6 +42,7 @@ function fixture(t) {
   write(root, "README.md", "# CodexRig Framework\n");
   write(root, ".agents/skills/reset-framework/SKILL.md", "# Reset Fixture\n");
   write(root, ".agents/skills/create-project-from-framework/SKILL.md", "# Generation Fixture\n");
+  write(root, ".codexrig/project-tools.json", "{}\n");
   write(root, ".codex/README.md", "# Portable Policy\n");
   write(root, ".gitignore", ".codex/runtime/\nhistory.jsonl\n");
   write(root, "source.txt", "baseline\n");

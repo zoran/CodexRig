@@ -1,10 +1,10 @@
 /** Owns the exact persistent session-lease schema and parent-bound file transitions. */
 import { randomUUID } from "node:crypto";
 import {
-  frameworkRoot,
-  resolveFrameworkPath,
+  toolingRoot,
+  resolveRepositoryPath,
   serializeCanonicalJson,
-} from "../contracts/framework-contract.mjs";
+} from "../filesystem/repository-files.mjs";
 import { repositoryCodexRuntimeDirectory } from "./source-inventory.mjs";
 import {
   atomicReplaceOwnedFile,
@@ -88,7 +88,7 @@ function invalidRuntimeSessionLease(message) {
 }
 
 function readRuntimeSessionLease(root) {
-  const target = resolveFrameworkPath(root, runtimeSessionLeasePath);
+  const target = resolveRepositoryPath(root, runtimeSessionLeasePath);
   const file = runtimeFile(root, "codexrig-session.json", "Codex runtime session lease");
   if (file.status === "absent") {
     closeRuntimeFile(file);
@@ -142,7 +142,7 @@ function readRuntimeSessionLease(root) {
 }
 
 function readRuntimeSessionRecovery(root) {
-  const target = resolveFrameworkPath(root, runtimeSessionRecoveryPath);
+  const target = resolveRepositoryPath(root, runtimeSessionRecoveryPath);
   const file = runtimeFile(
     root,
     "codexrig-session-recovery.json",
@@ -287,7 +287,7 @@ function unlinkStableRuntimeSessionLease(root, expected, { testHooks } = {}) {
   }
 }
 
-export function inspectRuntimeSessionLease({ root = frameworkRoot } = {}) {
+export function inspectRuntimeSessionLease({ root = toolingRoot } = {}) {
   const current = readRuntimeSessionLease(root);
   try {
     return Object.freeze({
@@ -301,7 +301,7 @@ export function inspectRuntimeSessionLease({ root = frameworkRoot } = {}) {
   }
 }
 
-export function inspectRuntimeSessionRecovery({ root = frameworkRoot } = {}) {
+export function inspectRuntimeSessionRecovery({ root = toolingRoot } = {}) {
   const current = readRuntimeSessionRecovery(root);
   try {
     return Object.freeze({
@@ -339,7 +339,7 @@ function runtimeSessionPlan(current) {
 }
 
 /** Reads the canonical next-session selection without reserving a writer lease. */
-export function inspectRuntimeSessionPlan({ root = frameworkRoot } = {}) {
+export function inspectRuntimeSessionPlan({ root = toolingRoot } = {}) {
   const current = readRuntimeSessionLease(root);
   try {
     const recovery = readRuntimeSessionRecovery(root);

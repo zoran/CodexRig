@@ -14,6 +14,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { runSelectedPrePushPolicy } from "./pre-push-policy.mjs";
 import { changedPathsFromGit, validateCurrentCheckoutForPush } from "./adaptive-state.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -100,6 +101,7 @@ test("pre-push keeps security checks and consumes evidence without running the f
   assert.doesNotMatch(result.stdout, /complete deterministic verification plan/i);
   assert.deepEqual(readFileSync(value.logPath, "utf8").trim().split("\n"), [
     "node scripts/verify/git-remote-identity.mjs",
+    "node scripts/verify/pre-push-policy.mjs",
     "node scripts/verify/adaptive.mjs --validate-pre-push-refs",
     "node scripts/verify/pushed-object-scan.mjs",
     "node scripts/verify/adaptive.mjs --mode pre-push",
@@ -139,43 +141,36 @@ test("a staged-only checkout explains the commit requirement before evidence ref
   assert.ok(source.indexOf("--validate-pre-push-refs") < source.indexOf("Refreshing"));
 });
 
-test("source-framework pre-push fails closed on resettable local state", () => {
-  const source = readFileSync(sourceSteps, "utf8");
-  assert.match(source, /\.agents\/skills\/reset-framework\/scripts\/reset-framework\.mjs/u);
-  assert.match(source, /source_framework_contract/u);
-  assert.match(source, /if \[ ! -f "\$reset_script" \]/u);
-  assert.ok(source.indexOf('node "$reset_script"') < source.indexOf("--validate-pre-push-refs"));
-});
-
-test("source-framework pre-push refuses a missing reset boundary", () => {
+test("selected pre-push policy requires source reset and propagates prerequisite failure", () => {
   const value = fixture();
-  mkdirSync(path.join(value.fixtureRoot, ".codexrig"));
-  writeFileSync(path.join(value.fixtureRoot, ".codexrig", "framework.json"), "{}\n", "utf8");
-
-  const result = runFixture(value);
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /requires the reset boundary/);
-});
-
-test("source-framework pre-push runs the reset preview before checkout validation", () => {
-  const value = fixture();
-  mkdirSync(path.join(value.fixtureRoot, ".codexrig"));
-  writeFileSync(path.join(value.fixtureRoot, ".codexrig", "framework.json"), "{}\n", "utf8");
-  const resetScript = path.join(
-    value.fixtureRoot,
-    ".agents",
-    "skills",
-    "reset-framework",
-    "scripts",
-    "reset-framework.mjs",
+  mkdirSync(path.join(value.fixtureRoot, ".codex"));
+  copyFileSync(
+    path.join(root, ".codex/verification.json"),
+    path.join(value.fixtureRoot, ".codex/verification.json"),
   );
-  mkdirSync(path.dirname(resetScript), { recursive: true });
-  writeFileSync(resetScript, "// fixture\n", "utf8");
-
+  const configuration = JSON.parse(
+    readFileSync(path.join(root, ".codex/verification.json"), "utf8"),
+  );
+  assert.deepEqual(configuration.prePushChecks, [
+    ".agents/skills/reset-framework/scripts/reset-framework.mjs",
+  ]);
+  assert.throws(
+    () => runSelectedPrePushPolicy(value.fixtureRoot),
+    /Missing required repository file/,
+  );
+  const reset = path.join(value.fixtureRoot, configuration.prePushChecks[0]);
+  mkdirSync(path.dirname(reset), { recursive: true });
+  writeFileSync(reset, "process.exit(23);\n");
+  assert.throws(
+    () => runSelectedPrePushPolicy(value.fixtureRoot),
+    /Selected pre-push check failed/,
+  );
+  writeFileSync(reset, "process.exit(0);\n");
+  assert.doesNotThrow(() => runSelectedPrePushPolicy(value.fixtureRoot));
   const result = runFixture(value);
   assert.equal(result.status, 0, result.stderr);
   const calls = readFileSync(value.logPath, "utf8").trim().split("\n");
-  assert.equal(calls[1], `node ${path.relative(value.fixtureRoot, resetScript)}`);
+  assert.equal(calls[1], "node scripts/verify/pre-push-policy.mjs");
   assert.equal(calls[2], "node scripts/verify/adaptive.mjs --validate-pre-push-refs");
 });
 
@@ -285,6 +280,7 @@ test("missing or stale evidence blocks before final checkout acceptance", () => 
   assert.equal(result.status, 9);
   assert.deepEqual(readFileSync(value.logPath, "utf8").trim().split("\n"), [
     "node scripts/verify/git-remote-identity.mjs",
+    "node scripts/verify/pre-push-policy.mjs",
     "node scripts/verify/adaptive.mjs --validate-pre-push-refs",
     "node scripts/verify/pushed-object-scan.mjs",
     "node scripts/verify/adaptive.mjs --mode pre-push",

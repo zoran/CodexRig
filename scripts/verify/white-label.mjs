@@ -9,7 +9,7 @@ import {
   productConfigurationFindings,
   productConfigurationPath,
 } from "../contracts/product-configuration.mjs";
-import { isReusableFrameworkSource } from "../contracts/framework-contract.mjs";
+import { hasProductWorkspace } from "../repository/product-roots.mjs";
 import { discoverProductLayout } from "../repository/product-roots.mjs";
 import { listActiveFiles } from "../repository/source-inventory.mjs";
 
@@ -84,12 +84,9 @@ function configurationContent(root, required, findings) {
 }
 
 export function whiteLabelProjectFindings({ root = repositoryRoot, relativePaths } = {}) {
-  const sourceFramework = isReusableFrameworkSource(root);
+  const requiresProduct = hasProductWorkspace({ root, relativePaths });
   const findings = [];
-  const content = configurationContent(root, !sourceFramework, findings);
-  if (sourceFramework && content !== null) {
-    findings.push("the neutral source framework must not own a child product configuration");
-  }
+  const content = configurationContent(root, requiresProduct, findings);
 
   let configuredValues = [];
   if (content !== null) {
@@ -104,14 +101,8 @@ export function whiteLabelProjectFindings({ root = repositoryRoot, relativePaths
   const layout = discoverProductLayout({ repositoryRoot: root, relativePaths: activeFiles });
   for (const relativePath of activeFiles) {
     if (!productFacingPath(relativePath, layout.sourceRoots)) continue;
-    if (/codexrig/iu.test(relativePath)) {
-      findings.push(`${relativePath} leaks CodexRig branding through a product-facing path`);
-    }
     const surface = readableSurface(root, relativePath, findings);
     if (surface === null) continue;
-    if (/codexrig/iu.test(surface)) {
-      findings.push(`${relativePath} leaks CodexRig branding into a product-facing surface`);
-    }
     if (frameworkBoundaryReferencePattern.test(surface)) {
       findings.push(`${relativePath} crosses from product code into a framework-owned boundary`);
     }

@@ -5,14 +5,14 @@ import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-proce
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 import {
-  frameworkRoot,
-  readFrameworkContract,
-  readRegularFrameworkFile,
-  resolveFrameworkPath,
+  toolingRoot,
+  readRepositoryFile,
+  resolveRepositoryPath,
   serializeCanonicalJson,
   sha256,
-} from "../contracts/framework-contract.mjs";
+} from "../filesystem/repository-files.mjs";
 import {
   repositoryCodexRuntimeCacheDirectory,
   repositoryCodexRuntimeDirectory,
@@ -52,13 +52,13 @@ export const startupControlPolicies = Object.freeze({
 const fixedStartupAttestedInputs = Object.freeze([
   ".codex/config.toml",
   ".codex/hooks.json",
-  ".codexrig/compatibility.json",
-  ".codexrig/framework.json",
+  ".codex/toolchain.json",
+  ".codex/tooling.json",
   "mise.lock",
   "mise.toml",
   "package.json",
   "pnpm-lock.yaml",
-  "scripts/framework/framework-doctor.mjs",
+  "scripts/setup/tooling-doctor.mjs",
   "scripts/context/session-stop-lifecycle.mjs",
   "scripts/setup/start-codex.sh",
   "scripts/setup/session-control-hook-command.mjs",
@@ -67,8 +67,8 @@ const fixedStartupAttestedInputs = Object.freeze([
   "scripts/setup/validate-codex-model-policy.mjs",
 ]);
 
-export function startupAttestedInputPaths(root = frameworkRoot) {
-  const agentsDirectory = resolveFrameworkPath(root, ".codex/agents");
+export function startupAttestedInputPaths(root = toolingRoot) {
+  const agentsDirectory = resolveRepositoryPath(root, ".codex/agents");
   if (!existsSync(agentsDirectory)) {
     throw new Error("Startup attestation requires project-scoped agent roles.");
   }
@@ -95,7 +95,7 @@ export function startupAttestedInputPaths(root = frameworkRoot) {
   ].sort();
 }
 
-export const startupAttestedInputs = Object.freeze(startupAttestedInputPaths(frameworkRoot));
+export const startupAttestedInputs = Object.freeze(startupAttestedInputPaths(toolingRoot));
 
 function commandVersion(root, executable, args, label) {
   const result = spawnSync(executable, args, {
@@ -130,15 +130,15 @@ function inputHashes(root) {
   return Object.fromEntries(
     startupAttestedInputPaths(root).map((relativePath) => [
       relativePath,
-      sha256(readRegularFrameworkFile(root, relativePath)),
+      sha256(readRepositoryFile(root, relativePath)),
     ]),
   );
 }
 
 function ensurePrivateStateDirectory(root) {
-  const runtimeRoot = resolveFrameworkPath(root, repositoryCodexRuntimeDirectory);
-  const cacheRoot = resolveFrameworkPath(root, repositoryCodexRuntimeCacheDirectory);
-  const stateRoot = resolveFrameworkPath(root, `${repositoryCodexRuntimeCacheDirectory}/codexrig`);
+  const runtimeRoot = resolveRepositoryPath(root, repositoryCodexRuntimeDirectory);
+  const cacheRoot = resolveRepositoryPath(root, repositoryCodexRuntimeCacheDirectory);
+  const stateRoot = resolveRepositoryPath(root, `${repositoryCodexRuntimeCacheDirectory}/codexrig`);
   for (const directory of [runtimeRoot, cacheRoot, stateRoot]) {
     ensureOwnedPrivateDirectory(root, directory, "startup attestation state directory");
   }
@@ -146,7 +146,7 @@ function ensurePrivateStateDirectory(root) {
 
 function atomicWriteAttestation(root, content, { testHooks } = {}) {
   ensurePrivateStateDirectory(root);
-  const stateRoot = resolveFrameworkPath(root, `${repositoryCodexRuntimeCacheDirectory}/codexrig`);
+  const stateRoot = resolveRepositoryPath(root, `${repositoryCodexRuntimeCacheDirectory}/codexrig`);
   const directory = openPrivateOwnedDirectory(root, stateRoot, "startup attestation state");
   try {
     atomicReplaceOwnedFile(
@@ -162,7 +162,7 @@ function atomicWriteAttestation(root, content, { testHooks } = {}) {
 }
 
 function readAttestation(root) {
-  const stateRoot = resolveFrameworkPath(root, `${repositoryCodexRuntimeCacheDirectory}/codexrig`);
+  const stateRoot = resolveRepositoryPath(root, `${repositoryCodexRuntimeCacheDirectory}/codexrig`);
   if (!existsSync(stateRoot)) throw new Error("No launcher attestation exists.");
   const directory = openPrivateOwnedDirectory(root, stateRoot, "startup attestation state");
   let value;
@@ -209,9 +209,7 @@ function startupControlPolicy(value) {
 }
 
 function startupRuntimePolicy(root, controlPolicy) {
-  const portablePolicy = parsePortableCodexConfig(
-    readRegularFrameworkFile(root, ".codex/config.toml"),
-  );
+  const portablePolicy = parsePortableCodexConfig(readRepositoryFile(root, ".codex/config.toml"));
   return Object.freeze({
     model: portablePolicy.model,
     reasoningEffort: portablePolicy.model_reasoning_effort,
@@ -225,7 +223,7 @@ function startupRuntimePolicy(root, controlPolicy) {
 
 /** Captures the exact read-only startup basis that must survive preflight and every launch. */
 export function startupAttestationBasis({
-  root = frameworkRoot,
+  root = toolingRoot,
   controlPolicy = process.env.CODEXRIG_STARTUP_CONTROL_POLICY ?? "",
   runtimeExecutables,
 } = {}) {
@@ -240,7 +238,7 @@ export function startupAttestationBasis({
 }
 
 /** Inspects whether native session selection can reserve this repository. */
-export function startupSessionPlan({ root = frameworkRoot } = {}) {
+export function startupSessionPlan({ root = toolingRoot } = {}) {
   return inspectRuntimeSessionPlan({ root });
 }
 
@@ -383,14 +381,14 @@ export function bindStartupSessionCodexProcess(root, pid, codexPid, options = {}
 }
 
 export function issueStartupAttestation({
-  root = frameworkRoot,
+  root = toolingRoot,
   now = Date.now,
   controlPolicy = process.env.CODEXRIG_STARTUP_CONTROL_POLICY ?? "",
   expectedBasis,
   runtimeExecutables,
   testHooks,
 } = {}) {
-  const contract = readFrameworkContract(root);
+  const contract = readToolingConfiguration(root);
   const effectiveControlPolicy = startupControlPolicy(controlPolicy);
   const runtimeLease = inspectRuntimeSessionLease({ root });
   if (runtimeLease.status !== "active") {
@@ -416,8 +414,8 @@ export function issueStartupAttestation({
   const issuedAt = now();
   const attestation = {
     schemaVersion: 7,
-    frameworkId: contract.frameworkId,
-    frameworkVersion: contract.frameworkVersion,
+    frameworkId: contract.protocol.id,
+    frameworkVersion: contract.protocol.version,
     issuedAt,
     expiresAt: issuedAt + contract.startup.attestationMaxAgeSeconds * 1000,
     controlPolicySha256: sha256(effectiveControlPolicy),
@@ -469,7 +467,7 @@ function validateCurrentAttestationBasis({
   now,
   runtimeExecutables,
 }) {
-  const contract = readFrameworkContract(root);
+  const contract = readToolingConfiguration(root);
   const identity = repositoryRuntimeRootIdentity(root);
   const persistedAttestation = readAttestation(root);
   if (
@@ -510,8 +508,8 @@ function validateCurrentAttestationBasis({
     throw new Error("Codex runtime session lease differs from the launcher attestation.");
   }
   if (
-    attestation.frameworkId !== contract.frameworkId ||
-    attestation.frameworkVersion !== contract.frameworkVersion ||
+    attestation.frameworkId !== contract.protocol.id ||
+    attestation.frameworkVersion !== contract.protocol.version ||
     JSON.stringify(attestation.root) !== JSON.stringify(identity)
   ) {
     throw new Error("Launcher attestation does not match this framework root.");
@@ -536,7 +534,7 @@ function validateCurrentAttestationBasis({
 
 /** Activates a durable session; transcriptless events return null without acquiring ownership. */
 export function verifyStartupAttestation({
-  root = frameworkRoot,
+  root = toolingRoot,
   hookInput,
   expectedAttestation,
   nonce = process.env.CODEXRIG_STARTUP_NONCE ?? "",

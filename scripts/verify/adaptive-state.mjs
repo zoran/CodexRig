@@ -323,12 +323,9 @@ function isImageQualityPolicy(filePath) {
     filePath.startsWith(".agents/skills/generated-image-quality-review/") ||
     [
       "scripts/verify/adaptive-surfaces.mjs",
-      "scripts/verify/adaptive-surfaces.test.mjs",
       "scripts/verify/image-assets.mjs",
-      "scripts/verify/image-assets.test.mjs",
       "scripts/verify/surface-quality.mjs",
-      "scripts/verify/surface-quality.test.mjs",
-    ].includes(filePath)
+    ].includes(filePath.replace(/\.test(?=\.mjs$)/u, ""))
   );
 }
 

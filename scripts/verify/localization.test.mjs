@@ -74,14 +74,13 @@ test("configured single and multilingual locale sets stay canonical and manifest
   assert.match(localizationConfigurationFindings(invalid).join("\n"), /fallbackLocale/u);
 });
 
-test("the reusable framework never carries a child localization configuration", (t) => {
+test("explicit localization configuration requires manifest truth even without product files", (t) => {
   const root = fixture(t, "localization-source-");
-  write(root, ".agents/skills/create-project-from-framework/SKILL.md", "# Generator\n");
   write(root, localizationConfigurationPath, initialLocalizationConfiguration());
   assert.match(
     localizationProjectFindings({ root, relativePaths: [localizationConfigurationPath] }).join(
       "\n",
     ),
-    /neutral source framework/u,
+    /missing localization truth owner: docs\/project\.md/u,
   );
 });

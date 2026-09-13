@@ -7,10 +7,7 @@ import {
   effectiveDeliveryTargets,
   parseDeliveryConfiguration,
 } from "../contracts/delivery-configuration.mjs";
-import {
-  isReusableFrameworkSource,
-  readRegularFrameworkFile,
-} from "../contracts/framework-contract.mjs";
+import { readRepositoryFile } from "../filesystem/repository-files.mjs";
 import { sensitivePathReason } from "../repository/sensitive-paths.mjs";
 import {
   captureStableRepositoryFileIdentity,
@@ -185,7 +182,7 @@ function verifyBoundFiles(root, entries, label) {
 function projectScript(root, targetEnvironment) {
   let packageJson;
   try {
-    packageJson = JSON.parse(readRegularFrameworkFile(root, "package.json"));
+    packageJson = JSON.parse(readRepositoryFile(root, "package.json"));
   } catch (error) {
     if (error instanceof SyntaxError) throw new Error("package.json must contain valid JSON.");
     throw error;
@@ -227,12 +224,9 @@ export function resolveDeliveryArtifactBinding({
   if (!artifactManifest) {
     throw new Error("Staging and production verification require --artifact-manifest.");
   }
-  if (isReusableFrameworkSource(canonicalRoot)) {
-    throw new Error("The neutral framework source has no staging or production delivery target.");
-  }
 
   const configuration = parseDeliveryConfiguration(
-    readRegularFrameworkFile(canonicalRoot, deliveryConfigurationPath),
+    readRepositoryFile(canonicalRoot, deliveryConfigurationPath),
   );
   if (!effectiveDeliveryTargets(configuration).includes(targetEnvironment)) {
     throw new Error(

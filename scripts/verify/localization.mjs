@@ -8,7 +8,7 @@ import {
   localizationConfigurationPath,
   parseLocalizationConfiguration,
 } from "../contracts/localization-configuration.mjs";
-import { isReusableFrameworkSource } from "../contracts/framework-contract.mjs";
+import { hasProductWorkspace } from "../repository/product-roots.mjs";
 import {
   discoverProductLayout,
   isProductImplementationPath,
@@ -85,19 +85,13 @@ export function localizationProjectFindings({
   relativePaths = listActiveFiles({ root }),
 } = {}) {
   const findings = [];
-  const sourceFramework = isReusableFrameworkSource(root);
+  const requiresProduct = hasProductWorkspace({ root, relativePaths });
   const content = readRegular(
     root,
     localizationConfigurationPath,
     findings,
-    sourceFramework ? "" : `missing required localization owner: ${localizationConfigurationPath}`,
+    !requiresProduct ? "" : `missing required localization owner: ${localizationConfigurationPath}`,
   );
-  if (sourceFramework) {
-    if (content !== null) {
-      findings.push("neutral source framework must not contain generated product localization");
-    }
-    return [...new Set(findings)].sort();
-  }
   if (content === null) return [...new Set(findings)].sort();
 
   const configurationFindings = localizationConfigurationFindings(content);

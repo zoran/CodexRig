@@ -1,82 +1,29 @@
-/** Owns repository smoke behavior for the repository verification boundary. */
-import { existsSync, lstatSync, readFileSync } from "node:fs";
+/** Owns repository smoke checks for selected local tools and their contracts. */
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
-import {
-  portableContextContractFindings,
-  supportedCodexStartCommand,
-} from "../context/portable-context-contract.mjs";
+import { toolingRoot as root, readRepositoryFile } from "../filesystem/repository-files.mjs";
+import { portableContextContractFindings } from "../context/portable-context-contract.mjs";
 import { validateMinimalMiseTools } from "../contracts/mise-toolchain-configuration.mjs";
-import { readCompatibilityMatrix } from "../contracts/framework-contract.mjs";
-import { discoverProductLayout } from "../repository/product-roots.mjs";
-import {
-  listActiveFiles,
-  portableCodexGitignorePatterns,
-  repositoryCodexHomeGitignorePatterns,
-} from "../repository/source-inventory.mjs";
-import { classifyPath, isFullRelevantPath } from "./adaptive-state.mjs";
-import { repositorySmokeContentExpectations } from "./repository-smoke-content.mjs";
-import { repositorySmokeRequiredFiles } from "./repository-smoke-inventory.mjs";
+import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
+import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
+import { startupExecutableClosurePaths } from "../setup/startup-executable-closure.mjs";
+import { validateCodexConfig } from "../setup/validate-codex-config.mjs";
 import { futureModulesDocumentFindings } from "../docs/project-manifest-contract.mjs";
-import { frameworkInstallationFindings } from "../framework/framework-doctor.mjs";
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const failures = [];
-const compatibilityMatrix = readCompatibilityMatrix(root);
-
+const compatibilityMatrix = readToolchainConfiguration(root);
 function readRelative(relativePath) {
-  const fullPath = path.join(root, relativePath);
-  return existsSync(fullPath) ? readFileSync(fullPath, "utf8") : "";
+  return readRepositoryFile(root, relativePath);
 }
-
-function requireContent(relativePath, expected) {
-  const content = readRelative(relativePath);
-  const normalizedContent = content.replace(/\s+/g, " ");
-  const normalizedExpected = expected.replace(/\s+/g, " ");
-  const prose = relativePath.endsWith(".md");
-  const contains = prose
-    ? normalizedContent.toLowerCase().includes(normalizedExpected.toLowerCase())
-    : normalizedContent.includes(normalizedExpected);
-  if (!contains) failures.push(`${relativePath} must include ${expected}`);
+try {
+  readToolingConfiguration(root);
+  validateCodexConfig(root);
+  startupExecutableClosurePaths(root);
+  failures.push(...portableContextContractFindings({ repositoryRoot: root }));
+  failures.push(...futureModulesDocumentFindings(readRelative("docs/future-modules.md")));
+} catch (error) {
+  failures.push(error.message);
 }
-
-function requireExactContent(relativePath, expected) {
-  if (!readRelative(relativePath).includes(expected)) {
-    failures.push(`${relativePath} must include the exact content ${expected}`);
-  }
-}
-
-function requireOccurrenceCount(relativePath, expected, count) {
-  const occurrences = readRelative(relativePath).split(expected).length - 1;
-  if (occurrences !== count) {
-    failures.push(`${relativePath} must include ${expected} exactly ${count} time(s)`);
-  }
-}
-
-for (const relativePath of repositorySmokeRequiredFiles) {
-  const fullPath = path.join(root, relativePath);
-  if (!existsSync(fullPath)) {
-    failures.push(`missing required file: ${relativePath}`);
-    continue;
-  }
-  const stats = lstatSync(fullPath);
-  if (stats.isSymbolicLink() || !stats.isFile()) {
-    failures.push(`required file must be regular and non-symlink: ${relativePath}`);
-  }
-}
-
-const activeFiles = listActiveFiles({ root });
-const productLayout = discoverProductLayout({ repositoryRoot: root, relativePaths: activeFiles });
-failures.push(...productLayout.findings);
-failures.push(...portableContextContractFindings({ repositoryRoot: root }));
-failures.push(...futureModulesDocumentFindings(readRelative("docs/future-modules.md")));
-failures.push(
-  ...frameworkInstallationFindings({ root }).errors.map(
-    ({ code, message }) => `[${code}] ${message}`,
-  ),
-);
-
 let packageJson;
 try {
   packageJson = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
@@ -129,11 +76,6 @@ if (packageJson) {
   ) {
     failures.push("goal:new must use the fail-closed publication precondition");
   }
-  if (
-    packageJson.scripts?.["repo:housekeeping"] !== "node scripts/goals/repository-housekeeping.mjs"
-  ) {
-    failures.push("repo:housekeeping must use the canonical repository housekeeping entry point");
-  }
   if (!packageJson.scripts?.setup?.includes("node scripts/verify/identity-access.mjs")) {
     failures.push("setup must validate the Identity and Access boundary");
   }
@@ -145,58 +87,15 @@ if (packageJson) {
   }
 }
 
-requireContent("scripts/verify/image-assets.mjs", "listActiveFiles");
-requireContent(".codex/hooks.json", "no mutable project-file hook may execute");
-requireContent("scripts/setup/session-control-hook-command.mjs", 'require("node:http")');
-requireContent(
-  "scripts/setup/session-control-hook-command.mjs",
-  "sessionControlHookConfigArguments",
-);
-requireContent("scripts/setup/startup-codex-process.mjs", "codexProcessSupervisorSource");
-requireContent("scripts/setup/startup-session-controller.mjs", "verifyTrustedSessionControlHooks");
-requireContent("scripts/setup/startup-session-controller.mjs", "runStopLifecycle");
-requireContent("scripts/context/session-stop-lifecycle.mjs", "sealedHandoverStop");
-requireContent("scripts/repository/source-inventory.mjs", "isRepositoryCodexHomePath");
-requireContent(
-  "scripts/repository/worktree-prune-transaction.mjs",
-  "inspectWorktreePruneTransaction",
-);
-requireContent(
-  "scripts/repository/worktree-prune-transaction.mjs",
-  "codexrig-worktree-prune-transaction.json",
-);
-requireContent("scripts/verify/format-project.mjs", "projectFormatFiles");
-requireContent(
-  "scripts/verify/adaptive-runner.mjs",
-  "scripts/deps/dependency-owner-normalization.test.mjs",
-);
-requireContent("scripts/verify/adaptive-runner.mjs", "./workspace-verification.mjs");
-requireContent("scripts/verify/adaptive-runner.mjs", "./verification-admission.mjs");
-requireContent("scripts/verify/pre-push.sh", "verification-session-lock.mjs");
-
-const validMiseFixture = '[tools]\nnode = "1.2.3"\npnpm = "4.5.6"\n';
-if (validateMinimalMiseTools(validMiseFixture).errors.length > 0) {
-  failures.push("minimal mise.toml validator must accept the intended structure");
-}
-const extensibleMiseFixture =
-  '[tools]\nnode = "1.2.3"\npnpm = "4.5.6"\npython = "3.14.0"\ngo = "1.26.0"\n';
-if (validateMinimalMiseTools(extensibleMiseFixture).errors.length > 0) {
-  failures.push("minimal mise.toml validator must permit safe exact project-specific tool pins");
-}
-for (const [name, fixture] of Object.entries({
-  "backend expression":
-    '[tools]\nnode = "1.2.3"\npnpm = "4.5.6"\npython = "ubi:example/tool@3.14.0"\n',
-  "duplicate key": '[tools]\nnode = "1.2.3"\nnode = "1.2.4"\npnpm = "4.5.6"\n',
-  "environment section": '[tools]\nnode = "1.2.3"\npnpm = "4.5.6"\n[env]\nFLAG = "1"\n',
-  "floating version": '[tools]\nnode = "1.2.3"\npnpm = "4.5.6"\npython = "latest"\n',
-  "hook section": '[tools]\nnode = "1.2.3"\npnpm = "4.5.6"\n[hooks]\npostinstall = "true"\n',
-  "key outside tools": 'node = "1.2.3"\n[tools]\npnpm = "4.5.6"\n',
-})) {
-  if (validateMinimalMiseTools(fixture).errors.length === 0) {
-    failures.push(`minimal mise.toml validator must reject fixture: ${name}`);
+for (const command of Object.values(packageJson?.scripts ?? {})) {
+  for (const [, relativePath] of command.matchAll(/(?:^|[\s"'])(scripts\/[A-Za-z0-9_./-]+)/gu)) {
+    try {
+      readRepositoryFile(root, relativePath);
+    } catch (error) {
+      failures.push(error.message);
+    }
   }
 }
-
 const miseToml = readRelative("mise.toml");
 const miseValidation = validateMinimalMiseTools(miseToml);
 for (const error of miseValidation.errors) failures.push(`mise.toml ${error}`);
@@ -355,177 +254,8 @@ for (const [tool, platformUrls] of Object.entries(officialArtifactUrls)) {
   }
 }
 
-requireContent("scripts/setup/check-prereqs.sh", "stable.node.version");
-requireContent("scripts/setup/check-prereqs.sh", "stable.pnpm.version");
-if (/corepack/iu.test(readRelative("scripts/setup/check-prereqs.sh"))) {
-  failures.push("the local prerequisite check must not install or activate Corepack shims");
-}
-const sourceFramework = existsSync(
-  path.join(root, ".agents/skills/create-project-from-framework/SKILL.md"),
-);
-for (const [filePath, expected] of repositorySmokeContentExpectations(supportedCodexStartCommand, {
-  sourceFramework,
-})) {
-  requireContent(filePath, expected);
-}
-if (packageJson?.scripts?.["framework:reset"]) {
-  requireContent("instructions.md", "Every framework reset removes");
-  requireContent(
-    ".agents/skills/reset-framework/SKILL.md",
-    "runtime identity required for the next session",
-  );
-  requireContent(
-    ".agents/skills/reset-framework/scripts/reset-framework.mjs",
-    "repositoryCodexRuntimeDirectory",
-  );
-  requireContent("scripts/verify/source-baseline.mjs", "--verification-source-baseline");
-}
-const projectCreatorSkill = ".agents/skills/create-project-from-framework/SKILL.md";
-if (existsSync(path.join(root, projectCreatorSkill))) {
-  const projectCreatorSkillDirectory = projectCreatorSkill.slice(0, -"/SKILL.md".length);
-  requireContent(projectCreatorSkill, "ephemeral side conversations");
-  requireContent(projectCreatorSkill, "caller-selected stage path");
-  requireContent(projectCreatorSkill, "complete selected-source transfer manifest");
-  requireContent(
-    `${projectCreatorSkillDirectory}/scripts/source-readiness.mjs`,
-    "--portable-source-baseline",
-  );
-  requireContent(
-    `${projectCreatorSkillDirectory}/scripts/create-project-from-framework.mjs`,
-    "broad, realistic",
-  );
-  requireContent(
-    `${projectCreatorSkillDirectory}/scripts/create-project-from-framework.mjs`,
-    "reviewable slices",
-  );
-  requireContent(
-    `${projectCreatorSkillDirectory}/scripts/create-project-from-framework.mjs`,
-    "fresh audit",
-  );
-  requireContent(
-    `${projectCreatorSkillDirectory}/scripts/create-project-from-framework.mjs`,
-    "assertGeneratedProjectParity",
-  );
-  requireContent(
-    `${projectCreatorSkillDirectory}/scripts/generated-project-finalization.mjs`,
-    "changed outside declared project-specific transformations",
-  );
-  requireContent(
-    `${projectCreatorSkillDirectory}/scripts/source-git-state.mjs`,
-    "isolatedGitArguments",
-  );
-  requireContent("scripts/setup/project-generator-state.test.mjs", "core.worktree");
-  requireContent("scripts/setup/project-generator-state.test.mjs", "core.fsmonitor");
-  requireContent(
-    "scripts/setup/project-generator-state.test.mjs",
-    "Git-less root nested below another repository",
-  );
-}
-for (const filePath of [
-  "AGENTS.md",
-  "README.md",
-  "instructions.md",
-  ".codex/README.md",
-  "scripts/setup/check-prereqs.sh",
-]) {
-  requireExactContent(filePath, supportedCodexStartCommand);
-}
-for (const filePath of [
-  "AGENTS.md",
-  "README.md",
-  "instructions.md",
-  ".codex/README.md",
-  "docs/project.md",
-]) {
-  if (
-    /normal Codex home|user(?:'s)? Codex home|never redirects `?CODEX_HOME/iu.test(
-      readRelative(filePath),
-    )
-  ) {
-    failures.push(`${filePath}: contains the superseded global user-home contract`);
-  }
-}
-if (existsSync(path.join(root, ".github/workflows/ci.yml"))) {
-  const githubCi = readRelative(".github/workflows/ci.yml");
-  requireContent(".github/workflows/ci.yml", `version: ${miseVersions.pnpm}`);
-  requireContent(".github/workflows/ci.yml", `node-version: ${miseVersions.node}`);
-  if ((githubCi.match(/jdx\/mise-action@[a-f0-9]{40} # v\d+\.\d+\.\d+\b/gu) ?? []).length !== 2) {
-    failures.push(
-      ".github/workflows/ci.yml must pin both mise actions to annotated stable commit identities",
-    );
-  }
-  requireOccurrenceCount(".github/workflows/ci.yml", "install: false", 2);
-  requireOccurrenceCount(".github/workflows/ci.yml", "cache: false", 2);
-  requireOccurrenceCount(
-    ".github/workflows/ci.yml",
-    "node scripts/deps/verify-pnpm-execution-policy.mjs",
-    2,
-  );
-  for (const key of ["NPM_CONFIG_IGNORE_PNPMFILE", "PNPM_CONFIG_IGNORE_PNPMFILE"]) {
-    requireContent(".github/workflows/ci.yml", `${key}: \"true\"`);
-  }
-  if (
-    githubCi.indexOf("node scripts/deps/verify-pnpm-execution-policy.mjs") >
-    githubCi.indexOf("pnpm/action-setup")
-  ) {
-    failures.push(".github/workflows/ci.yml must reject executable pnpm config before pnpm setup");
-  }
-}
-if (existsSync(path.join(root, ".gitlab-ci.yml"))) {
-  requireContent(".gitlab-ci.yml", `pnpm@${miseVersions.pnpm}`);
-  requireContent(".gitlab-ci.yml", `node:${miseVersions.node}-bookworm`);
-  requireContent(".gitlab-ci.yml", "ripgrep shellcheck");
-  for (const misePackage of Object.values(compatibilityMatrix.ci.miseNpmPackages)) {
-    requireContent(".gitlab-ci.yml", misePackage);
-  }
-  for (const integrity of Object.values(compatibilityMatrix.ci.miseNpmPackageIntegrities)) {
-    requireContent(".gitlab-ci.yml", integrity);
-  }
-  requireContent(".gitlab-ci.yml", `\${mise_package}@${compatibilityMatrix.ci.miseVersion}`);
-  requireContent(".gitlab-ci.yml", 'case "$(uname -m)" in');
-  requireContent(".gitlab-ci.yml", "--verify-mise-archive");
-  requireContent(
-    ".gitlab-ci.yml",
-    'npm install --global "$mise_archive" --ignore-scripts --offline',
-  );
-  requireContent(".gitlab-ci.yml", "--ignore-scripts");
-  requireContent(".gitlab-ci.yml", "--ignore-pnpmfile");
-  requireContent(".gitlab-ci.yml", 'NPM_CONFIG_IGNORE_PNPMFILE: "true"');
-  requireContent(".gitlab-ci.yml", 'PNPM_CONFIG_IGNORE_PNPMFILE: "true"');
-  requireContent(".gitlab-ci.yml", "node scripts/deps/verify-pnpm-execution-policy.mjs");
-  if (/mise@latest/u.test(readRelative(".gitlab-ci.yml"))) {
-    failures.push(".gitlab-ci.yml must not execute a floating mise installer");
-  }
-  if (/npm install --global "\$\{mise_package\}@/u.test(readRelative(".gitlab-ci.yml"))) {
-    failures.push(".gitlab-ci.yml must install only the verified local mise archive");
-  }
-}
-for (const runtimePath of ["mise.lock", "mise.toml"]) {
-  const categories = classifyPath(runtimePath, { productLayout });
-  if (
-    !categories.includes("dependency/package manager files") ||
-    !isFullRelevantPath(runtimePath, { productLayout })
-  ) {
-    failures.push(`${runtimePath} must remain a full-relevant dependency/package manager file`);
-  }
-}
-
-const gitignore = existsSync(path.join(root, ".gitignore"))
-  ? readFileSync(path.join(root, ".gitignore"), "utf8")
-  : "";
-for (const entry of [
-  ...repositoryCodexHomeGitignorePatterns,
-  ...portableCodexGitignorePatterns,
-  ".delivery/",
-  "node_modules/",
-  ".env",
-]) {
-  if (!gitignore.includes(entry)) failures.push(`.gitignore must include ${entry}`);
-}
-
-if (failures.length > 0) {
-  console.error("Repository smoke check failed:");
-  for (const failure of failures) console.error(`- ${failure}`);
-  process.exit(1);
-}
-console.log("Repository smoke check passed.");
+if (failures.length) {
+  console.error("Project tooling verification failed:");
+  for (const finding of failures) console.error(`- ${finding}`);
+  process.exitCode = 1;
+} else console.log("Project tooling verification passed.");

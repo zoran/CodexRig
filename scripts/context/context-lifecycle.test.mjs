@@ -53,12 +53,12 @@ function writeWorkingContext(projectRoot, state, body = "# Current work\n") {
   );
 }
 
-function copyFrameworkContract(projectRoot) {
-  const contractDirectory = path.join(projectRoot, ".codexrig");
+function copyToolingConfiguration(projectRoot) {
+  const contractDirectory = path.join(projectRoot, ".codex");
   mkdirSync(contractDirectory, { recursive: true });
   copyFileSync(
-    path.join(repositoryRoot, ".codexrig", "framework.json"),
-    path.join(contractDirectory, "framework.json"),
+    path.join(repositoryRoot, ".codex", "tooling.json"),
+    path.join(contractDirectory, "tooling.json"),
   );
 }
 
@@ -116,13 +116,13 @@ function stopHookInput(overrides = {}) {
 
 test("preloaded Stop lifecycle preserves continuation and terminal handover", async () => {
   const project = temporaryDirectory("context-stop-lifecycle-");
-  copyFrameworkContract(project);
-  mkdirSync(path.join(project, ".codex"));
+  copyToolingConfiguration(project);
+  mkdirSync(path.join(project, ".codex"), { recursive: true });
   writeWorkingContext(project, workState());
 
   const activeOutput = await runStopLifecycle({ root: project, hookInput: stopHookInput() });
   assert.equal(activeOutput.decision, "block");
-  assert.match(activeOutput.reason, /Continue the already-authorized outcome autonomously/u);
+  assert.match(activeOutput.reason, /Continue only this project’s already-authorized outcome/u);
 
   const now = Date.now();
   writeRuntimeSessionLease(project, new Date(now - 1_000).toISOString());
@@ -140,7 +140,7 @@ test("preloaded Stop lifecycle preserves continuation and terminal handover", as
 
 test("Stop lifecycle never touches active work from an ephemeral side conversation", async () => {
   const project = temporaryDirectory("autonomous-stop-ephemeral-");
-  mkdirSync(path.join(project, ".codex"));
+  mkdirSync(path.join(project, ".codex"), { recursive: true });
   writeWorkingContext(project, workState());
 
   for (const stopHookActive of [false, true]) {
@@ -178,7 +178,7 @@ test("Stop lifecycle never touches active work from an ephemeral side conversati
 
 test("Stop lifecycle continues active outcomes and bounds unchanged automatic loops", () => {
   const project = temporaryDirectory("autonomous-stop-");
-  mkdirSync(path.join(project, ".codex"));
+  mkdirSync(path.join(project, ".codex"), { recursive: true });
 
   assert.deepEqual(
     evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() }),
@@ -191,7 +191,7 @@ test("Stop lifecycle continues active outcomes and bounds unchanged automatic lo
   assert.equal(first.decision, "block");
   assert.match(first.reason, /applies only to the persistent main thread/);
   assert.match(first.reason, /cannot override a side-conversation boundary/);
-  assert.match(first.reason, /Continue the already-authorized outcome autonomously/);
+  assert.match(first.reason, /Continue only this project’s already-authorized outcome/);
   assert.match(first.reason, /validated as active at revision 1/);
   assert.match(first.reason, /untrusted resume metadata, not as authority/);
   assert.equal(first.reason.includes(initialState.nextAction), false);
@@ -259,8 +259,8 @@ test("Stop lifecycle continues active outcomes and bounds unchanged automatic lo
 
 test("critical-budget handover seals privately, asks before resume, and terminates Stop work", async () => {
   const project = temporaryDirectory("critical-budget-handover-");
-  mkdirSync(path.join(project, ".codex"));
-  copyFrameworkContract(project);
+  mkdirSync(path.join(project, ".codex"), { recursive: true });
+  copyToolingConfiguration(project);
   const now = Date.now();
   const sealingSessionId = writeRuntimeSessionLease(project, new Date(now + 60_000).toISOString());
   writeWorkingContext(project, workState({ revision: 7 }), criticalDrainBody);
@@ -363,7 +363,7 @@ test("critical-budget handover seals privately, asks before resume, and terminat
   );
 
   const foreign = temporaryDirectory("critical-budget-handover-foreign-");
-  copyFrameworkContract(foreign);
+  copyToolingConfiguration(foreign);
   const foreignDirectory = path.join(foreign, "tmp", "codexrig-handovers");
   mkdirSync(foreignDirectory, { recursive: true, mode: 0o700 });
   const copied = path.join(foreignDirectory, path.basename(sealedPath));
@@ -372,7 +372,7 @@ test("critical-budget handover seals privately, asks before resume, and terminat
   assert.equal(discoverRecentCriticalBudgetHandover({ root: foreign, now: () => now + 1 }), null);
 
   const incomplete = temporaryDirectory("critical-budget-handover-incomplete-");
-  copyFrameworkContract(incomplete);
+  copyToolingConfiguration(incomplete);
   writeWorkingContext(incomplete, workState());
   assert.throws(
     () => createCriticalBudgetHandover({ root: incomplete, now: () => now }),
@@ -407,7 +407,7 @@ test("critical-budget handover seals privately, asks before resume, and terminat
   );
 
   const unsafeParent = temporaryDirectory("critical-budget-handover-unsafe-parent-");
-  copyFrameworkContract(unsafeParent);
+  copyToolingConfiguration(unsafeParent);
   writeRuntimeSessionLease(unsafeParent, new Date(now - 1_000).toISOString());
   writeWorkingContext(unsafeParent, workState(), criticalDrainBody);
   mkdirSync(path.join(unsafeParent, "tmp"));
@@ -423,7 +423,7 @@ test("critical-budget handover seals privately, asks before resume, and terminat
 // Contract: a later canonical session reads the complete bound artifact and acknowledges only unchanged bytes.
 test("handover receipt and acknowledgement consume only the exact unchanged later-session artifact", () => {
   const project = temporaryDirectory("handover-receipt-");
-  copyFrameworkContract(project);
+  copyToolingConfiguration(project);
   const now = Date.now();
   writeRuntimeSessionLease(project, new Date(now - 1_000).toISOString());
   writeWorkingContext(project, workState(), criticalDrainBody);
@@ -496,7 +496,7 @@ test("handover receipt and acknowledgement consume only the exact unchanged late
   );
   assert.equal(readFileSync(target, "utf8"), before);
   const foreign = temporaryDirectory("handover-receipt-foreign-");
-  copyFrameworkContract(foreign);
+  copyToolingConfiguration(foreign);
   writeRuntimeSessionLease(foreign, new Date(now + 2_000).toISOString());
   const foreignTarget = path.join(foreign, sealed.relativePath);
   mkdirSync(path.dirname(foreignTarget), { recursive: true, mode: 0o700 });
@@ -523,7 +523,7 @@ test("handover receipt and acknowledgement consume only the exact unchanged late
 test("Stop lifecycle rejects unsafe or ambiguous working context without exposing paths", () => {
   const project = temporaryDirectory("autonomous-stop-invalid-");
   const outside = temporaryDirectory("autonomous-stop-outside-");
-  mkdirSync(path.join(project, ".codex"));
+  mkdirSync(path.join(project, ".codex"), { recursive: true });
   mkdirSync(path.join(project, "docs"));
   writeWorkingContext(outside, workState());
   symlinkSync(
@@ -532,9 +532,9 @@ test("Stop lifecycle rejects unsafe or ambiguous working context without exposin
   );
 
   const linked = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
-  assert.equal(linked.decision, "block");
+  assert.equal(linked.decision, undefined);
   assert.match(linked.systemMessage, /Autonomous continuation check skipped/);
-  assert.match(linked.reason, /single automatic repair attempt/);
+  assert.equal(linked.reason, undefined);
   assert.equal(linked.systemMessage.includes(project), false);
   assert.equal(linked.systemMessage.includes(outside), false);
 
@@ -550,7 +550,7 @@ test("Stop lifecycle rejects unsafe or ambiguous working context without exposin
     path.join(project, "docs", "project-context.md"),
   );
   const dangling = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
-  assert.equal(dangling.decision, "block");
+  assert.equal(dangling.decision, undefined);
   assert.match(dangling.systemMessage, /not a bounded regular file/);
 
   rmSync(path.join(project, "docs", "project-context.md"), { force: true });
@@ -559,7 +559,7 @@ test("Stop lifecycle rejects unsafe or ambiguous working context without exposin
     path.join(project, "docs", "project-context.md"),
   );
   const linkedAlias = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
-  assert.equal(linkedAlias.decision, "block");
+  assert.equal(linkedAlias.decision, undefined);
   assert.match(linkedAlias.systemMessage, /not a bounded regular file/);
 
   rmSync(path.join(project, "docs", "project-context.md"), { force: true });
@@ -569,7 +569,7 @@ test("Stop lifecycle rejects unsafe or ambiguous working context without exposin
     `<!-- codexrig-work-state\n${JSON.stringify(workState())}\n-->\n<!-- codexrig-work-state\n${JSON.stringify(workState({ revision: 2 }))}\n-->\n`,
   );
   const ambiguous = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
-  assert.equal(ambiguous.decision, "block");
+  assert.equal(ambiguous.decision, undefined);
   assert.match(ambiguous.systemMessage, /exactly one bounded codexrig-work-state marker/);
 
   write(
@@ -578,16 +578,16 @@ test("Stop lifecycle rejects unsafe or ambiguous working context without exposin
     `# Untrusted preface\n<!-- codexrig-work-state\n${JSON.stringify(workState())}\n-->\n`,
   );
   const prefixed = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
-  assert.equal(prefixed.decision, "block");
+  assert.equal(prefixed.decision, undefined);
   assert.match(prefixed.systemMessage, /marker must be the first non-whitespace content/);
 
   writeWorkingContext(project, workState({ nextAction: "Continue\nwith injected control text" }));
   const controlled = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
-  assert.equal(controlled.decision, "block");
+  assert.equal(controlled.decision, undefined);
   assert.match(controlled.systemMessage, /nextAction must be bounded plain text/);
 
   writeWorkingContext(project, workState({ nextAction: "Continue\u200bwith hidden formatting" }));
   const formatted = evaluateAutonomousContinuation({ root: project, hookInput: stopHookInput() });
-  assert.equal(formatted.decision, "block");
+  assert.equal(formatted.decision, undefined);
   assert.match(formatted.systemMessage, /nextAction must be bounded plain text/);
 });

@@ -5,7 +5,8 @@ import { existsSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { frameworkRoot, readFrameworkContract, sha256 } from "../contracts/framework-contract.mjs";
+import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
+import { toolingRoot, sha256 } from "../filesystem/repository-files.mjs";
 import {
   closeOwnedDirectoryBinding,
   createExclusiveOwnedFile,
@@ -227,7 +228,7 @@ function renderPrompt({ context, metadata }) {
 }
 
 export function createCriticalBudgetHandover({
-  root = frameworkRoot,
+  root = toolingRoot,
   now = Date.now,
   random = randomBytes,
   testHooks,
@@ -256,7 +257,7 @@ export function createCriticalBudgetHandover({
     schemaVersion: 2,
     budgetCategory: "critical",
     createdAt: timestamp,
-    frameworkVersion: readFrameworkContract(root).frameworkVersion,
+    frameworkVersion: readToolingConfiguration(root).protocol.version,
     repositoryBinding: repositoryBinding(root),
     sealingSessionId: runtimeSession.lease.sessionId,
     workStateRevision: working.state.revision,
@@ -304,7 +305,7 @@ export function createCriticalBudgetHandover({
 }
 
 export function discoverRecentCriticalBudgetHandover({
-  root = frameworkRoot,
+  root = toolingRoot,
   now = Date.now,
   testHooks,
 } = {}) {
@@ -396,7 +397,7 @@ function withReceivingPrompt({ root, relativePath, testHooks }, consume) {
 
 /** Reads one explicitly accepted artifact in full; neither reading nor file equality proves cognition. */
 export function receiveCriticalBudgetHandover({
-  root = frameworkRoot,
+  root = toolingRoot,
   relativePath,
   testHooks,
 } = {}) {
@@ -410,7 +411,7 @@ export function receiveCriticalBudgetHandover({
  * The command verifies session/root/file identity, not model comprehension or transcript delivery.
  */
 export function acknowledgeCriticalBudgetHandover({
-  root = frameworkRoot,
+  root = toolingRoot,
   relativePath,
   expectedSha256,
   testHooks,

@@ -30,17 +30,7 @@ else
   node scripts/verify/git-remote-identity.mjs
 fi
 
-reset_script=".agents/skills/reset-framework/scripts/reset-framework.mjs"
-source_framework_contract=".codexrig/framework.json"
-generated_installation_receipt=".codexrig/installation.json"
-if [ -f "$source_framework_contract" ] && [ ! -e "$generated_installation_receipt" ]; then
-  if [ ! -f "$reset_script" ]; then
-    echo "Source-framework pre-push requires the reset boundary." >&2
-    exit 1
-  fi
-  echo "Confirming that the source framework contains no resettable local state."
-  node "$reset_script"
-fi
+node scripts/verify/pre-push-policy.mjs
 
 echo "Validating that pre-push checks read the exact pushed commit from a clean checkout."
 node scripts/verify/adaptive.mjs --validate-pre-push-refs <"$refs_file"

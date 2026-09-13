@@ -10,12 +10,12 @@ import {
   parseDeliveryConfiguration,
   reconcileDetectedDeliveryTargets,
 } from "../contracts/delivery-configuration.mjs";
-import { isReusableFrameworkSource } from "../contracts/framework-contract.mjs";
+import { hasProductWorkspace } from "../repository/product-roots.mjs";
 import { discoverDeliveryEnvironmentEvidence } from "../repository/delivery-environment-discovery.mjs";
 import { listActiveFiles, repositoryRoot } from "../repository/source-inventory.mjs";
 
-export const deliveryManifestStartMarker = "<!-- codexrig:delivery-inventory:start -->";
-export const deliveryManifestEndMarker = "<!-- codexrig:delivery-inventory:end -->";
+export const deliveryManifestStartMarker = "<!-- project:delivery-inventory:start -->";
+export const deliveryManifestEndMarker = "<!-- project:delivery-inventory:end -->";
 
 function readRegularText(root, relativePath) {
   const target = path.join(root, ...relativePath.split("/"));
@@ -31,12 +31,10 @@ function readRegularText(root, relativePath) {
   }
 }
 
-export function renderDeliveryManifestProjection({ configuration, sourceFramework = false }) {
+export function renderDeliveryManifestProjection({ configuration }) {
   const lines = [deliveryManifestStartMarker, ""];
-  if (sourceFramework) {
-    lines.push(
-      "- Product delivery inventory: this neutral framework source has no integrated product environment.",
-    );
+  if (!configuration) {
+    lines.push("- Product delivery inventory: no integrated product environment.");
   } else {
     const effectiveTargets = effectiveDeliveryTargets(configuration);
     lines.push(`- Configured delivery default: \`${configuration.defaultTarget}\`.`);
@@ -98,7 +96,6 @@ export function deliveryReconciliationPlan({
   manifestContent,
   relativePaths,
 } = {}) {
-  const sourceFramework = isReusableFrameworkSource(root);
   const activeFiles = relativePaths ?? listActiveFiles({ root });
   const blockingFindings = [];
   const driftFindings = [];
@@ -108,13 +105,7 @@ export function deliveryReconciliationPlan({
 
   let configuration;
   let expectedDeliveryContent = null;
-  if (sourceFramework) {
-    if (deliveryFile.content !== null) {
-      blockingFindings.push(
-        `the neutral source framework must not own generated ${deliveryConfigurationPath}`,
-      );
-    }
-  } else {
+  if (deliveryFile.content !== null || hasProductWorkspace({ root, relativePaths: activeFiles })) {
     const currentContent = deliveryFile.content;
     const configurationContent = currentContent ?? initialDeliveryConfiguration();
     const configurationFindings = deliveryConfigurationFindings(configurationContent);
@@ -159,8 +150,8 @@ export function deliveryReconciliationPlan({
   if (manifestFile.finding) blockingFindings.push(manifestFile.finding);
   if (manifestFile.content === null) {
     blockingFindings.push("docs/project.md is required before delivery reconciliation");
-  } else if (sourceFramework || configuration) {
-    const projection = renderDeliveryManifestProjection({ configuration, sourceFramework });
+  } else {
+    const projection = renderDeliveryManifestProjection({ configuration });
     const reconciled = replaceOrInsertProjection(manifestFile.content, projection);
     if (reconciled.finding) blockingFindings.push(reconciled.finding);
     else if (reconciled.content !== manifestFile.content) {
@@ -178,7 +169,6 @@ export function deliveryReconciliationPlan({
   return {
     blockingFindings: [...new Set(blockingFindings)].sort(),
     driftFindings: [...new Set(driftFindings)].sort(),
-    sourceFramework,
     writes,
   };
 }

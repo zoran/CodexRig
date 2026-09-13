@@ -2,8 +2,10 @@
 
 ## Portable And Runtime State
 
-Tracked `.codex/config.toml`, `.codex/hooks.json`, `.codex/agents/*.toml`, and this document are the
-portable project policy. Mutable repository-local Codex runtime—authentication, trust, approval
+Tracked `.codex/config.toml`, `.codex/hooks.json`, `.codex/agents/*.toml`, the three local JSON
+contracts and this document are portable project policy. `.codex/tooling.json` owns startup/provider
+settings and the requirement for product configuration; `.codex/toolchain.json` owns stable pins
+and archive integrity; `.codex/verification.json` owns selected checks and their consumers. Mutable repository-local Codex runtime—authentication, trust, approval
 rules, sessions, logs, memories, caches, plugins, runtime skills, history, installation/model
 metadata, and databases—stays in ignored entries of the repository-root `CODEX_HOME`. Framework
 coordination alone stays in ignored `.codex/runtime/`. Neither is copied between projects or

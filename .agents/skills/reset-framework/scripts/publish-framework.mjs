@@ -5,10 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import {
-  frameworkRoot,
-  isReusableFrameworkSource,
-} from "../../../../scripts/contracts/framework-contract.mjs";
+import { isReusableFrameworkSource } from "../../../../scripts/contracts/framework-contract.mjs";
+import { toolingRoot } from "../../../../scripts/filesystem/repository-files.mjs";
 import { spawnSyncWithBoundedIo as spawnSync } from "../../../../scripts/repository/runtime-process-io.mjs";
 import {
   cleanGitEnvironment,
@@ -224,7 +222,7 @@ function requireSnapshot(git, expected) {
 
 /** Publishes only the verified current source; injected gates are an in-process test seam, never CLI bypasses. */
 export function publishFramework({
-  root = frameworkRoot,
+  root = toolingRoot,
   message,
   runGate = runPublicationGate,
   log = console.log,

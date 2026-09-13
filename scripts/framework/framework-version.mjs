@@ -8,13 +8,12 @@ import { fileURLToPath } from "node:url";
 import {
   compareSemver,
   frameworkContractPath,
-  frameworkRoot,
   isReusableFrameworkSource,
   parseSemver,
   readFrameworkContract,
-  readRegularFrameworkFile,
   validateFrameworkContract,
 } from "../contracts/framework-contract.mjs";
+import { toolingRoot, readRepositoryFile } from "../filesystem/repository-files.mjs";
 import {
   cleanGitEnvironment,
   isolatedGitArguments,
@@ -23,11 +22,7 @@ import {
 } from "../repository/git-runtime-isolation.mjs";
 import { isExcludedActivePath, listActiveFiles } from "../repository/source-inventory.mjs";
 import { formatContextError } from "../terminal/terminal-output.mjs";
-import {
-  policyProjectionChanges,
-  policyProjectionPath,
-  validatePolicyProjection,
-} from "./policy-projection.mjs";
+import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, "..", "..");
@@ -51,29 +46,18 @@ function parseJson(content, label) {
   }
 }
 
-function validateIncompatibleBaseline(contract, policyProjection, current) {
+function validateIncompatibleBaseline(contract, current) {
   if (
     !contract ||
     typeof contract !== "object" ||
     Array.isArray(contract) ||
     !Number.isSafeInteger(contract.schemaVersion) ||
     contract.schemaVersion < 1 ||
-    contract.schemaVersion === current.contract.schemaVersion ||
-    contract.frameworkId !== current.contract.frameworkId
-  ) {
+    contract.schemaVersion === current.schemaVersion ||
+    contract.frameworkId !== current.frameworkId
+  )
     throw new Error("Published incompatible framework baseline identity is invalid.");
-  }
   stableVersion(contract.frameworkVersion, "published frameworkVersion");
-  if (
-    !policyProjection ||
-    typeof policyProjection !== "object" ||
-    Array.isArray(policyProjection) ||
-    !Number.isSafeInteger(policyProjection.schemaVersion) ||
-    policyProjection.schemaVersion < 1 ||
-    policyProjection.schemaVersion === current.policyProjection.schemaVersion
-  ) {
-    throw new Error("Published incompatible policy baseline identity is invalid.");
-  }
 }
 
 function stableVersion(value, label) {
@@ -365,38 +349,15 @@ function removedEntries(before, after) {
   return (Array.isArray(before) ? before : []).filter((entry) => !current.has(entry));
 }
 
-function contractExcludedPaths(contract) {
-  const reasons = contract?.upgrade?.excludedPathReasons;
-  return reasons && typeof reasons === "object" && !Array.isArray(reasons)
-    ? Object.keys(reasons)
-    : [];
-}
-
 function contractBump(baseline, current) {
-  if (
-    JSON.stringify(normalizedContract(baseline)) === JSON.stringify(normalizedContract(current))
-  ) {
+  if (JSON.stringify(normalizedContract(baseline)) === JSON.stringify(normalizedContract(current)))
     return "none";
-  }
-  if (
-    baseline.schemaVersion !== current.schemaVersion ||
+  return baseline.schemaVersion !== current.schemaVersion ||
     baseline.frameworkId !== current.frameworkId ||
     baseline.compatibilityFile !== current.compatibilityFile ||
-    baseline.upgrade?.receiptFile !== current.upgrade?.receiptFile ||
-    removedEntries(baseline.upgrade?.projectOwnedDocuments, current.upgrade?.projectOwnedDocuments)
-      .length > 0 ||
-    removedEntries(baseline.upgrade?.managedRoots, current.upgrade?.managedRoots).length > 0 ||
-    removedEntries(contractExcludedPaths(current), contractExcludedPaths(baseline)).length > 0 ||
-    removedEntries(baseline.upgrade?.managedPackageScripts, current.upgrade?.managedPackageScripts)
-      .length > 0 ||
-    removedEntries(
-      baseline.upgrade?.managedDevDependencies,
-      current.upgrade?.managedDevDependencies,
-    ).length > 0
-  ) {
-    return "major";
-  }
-  return "minor";
+    baseline.projectToolsFile !== current.projectToolsFile
+    ? "major"
+    : "minor";
 }
 
 function packageBump(baseline, current) {
@@ -414,30 +375,14 @@ function packageBump(baseline, current) {
   return "minor";
 }
 
-function policyBump(baselineContentValue, currentContent, baselineContract, currentContract) {
-  const baselineValue = parseJson(baselineContentValue, "Published policy projection");
-  const current = validatePolicyProjection(
-    parseJson(currentContent, "Current policy projection"),
-    currentContract,
-  );
-  if (baselineValue.schemaVersion !== current.schemaVersion) return "major";
-  const baseline = validatePolicyProjection(baselineValue, baselineContract);
-  if (baselineContentValue === currentContent) return "none";
-  return policyProjectionChanges(baseline, current).some((policy) => policy.change === "retired")
-    ? "major"
-    : "minor";
-}
-
 function requiredChangeBump({
   baselineContract,
   baselineManifest,
   baselinePackage,
-  baselinePolicy,
   changedPaths,
   currentContract,
   currentManifest,
   currentPackage,
-  currentPolicy,
   root,
 }) {
   let bump = "none";
@@ -453,13 +398,6 @@ function requiredChangeBump({
     normalizedManifest(baselineManifest) !== normalizedManifest(currentManifest)
   ) {
     bump = highestBump(bump, "patch");
-  }
-  if (changedPaths.includes(policyProjectionPath)) {
-    handled.add(policyProjectionPath);
-    bump = highestBump(
-      bump,
-      policyBump(baselinePolicy, currentPolicy, baselineContract, currentContract),
-    );
   }
 
   for (const relativePath of changedPaths) {
@@ -477,7 +415,7 @@ function requiredChangeBump({
 }
 
 function plannedWrite(root, relativePath, after) {
-  const before = readRegularFrameworkFile(root, relativePath);
+  const before = readRepositoryFile(root, relativePath);
   return before === after ? null : Object.freeze({ after, before, relativePath });
 }
 
@@ -514,7 +452,7 @@ export function frameworkVersionReconciliationPlan({ root = repositoryRoot } = {
     );
   }
   const currentContract = readFrameworkContract(root);
-  const integrationBranch = currentContract.platform?.integrationBranch;
+  const integrationBranch = readToolingConfiguration(root).platform.integrationBranch;
   if (typeof integrationBranch !== "string" || !/^[A-Za-z0-9._/-]+$/u.test(integrationBranch)) {
     throw new Error("Framework contract must define a valid platform integrationBranch.");
   }
@@ -534,23 +472,10 @@ export function frameworkVersionReconciliationPlan({ root = repositoryRoot } = {
   );
   const baselinePackageContent = baselineContent(root, gitMetadata, baseline.commit, packagePath);
   const baselineManifest = baselineContent(root, gitMetadata, baseline.commit, projectManifestPath);
-  const baselinePolicy = baselineContent(root, gitMetadata, baseline.commit, policyProjectionPath);
-  const currentPolicy = readRegularFrameworkFile(root, policyProjectionPath);
-  const currentPolicyValue = validatePolicyProjection(
-    parseJson(currentPolicy, "Current policy projection"),
-    currentContract,
-  );
   const baselineContract = parseJson(baselineContractContent, "Published framework contract");
-  const baselinePolicyValue = parseJson(baselinePolicy, "Published policy projection");
-  if (baselineContract.schemaVersion === currentContract.schemaVersion) {
+  if (baselineContract.schemaVersion === currentContract.schemaVersion)
     validateFrameworkContract(baselineContract);
-    validatePolicyProjection(baselinePolicyValue, baselineContract);
-  } else {
-    validateIncompatibleBaseline(baselineContract, baselinePolicyValue, {
-      contract: currentContract,
-      policyProjection: currentPolicyValue,
-    });
-  }
+  else validateIncompatibleBaseline(baselineContract, currentContract);
   const baselinePackage = parseJson(baselinePackageContent, "Published package manifest");
   const baselineVersion = stableVersion(
     baselineContract.frameworkVersion,
@@ -566,8 +491,8 @@ export function frameworkVersionReconciliationPlan({ root = repositoryRoot } = {
     );
   }
 
-  const currentPackageContent = readRegularFrameworkFile(root, packagePath);
-  const currentManifest = readRegularFrameworkFile(root, projectManifestPath);
+  const currentPackageContent = readRepositoryFile(root, packagePath);
+  const currentManifest = readRepositoryFile(root, projectManifestPath);
   const currentPackage = parseJson(currentPackageContent, "Current package manifest");
   const currentContractVersion = stableVersion(
     currentContract.frameworkVersion,
@@ -582,12 +507,10 @@ export function frameworkVersionReconciliationPlan({ root = repositoryRoot } = {
     baselineContract,
     baselineManifest,
     baselinePackage,
-    baselinePolicy,
     changedPaths,
     currentContract,
     currentManifest,
     currentPackage,
-    currentPolicy,
     root,
   });
   const minimumVersion = nextFrameworkVersion(baselineVersion, requiredBump);
@@ -597,7 +520,7 @@ export function frameworkVersionReconciliationPlan({ root = repositoryRoot } = {
     currentContractVersion,
     currentPackageVersion,
   ]);
-  const currentContractContent = readRegularFrameworkFile(root, frameworkContractPath);
+  const currentContractContent = readRepositoryFile(root, frameworkContractPath);
   const nextContractContent = jsonStringFieldWithValue(
     currentContractContent,
     "frameworkVersion",
@@ -664,11 +587,9 @@ async function main() {
   }
   const unknown = argumentsWithoutDelimiter.find((argument) => argument !== "--check");
   if (unknown) throw new Error(`Unknown framework version option: ${unknown}`);
-  const plan = frameworkVersionReconciliationPlan({ root: frameworkRoot });
+  const plan = frameworkVersionReconciliationPlan({ root: toolingRoot });
   if (!plan.applicable) {
-    console.log(
-      "Framework source versioning is not applicable in this generated product; its product version is project-owned and its installed framework version remains in .codexrig/installation.json.",
-    );
+    console.log("Source release versioning is not applicable in this repository.");
     return;
   }
   console.log(

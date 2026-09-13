@@ -2,10 +2,10 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import {
-  normalizeFrameworkPath,
-  readRegularFrameworkFile,
-  resolveFrameworkPath,
-} from "../contracts/framework-contract.mjs";
+  normalizeRepositoryPath,
+  readRepositoryFile,
+  resolveRepositoryPath,
+} from "../filesystem/repository-files.mjs";
 import { importSpecifiersForFile } from "../repository/source-import-specifiers.mjs";
 
 const maximumClosureFiles = 256;
@@ -27,11 +27,11 @@ function resolvedRelativeModule(root, importer, specifier) {
   for (const candidate of candidates) {
     let normalized;
     try {
-      normalized = normalizeFrameworkPath(candidate, `module imported by ${importer}`);
+      normalized = normalizeRepositoryPath(candidate, `module imported by ${importer}`);
     } catch {
       continue;
     }
-    if (existsSync(resolveFrameworkPath(root, normalized))) return normalized;
+    if (existsSync(resolveRepositoryPath(root, normalized))) return normalized;
   }
   throw new Error(`${importer} imports missing repository module ${specifier}.`);
 }
@@ -41,13 +41,13 @@ export function startupExecutableClosurePaths(root) {
   const pending = [...startupExecutableEntryPoints];
   const closure = new Set();
   while (pending.length > 0) {
-    const relativePath = normalizeFrameworkPath(pending.pop(), "startup executable path");
+    const relativePath = normalizeRepositoryPath(pending.pop(), "startup executable path");
     if (closure.has(relativePath)) continue;
     closure.add(relativePath);
     if (closure.size > maximumClosureFiles) {
       throw new Error("Startup executable closure exceeds its reviewed size bound.");
     }
-    const content = readRegularFrameworkFile(root, relativePath);
+    const content = readRepositoryFile(root, relativePath);
     if (path.posix.extname(relativePath) === ".json") continue;
     for (const specifier of importSpecifiersForFile({ content, relativePath })) {
       if (!specifier.startsWith(".")) continue;

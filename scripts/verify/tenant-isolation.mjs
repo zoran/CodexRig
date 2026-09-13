@@ -8,7 +8,7 @@ import {
   tenancyConfigurationFindings,
   tenancyConfigurationPath,
 } from "../contracts/tenancy-configuration.mjs";
-import { isReusableFrameworkSource } from "../contracts/framework-contract.mjs";
+import { hasProductWorkspace } from "../repository/product-roots.mjs";
 import { parseActiveModuleInventory } from "../docs/project-manifest-contract.mjs";
 import {
   canonicalArchitectureSegment,
@@ -598,12 +598,10 @@ function requiredTenancyConcernFindings(files, productLayout) {
 }
 
 export function tenantIsolationProjectFindings({ root = repositoryRoot, relativePaths } = {}) {
-  const sourceFramework = isReusableFrameworkSource(root);
+  const requiresProduct = hasProductWorkspace({ root, relativePaths });
   const findings = [];
-  const content = configurationContent(root, !sourceFramework, findings);
-  if (sourceFramework && content !== null) {
-    findings.push("the neutral source framework must not own a child tenancy configuration");
-  }
+  const content = configurationContent(root, requiresProduct, findings);
+
   let configuration = null;
   if (content !== null) {
     const configurationFindings = tenancyConfigurationFindings(content);

@@ -54,9 +54,12 @@ function assertGit(cwd, ...args) {
 
 function copyGoalGateRuntime(repository) {
   const runtimeFiles = [
-    "scripts/contracts/compatibility-contract.mjs",
+    ".codex/tooling.json",
+    ".codex/verification.json",
+    "scripts/contracts/tooling-configuration.mjs",
+    "scripts/filesystem/repository-files.mjs",
+    "scripts/verify/verification-configuration.mjs",
     "scripts/contracts/delivery-configuration.mjs",
-    "scripts/contracts/framework-contract.mjs",
     "scripts/contracts/semver-contract.mjs",
     "scripts/filesystem/owned-file-operations.mjs",
     "scripts/filesystem/owned-path-safety.mjs",

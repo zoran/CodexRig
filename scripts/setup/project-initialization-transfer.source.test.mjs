@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { after, test } from "node:test";
-import { copyPortableSetupFixture } from "./setup-regression-fixtures.mjs";
+import { copyPortableSetupFixture } from "./setup-regression-test-helpers.mjs";
 import {
   assertGeneratedProjectQuality,
   cleanupTemporaryRoots,
@@ -105,58 +105,6 @@ test("clean project initialization excludes untracked source drafts by default",
   const sourceParent = temporaryRoot("tracked-project-source-");
   const source = path.join(sourceParent, "source");
   copyPortableSetupFixture(source);
-  for (const runtimeContract of [
-    ".codex/hooks.json",
-    "mise.lock",
-    "mise.toml",
-    "scripts/context/portable-context-contract.mjs",
-    "scripts/context/session-stop-lifecycle.mjs",
-    "scripts/setup/session-control-hook-command.mjs",
-    "scripts/setup/startup-codex-process.mjs",
-    "scripts/setup/startup-runtime-executables.mjs",
-    "scripts/setup/startup-session-controller.mjs",
-    "scripts/terminal/terminal-output.test.mjs",
-    "scripts/deps/dependency-owner-normalization.test.mjs",
-    "scripts/goals/goal-publication-precondition.mjs",
-    "scripts/goals/goal-publication-precondition.test.mjs",
-    "scripts/repository/product-roots.mjs",
-    "scripts/repository/product-roots.test.mjs",
-    "scripts/repository/stable-file-snapshot.test.mjs",
-    "scripts/setup/codex-launcher.test.mjs",
-    "scripts/setup/setup-regression-fixtures.mjs",
-    "scripts/verify/format-project.mjs",
-    "scripts/verify/adaptive-cli.test.mjs",
-    "scripts/verify/adaptive-options.mjs",
-    "scripts/verify/verification-admission.mjs",
-    "scripts/verify/adaptive-runner-routing.test.mjs",
-    "scripts/verify/adaptive-runner-test-helpers.mjs",
-    "scripts/verify/adaptive-runner.test.mjs",
-    "scripts/verify/package-manifest.mjs",
-    "scripts/verify/package-manifest.test.mjs",
-    "scripts/verify/pre-push-steps.sh",
-    "scripts/verify/pre-push.test.mjs",
-    "scripts/verify/verification-evidence.mjs",
-    "scripts/verify/verification-evidence-record.mjs",
-    "scripts/verify/verification-evidence-integrity.test.mjs",
-    "scripts/verify/verification-evidence-test-helpers.mjs",
-    "scripts/verify/verification-evidence.test.mjs",
-    "scripts/verify/verification-entrypoints.mjs",
-    "scripts/verify/verification-executor.test.mjs",
-    "scripts/verify/verification-risk-profile.mjs",
-    "scripts/verify/verification-record-helpers.mjs",
-    "scripts/verify/verification-runtime-identity.mjs",
-    "scripts/verify/verification-git-basis.mjs",
-    "scripts/verify/verification-git-basis.test.mjs",
-    "scripts/verify/verification-session-lock.mjs",
-    "scripts/verify/verification-session-lock.test.mjs",
-    "scripts/verify/workspace-verification.mjs",
-    "scripts/web/update-sitemap-lastmod.test.mjs",
-  ]) {
-    if (!existsSync(path.join(source, runtimeContract))) {
-      mkdirSync(path.dirname(path.join(source, runtimeContract)), { recursive: true });
-      copyFileSync(path.join(root, runtimeContract), path.join(source, runtimeContract));
-    }
-  }
   writeFileSync(path.join(source, "docs", "tracked-guide.mdx"), "# Tracked guide\n", "utf8");
   initializeTrackedSource(source);
   const untrackedRuntimeContract = spawnSync(
@@ -210,7 +158,7 @@ test("clean project initialization excludes untracked source drafts by default",
         "scripts/deps/dependency-owner-normalization.test.mjs",
       ),
     ),
-    true,
+    false,
   );
 
   const unpublishedContracts = [
@@ -274,7 +222,7 @@ test("clean project initialization excludes untracked source drafts by default",
         "untracked.txt",
       ),
     ),
-    true,
+    false,
   );
 
   const lockfilePath = path.join(source, "pnpm-lock.yaml");
@@ -293,7 +241,7 @@ test("clean project initialization excludes untracked source drafts by default",
     "--include-untracked",
   ]);
   assert.equal(missingLock.status, 1);
-  assert.match(missingLock.stderr, /missing required portable contract files: pnpm-lock\.yaml/u);
+  assert.match(missingLock.stderr, /Missing required repository file: pnpm-lock\.yaml/u);
   assert.equal(existsSync(path.join(missingLockOutput, "missing-lock-contract")), false);
   writeFileSync(lockfilePath, lockfile, "utf8");
 

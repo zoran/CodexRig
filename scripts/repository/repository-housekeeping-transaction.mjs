@@ -3,11 +3,11 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import {
-  normalizeFrameworkPath,
-  resolveFrameworkPath,
+  normalizeRepositoryPath,
+  resolveRepositoryPath,
   serializeCanonicalJson,
   sha256,
-} from "../contracts/framework-contract.mjs";
+} from "../filesystem/repository-files.mjs";
 import { removeOwnedEmptyDirectory } from "../filesystem/owned-file-operations.mjs";
 import {
   assertHousekeepingDirectory,
@@ -31,7 +31,6 @@ import {
 } from "./repository-housekeeping-files.mjs";
 
 export { housekeepingStateDirectory };
-
 const journalSchemaVersion = 1;
 const maximumTransactionWrites = 64;
 const publicationTemporaryPattern =
@@ -91,7 +90,7 @@ function plannedTransaction(root, writes) {
       ) {
         throw new Error("Repository housekeeping received an invalid write plan.");
       }
-      const relativePath = normalizeFrameworkPath(
+      const relativePath = normalizeRepositoryPath(
         write.relativePath,
         "repository housekeeping write path",
       );
@@ -184,7 +183,7 @@ function validateJournal(journal) {
       ],
       "Repository housekeeping journal record",
     );
-    const relativePath = normalizeFrameworkPath(record?.relativePath, "housekeeping journal path");
+    const relativePath = normalizeRepositoryPath(record?.relativePath, "housekeeping journal path");
     const directory = path.posix.dirname(relativePath);
     const expectedTemporary = `${directory === "." ? "" : `${directory}/`}.codexrig-housekeeping-${journal.transactionId}-${index}.tmp`;
     const beforeContent = decodedContent(record, "beforeContent");
@@ -222,7 +221,7 @@ function persistJournal(root, journal, testHooks) {
   const paths = housekeepingStatePaths(root);
   const temporaryName = publicationTemporaryName(journal.ownerPid, journal.transactionId);
   const temporaryRelativePath = `${housekeepingStateDirectory}/${temporaryName}`;
-  const temporary = resolveFrameworkPath(root, temporaryRelativePath);
+  const temporary = resolveRepositoryPath(root, temporaryRelativePath);
   const serialized = serializeCanonicalJson(journal);
   const initialTemporary = writeHousekeepingTemporary(
     root,
@@ -348,7 +347,7 @@ function matchesState(state, record, prefix) {
   );
 }
 function temporaryState(root, relativePath) {
-  const target = resolveFrameworkPath(root, relativePath);
+  const target = resolveRepositoryPath(root, relativePath);
   const state = readHousekeepingRegularState(root, relativePath);
   if (!state.exists) return null;
   return {
@@ -547,7 +546,9 @@ function recoverInterruptedHousekeepingWritesInternal(root, allowedOwnerPid = nu
       }
     }
     for (const directory of new Set(
-      inspected.map((entry) => path.dirname(resolveFrameworkPath(root, entry.record.relativePath))),
+      inspected.map((entry) =>
+        path.dirname(resolveRepositoryPath(root, entry.record.relativePath)),
+      ),
     )) {
       syncHousekeepingDirectory(root, directory);
     }
@@ -557,7 +558,7 @@ function recoverInterruptedHousekeepingWritesInternal(root, allowedOwnerPid = nu
 
   for (const entry of [...inspected].reverse()) {
     const { record } = entry;
-    const target = resolveFrameworkPath(root, record.relativePath);
+    const target = resolveRepositoryPath(root, record.relativePath);
     const current = readHousekeepingRegularState(root, record.relativePath);
     const beforeRecord = { ...record, beforeExists: record.beforeExists };
     const afterRecord = { ...record, afterExists: true };

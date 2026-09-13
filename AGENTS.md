@@ -103,9 +103,10 @@ procedures.
   confirmed separately and changed copy uses `$native-language-content-review`. Hand-authored text
   has a format-native purpose/owner header; public types document invariants and Markdown has one
   descriptive H1 with unique non-skipping headings.
-- Retain LICENSE and NOTICE, the Zoran Kikic author credit and CodexRig Framework Required Notice in
-  the framework and noncommercial children. Commercial use needs a separate express written license;
-  only it may permit removing credits from its specifically licensed child, never CodexRig itself.
+- Retain LICENSE, NOTICE, the Zoran Kikic author credit and CodexRig Framework Required Notice in
+  the source framework. NOTICE expressly permits selected generated output without those notices or
+  inherited framework license obligations. Generated projects contain no CodexRig references and
+  choose their own licensing; independent third-party terms remain applicable.
 
 ## Delivery And Verification
 
@@ -163,9 +164,9 @@ procedures.
   apply explicitly with `--apply`, and require a clean preview. Active/dirty/unsafe/unintegrated
   resources remain protected.
 - At completed goals run `mise exec --locked -- pnpm repo:housekeeping -- --apply`, review active
-  docs and give changed critical authorities a separate preservation review. Framework version,
-  compatibility and child-policy reconciliation stay in `.codexrig/`; project-owned upgrade
-  documents are never blindly replaced.
+  docs and give changed critical authorities a separate preservation review. Source version, future
+  compatibility and explicit distribution selection stay in `.codexrig/`; generated local
+  configuration is independent and project-owned documents are never blindly replaced.
 - Central `main` is the only durable integration branch. Closure requires authorized publication and
   rechecking actual main, then `mise exec --locked -- pnpm goal:new` before another goal. Source
   publication uses the explicit post-exit `pnpm framework:publish --message "<message>"` command:

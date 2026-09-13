@@ -12,6 +12,7 @@ import {
   repositoryCodexRuntimeCacheDirectory,
   repositoryCodexRuntimeDirectory,
 } from "../../../../scripts/repository/source-inventory.mjs";
+import { isPortableCodexPath } from "../../../../scripts/repository/source-inventory-policy.mjs";
 import { inspectLinuxOpenRepositoryPaths } from "../../../../scripts/repository/runtime-process-identity.mjs";
 import {
   acquireRuntimeLifecycleLock,
@@ -52,13 +53,6 @@ const optionalEmptyDirectories = [
   "services",
 ];
 const scanExcludedDirectories = new Set([".codex", ".git", ".project-state", "node_modules"]);
-const portableCodexEntries = new Set([
-  "README.md",
-  "agents",
-  "config.toml",
-  "hooks.json",
-  "runtime",
-]);
 const preservedCodexHomeFiles = new Set(["auth.json", "config.toml", "installation_id"]);
 const preservedRuntimeFiles = new Set([runtimeLifecycleGuardName, runtimeLifecycleLockName]);
 
@@ -69,16 +63,12 @@ function fail(message) {
 function parseArgs(argv) {
   const options = {
     apply: false,
-    portableSourceBaseline: false,
-    postProjectCreation: false,
     root: defaultRoot,
     verificationSourceBaseline: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--apply") options.apply = true;
-    else if (argument === "--portable-source-baseline") options.portableSourceBaseline = true;
-    else if (argument === "--post-project-creation") options.postProjectCreation = true;
     else if (argument === "--verification-source-baseline") {
       options.verificationSourceBaseline = true;
     } else if (argument === "--root") {
@@ -89,16 +79,8 @@ function parseArgs(argv) {
     } else if (argument.startsWith("--root=")) options.root = path.resolve(argument.slice(7));
     else fail(`Unknown argument: ${argument}`);
   }
-  const selectedModes = [
-    options.portableSourceBaseline,
-    options.postProjectCreation,
-    options.verificationSourceBaseline,
-  ].filter(Boolean).length;
-  if (selectedModes > 1) {
-    fail("Reset modes are mutually exclusive.");
-  }
-  if (options.apply && (options.portableSourceBaseline || options.verificationSourceBaseline)) {
-    fail("Source-baseline modes are read-only, mutually exclusive, and cannot use --apply.");
+  if (options.apply && options.verificationSourceBaseline) {
+    fail("Verification source baseline is read-only and cannot use --apply.");
   }
   return options;
 }
@@ -324,7 +306,7 @@ function collectRuntimeCacheCandidates(root, candidates) {
 function collectCodexCandidates(root, candidates) {
   const codexPath = path.join(root, ".codex");
   for (const name of readdirSync(codexPath)) {
-    if (!portableCodexEntries.has(name)) {
+    if (name !== "runtime" && !isPortableCodexPath(`.codex/${name}`)) {
       candidates.add(`.codex/${name}`);
       continue;
     }
@@ -448,16 +430,12 @@ async function main() {
   if (options.verificationSourceBaseline && !isActiveVerificationLock(root)) {
     fail("Verification source baseline requires the active repository verification lock.");
   }
-  const reducedSourceBaseline =
-    options.portableSourceBaseline || options.verificationSourceBaseline;
-  const activeSessionCleanup = options.postProjectCreation;
-  const fullReset = !reducedSourceBaseline && !activeSessionCleanup;
+  const fullReset = !options.verificationSourceBaseline;
   // Preview is strictly read-only; every mutating reset mode holds the shared capability through
   // planning, apply, and the residual recheck.
-  const lifecycleOwner =
-    options.apply && !reducedSourceBaseline
-      ? acquireRuntimeLifecycleLock({ root, operation: "framework-reset" })
-      : null;
+  const lifecycleOwner = options.apply
+    ? acquireRuntimeLifecycleLock({ root, operation: "framework-reset" })
+    : null;
   try {
     if (fullReset && options.apply && isActiveVerificationLock(root)) {
       fail("Reset refused while a repository verification session is active.");
@@ -470,18 +448,13 @@ async function main() {
     if (!options.apply) {
       if (candidates.length === 0) {
         console.log(
-          reducedSourceBaseline
-            ? "Framework portable source baseline is clean."
-            : activeSessionCleanup
-              ? "Framework active-session cleanup is clean; local runtime are deferred until Codex exits."
-              : "Framework baseline is clean.",
+          fullReset
+            ? "Framework baseline is clean."
+            : "Framework verification source baseline is clean.",
         );
         return;
       }
-      printPreview(
-        candidates,
-        activeSessionCleanup ? "--post-project-creation --apply" : "--apply",
-      );
+      printPreview(candidates);
       process.exitCode = 1;
       return;
     }
@@ -489,17 +462,10 @@ async function main() {
     await applyReset(root, candidates);
     const residual = collectCandidates(root, { includeLocalRuntime });
     if (residual.length > 0) fail(`Reset left removable state: ${residual.join(", ")}`);
-    if (activeSessionCleanup) {
-      console.log(
-        `Framework active-session cleanup complete; removed ${candidates.length} safe path(s).`,
-      );
-      console.log("Local runtime were preserved for the mandatory post-exit reset.");
-    } else {
-      console.log(`Framework reset complete; removed ${candidates.length} path(s).`);
-      console.log(
-        "Source, portable .codex policy, required runtime identity, and exact verification evidence were preserved.",
-      );
-    }
+    console.log(`Framework reset complete; removed ${candidates.length} path(s).`);
+    console.log(
+      "Source, portable .codex policy, required runtime identity, and exact verification evidence were preserved.",
+    );
   } finally {
     if (lifecycleOwner) releaseRuntimeLifecycleLock({ root, owner: lifecycleOwner });
   }

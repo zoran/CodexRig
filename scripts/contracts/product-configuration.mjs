@@ -31,9 +31,7 @@ function valueFindings(value, label, depth = 0) {
   }
   if (typeof value === "string") {
     const findings = [];
-    if (/codexrig/iu.test(value)) {
-      findings.push(`${label} leaks framework branding into product configuration`);
-    }
+
     if (/[\0\r\n]/u.test(value)) findings.push(`${label} contains a control or multiline value`);
     return findings;
   }

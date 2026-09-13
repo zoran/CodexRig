@@ -3,9 +3,9 @@
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
-  readFrameworkContract,
-  validateFrameworkContract,
-} from "../contracts/framework-contract.mjs";
+  readToolingConfiguration,
+  validateToolingConfiguration,
+} from "../contracts/tooling-configuration.mjs";
 import { detectGitProvider, platformRoot } from "./git-provider.mjs";
 import { applyGithubPlatform, githubRulesetPayload } from "./github-platform.mjs";
 import { applyGitlabPlatform } from "./gitlab-platform.mjs";
@@ -85,11 +85,11 @@ export async function configurePlatform({
   root = platformRoot,
   environment = process.env,
   fetchImpl = globalThis.fetch,
-  contract = readFrameworkContract(root),
+  contract = readToolingConfiguration(root),
   detected = detectGitProvider({ root, environment, contract }),
   apply = false,
 } = {}) {
-  const validatedContract = validateFrameworkContract(structuredClone(contract));
+  const validatedContract = validateToolingConfiguration(structuredClone(contract));
   const plan = platformConfigurationPlan({ contract: validatedContract, detected });
   if (!apply) return { applied: false, plan, warnings: [] };
   if (typeof fetchImpl !== "function") throw new Error("Platform configuration requires fetch.");

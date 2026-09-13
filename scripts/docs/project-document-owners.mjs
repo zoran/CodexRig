@@ -1,5 +1,5 @@
 /** Owns project document owner declarations and their requirements/UI-reference discovery links. */
-import { readRegularFrameworkFile } from "../contracts/framework-contract.mjs";
+import { readRepositoryFile } from "../filesystem/repository-files.mjs";
 import { projectManifestPath } from "./document-scope.mjs";
 import { resolveDocumentReference } from "./document-references.mjs";
 
@@ -18,7 +18,7 @@ const nonProductOwners = new Set([
  */
 export function projectDocumentOwners({ root, content } = {}) {
   const manifest =
-    content ?? readRegularFrameworkFile(root, projectManifestPath, { optional: true }) ?? "";
+    content ?? readRepositoryFile(root, projectManifestPath, { optional: true }) ?? "";
   const entries = [];
   const findings = [];
   const declarations = new Map();

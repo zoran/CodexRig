@@ -17,17 +17,6 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
-import { portableContextContractFiles } from "../context/portable-context-contract.mjs";
-import { initialDeliveryConfiguration } from "../contracts/delivery-configuration.mjs";
-import { initialLocalizationConfiguration } from "../contracts/localization-configuration.mjs";
-import { initialProductConfiguration } from "../contracts/product-configuration.mjs";
-import { initialTenancyConfiguration } from "../contracts/tenancy-configuration.mjs";
-import { renderDeliveryManifestProjection } from "../docs/delivery-manifest.mjs";
-import {
-  activeModuleInventoryHeading,
-  manifestAuthorityPreamble,
-  noActiveModulesStatement,
-} from "../docs/project-manifest-contract.mjs";
 import {
   gitlessPreDescentExcludePatterns,
   isRepositoryCodexHomePath,
@@ -46,8 +35,6 @@ import {
   repositoryRoot,
 } from "./source-inventory.mjs";
 import { assertSafeTransferSource } from "./validate-transfer-source.mjs";
-import { stageProjectExport } from "../setup/stage-project-export.mjs";
-import { requiredPortableContractFiles } from "../setup/portable-project-contract.mjs";
 import { scanRepositorySecrets } from "../verify/secrets.mjs";
 import { projectFormatFiles } from "../verify/format-project.mjs";
 import {
@@ -69,84 +56,6 @@ function write(root, relativePath, content = relativePath) {
   writeFileSync(target, content, "utf8");
 }
 
-function writePortableCodexFiles(targetRoot) {
-  write(targetRoot, ".codex/README.md", "portable config\n");
-  write(
-    targetRoot,
-    ".codex/hooks.json",
-    readFileSync(path.join(repositoryRoot, ".codex", "hooks.json"), "utf8"),
-  );
-  for (const relativePath of new Set([
-    ...portableContextContractFiles,
-    ...requiredPortableContractFiles,
-  ])) {
-    write(
-      targetRoot,
-      relativePath,
-      readFileSync(path.join(repositoryRoot, ...relativePath.split("/")), "utf8"),
-    );
-  }
-  const configPath = path.join(targetRoot, ".codex", "config.toml");
-  write(
-    targetRoot,
-    ".codex/config.toml",
-    readFileSync(configPath, "utf8").replace(/^memories\s*=\s*false\s*$/mu, "memories = true"),
-  );
-  write(targetRoot, "src/.gitkeep", "");
-  write(targetRoot, "config/delivery.json", initialDeliveryConfiguration());
-  write(targetRoot, "config/localization.json", initialLocalizationConfiguration());
-  write(targetRoot, "config/product.json", initialProductConfiguration("portable-fixture"));
-  write(targetRoot, "config/tenancy.json", initialTenancyConfiguration());
-  write(
-    targetRoot,
-    "docs/project.md",
-    `# Project Manifest
-
-This is a generated-product fixture with current durable truth only.
-
-${manifestAuthorityPreamble}
-
-## Definition
-
-Product definition: pending fixture intake.
-
-## Users And Outcome
-
-- Target users: pending.
-- Problem and desired outcome: pending.
-- Success evidence: the staged-project lifecycle validator passes.
-
-## Scope
-
-- In scope: portable framework contract validation.
-- Non-goals: no product behavior is implemented by this fixture.
-
-## System Shape
-
-- Runtime and delivery shape: no product runtime or deployment is integrated.
-- Product languages and localization: pending.
-- Source code, identifiers, filenames, and technical source documentation use English.
-
-${renderDeliveryManifestProjection({
-  configuration: JSON.parse(initialDeliveryConfiguration()),
-})}
-
-${activeModuleInventoryHeading}
-
-${noActiveModulesStatement}
-
-## Constraints And Decisions
-
-- Future candidates belong in \`docs/future-modules.md\`.
-- Workflow authority remains in \`instructions.md\`.
-
-## Maintenance
-
-Replace pending facts only after developer confirmation and keep current truth concise.
-`,
-  );
-}
-
 function git(root, args) {
   return spawnSync("git", args, { cwd: root, encoding: "utf8", input: "", stdio: "pipe" });
 }
@@ -154,28 +63,6 @@ function git(root, args) {
 function initializeGit(root) {
   const result = git(root, ["init", "-q"]);
   assert.equal(result.status, 0, result.stderr);
-}
-
-function runStagedProjectValidator(stageRoot, args = []) {
-  return spawnSync(
-    process.execPath,
-    [path.join(stageRoot, "scripts/setup/validate-staged-project.mjs"), ...args],
-    {
-      cwd: stageRoot,
-      encoding: "utf8",
-      env: process.env,
-      input: "",
-      stdio: "pipe",
-    },
-  );
-}
-
-async function validateStagedProject(stageRoot) {
-  const result = runStagedProjectValidator(stageRoot);
-  if (result.error || result.status !== 0) {
-    throw new Error(result.error?.message ?? `${result.stdout}${result.stderr}`);
-  }
-  return { root: stageRoot };
 }
 
 after(() => {
@@ -256,10 +143,6 @@ test("active, portable, and copy boundaries refuse hardlinked or replaced source
   assert.equal(projectFormatFiles(root).includes("src/alias.jsonl"), false);
   assert.throws(
     () => listPortableTransferFiles({ root }),
-    /single-link regular file: src\/alias\.jsonl/,
-  );
-  assert.throws(
-    () => stageProjectExport({ sourceRoot: root, targetRoot: path.join(target, "stage") }),
     /single-link regular file: src\/alias\.jsonl/,
   );
 
@@ -484,52 +367,7 @@ test("transfer policy permits code ownership names and public certificate materi
   assert.doesNotThrow(() => assertSafeTransferSource({ root }));
 });
 
-test("export staging copies only the canonical portable inventory", () => {
-  const source = temporaryRoot("export-source-");
-  const stagingParent = temporaryRoot("export-target-");
-  write(source, "README.md", "portable\n");
-  write(source, "src/index.ts", "export const active = true;\n");
-  write(source, "scripts/run.sh", "#!/usr/bin/env bash\nexit 0\n");
-  write(source, ".gitignore", readFileSync(path.join(repositoryRoot, ".gitignore"), "utf8"));
-  for (const relativePath of [
-    "auth.json",
-    "sessions/thread.jsonl",
-    "plugins/runtime/plugin.json",
-    "skills/runtime/SKILL.md",
-    "state_1.sqlite",
-  ]) {
-    write(source, relativePath, "ignored Codex runtime fixture\n");
-  }
-  write(source, "apps/site/node_modules/pkg/private.txt", "ignored\n");
-  write(source, "apps/site/.git/config", "ignored\n");
-  write(source, ".codex/runtime/session.json", "ignored\n");
-  initializeGit(source);
-  const added = git(source, ["add", "."]);
-  assert.equal(added.status, 0, added.stderr);
-
-  const target = path.join(stagingParent, "stage");
-  stageProjectExport({ sourceRoot: source, targetRoot: target });
-  assert.equal(readFileSync(path.join(target, "README.md"), "utf8"), "portable\n");
-  assert.equal(lstatSync(path.join(target, "README.md")).mode & 0o777, 0o644);
-  assert.equal(lstatSync(path.join(target, "scripts/run.sh")).mode & 0o777, 0o755);
-  assert.deepEqual(listActiveFiles({ root: target }), [
-    ".gitignore",
-    "README.md",
-    "scripts/run.sh",
-    "src/index.ts",
-  ]);
-  for (const relativePath of [
-    "auth.json",
-    "sessions/thread.jsonl",
-    "plugins/runtime/plugin.json",
-    "skills/runtime/SKILL.md",
-    "state_1.sqlite",
-  ]) {
-    assert.equal(existsSync(path.join(target, ...relativePath.split("/"))), false, relativePath);
-  }
-});
-
-test("export staging copies legitimate tracked vendor, dist, and build content", () => {
+test("portable inventory retains legitimate tracked vendor, dist, and build content", () => {
   const source = temporaryRoot("export-tracked-source-");
   const stagingParent = temporaryRoot("export-tracked-target-");
   write(source, ".gitignore", "vendor/\ndist/\nbuild/\n");
@@ -541,13 +379,11 @@ test("export staging copies legitimate tracked vendor, dist, and build content",
   const forced = git(source, ["add", "-f", ".gitignore", "vendor", "dist", "build"]);
   assert.equal(forced.status, 0, forced.stderr);
 
-  const target = path.join(stagingParent, "stage");
-  stageProjectExport({ sourceRoot: source, targetRoot: target });
+  const files = listPortableTransferFiles({ root: source, includeUntracked: false });
   for (const relativePath of ["vendor/pkg/index.js", "dist/site/index.html", "build/schema.json"]) {
-    assert.equal(readFileSync(path.join(target, relativePath), "utf8").length > 0, true);
+    assert.ok(files.includes(relativePath));
   }
-  assert.equal(readFileSync(path.join(target, "src", ".gitkeep"), "utf8"), "");
-  assert.equal(existsSync(path.join(target, "untracked-draft.txt")), false);
+  assert.equal(files.includes("untracked-draft.txt"), false);
 });
 
 test("portable transfer fails closed for tracked runtime and dependency state", () => {
@@ -571,146 +407,6 @@ test("portable transfer fails closed for tracked runtime and dependency state", 
     () => listPortableTransferFiles({ root: source }),
     /\.codex\/runtime\/session\.json.*\.project-state\/dependency-update\/plan\.json.*node_modules\/pkg\/index\.js/s,
   );
-});
-
-test("Git-less staging rejects repository-root Codex runtime and retains portable .codex files", async () => {
-  const cleanStage = temporaryRoot("export-codex-runtime-clean-stage-");
-  writePortableCodexFiles(cleanStage);
-  const cleanFiles = listStagedTransferFiles({ root: cleanStage });
-  for (const relativePath of [
-    ".codex/README.md",
-    ".codex/config.toml",
-    ".codex/hooks.json",
-    ".codex/agents/default.toml",
-  ]) {
-    assert.equal(cleanFiles.includes(relativePath), true, relativePath);
-  }
-
-  const unsafeStage = temporaryRoot("export-codex-runtime-unsafe-stage-");
-  writePortableCodexFiles(unsafeStage);
-  write(unsafeStage, "sessions/private-thread.jsonl", "private runtime fixture\n");
-  assert.throws(
-    () => listStagedTransferFiles({ root: unsafeStage }),
-    /sessions.*repository-root Codex runtime or cache state/s,
-  );
-  await assert.rejects(
-    () => validateStagedProject(unsafeStage),
-    /sessions.*repository-root Codex runtime or cache state/s,
-  );
-});
-
-test("stage validation rejects mutable project-file lifecycle hooks", async () => {
-  const stage = temporaryRoot("export-hook-validation-");
-  writePortableCodexFiles(stage);
-  write(
-    stage,
-    ".codex/hooks.json",
-    readFileSync(path.join(repositoryRoot, ".codex", "hooks.json"), "utf8").replace(
-      '"hooks": {}',
-      '"hooks": {"Stop": []}',
-    ),
-  );
-
-  await assert.rejects(() => validateStagedProject(stage), /hook events must remain empty/);
-});
-
-test("stage validation requires portable skills and manifest-led discovery", async () => {
-  const missingSkill = temporaryRoot("export-context-contract-missing-");
-  writePortableCodexFiles(missingSkill);
-  rmSync(path.join(missingSkill, ".agents", "skills", "ui-ux-review", "SKILL.md"));
-  await assert.rejects(
-    () => validateStagedProject(missingSkill),
-    /portable context contract is missing \.agents\/skills\/ui-ux-review\/SKILL\.md/,
-  );
-
-  const weakenedPrimary = temporaryRoot("export-context-contract-primary-");
-  writePortableCodexFiles(weakenedPrimary);
-  write(
-    weakenedPrimary,
-    "instructions.md",
-    readFileSync(path.join(repositoryRoot, "instructions.md"), "utf8").replaceAll(
-      "Startup Repository Reconstruction",
-      "Repository Startup",
-    ),
-  );
-  await assert.rejects(
-    () => validateStagedProject(weakenedPrimary),
-    /instructions\.md to include Startup Repository Reconstruction/,
-  );
-
-  const weakenedRole = temporaryRoot("export-context-contract-role-");
-  writePortableCodexFiles(weakenedRole);
-  write(
-    weakenedRole,
-    ".codex/agents/explorer.toml",
-    readFileSync(path.join(repositoryRoot, ".codex/agents/explorer.toml"), "utf8").replace(
-      "manifest-led discovery",
-      "broad file scan",
-    ),
-  );
-  await assert.rejects(
-    () => validateStagedProject(weakenedRole),
-    /orchestration marker manifest-led discovery/,
-  );
-
-  const missingCommand = temporaryRoot("export-context-contract-command-");
-  writePortableCodexFiles(missingCommand);
-  const packageJson = JSON.parse(readFileSync(path.join(missingCommand, "package.json"), "utf8"));
-  delete packageJson.scripts["handover:receive"];
-  write(missingCommand, "package.json", `${JSON.stringify(packageJson, null, 2)}\n`);
-  await assert.rejects(
-    () => validateStagedProject(missingCommand),
-    /package\.json script handover:receive/,
-  );
-
-  const missingHandover = temporaryRoot("export-context-contract-missing-handover-");
-  writePortableCodexFiles(missingHandover);
-  rmSync(path.join(missingHandover, "scripts/context/critical-budget-handover.mjs"));
-  await assert.rejects(
-    () => validateStagedProject(missingHandover),
-    /portable context contract is missing scripts\/context\/critical-budget-handover\.mjs/,
-  );
-});
-
-test("stage validation rejects agent state inside a product root", async () => {
-  const stage = temporaryRoot("product-boundary-stage-validation-");
-  writePortableCodexFiles(stage);
-  write(stage, "src/feature/.agents/skills/example/SKILL.md", "agent pollution\n");
-
-  await assert.rejects(
-    () => validateStagedProject(stage),
-    /src\/feature\/\.agents: agent-only path is forbidden inside product unit src/,
-  );
-});
-
-test("stage validation sees a copied tracked .env even though the stage has no Git metadata", async () => {
-  const source = temporaryRoot("export-secret-source-");
-  const stagingParent = temporaryRoot("export-secret-target-");
-  write(source, ".gitignore", ".env\n");
-  writePortableCodexFiles(source);
-  write(source, ".env", `OPENAI_API_KEY=${["sk-", "c".repeat(24)].join("")}\n`);
-  initializeGit(source);
-  const added = git(source, ["add", "-f", "."]);
-  assert.equal(added.status, 0, added.stderr);
-
-  const target = path.join(stagingParent, "stage");
-  stageProjectExport({ sourceRoot: source, targetRoot: target });
-  for (const relativePath of [
-    ".codex/hooks.json",
-    "scripts/context/critical-budget-handover.mjs",
-    "scripts/context/session-stop-lifecycle.mjs",
-    "scripts/setup/session-control-hook-command.mjs",
-    "scripts/setup/startup-codex-process.mjs",
-    "scripts/setup/startup-runtime-executables.mjs",
-    "scripts/setup/startup-session-controller.mjs",
-  ]) {
-    assert.equal(
-      readFileSync(path.join(target, relativePath), "utf8"),
-      readFileSync(path.join(source, relativePath), "utf8"),
-      relativePath,
-    );
-  }
-  await assert.rejects(() => validateStagedProject(target), /\.env.*environment credential file/s);
 });
 
 test("tracked paths cannot escape through a replaced parent symlink", () => {

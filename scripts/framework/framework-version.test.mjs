@@ -5,9 +5,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { serializeCanonicalJson } from "../contracts/framework-contract.mjs";
+import { serializeCanonicalJson } from "../filesystem/repository-files.mjs";
 import { cleanGitEnvironment } from "../repository/git-runtime-isolation.mjs";
-import { reconcileHousekeepingVersion } from "../goals/repository-housekeeping.mjs";
+import { reconcileHousekeepingVersion } from "./source-housekeeping.mjs";
 import { applyHousekeepingWrites } from "../repository/repository-housekeeping-transaction.mjs";
 import { trustedPnpmCommand } from "../deps/trusted-pnpm-command.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
@@ -52,7 +52,7 @@ function git(root, args) {
   return result.stdout.trim();
 }
 
-function versionManifest(version, schemaVersion = 2) {
+function versionManifest(version, schemaVersion = 3) {
   return `# Project Manifest
 
 ## Constraints And Decisions
@@ -78,9 +78,10 @@ function fixture(t, { reusable = true } = {}) {
   write(root, ".codexrig/framework.json", serializeCanonicalJson(contract));
   write(
     root,
-    ".codexrig/policy-projection.json",
-    readFileSync(path.join(repositoryRoot, ".codexrig/policy-projection.json"), "utf8"),
+    ".codex/tooling.json",
+    readFileSync(path.join(repositoryRoot, ".codex/tooling.json"), "utf8"),
   );
+  if (reusable) write(root, ".codexrig/project-tools.json", "{}\n");
   write(
     root,
     "package.json",
@@ -165,8 +166,8 @@ for (const interrupted of [false, true]) {
     write(root, ".gitignore", "node_modules/\n.codex/runtime/\n.project-state/\n");
     write(
       root,
-      ".codexrig/compatibility.json",
-      readFileSync(path.join(repositoryRoot, ".codexrig/compatibility.json"), "utf8"),
+      ".codex/toolchain.json",
+      readFileSync(path.join(repositoryRoot, ".codex/toolchain.json"), "utf8"),
     );
     write(
       root,
@@ -317,102 +318,26 @@ test("source release reconciliation rejects an ambiguous central remote", (t) =>
   );
 });
 
-test("managed-surface removal receives a major release", (t) => {
-  const root = fixture(t);
-  const contractPath = path.join(root, ".codexrig/framework.json");
-  const contract = JSON.parse(readFileSync(contractPath, "utf8"));
-  contract.upgrade.managedRoots = contract.upgrade.managedRoots.filter(
-    (entry) => entry !== ".codex/agents",
-  );
-  write(root, ".codexrig/framework.json", serializeCanonicalJson(contract));
-  const plan = frameworkVersionReconciliationPlan({ root });
-  assert.equal(plan.requiredBump, "major");
-  assert.equal(plan.minimumVersion, "3.0.0");
-});
-
-test("policy reconciliation documents follow their own framework snapshot across retirement", (t) => {
-  const root = fixture(t);
-  const contract = JSON.parse(readFileSync(path.join(root, ".codexrig/framework.json"), "utf8"));
-  const projection = JSON.parse(
-    readFileSync(path.join(root, ".codexrig/policy-projection.json"), "utf8"),
-  );
-  const document = "docs/operations.md";
-  contract.upgrade.projectOwnedDocuments.push(document);
-  projection.policies[0].reconcileDocuments.push(document);
-  projection.policies[0].version += 1;
-  write(root, ".codexrig/framework.json", serializeCanonicalJson(contract));
-  write(root, ".codexrig/policy-projection.json", serializeCanonicalJson(projection));
-  write(root, document, "# Operations\n\nOwns the fixture operations policy.\n");
-  git(root, ["add", "--all"]);
-  git(root, ["commit", "--quiet", "-m", "publish owned operations document"]);
-  git(root, ["push", "--quiet", "origin", "main"]);
-
-  contract.upgrade.projectOwnedDocuments = contract.upgrade.projectOwnedDocuments.filter(
-    (entry) => entry !== document,
-  );
-  write(root, ".codexrig/framework.json", serializeCanonicalJson(contract));
-  assert.throws(
-    () => frameworkVersionReconciliationPlan({ root }),
-    /reconcileDocuments contains unsupported value docs\/operations\.md/u,
-  );
-  projection.policies[0].reconcileDocuments = projection.policies[0].reconcileDocuments.filter(
-    (entry) => entry !== document,
-  );
-  projection.policies[0].version += 1;
-  write(root, ".codexrig/policy-projection.json", serializeCanonicalJson(projection));
-  rmSync(path.join(root, document));
-
-  const plan = frameworkVersionReconciliationPlan({ root });
-  assert.equal(plan.requiredBump, "major");
-  assert.equal(plan.targetVersion, "3.0.0");
-  applyHousekeepingWrites({ root, writes: plan.writes });
-  assert.deepEqual(frameworkVersionReconciliationPlan({ root }).writes, []);
-});
-
-test("policy content cannot change without its own policy-version increment", (t) => {
-  const root = fixture(t);
-  const projectionPath = path.join(root, ".codexrig/policy-projection.json");
-  const projection = JSON.parse(readFileSync(projectionPath, "utf8"));
-  projection.policies[0].statement = `${projection.policies[0].statement} Changed without version.`;
-  write(root, ".codexrig/policy-projection.json", serializeCanonicalJson(projection));
-  assert.throws(
-    () => frameworkVersionReconciliationPlan({ root }),
-    /changed without increasing its policy version/u,
-  );
-});
-
 test("an incompatible published schema is a major boundary, not an interpreted contract", (t) => {
   const root = fixture(t);
   const contractPath = path.join(root, ".codexrig/framework.json");
-  const projectionPath = path.join(root, ".codexrig/policy-projection.json");
   const packagePath = path.join(root, "package.json");
   const manifestPath = path.join(root, "docs/project.md");
   const currentContract = readFileSync(contractPath, "utf8");
-  const currentProjection = readFileSync(projectionPath, "utf8");
   const currentPackage = readFileSync(packagePath, "utf8");
   const currentManifest = readFileSync(manifestPath, "utf8");
   const incompatibleContract = JSON.parse(currentContract);
   incompatibleContract.schemaVersion = 1;
   incompatibleContract.frameworkVersion = "1.9.0";
   write(root, ".codexrig/framework.json", serializeCanonicalJson(incompatibleContract));
-  const incompatibleProjection = JSON.parse(currentProjection);
-  incompatibleProjection.schemaVersion = 2;
-  write(root, ".codexrig/policy-projection.json", serializeCanonicalJson(incompatibleProjection));
   const publishedPackage = JSON.parse(currentPackage);
   publishedPackage.version = "1.9.0";
   write(root, "package.json", serializeCanonicalJson(publishedPackage));
   write(root, "docs/project.md", versionManifest("1.9.0", 1));
-  git(root, [
-    "add",
-    ".codexrig/framework.json",
-    ".codexrig/policy-projection.json",
-    "package.json",
-    "docs/project.md",
-  ]);
+  git(root, ["add", ".codexrig/framework.json", "package.json", "docs/project.md"]);
   git(root, ["commit", "--quiet", "-m", "publish older policy schema"]);
   git(root, ["push", "--quiet", "origin", "main"]);
   write(root, ".codexrig/framework.json", currentContract);
-  write(root, ".codexrig/policy-projection.json", currentProjection);
   write(root, "package.json", currentPackage);
   write(root, "docs/project.md", currentManifest);
 

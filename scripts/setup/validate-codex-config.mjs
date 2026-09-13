@@ -633,25 +633,6 @@ export function validateCodexConfig(projectRoot = defaultRoot) {
     expectedModel: policy.model,
     expectedReasoningEffort: policy.model_reasoning_effort,
   });
-  const sourceCreationSkillPath = path.join(
-    root,
-    ".agents",
-    "skills",
-    "create-project-from-framework",
-    "SKILL.md",
-  );
-  const isReusableFrameworkSource = existsSync(sourceCreationSkillPath);
-  if (isReusableFrameworkSource) {
-    requireRegularFile(sourceCreationSkillPath, "reusable-framework project-creation skill");
-  }
-  const expectedMemories = !isReusableFrameworkSource;
-  if (policy["features.memories"] !== expectedMemories) {
-    throw new CodexConfigError(
-      isReusableFrameworkSource
-        ? "Reusable framework source must disable local Codex memories so project work leaves no historical memory residue."
-        : "Generated projects must enable local Codex memories only inside their isolated repository-local CODEX_HOME.",
-    );
-  }
   return policy;
 }
 

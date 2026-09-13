@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "protocol": {
+    "id": "codexrig",
+    "version": "1.0.0"
+  },
+  "startup": {
+    "attestationMaxAgeSeconds": 1800
+  },
+  "platform": {
+    "provider": "auto",
+    "integrationBranch": "main",
+    "hosts": {
+      "github": [
+        "github.com"
+      ],
+      "gitlab": [
+        "gitlab.com"
+      ]
+    },
+    "apiBaseUrls": {
+      "github": {
+        "github.com": "https://api.github.com"
+      },
+      "gitlab": {
+        "gitlab.com": "https://gitlab.com/api/v4"
+      }
+    },
+    "ci": {
+      "requiredCheck": "verify"
+    },
+    "protection": {
+      "requiredApprovals": 1,
+      "requireCodeOwnerReview": false,
+      "preventAuthorApproval": true,
+      "preventCommitterApproval": true,
+      "preventApprovalRuleOverrides": true,
+      "resetApprovalsOnPush": true,
+      "mergeSerialization": "prefer"
+    }
+  },
+  "productConfigurationRequired": false
+}

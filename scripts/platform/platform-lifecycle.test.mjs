@@ -6,9 +6,9 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import {
-  readFrameworkContract,
-  validateFrameworkContract,
-} from "../contracts/framework-contract.mjs";
+  readToolingConfiguration,
+  validateToolingConfiguration,
+} from "../contracts/tooling-configuration.mjs";
 import { configurePlatform, githubRulesetPayload } from "./configure-platform.mjs";
 import { detectGitProvider, parseGitRemoteUrl } from "./git-provider.mjs";
 import { gitlabApprovalRuleName } from "./gitlab-platform.mjs";
@@ -22,7 +22,7 @@ import {
 } from "./platform-lifecycle-harness.mjs";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..", "..");
-const contract = readFrameworkContract(repositoryRoot);
+const contract = readToolingConfiguration(repositoryRoot);
 const temporaryRoots = [];
 
 after(() => {
@@ -141,7 +141,7 @@ test("API bases support self-hosted ports and paths but reject foreign origins",
   selfHosted.platform.hosts.gitlab.push("gitlab.example.test");
   selfHosted.platform.apiBaseUrls.gitlab["gitlab.example.test"] =
     "https://gitlab.example.test:8443/custom/api/v4/";
-  const validated = validateFrameworkContract(selfHosted);
+  const validated = validateToolingConfiguration(selfHosted);
   assert.equal(
     validated.platform.apiBaseUrls.gitlab["gitlab.example.test"],
     "https://gitlab.example.test:8443/custom/api/v4",
@@ -149,7 +149,7 @@ test("API bases support self-hosted ports and paths but reject foreign origins",
   const foreign = structuredClone(selfHosted);
   foreign.platform.apiBaseUrls.gitlab["gitlab.example.test"] =
     "https://foreign.example.test/api/v4";
-  assert.throws(() => validateFrameworkContract(foreign), /owned by gitlab\.example\.test/);
+  assert.throws(() => validateToolingConfiguration(foreign), /owned by gitlab\.example\.test/);
 });
 
 test("platform configuration refuses an unowned host before I/O", async () => {

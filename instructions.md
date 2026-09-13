@@ -1177,14 +1177,14 @@ any active repository-local Git exclude rule blocks `pnpm goal:new`. Source inve
 source-state checks, and `goal:new` bind root-owned Git metadata with the canonical worktree and pin
 stat checks. Goal publication compares worktree content through a fresh temporary index;
 policy-sensitive probes disable repository-local FSMonitor execution and reject hidden index flags.
-A Git-less root beneath another repository remains Git-less. The staged validator runs from the
-copied stage, derives its target from its own script rather than a caller-selected stage path, and
-rechecks the bound directory identity through validation.
+A Git-less root beneath another repository remains Git-less. The source-owned staged validator
+accepts the explicit generated target and rechecks its bound directory identity throughout
+validation. It is not installed in the product.
 
 ## Dependency Installation And Freshness
 
 Canonical `bash scripts/setup/start-codex.sh` runs the framework-owned
-`scripts/framework/maintain-toolchain.mjs --startup` boundary on every start, before native session
+`scripts/deps/maintain-toolchain.mjs --startup` boundary on every start, before native session
 selection or attestation. It inventories every same-clone worktree and safe latest-session marker
 before writes, preserves unsafe or active writers, and uses the shared lifecycle lock and repository
 maintenance transaction. It checks official stable releases for Node.js within its declared LTS
@@ -1205,14 +1205,13 @@ is recovered as current state and its derived installation is reproduced on retr
 An unchanged version with different published archive digests or a moved existing CI action tag is
 an error. Registry failure is indeterminate freshness and never authorizes cached fallback.
 
-The compatibility matrix, mise files and both CI adapters are project-owned upgrade documents.
-Framework upgrades preserve these local pins and the package-manager field while reconciling policy;
-maintenance updates only the two package-manager receipt projections, preserving every managed-code
-proof. Pending dependency plans and unacknowledged framework reconciliation block maintenance. Use
-`mise exec --locked -- node scripts/framework/maintain-toolchain.mjs` to perform the same work
-explicitly inside an authorized current slice; this grants no control over another session. Moving
-beyond declared dependency ranges or tool/action major lines requires migration review and affected
-consumer evidence. Session-only `/side` hooks never run maintenance.
+Local `.codex/toolchain.json`, mise files and stable CI own their actual tool pins independently of
+source releases. Maintenance does not read an installation receipt or initiate framework work.
+Pending dependency plans block conflicting maintenance. Use
+`mise exec --locked -- node scripts/deps/maintain-toolchain.mjs` only inside an authorized tool
+maintenance slice; it grants no control over another session. Moving beyond declared dependency
+ranges or tool/action major lines requires migration review and affected consumer evidence.
+Session-only `/side` hooks never run maintenance.
 
 Use `mise exec --locked -- node scripts/deps/install-compatible.mjs` for the first dependency
 installation in this repository and every generated project. Invoking the checked-in Node boundary
@@ -1266,81 +1265,76 @@ project's product, UI, deployment and external-mutation approval gates throughou
 
 ## Framework Lifecycle, Compatibility, And Git Platforms
 
-`.codexrig/framework.json` is the versioned machine contract. It owns the CodexRig version, complete
-managed upgrade roots and package fields, explicit source-only exclusions, project-owned document
-classification, startup-attestation lifetime, central integration branch, GitHub/GitLab host
-mapping, required CI job, review count, and merge-serialization preference.
-`.codexrig/policy-projection.json` owns stable, individually versioned policy concepts plus the
-bootstrap/README surfaces and project-owned documents each concept affects. It never projects
-workflow bullets into `docs/project.md`; the manifest remains current system truth.
-`.codexrig/compatibility.json` separately owns the reviewed stable Node.js, pnpm, and minimum Codex
-versions plus non-blocking canaries for the next Node LTS line, next pnpm major, and next Codex
-channel. Stable CI is blocking; scheduled and manual canaries expose migration work before a line
-becomes mandatory.
+`.codexrig/framework.json` owns source release identity only. `.codexrig/project-tools.json`
+positively selects each project capability, exact files, package commands and verification owners.
+Every selected import and executable shell target must remain inside that reviewed file set. New
+source files never transfer automatically, including under `--include-untracked`. The untracked
+option admits only explicitly selected unpublished inputs. A separate distribution service/package
+is unnecessary for this bounded source-to-project boundary.
 
-Follow the official repository-scoped Codex layout: root `AGENTS.md` is the concise safe-entry file,
-this file is the linked complete authority, project configuration is `.codex/config.toml`, custom
-roles are `.codex/agents/*.toml`, and reusable repository skills are
-`.agents/skills/<skill>/SKILL.md` with optional `agents/openai.yaml`, scripts, references, and
-assets. Do not invent parallel hidden policy locations or rely on undocumented discovery behavior.
+Local `.codex/tooling.json` owns startup/provider settings, `.codex/toolchain.json` owns stable
+versions and archive integrity, and `.codex/verification.json` owns current commands, consumers,
+named risks and optional pre-push checks. Source `.codexrig/compatibility.json` owns only future
+experiments. Both product CI adapters contain stable verification, while source CI additionally owns
+its canaries. Generic doctors, document checks and runtime protection do not consult source release,
+upgrade or licensing metadata. Source licensing is verified only by source-owned command
+composition.
 
-Framework transparency is mandatory. Portable policy, agent roles, skills, hooks, managed files,
-source-only exclusions, and planned upgrade operations must be tracked, inspectable, and described
-from the root README and machine contracts. Dot-prefixed official Codex directories are
-organization, not secrecy. Only explicitly documented credentials, trust, sessions, logs, caches,
-indexes, databases, and other disposable runtime state may remain ignored; normative project policy
-or framework-controlled executable behavior never hides there. Generation and upgrade expose exact
-file inventories and exclusion reasons rather than silently omitting framework elements.
+Follow the official repository-scoped native layout: concise `AGENTS.md`, complete
+`instructions.md`, `.codex/config.toml`, `.codex/agents/*.toml` and
+`.agents/skills/<skill>/SKILL.md`. Generated projects receive curated project instructions and only
+selected reusable skills. README owns setup/use and links, the manifest current technical facts, and
+the requirements owner requirements/acceptance. A static UI reference remains separate. Preserve
+explicit approval gates before implementation. A tool failure or invalid work-state reports a
+bounded diagnostic; neither creates a source repair task, broadens product authority nor starts a
+continuation loop.
 
-Run `pnpm framework:doctor` for local contract, receipt, reconciliation, runtime, CI-adapter, and
-provider checks; add `-- --online` when registry freshness must be known. The reusable framework
-source has one stable SemVer owner in `.codexrig/framework.json`; root `package.json` and the
-bounded source-manifest version block are exact mirrors. `pnpm framework:version` previews the
-deterministic plan, and completed-goal `pnpm repo:housekeeping -- --apply` writes all mirrors
-atomically. The plan binds the configured local integration branch to one central remote and branch,
-queries that branch read-only, requires its unique live commit to equal the local remote-tracking
-ref, and compares every committed-but-unpublished, tracked, and untracked active change with that
-immutable published commit. Missing, stale, ambiguous, detached, diverged, or non-central upstream
-state fails closed: incompatible schema, contract, policy-ID, or managed-surface removals require a
-major release; capability, behavior, policy, dependency, or workflow changes require minor; and
-documentation/test-only changes require patch. It selects at least the next required version without
-downgrading a higher explicit valid release, so repeated runs are idempotent and `--check`/scheduled
-runs fail on drift. A generated project's root package version remains independent product truth;
-framework upgrades never overwrite it, and `.codexrig/installation.json` separately records the
-installed CodexRig version. A generated project may self-preview with
-`pnpm framework:upgrade -- --source <new-codexrig-root>`. The reviewed framework source may instead
-preview a child with `pnpm framework:upgrade -- --target <child-root>`. Both directions accept only
-the current framework-contract, installation-receipt, and policy-projection schemas. A non-current
-child is outside the upgrade contract and is regenerated from the current framework. Treat the
-source as executable supply-chain input and never run an upgrade from an unreviewed checkout.
+`pnpm framework:doctor` diagnoses source releases, selection, licenses and tools. Generated projects
+use `pnpm tooling:doctor` for their local tools. Source `framework:version` compares current active
+changes with the unique live central commit matching its local remote-tracking ref. Source
+housekeeping reconciles the contract/package/manifest version mirrors atomically. Incompatible
+source schema or removed production capability requires major, added behavior minor, and docs/tests
+patch. An old published source schema is opaque except for its release identity. Product package
+versions are independent; products contain neither a source release contract nor an install receipt.
 
-`--apply` performs a receipt-backed three-way comparison. Identical newly managed files are adopted;
-divergent local files conflict. The transaction journals originals, authorizes the dependency lock,
-writes managed files and package fields, and records the new receipt last; failure restores files,
-lockfile, receipt, and installed dependencies. Project-owned documents are never copied blindly. The
-plan compares versioned policy IDs, reports added, changed, and retired concepts with the exact
-local documents they affect, and carries unresolved reconciliation in the receipt until the primary
-has adapted those concepts to local truth and acknowledged them after affected checks. A semantic
-upgrade may reorganize local wording and behavior, but it cannot invent product decisions, activate
-future modules, or replace a truthful current manifest with framework defaults.
+Explicit migration runs only from the source:
+`pnpm framework:upgrade -- --target <project-root> --baseline <pristine-generated-reference>`. The
+supplied reference is an unchanged generated file snapshot before customization; old metadata is
+opaque bytes, never an old schema reader. The source uses the same current tool selection and output
+projections as generation. It compares reference/current/desired bytes and package fields, keeps
+local changes when the selected source field has not changed, and reports divergent edits before
+writing. Unchanged obsolete tools, source metadata and notices are retired. Project-owned README,
+AGENTS, instructions, manifest, requirements, UI, configuration and data are preserved. The
+authorized primary reconciles retained local policy when the requested migration requires it; the
+tool never overwrites maintained documents with templates or invents product decisions.
 
-Project creation is a distinct non-publication workflow. Its complete selected-source transfer
-manifest classifies every inventoried path as copied or excluded for the machine-contract reason.
-Every copied reusable file remains byte-identical unless it is a declared project identity or
-configuration transformation; missing, unexpected, or undeclared changed paths fail creation. The
-generated installation receipt lists every managed portable framework file. Source-only project
-creation/reset machinery remains visible and explicitly classified in the source contract rather
-than silently disappearing. After atomically publishing the target, the generator applies only its
-documented active-session-safe cleanup, revalidates the source baseline, never initializes Git,
-commits, or pushes, and prints the exact post-exit reset sequence for the source owner.
+Add `--apply` only to the reviewed conflict-free plan. All owning target sessions must exit first.
+The target's installed runtime owner acquires its own current lifecycle lock; an unsupported runtime
+boundary requires regeneration after exit. Originals are journaled before writes; failure restores
+only proven transaction-owned bytes and preserves unrelated changes as explicit recovery blockers.
+Use `--target <project-root> --recover` for an interrupted current transaction. No dependency
+install, network request, commit or push is part of migration. A changed customized lockfile needs
+explicit local reconciliation. Repeating a settled migration produces no changes, and no receipt or
+universal self-updater is left in the product.
+
+Project creation and archive export share one preparation/validation owner. They build a new target,
+create the product identity and optional intake draft, select stable CI/checks, and project a
+neutral new-installation protocol namespace throughout the selected tools. They exclude source
+LICENSE and NOTICE under the generated-output permission below. Validation checks exact file parity
+against those declared transformations, imports, contracts, trust boundaries and absence of source
+identity. It also proves private-state isolation with controlled markers; an identity search alone
+is not acceptance. Active source work context is excluded and preserved, never continued in the
+product. Source-state changes during creation discard staging. Creation never initializes Git,
+mutates or resets the source, commits or pushes. Source publication remains the explicit post-exit
+orchestrator.
 
 Provider detection prefers CI identity, then the selected branch upstream, `origin`, or the sole
 remote. Standard GitHub/GitLab hosts work without configuration; self-hosted domains must have one
-unambiguous owner and an explicit credential-free HTTPS API base in the framework contract;
+unambiguous owner and an explicit credential-free HTTPS API base in the local tooling configuration;
 nonstandard ports and API path prefixes are supported without endpoint guessing. Both
-`.github/workflows/ci.yml` and `.gitlab-ci.yml` remain portable and execute equivalent stable and
-canary contracts. `pnpm platform:configure` previews the detected provider policy without network
-mutation. Only explicit `-- --apply` may use `GH_TOKEN`/`GITHUB_TOKEN` or
+`.github/workflows/ci.yml` and `.gitlab-ci.yml` execute equivalent stable verification; only source
+CI adds future compatibility experiments. `pnpm platform:configure` previews the detected provider
+policy without network mutation. Only explicit `-- --apply` may use `GH_TOKEN`/`GITHUB_TOKEN` or
 `GITLAB_TOKEN`/`GLAB_TOKEN` to configure protection. Capability or tier limitations fail closed when
 a required policy is unavailable; tokens are sent only to a host owned by that provider in the
 contract. A `prefer` merge-serialization policy may fall back while retaining protected review and
@@ -1722,11 +1716,11 @@ repository verification; `pnpm verify` never deploys.
 
 ## White-Label Product Configuration
 
-Every generated project is white-label by default. CodexRig policy, receipts, and developer
-documentation remain tracked and inspectable, but no CodexRig name, copy, visual asset, theme,
-domain, or other framework identity may enter a product-facing runtime, UI, public artifact,
-metadata surface, or deployment output. Rebranding, tenant branding, or deployment variation must
-change owned configuration and assets rather than fork domain behavior or copy a product tree.
+Every generated project is white-label by default. Development policy and developer documentation
+remain tracked and inspectable, but no CodexRig name, copy, visual asset, theme, domain, or other
+framework identity may enter a product-facing runtime, UI, public artifact, metadata surface, or
+deployment output. Rebranding, tenant branding, or deployment variation must change owned
+configuration and assets rather than fork domain behavior or copy a product tree.
 
 Generated children begin with `config/product.json` as the visible, replaceable machine owner for
 public product identity, brand/theme/asset maps, public endpoints and contacts, and application IDs.
@@ -1776,22 +1770,18 @@ does not duplicate them.
 
 ## Licensing And Attribution
 
-`LICENSE` contains the unmodified PolyForm Noncommercial License 1.0.0, and `NOTICE` contains the
-controlling CodexRig Required Notice. Every noncommercial CodexRig copy, distribution, derivative
-work, and generated project must retain both files, the Zoran Kikic author credit, and the CodexRig
-Framework credit. They are managed portable framework inputs: project creation, receipt-backed
-upgrade, setup, verification, completed-goal housekeeping, and export validation fail closed when
-they are missing, altered, or no longer managed.
+`LICENSE` contains the unmodified PolyForm Noncommercial License 1.0.0. `NOTICE` retains Zoran
+Kikic's CodexRig Required Notice and controls the explicit generated-output exception confirmed by
+the rights holder. Source framework copies retain those terms and credits; commercial use of the
+framework itself requires a separate express written license. CodexRig's own credits remain intact.
 
-The standard license grants no commercial-use right. Commercial use requires a separate express
-written license from Zoran Kikic. CodexRig itself always retains its license, author credit, and
-framework credit. A separate written commercial license may expressly permit those credits to be
-removed only from the specifically licensed project generated by CodexRig; noncommercial use never
-permits removal. Do not infer a commercial grant or waiver from an inquiry, negotiation,
-contribution, or payment. Product-facing runtime and UI remain white-label: required attribution is
-developer-/source-facing unless a separate agreement or applicable law requires another placement.
-Run `pnpm license:check` after any licensing, package, generator, transfer, upgrade, README, or
-NOTICE change.
+The selected development files and project templates emitted into generated projects may be used,
+modified, distributed, sublicensed and sold without CodexRig attribution or inherited license
+obligations. New projects contain no CodexRig references, author credit, LICENSE/NOTICE copies or
+framework license checker, and start with package `license: "UNLICENSED"` until their owner selects
+product terms. This output permission does not relicense the source generator, updater, release
+management or internal suites. Independent third-party licenses remain applicable. Run
+`pnpm license:check` in the source after licensing, generator, transfer, upgrade or notice changes.
 
 ## Security And Privacy
 

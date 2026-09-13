@@ -221,7 +221,16 @@ export function workspaceLifecycleCommands(
       key: `workspace:${scriptName}`,
       label: `project lifecycle ${scriptName}`,
       executable: "pnpm",
-      args: ["--recursive", ...filters, "--if-present", "run", scriptName],
+      args: [
+        "--recursive",
+        ...(owners.some((manifest) => manifest.directory === ".")
+          ? ["--include-workspace-root"]
+          : []),
+        ...filters,
+        "--if-present",
+        "run",
+        scriptName,
+      ],
       artifactOwners: owners.map((manifest) => `workspace:${manifest.directory}`).sort(),
       reason: `${owners.length} selected project(s) expose ${scriptName}; exact workspace filters avoid non-owners and recursive aggregators`,
       phase: lifecyclePhase(scriptName, mode),

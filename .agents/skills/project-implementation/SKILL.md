@@ -48,13 +48,6 @@ choices. Use `$architecture-evolution` for material topology, surface, trust, ow
 changes. A new feature extends its current owner, creates a new module in an existing domain, or
 establishes a domain; there is no generic catch-all placement.
 
-For a framework upgrade, use only the current receipt-backed contract documented in
-[Framework Lifecycle](../../../instructions.md#framework-lifecycle-compatibility-and-git-platforms).
-Preview the exact source/target and review changes, conflicts and policy reconciliation before
-apply. Project-owned documents never become blind copy targets; preserve child decisions,
-acknowledge the exact plan digest, and verify the assembled child. No compatibility path or
-alternative updater.
-
 ## Implement At The Owner
 
 1. Trace the behavior through its public entry, composition, owning module, contract and data/state
@@ -77,8 +70,8 @@ alternative updater.
 4. Read the existing typed owners for white-label identity and branding (`config/product.json`),
    delivery (`config/delivery.json`), tenant context/isolation (`config/tenancy.json`) and locales
    (`config/localization.json`). Resolve relevant pending product choices before implementation.
-   Preserve source-facing LICENSE/NOTICE and keep CodexRig identity out of product-facing output.
-   Use the
+   Preserve applicable third-party licenses and the project owner's confirmed licensing terms. Use
+   the
    [architecture and product contracts](../../../instructions.md#modular-architecture-parallel-ownership-and-integration)
    for detailed boundaries; do not copy their implementation into this skill.
 5. Implement the largest coherent unblocked slice within the declared write set. Match the owning
@@ -162,9 +155,9 @@ changed trust surfaces, and other reviews only where relevant. Keep results in t
 Use `pnpm verify:changed -- --print-plan` for admission and focused evidence while iterating; one
 final `pnpm verify` belongs on the stable integrated candidate. Preserve Dev feedback priority. The
 verification and documentation sections of [instructions](../../../instructions.md) define full
-audit, all-document currency review, critical-document preservation, `repo:housekeeping`, post-exit
-reset, publication and `pnpm goal:new` gates. Preserve the durable project manifest and never bypass
-a gate because an intermediate slice is green.
+audit, document currency, critical-document preservation and applicable housekeeping/publication
+gates. Preserve the durable project manifest and never bypass a gate because an intermediate slice
+is green.
 
 The
 [orchestration authority](../../../instructions.md#subagent-orchestration-and-integration-authority)

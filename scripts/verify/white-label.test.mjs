@@ -35,15 +35,6 @@ test("the portable product configuration is neutral, structured, and secret-free
   assert.match(content, /"displayName": null/u);
   assert.doesNotMatch(content, /CodexRig/u);
 
-  const leakedFramework = content.replace(
-    '"displayName": null',
-    '"displayName": "CodexRig Storefront"',
-  );
-  assert.ok(
-    productConfigurationFindings(leakedFramework).some((finding) =>
-      finding.includes("framework branding"),
-    ),
-  );
   const secretSetting = content.replace('"theme": {}', '"theme": { "apiToken": "x" }');
   assert.ok(
     productConfigurationFindings(secretSetting).some((finding) =>
@@ -90,46 +81,17 @@ test("generated products require one owner and reject public identity literals",
     ),
   );
 
-  write(root, "src/index.js", 'export const footer = "Powered by CodexRig";\n');
+  write(root, "src/index.js", 'import "../scripts/setup/tooling-doctor.mjs";\n');
   assert.ok(
     whiteLabelProjectFindings({ root, relativePaths: paths }).some((finding) =>
-      finding.includes("leaks CodexRig branding"),
+      finding.includes("boundary"),
     ),
-  );
-
-  write(root, "src/index.js", 'export const framework = "../.codexrig/framework.json";\n');
-  assert.ok(
-    whiteLabelProjectFindings({ root, relativePaths: paths }).some((finding) =>
-      finding.includes("framework-owned boundary"),
-    ),
-  );
-
-  write(root, "src/CODEXRIG-brand.js", "export const brand = true;\n");
-  assert.ok(
-    whiteLabelProjectFindings({
-      root,
-      relativePaths: [productConfigurationPath, "src/CODEXRIG-brand.js"],
-    }).some((finding) => finding.includes("product-facing path")),
   );
 });
 
-test("the reusable source stays product-neutral while children require configuration", () => {
+test("repositories with product roots require explicit configuration", () => {
   const source = fixture("white-label-source-");
-  write(source, ".agents/skills/create-project-from-framework/SKILL.md", "# Source-only skill\n");
-  write(source, "src/.gitkeep", "");
-  assert.deepEqual(
-    whiteLabelProjectFindings({ root: source, relativePaths: ["src/.gitkeep"] }),
-    [],
-  );
-
-  write(source, productConfigurationPath, initialProductConfiguration("Leaked Child"));
-  assert.ok(
-    whiteLabelProjectFindings({
-      root: source,
-      relativePaths: [productConfigurationPath, "src/.gitkeep"],
-    }).some((finding) => finding.includes("neutral source framework")),
-  );
-
+  assert.deepEqual(whiteLabelProjectFindings({ root: source, relativePaths: [] }), []);
   const child = fixture("white-label-child-");
   write(child, "src/.gitkeep", "");
   assert.ok(

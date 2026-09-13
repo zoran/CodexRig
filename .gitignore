@@ -53,6 +53,9 @@ backups/
 !.codex/
 !.codex/config.toml
 !.codex/hooks.json
+!.codex/tooling.json
+!.codex/toolchain.json
+!.codex/verification.json
 !.codex/README.md
 !.codex/agents/
 .codex/agents/*

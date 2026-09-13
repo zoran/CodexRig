@@ -6,12 +6,10 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { deliveryReconciliationPlan } from "../docs/delivery-manifest.mjs";
-import { frameworkVersionReconciliationPlan } from "../framework/framework-version.mjs";
 import { formatContextError, sanitizeMultilineForTerminal } from "../terminal/terminal-output.mjs";
 import { verificationChildEnvironment } from "../verify/verification-runtime-identity.mjs";
 import { acquireVerificationSessionLock } from "../verify/verification-session-lock.mjs";
 import { reconcileRepositoryWorktreeState } from "../repository/worktree-recovery.mjs";
-import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycle-process.mjs";
 import {
   applyHousekeepingWrites,
   housekeepingStateDirectory,
@@ -43,7 +41,7 @@ function usage() {
   return `Usage: pnpm repo:housekeeping [-- --check|--apply] [--online]
 
   --check   Read-only drift and repository-health check. This is the default.
-  --apply   Reconcile the source version, unambiguous delivery inventory, manifest projection, and formatting, then check.
+  --apply   Reconcile unambiguous delivery inventory, manifest projection, and formatting, then check.
   --online  Also check registry/tool freshness without changing dependency version lines.
 `;
 }
@@ -74,7 +72,6 @@ function runRepositoryHealthChecks({ online }) {
     ["scripts/verify/docs.mjs", []],
     ["scripts/verify/identity-access.mjs", []],
     ["scripts/verify/localization.mjs", []],
-    ["scripts/verify/licensing.mjs", []],
     ["scripts/verify/tenant-isolation.mjs", []],
     ["scripts/verify/white-label.mjs", []],
     ["scripts/verify/path-hygiene.mjs", []],
@@ -84,8 +81,7 @@ function runRepositoryHealthChecks({ online }) {
     ["scripts/verify/dependencies.mjs", []],
     ["scripts/verify/skill-paths.mjs", []],
     ["scripts/setup/validate-codex-model-policy.mjs", []],
-    ["scripts/framework/framework-version.mjs", ["--check"]],
-    ["scripts/framework/framework-doctor.mjs", online ? ["--online"] : []],
+    ["scripts/setup/tooling-doctor.mjs", online ? ["--online"] : []],
     ["scripts/verify/repository-smoke.mjs", []],
     ["scripts/verify/format-project.mjs", ["--check"]],
   ];
@@ -104,52 +100,7 @@ function failFromPlan(plan) {
   );
 }
 
-/** Reconciles source release metadata and its derived installation, including interrupted retries. */
-export function reconcileHousekeepingVersion({ root, apply, lifecycleCapability }) {
-  let plan = frameworkVersionReconciliationPlan({ root });
-  if (plan.blockingFindings.length > 0) failFromPlan(plan);
-  if (apply && plan.writes.length > 0) {
-    applyHousekeepingWrites({ root, writes: plan.writes });
-    plan = frameworkVersionReconciliationPlan({ root });
-  }
-  failFromPlan(plan);
-  if (apply && plan.applicable) {
-    try {
-      const result = spawnRuntimeLifecycleCommandSync({
-        command: process.execPath,
-        args: [
-          path.join(repositoryRoot, "scripts/deps/install-compatible.mjs"),
-          "--reproduce-locked",
-        ],
-        commandDelegation: { operation: "dependency", role: "housekeeping-dependency" },
-        lifecycleCapability,
-        repositoryRoot: root,
-        role: "housekeeping-deps-supervisor",
-        options: {
-          cwd: root,
-          encoding: "utf8",
-          env: verificationChildEnvironment(),
-          input: "",
-          stdio: "pipe",
-          timeout: 240_000,
-        },
-      });
-      if (result.error || result.status !== 0) {
-        throw new Error(
-          result.error?.message || result.stderr || "Dependency reproduction failed.",
-        );
-      }
-    } catch (error) {
-      throw new Error(
-        `${error.message} Source housekeeping is incomplete. Retry with mise exec --locked -- node scripts/goals/repository-housekeeping.mjs --apply; this also works when pnpm's pre-script guard rejects stale installation metadata.`,
-        { cause: error },
-      );
-    }
-  }
-}
-
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
+export async function runRepositoryHousekeeping(options, { reconcileOwnedState } = {}) {
   if (options.help) {
     console.log(usage());
     return;
@@ -174,11 +125,12 @@ async function main() {
     }
     failFromPlan(worktreePlan);
     if (options.apply) recoverInterruptedHousekeepingWrites(repositoryRoot);
-    reconcileHousekeepingVersion({
-      root: repositoryRoot,
-      apply: options.apply,
-      lifecycleCapability: lock.lifecycleCapability,
-    });
+    if (reconcileOwnedState)
+      await reconcileOwnedState({
+        root: repositoryRoot,
+        apply: options.apply,
+        lifecycleCapability: lock.lifecycleCapability,
+      });
 
     let plan = deliveryReconciliationPlan({ root: repositoryRoot });
     if (plan.blockingFindings.length > 0) failFromPlan(plan);

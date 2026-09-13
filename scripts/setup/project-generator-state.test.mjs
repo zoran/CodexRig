@@ -9,7 +9,7 @@ import {
   assertSourceGitStateUnchanged,
   captureSourceGitState,
   sourceHasGitChanges,
-} from "../../.agents/skills/create-project-from-framework/scripts/source-git-state.mjs";
+} from "../../scripts/framework/source-git-state.mjs";
 
 test("generator source state detects content changes inside an already dirty tracked path", (t) => {
   const root = mkdtempSync(path.join(os.tmpdir(), "project-generator-state-"));

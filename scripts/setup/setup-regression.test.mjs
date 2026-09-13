@@ -56,7 +56,7 @@ import {
   run,
   temporaryRoot,
   validPortableConfig,
-} from "./setup-regression-fixtures.mjs";
+} from "./setup-regression-test-helpers.mjs";
 
 test("the sole TOML parser is strict and supports the portable config subset", () => {
   assert.deepEqual(
@@ -173,42 +173,10 @@ test("Codex config parser accepts only the complete typed portable policy", () =
     "tui.theme": "catppuccin-mocha",
   });
 
-  const reusableFramework = configFixture(
+  const disabledMemories = configFixture(
     validPortableConfig.replace("memories = true", "memories = false"),
   );
-  const sourceCreationSkill = path.join(
-    reusableFramework,
-    ".agents",
-    "skills",
-    "create-project-from-framework",
-    "SKILL.md",
-  );
-  mkdirSync(path.dirname(sourceCreationSkill), { recursive: true });
-  writeFileSync(sourceCreationSkill, "# Source-only fixture\n", "utf8");
-  assert.equal(validateCodexConfig(reusableFramework)["features.memories"], false);
-
-  const generatedWithDisabledMemories = configFixture(
-    validPortableConfig.replace("memories = true", "memories = false"),
-  );
-  assert.throws(
-    () => validateCodexConfig(generatedWithDisabledMemories),
-    /Generated projects must enable local Codex memories/,
-  );
-
-  const reusableFrameworkWithEnabledMemories = configFixture();
-  const enabledSourceCreationSkill = path.join(
-    reusableFrameworkWithEnabledMemories,
-    ".agents",
-    "skills",
-    "create-project-from-framework",
-    "SKILL.md",
-  );
-  mkdirSync(path.dirname(enabledSourceCreationSkill), { recursive: true });
-  writeFileSync(enabledSourceCreationSkill, "# Source-only fixture\n", "utf8");
-  assert.throws(
-    () => validateCodexConfig(reusableFrameworkWithEnabledMemories),
-    /Reusable framework source must disable local Codex memories/,
-  );
+  assert.equal(validateCodexConfig(disabledMemories)["features.memories"], false);
 
   const incompleteIsolation = configFixture();
   writeFileSync(
@@ -519,7 +487,7 @@ test("startup attestation binds the complete preloaded controller closure", () =
 
   assert.equal(issued.attestation.schemaVersion, 7);
   for (const relativePath of [
-    "scripts/contracts/framework-contract.mjs",
+    "scripts/contracts/tooling-configuration.mjs",
     "scripts/context/session-stop-lifecycle.mjs",
     "scripts/repository/source-inventory.mjs",
     "scripts/security/secret-patterns.mjs",
@@ -623,7 +591,7 @@ test("startup attestation binds the complete preloaded controller closure", () =
   assert.deepEqual(inspectRuntimeSessionLease({ root: fixture }).lease, activeLease);
   assert.deepEqual(inspectRuntimeSessionRecovery({ root: fixture }).recovery, recovery);
 
-  const changedHelper = path.join(fixture, "scripts", "contracts", "framework-contract.mjs");
+  const changedHelper = path.join(fixture, "scripts", "contracts", "tooling-configuration.mjs");
   writeFileSync(changedHelper, `${readFileSync(changedHelper, "utf8")}\n`, "utf8");
   assert.equal(verifyStartupAttestation({ ...verification, hookInput: sideInput }), null);
   assert.throws(
@@ -899,18 +867,17 @@ test("project export cannot overwrite source or an existing archive", () => {
   const setupDirectory = path.join(fixture, "scripts", "setup");
   mkdirSync(setupDirectory, { recursive: true });
   const exporter = path.join(setupDirectory, "export-project.sh");
-  copyFileSync(path.join(root, "scripts/setup/export-project.sh"), exporter);
+  copyFileSync(path.join(root, "scripts/framework/export-project.sh"), exporter);
   chmodSync(exporter, 0o755);
-  const exporterContent = readFileSync(exporter, "utf8");
-  assert.match(exporterContent, /node "\$stage\/scripts\/setup\/validate-staged-project\.mjs"/);
-  assert.doesNotMatch(
-    exporterContent,
-    /node scripts\/setup\/validate-staged-project\.mjs "\$stage"/,
-  );
+  const optionsTarget = path.join(fixture, "scripts/framework/project-options.mjs");
+  mkdirSync(path.dirname(optionsTarget), { recursive: true });
+  copyFileSync(path.join(root, "scripts/framework/project-options.mjs"), optionsTarget);
   writeFileSync(path.join(fixture, "package.json"), '{"name":"export-boundary-fixture"}\n', "utf8");
   writeFileSync(path.join(fixture, "README.md"), "source sentinel\n", "utf8");
 
-  const sourceTarget = run("bash", [exporter, "README.md"], { cwd: fixture });
+  const sourceTarget = run("bash", [exporter, "--name", "Fixture", "--output", "README.md"], {
+    cwd: fixture,
+  });
   assert.notEqual(sourceTarget.status, 0);
   assert.match(sourceTarget.stderr, /dist\/exports/);
   assert.equal(readFileSync(path.join(fixture, "README.md"), "utf8"), "source sentinel\n");
@@ -918,9 +885,13 @@ test("project export cannot overwrite source or an existing archive", () => {
   mkdirSync(path.join(fixture, "dist", "exports"), { recursive: true });
   const existing = path.join(fixture, "dist", "exports", "existing.tar.gz");
   writeFileSync(existing, "archive sentinel\n", "utf8");
-  const existingTarget = run("bash", [exporter, "dist/exports/existing.tar.gz"], {
-    cwd: fixture,
-  });
+  const existingTarget = run(
+    "bash",
+    [exporter, "--name", "Fixture", "--output", "dist/exports/existing.tar.gz"],
+    {
+      cwd: fixture,
+    },
+  );
   assert.notEqual(existingTarget.status, 0);
   assert.match(existingTarget.stderr, /already exists/);
   assert.equal(readFileSync(existing, "utf8"), "archive sentinel\n");

@@ -2,13 +2,14 @@
 import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import {
-  frameworkRoot,
-  normalizeFrameworkPath,
-  resolveFrameworkPath,
+  toolingRoot,
+  normalizeRepositoryPath,
+  resolveRepositoryPath,
   serializeCanonicalJson,
   sha256,
-} from "../contracts/framework-contract.mjs";
+} from "../filesystem/repository-files.mjs";
 import {
+  isProjectToolPath,
   atomicWriteUpgradeFile,
   ensureUpgradeDirectoryChain,
   targetUpgradeFileState,
@@ -19,10 +20,6 @@ import {
   removeOwnedArtifact,
   removeOwnedRegularFile,
 } from "../filesystem/owned-file-operations.mjs";
-import {
-  acquireRuntimeLifecycleLock,
-  releaseRuntimeLifecycleLock,
-} from "../repository/runtime-session-lease.mjs";
 
 const journalRelativePath = ".project-state/framework-upgrade/journal.json";
 
@@ -35,9 +32,9 @@ function validMode(value) {
 }
 
 export function frameworkUpgradeStatePaths(root) {
-  const stateRoot = resolveFrameworkPath(root, ".project-state/framework-upgrade");
+  const stateRoot = resolveRepositoryPath(root, ".project-state/framework-upgrade");
   for (const relativePath of [".project-state", ".project-state/framework-upgrade"]) {
-    const candidate = resolveFrameworkPath(root, relativePath);
+    const candidate = resolveRepositoryPath(root, relativePath);
     if (!existsSync(candidate)) continue;
     const stats = lstatSync(candidate);
     if (stats.isSymbolicLink() || !stats.isDirectory()) {
@@ -53,33 +50,27 @@ export function frameworkUpgradeStatePaths(root) {
   };
 }
 
-function originalRecord(root, relativePath, { mutable = false } = {}) {
+function originalRecord(root, relativePath) {
   const state = targetUpgradeFileState(root, relativePath);
   return state.exists
     ? {
         content: Buffer.from(state.content).toString("base64"),
         existed: true,
         mode: state.mode,
-        mutable,
         path: relativePath,
         sha256: state.sha256,
       }
-    : { content: "", existed: false, mode: null, mutable, path: relativePath, sha256: null };
+    : { content: "", existed: false, mode: null, path: relativePath, sha256: null };
 }
 
 function journalForPlan(plan) {
   const paths = new Set(plan.operations.map((operation) => operation.path));
-  paths.add(plan.sourceContract.upgrade.receiptFile);
-  paths.add("pnpm-lock.yaml");
   const operationByPath = new Map(plan.operations.map((operation) => [operation.path, operation]));
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     digest: plan.digest,
-    toVersion: plan.toVersion,
     originals: [...paths].sort().map((relativePath) => {
-      const original = originalRecord(plan.targetRoot, relativePath, {
-        mutable: relativePath === "pnpm-lock.yaml",
-      });
+      const original = originalRecord(plan.targetRoot, relativePath);
       const operation = operationByPath.get(relativePath);
       return {
         ...original,
@@ -102,20 +93,26 @@ function journalForPlan(plan) {
 
 function validateJournal(journal, expectedDigest) {
   if (
-    journal?.schemaVersion !== 1 ||
-    typeof journal.digest !== "string" ||
+    journal?.schemaVersion !== 2 ||
+    !validHash(journal.digest) ||
+    journal.digest === null ||
+    Object.keys(journal).sort().join(",") !== "digest,originals,schemaVersion" ||
     (expectedDigest !== undefined && journal.digest !== expectedDigest) ||
-    !Array.isArray(journal.originals)
+    !Array.isArray(journal.originals) ||
+    journal.originals.length > 4096
   ) {
     throw new Error("Framework upgrade journal is invalid; manual recovery is required.");
   }
   const seen = new Set();
   for (const original of journal.originals) {
-    const relativePath = normalizeFrameworkPath(original?.path, "framework upgrade journal path");
+    const relativePath = normalizeRepositoryPath(original?.path, "framework upgrade journal path");
     if (
       seen.has(relativePath) ||
+      (relativePath !== "package.json" && !isProjectToolPath(relativePath)) ||
+      Object.keys(original).sort().join(",") !==
+        "allowedMode,allowedSha256,content,existed,mode,path,sha256" ||
+      (original.allowedSha256 === null) !== (original.allowedMode === null) ||
       typeof original.existed !== "boolean" ||
-      typeof original.mutable !== "boolean" ||
       !validHash(original.sha256) ||
       !validHash(original.allowedSha256) ||
       !validMode(original.mode) ||
@@ -125,6 +122,14 @@ function validateJournal(journal, expectedDigest) {
         (original.content !== "" || original.mode !== null || original.sha256 !== null))
     ) {
       throw new Error("Framework upgrade journal is invalid; manual recovery is required.");
+    }
+    if (original.existed) {
+      const decoded = Buffer.from(original.content, "base64");
+      if (decoded.toString("base64") !== original.content || sha256(decoded) !== original.sha256) {
+        throw new Error(
+          "Framework upgrade journal checksum is invalid; manual recovery is required.",
+        );
+      }
     }
     seen.add(relativePath);
   }
@@ -152,21 +157,6 @@ export function persistFrameworkUpgradeJournal(root, journal) {
   atomicWriteUpgradeFile(root, journalRelativePath, serializeCanonicalJson(journal), 0o600);
 }
 
-export function authorizeFrameworkUpgradeOutput(journal, relativePath, allowedSha256, allowedMode) {
-  if (!validHash(allowedSha256)) {
-    throw new Error("Framework upgrade output authorization hash is invalid.");
-  }
-  if (allowedMode !== undefined && !validMode(allowedMode)) {
-    throw new Error("Framework upgrade output authorization mode is invalid.");
-  }
-  const matches = journal.originals.filter((entry) => entry.path === relativePath);
-  if (matches.length !== 1) {
-    throw new Error(`Framework upgrade journal has no unique output record for ${relativePath}.`);
-  }
-  matches[0].allowedSha256 = allowedSha256;
-  if (allowedMode !== undefined) matches[0].allowedMode = allowedMode;
-}
-
 function currentJournalState(root, original) {
   const state = targetUpgradeFileState(root, original.path);
   return { exists: state.exists, mode: state.mode, sha256: state.sha256 };
@@ -186,7 +176,7 @@ export function restoreFrameworkUpgradeJournal(root, journal) {
     }
   }
   for (const original of [...journal.originals].reverse()) {
-    const target = resolveFrameworkPath(root, original.path);
+    const target = resolveRepositoryPath(root, original.path);
     if (original.existed) {
       const content = Buffer.from(original.content, "base64").toString("utf8");
       if (sha256(content) !== original.sha256) {
@@ -201,19 +191,28 @@ export function restoreFrameworkUpgradeJournal(root, journal) {
   }
 }
 
-export function beginFrameworkUpgrade(plan) {
+export function beginFrameworkUpgrade(plan, lifecycle) {
   const paths = frameworkUpgradeStatePaths(plan.targetRoot);
-  const lifecycleCapability = acquireRuntimeLifecycleLock({
+  const lifecycleCapability = lifecycle.acquireRuntimeLifecycleLock({
     root: paths.repositoryRoot,
     operation: "framework-upgrade",
   });
   let stateCreated = false;
   try {
+    lifecycle.assertRuntimeLifecycleQuiescent({
+      root: plan.targetRoot,
+      owner: lifecycleCapability,
+    });
+    if (existsSync(paths.root))
+      throw new Error("Unsettled migration state requires explicit recovery.");
     ensureUpgradeDirectoryChain(plan.targetRoot, ".project-state/framework-upgrade");
     createExclusiveOwnedDirectory(plan.targetRoot, paths.lock, "framework upgrade lock");
     stateCreated = true;
   } catch (error) {
-    releaseRuntimeLifecycleLock({ root: paths.repositoryRoot, owner: lifecycleCapability });
+    lifecycle.releaseRuntimeLifecycleLock({
+      root: paths.repositoryRoot,
+      owner: lifecycleCapability,
+    });
     if (error?.code === "EEXIST") throw new Error("Another framework upgrade is active.");
     throw error;
   }
@@ -244,13 +243,16 @@ export function beginFrameworkUpgrade(plan) {
         // Suspicious state remains visible and fail-closed for explicit recovery.
       }
     }
-    releaseRuntimeLifecycleLock({ root: paths.repositoryRoot, owner: lifecycleCapability });
+    lifecycle.releaseRuntimeLifecycleLock({
+      root: paths.repositoryRoot,
+      owner: lifecycleCapability,
+    });
     throw error;
   }
 }
 
-export function removeFrameworkUpgradeState(paths, lifecycleCapability) {
-  releaseRuntimeLifecycleLock({
+export function removeFrameworkUpgradeState(paths, lifecycleCapability, lifecycle) {
+  lifecycle.releaseRuntimeLifecycleLock({
     root: paths.repositoryRoot,
     owner: lifecycleCapability,
     finalize() {
@@ -259,29 +261,24 @@ export function removeFrameworkUpgradeState(paths, lifecycleCapability) {
   });
 }
 
-export function recoverFrameworkUpgradeState(root = frameworkRoot, { repairDependencies } = {}) {
-  if (typeof repairDependencies !== "function") {
-    throw new Error("Framework upgrade recovery requires a dependency repair function.");
-  }
-  const lifecycleCapability = acquireRuntimeLifecycleLock({
+export function recoverFrameworkUpgradeState(root, { lifecycle }) {
+  const lifecycleCapability = lifecycle.acquireRuntimeLifecycleLock({
     root,
     operation: "framework-upgrade",
   });
   let completing = false;
   try {
+    lifecycle.assertRuntimeLifecycleQuiescent({ root, owner: lifecycleCapability });
     const paths = frameworkUpgradeStatePaths(root);
     if (!existsSync(paths.journal)) {
       if (!existsSync(paths.root)) return false;
-      completing = true;
-      removeFrameworkUpgradeState(paths, lifecycleCapability);
-      return true;
+      throw new Error("Migration state has no valid journal; manual recovery is required.");
     }
     restoreFrameworkUpgradeJournal(root, readFrameworkUpgradeJournal(root));
-    repairDependencies(root, lifecycleCapability);
     completing = true;
-    removeFrameworkUpgradeState(paths, lifecycleCapability);
+    removeFrameworkUpgradeState(paths, lifecycleCapability, lifecycle);
     return true;
   } finally {
-    if (!completing) releaseRuntimeLifecycleLock({ root, owner: lifecycleCapability });
+    if (!completing) lifecycle.releaseRuntimeLifecycleLock({ root, owner: lifecycleCapability });
   }
 }

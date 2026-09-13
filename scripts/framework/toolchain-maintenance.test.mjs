@@ -1,33 +1,27 @@
-/** Exercises compatible release selection, atomic maintenance, receipt isolation, and startup admission. */
+/** Exercises compatible release selection, atomic maintenance, stable pin isolation, and startup admission. */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import {
-  frameworkRoot,
-  readCompatibilityMatrix,
-  readFrameworkContract,
-  serializeCanonicalJson,
-} from "../contracts/framework-contract.mjs";
+import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
+import { toolingRoot, serializeCanonicalJson } from "../filesystem/repository-files.mjs";
 import { applyHousekeepingWrites } from "../repository/repository-housekeeping-transaction.mjs";
 import { inspectRuntimeLifecycleLock } from "../repository/runtime-session-lease.mjs";
-import { assertMaintenanceInventory, maintainToolchain } from "./maintain-toolchain.mjs";
+import { assertMaintenanceInventory, maintainToolchain } from "../deps/maintain-toolchain.mjs";
 import {
   latestCompatibleVersion,
   refreshGithubActions,
   resolveToolchainReleases,
   verifiedMiseBinaryDigest,
-} from "./toolchain-releases.mjs";
+} from "../deps/toolchain-releases.mjs";
 import {
   projectToolchainConfiguration,
-  receiptWithMaintainedPackageManager,
   toolchainConfigurationPaths,
-} from "./toolchain-maintenance-inputs.mjs";
-import { packageUpdatePlan } from "./framework-upgrade-package.mjs";
+} from "../deps/toolchain-maintenance-inputs.mjs";
 
-const matrix = readCompatibilityMatrix();
+const matrix = readToolchainConfiguration();
 test("raw mise executables use the declared asset size and digest with a fixed outer bound", async () => {
   const bytes = Buffer.from("verified raw executable fixture");
   const digest = createHash("sha256").update(bytes).digest("hex");
@@ -62,14 +56,8 @@ function write(root, name, content) {
 function fixture(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), "toolchain-test-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const contract = readFrameworkContract();
-  contract.upgrade.managedRoots = [".codexrig/framework.json"];
-  contract.upgrade.managedPackageScripts = ["verify"];
-  contract.upgrade.managedDevDependencies = ["prettier"];
-  write(root, ".codexrig/framework.json", serializeCanonicalJson(contract));
-  write(root, ".agents/skills/create-project-from-framework/SKILL.md", "# Source Fixture\n");
   for (const name of toolchainConfigurationPaths)
-    write(root, name, readFileSync(path.join(frameworkRoot, name), "utf8"));
+    write(root, name, readFileSync(path.join(toolingRoot, name), "utf8"));
   write(
     root,
     "package.json",
@@ -132,7 +120,7 @@ function registry({ tamper = false, newerNode = false } = {}) {
       const [, repository, major] = decoded.match(
         /repos\/(.+)\/git\/matching-refs\/tags\/v(\d+)\./u,
       );
-      const source = readFileSync(path.join(frameworkRoot, ".github/workflows/ci.yml"), "utf8");
+      const source = readFileSync(path.join(toolingRoot, ".github/workflows/ci.yml"), "utf8");
       const record = [
         ...source.matchAll(/uses: ([^@ ]+)@([a-f0-9]{40}) # v(\d+\.\d+\.\d+)/gu),
       ].find((entry) => entry[1] === repository && entry[3].startsWith(`${major}.`));
@@ -201,7 +189,7 @@ test("configuration projection retains CI behavior and updates all stable pins",
   const contents = Object.fromEntries(
     toolchainConfigurationPaths.map((name) => [
       name,
-      readFileSync(path.join(frameworkRoot, name), "utf8"),
+      readFileSync(path.join(toolingRoot, name), "utf8"),
     ]),
   );
   const candidate = structuredClone(matrix);
@@ -212,37 +200,6 @@ test("configuration projection retains CI behavior and updates all stable pins",
   assert.match(result[".github/workflows/ci.yml"], /node-version: 24\.99\.0/u);
   assert.match(result[".gitlab-ci.yml"], /pnpm@11\.99\.0/u);
   assert.match(result[".gitlab-ci.yml"], /pnpm verify/u);
-});
-test("receipt maintenance changes only its two package-manager fields", () => {
-  const original = {
-    managedFiles: { code: { sha256: "proof" } },
-    installedFiles: { code: { sha256: "other proof" } },
-    managedPackage: { packageManager: "pnpm@11.0.0", scripts: { verify: "owned" } },
-    installedPackage: { packageManager: "pnpm@11.0.0", devDependencies: { prettier: "pinned" } },
-    pendingReconciliation: null,
-  };
-  const result = JSON.parse(receiptWithMaintainedPackageManager(original, "pnpm@11.99.0"));
-  result.managedPackage.packageManager = original.managedPackage.packageManager;
-  result.installedPackage.packageManager = original.installedPackage.packageManager;
-  assert.deepEqual(result, original);
-});
-test("framework package upgrades preserve independently maintained project tools", (t) => {
-  const root = fixture(t);
-  const target = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
-  const sourceManaged = {
-    license: target.license,
-    packageManager: "pnpm@11.0.0",
-    scripts: target.scripts,
-    devDependencies: target.devDependencies,
-  };
-  const plan = packageUpdatePlan({
-    sourceManaged,
-    targetRoot: root,
-    receipt: { managedPackage: sourceManaged },
-    preservePackageManager: true,
-  });
-  assert.deepEqual(plan.conflicts, []);
-  assert.equal(plan.operation, null);
 });
 test("canonical startup blocks active roots while explicit maintenance can own its current slice", () => {
   const current = { current: true, path: "/project", problem: null, session: { status: "active" } };
@@ -287,7 +244,7 @@ for (const failure of ["network", "peer", "reproduce", "concurrent", "pending", 
   test(`complete maintenance ${failure} preserves input and ownership invariants`, async (t) => {
     const root = fixture(t);
     const before = readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8");
-    const beforeMatrix = readFileSync(path.join(root, ".codexrig/compatibility.json"), "utf8");
+    const beforeMatrix = readFileSync(path.join(root, ".codex/toolchain.json"), "utf8");
     if (failure === "pending") write(root, ".project-state/dependency-update/plan.json", "{}");
     const calls = [];
     const runCommand = (command, args, options = {}) => {
@@ -330,10 +287,7 @@ for (const failure of ["network", "peer", "reproduce", "concurrent", "pending", 
                 : /changed/u,
       );
       assert.equal(readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8"), before);
-      assert.equal(
-        readFileSync(path.join(root, ".codexrig/compatibility.json"), "utf8"),
-        beforeMatrix,
-      );
+      assert.equal(readFileSync(path.join(root, ".codex/toolchain.json"), "utf8"), beforeMatrix);
       if (failure === "concurrent")
         assert.match(readFileSync(path.join(root, "package.json"), "utf8"), /concurrent-owner/u);
       if (["network", "pending"].includes(failure)) assert.equal(calls.length, 0);

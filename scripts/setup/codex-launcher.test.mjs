@@ -10,7 +10,12 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { after, test } from "node:test";
-import { cleanupTemporaryRoots, root, run, temporaryRoot } from "./setup-regression-fixtures.mjs";
+import {
+  cleanupTemporaryRoots,
+  root,
+  run,
+  temporaryRoot,
+} from "./setup-regression-test-helpers.mjs";
 
 after(cleanupTemporaryRoots);
 
@@ -69,7 +74,7 @@ test("launcher maintains before admission, fails closed, and admits only native 
     bootstrapNode,
     [
       ...captureShell,
-      '[[ "$*" == "scripts/framework/maintain-toolchain.mjs --startup" ]] || exit 89',
+      '[[ "$*" == "scripts/deps/maintain-toolchain.mjs --startup" ]] || exit 89',
       'exit "${FAKE_UPDATE_STATUS:-0}"',
       "",
     ].join("\n"),
@@ -131,7 +136,7 @@ test("launcher maintains before admission, fails closed, and admits only native 
       executable: "node",
       home: ambientHome,
       cwd: project,
-      args: ["scripts/framework/maintain-toolchain.mjs", "--startup"],
+      args: ["scripts/deps/maintain-toolchain.mjs", "--startup"],
     });
     assert.deepEqual(
       observed.slice(1).map((call) => call.args.slice(3)),
@@ -139,8 +144,7 @@ test("launcher maintains before admission, fails closed, and admits only native 
         ["node", "scripts/deps/verify-pnpm-execution-policy.mjs"],
         ["bash", "scripts/setup/check-prereqs.sh", "--codex"],
         ["node", "scripts/setup/validate-codex-model-policy.mjs"],
-        ["node", "scripts/verify/licensing.mjs"],
-        ["node", "scripts/framework/framework-doctor.mjs"],
+        ["pnpm", "tooling:doctor"],
         [
           "node",
           "scripts/setup/startup-session-controller.mjs",
@@ -168,8 +172,7 @@ test("launcher maintains before admission, fails closed, and admits only native 
     "node scripts/deps/verify-pnpm-execution-policy.mjs",
     "bash scripts/setup/check-prereqs.sh --codex",
     "node scripts/setup/validate-codex-model-policy.mjs",
-    "node scripts/verify/licensing.mjs",
-    "node scripts/framework/framework-doctor.mjs",
+    "pnpm tooling:doctor",
   ]) {
     const failure = invoke([], { FAKE_FAIL_COMMAND: `exec --locked -- ${command}` });
     assert.equal(failure.status, 74);

@@ -14,14 +14,14 @@ function strictDescendant(parent, candidate) {
 }
 
 function expectedToolchain(repositoryRoot) {
-  const compatibilityPath = path.join(repositoryRoot, ".codexrig", "compatibility.json");
+  const compatibilityPath = path.join(repositoryRoot, ".codex", "toolchain.json");
   const snapshot = readOptionalOwnedFile(
     repositoryRoot,
     compatibilityPath,
     "pnpm compatibility contract",
     { maximumBytes: 128 * 1024 },
   );
-  if (!snapshot.exists) throw new Error("Trusted pnpm requires .codexrig/compatibility.json.");
+  if (!snapshot.exists) throw new Error("Trusted pnpm requires .codex/toolchain.json.");
   let compatibility;
   try {
     compatibility = JSON.parse(snapshot.buffer.toString("utf8"));

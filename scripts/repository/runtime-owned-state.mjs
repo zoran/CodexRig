@@ -1,7 +1,7 @@
 /** Owns parent-bound private runtime-directory and regular-file access for lifecycle state. */
 import { existsSync, realpathSync, statSync } from "node:fs";
 import process from "node:process";
-import { resolveFrameworkPath } from "../contracts/framework-contract.mjs";
+import { resolveRepositoryPath } from "../filesystem/repository-files.mjs";
 import { repositoryCodexRuntimeDirectory } from "./source-inventory.mjs";
 import {
   closeOwnedDirectoryBinding,
@@ -19,8 +19,8 @@ export function repositoryRuntimeRootIdentity(root) {
 }
 
 export function ensureRuntimeDirectory(root, { testHooks } = {}) {
-  const codexDirectory = resolveFrameworkPath(root, ".codex");
-  const target = resolveFrameworkPath(root, repositoryCodexRuntimeDirectory);
+  const codexDirectory = resolveRepositoryPath(root, ".codex");
+  const target = resolveRepositoryPath(root, repositoryCodexRuntimeDirectory);
   ensureOwnedPrivateDirectory(root, codexDirectory, "Codex policy and runtime directory", {
     testHooks,
   });
@@ -35,7 +35,7 @@ export function ensureRuntimeDirectory(root, { testHooks } = {}) {
 }
 
 export function openRuntimeDirectory(root, label) {
-  const target = resolveFrameworkPath(root, repositoryCodexRuntimeDirectory);
+  const target = resolveRepositoryPath(root, repositoryCodexRuntimeDirectory);
   if (!existsSync(target)) return null;
   return openPrivateOwnedDirectory(root, target, label);
 }

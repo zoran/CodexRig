@@ -1,10 +1,10 @@
 {
   "name": "codexrig",
-  "version": "4.4.1",
+  "version": "5.0.0",
   "private": true,
   "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
-  "packageManager": "pnpm@11.26.0",
+  "packageManager": "pnpm@11.27.0",
   "scripts": {
     "auth:check": "node scripts/verify/identity-access.mjs",
     "localization:check": "node scripts/verify/localization.mjs",
@@ -36,14 +36,15 @@
     "hooks:install": "bash scripts/setup/install-git-hooks.sh",
     "setup": "bash scripts/setup/check-prereqs.sh --codex && node scripts/setup/validate-codex-model-policy.mjs && node scripts/verify/docs.mjs && node scripts/verify/identity-access.mjs && node scripts/verify/tenant-isolation.mjs && node scripts/verify/localization.mjs && node scripts/verify/licensing.mjs && node scripts/verify/secrets.mjs && bash scripts/setup/install-git-hooks.sh",
     "stack:detect": "node scripts/stack/stack-detector.mjs",
-    "project:export": "bash scripts/setup/export-project.sh",
-    "repo:housekeeping": "node scripts/goals/repository-housekeeping.mjs",
+    "project:export": "bash scripts/framework/export-project.sh",
+    "repo:housekeeping": "node scripts/framework/source-housekeeping.mjs",
     "verify": "node scripts/verify/adaptive.mjs --mode full",
     "verify:changed": "node scripts/verify/adaptive.mjs --mode repo",
     "verify:external": "node scripts/verify/external.mjs",
     "verify:pre-push": "bash scripts/verify/pre-push.sh",
     "web:update-sitemap-lastmod": "node scripts/web/update-sitemap-lastmod.mjs",
-    "worktree:status": "node scripts/repository/worktree-recovery-cli.mjs"
+    "worktree:status": "node scripts/repository/worktree-recovery-cli.mjs",
+    "tooling:doctor": "node scripts/framework/framework-doctor.mjs"
   },
   "devDependencies": {
     "prettier": "^3.9.6"

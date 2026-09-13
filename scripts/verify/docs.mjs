@@ -4,10 +4,6 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import {
-  readFrameworkContract,
-  readInstallationReceipt,
-} from "../contracts/framework-contract.mjs";
-import {
   isRepositoryProcessMarkdownPath,
   listDocumentationMarkdownFiles,
 } from "../docs/document-scope.mjs";
@@ -36,14 +32,6 @@ failures.push(
   }),
 );
 const agentsBootstrapByteLimit = 24 * 1024;
-const frameworkContract = readFrameworkContract(root);
-const installationReceipt = readInstallationReceipt(root, frameworkContract, { optional: true });
-if (installationReceipt?.pendingReconciliation) {
-  failures.push(
-    `framework policy reconciliation ${installationReceipt.pendingReconciliation.planDigest} is pending; reconcile its listed concepts into project-owned truth, then acknowledge that exact digest`,
-  );
-}
-
 const documentationPaths = listDocumentationMarkdownFiles();
 for (const relativePath of documentationPaths) {
   const content = readFileSync(path.join(root, relativePath), "utf8");

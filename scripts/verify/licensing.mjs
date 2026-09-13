@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Verifies CodexRig licensing, attribution, generation, and managed-upgrade invariants. */
+/** Verifies source licensing and attribution, including the generated-output permission. */
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -9,10 +9,10 @@ import { formatContextError } from "../terminal/terminal-output.mjs";
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const expectedLicenseDigest = "ffcca38841adb694b6f380647e15f17c446a4d1656fed51a1e2041d064c94cc8";
-const expectedNoticeDigest = "238e2bb9937bb95048c768fbb3e10acff263718b1529f9c6a78c18b7ad0f3d40";
+const expectedNoticeDigest = "e6823fb3de9a69ff1fe956b1348efd1002d1b8eb1abae2769f581a751e2f6568";
 const expectedLicenseId = "PolyForm-Noncommercial-1.0.0";
 const requiredNotice =
-  "Required Notice: CodexRig Framework. Copyright © 2026 Zoran Kikic. All noncommercial copies, distributions, and derivative works must retain this notice and the PolyForm Noncommercial License 1.0.0 terms.";
+  "Required Notice: CodexRig Framework. Copyright © 2026 Zoran Kikic. Copies, distributions, and derivative works of the framework must retain this notice and the PolyForm Noncommercial License 1.0.0 terms, except for generated project output expressly covered below.";
 
 function regularText(root, relativePath, findings) {
   const target = path.join(root, relativePath);
@@ -59,8 +59,8 @@ export function licensingFindings({ root = defaultRoot } = {}) {
     }
     for (const statement of [
       "must remain in CodexRig itself under every granted license",
-      "within that generated project only",
-      "No noncommercial license permits their removal",
+      "without a CodexRig attribution, notice, or license-retention requirement",
+      "Generated projects may choose their own licensing terms",
     ]) {
       if (!notice.includes(statement)) findings.push(`NOTICE: must state ${statement}`);
     }
@@ -73,20 +73,6 @@ export function licensingFindings({ root = defaultRoot } = {}) {
   );
   if (packageJson && packageJson.license !== expectedLicenseId) {
     findings.push(`package.json: license must be ${expectedLicenseId}`);
-  }
-
-  const contract = parseJson(
-    regularText(root, ".codexrig/framework.json", findings),
-    ".codexrig/framework.json",
-    findings,
-  );
-  if (contract) {
-    const managedRoots = contract.upgrade?.managedRoots;
-    for (const relativePath of ["LICENSE", "NOTICE"]) {
-      if (!Array.isArray(managedRoots) || !managedRoots.includes(relativePath)) {
-        findings.push(`.codexrig/framework.json: managedRoots must include ${relativePath}`);
-      }
-    }
   }
 
   const readme = regularText(root, "README.md", findings);

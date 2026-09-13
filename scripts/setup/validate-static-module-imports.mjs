@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /** Owns validate static module imports behavior for the setup, launch, and portable project boundary. */
-import { lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { SourceTextModule } from "node:vm";
-import { listStagedTransferFiles } from "../repository/source-inventory.mjs";
+import { listActiveFiles } from "../repository/source-inventory.mjs";
+import { readRepositoryFile } from "../filesystem/repository-files.mjs";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..", "..");
 
@@ -21,7 +21,7 @@ function relativeImportFindings(root, relativePath) {
   const absolutePath = path.join(root, ...relativePath.split("/"));
   let module;
   try {
-    module = new SourceTextModule(readFileSync(absolutePath, "utf8"), {
+    module = new SourceTextModule(readRepositoryFile(root, relativePath), {
       identifier: relativePath,
     });
   } catch (error) {
@@ -42,14 +42,11 @@ function relativeImportFindings(root, relativePath) {
       continue;
     }
     if (!isInsideRoot(root, importedPath)) {
-      findings.push(
-        `${relativePath} imports a module outside the staged project: ${displayedSpecifier}`,
-      );
+      findings.push(`${relativePath} imports a module outside the project: ${displayedSpecifier}`);
       continue;
     }
     try {
-      const stats = lstatSync(importedPath);
-      if (stats.isSymbolicLink() || !stats.isFile()) throw new Error("not a regular file");
+      readRepositoryFile(root, path.relative(root, importedPath).split(path.sep).join("/"));
     } catch {
       findings.push(`${relativePath} imports a missing relative module: ${displayedSpecifier}`);
     }
@@ -61,15 +58,13 @@ function main() {
   if (typeof SourceTextModule !== "function") {
     throw new Error("Static module validation requires Node.js --experimental-vm-modules.");
   }
-  const findings = listStagedTransferFiles({ root: repositoryRoot })
+  const findings = listActiveFiles({ root: repositoryRoot })
     .filter((relativePath) => relativePath.endsWith(".mjs"))
     .flatMap((relativePath) => relativeImportFindings(repositoryRoot, relativePath))
     .sort();
   if (findings.length > 0) {
     throw new Error(
-      ["Staged project static module imports failed:", ...findings.map((item) => `- ${item}`)].join(
-        "\n",
-      ),
+      ["Project static module imports failed:", ...findings.map((item) => `- ${item}`)].join("\n"),
     );
   }
 }

@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
-import { serializeCanonicalJson } from "../contracts/framework-contract.mjs";
+import { serializeCanonicalJson } from "../filesystem/repository-files.mjs";
 import {
   closeOwnedDirectoryBinding,
   createExclusiveOwnedFile,

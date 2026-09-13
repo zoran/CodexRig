@@ -1,22 +1,9 @@
-/** Owns stable path/category-to-verifier routing for adaptive verification admission. */
-export const worktreeRecoveryConsumers = Object.freeze([
-  "scripts/framework/framework-lifecycle.test.mjs",
-  "scripts/goals/repository-housekeeping.test.mjs",
-  "scripts/repository/worktree-recovery.test.mjs",
-]);
-
-export const startupControlConsumers = Object.freeze([
-  "scripts/framework/framework-lifecycle.test.mjs",
-  "scripts/setup/codex-launcher.test.mjs",
-  "scripts/setup/setup-regression.test.mjs",
-  "scripts/setup/startup-session-controller.test.mjs",
-]);
-
-export const removedFrameworkSourceConsumers = Object.freeze([
-  "framework-regressions",
-  "repository-smoke",
-]);
-
+/** Routes changed categories through the project's selected verification owners. */
+import { readVerificationConfiguration } from "./verification-configuration.mjs";
+const configuration = readVerificationConfiguration();
+export const ownedCategoryConsumers = new Map(Object.entries(configuration.ownedCategories));
+export const exactConsumerRegistry = new Map(Object.entries(configuration.exactConsumers));
+export const removedFrameworkSourceConsumers = Object.freeze(["repository-smoke"]);
 export function effectiveCategories(entry, { verifyOnlyRootManifest }) {
   if (entry.path !== "package.json" || !verifyOnlyRootManifest) return entry.categories;
   return ["framework scripts", "verification orchestration", "verify-only root manifest"];
@@ -93,118 +80,6 @@ export function categoryConsumerKeys(categories) {
   if (has("repository source-policy surface")) {
     add("codex-config", "path-hygiene", "repository-smoke", "secrets");
   }
-  return [...keys];
+  const selected = new Set(configuration.commands.map((command) => command.key));
+  return [...keys].filter((key) => selected.has(key));
 }
-
-export const ownedCategoryConsumers = new Map([
-  ["active documentation", ["docs"]],
-  ["project Codex config", ["codex-config"]],
-  ["Codex runtime boundary", ["codex-config"]],
-  ["repo-local skill source", ["skills"]],
-  ["skill path boundary", ["skills"]],
-  ["context workflow", ["context-regressions"]],
-  ["dependency workflow", ["dependency-regressions"]],
-  ["setup workflow", ["setup-regressions"]],
-  ["CodexRig framework workflow", ["framework-version", "framework-regressions"]],
-  ["stack workflow", ["surface-quality"]],
-  ["web workflow", ["surface-quality"]],
-  ["identity/access trust boundary", ["identity-access"]],
-  ["tenant-isolation trust boundary", ["tenant-isolation"]],
-  ["licensing and attribution contract", ["licensing"]],
-]);
-
-export const exactConsumerRegistry = new Map([
-  [".gitattributes", ["path-hygiene", "repository-smoke"]],
-  [".gitignore", ["codex-config", "path-hygiene", "repository-smoke"]],
-  ["LICENSE", ["licensing"]],
-  ["NOTICE", ["licensing"]],
-  ["package.json", ["delivery-environments", "verification-entrypoints"]],
-  ["config/delivery.json", ["delivery-environments", "docs"]],
-  ["config/localization.json", ["localization", "docs"]],
-  ["config/product.json", ["white-label"]],
-  ["config/tenancy.json", ["tenant-isolation"]],
-  ["scripts/contracts/delivery-configuration.mjs", ["delivery-environments"]],
-  ["scripts/contracts/mise-toolchain-configuration.mjs", ["repository-smoke"]],
-  ["scripts/contracts/localization-configuration.mjs", ["localization"]],
-  ["scripts/contracts/product-configuration.mjs", ["white-label"]],
-  ["scripts/contracts/semver-contract.mjs", ["framework-version", "framework-regressions"]],
-  ["scripts/contracts/tenancy-configuration.mjs", ["tenant-isolation"]],
-  [
-    "scripts/filesystem/owned-file-operations.mjs",
-    ["dependency-regressions", "framework-regressions", "repository-smoke"],
-  ],
-  [
-    "scripts/filesystem/owned-path-safety.mjs",
-    ["context-regressions", "dependency-regressions", "framework-regressions", "repository-smoke"],
-  ],
-  ["scripts/deps/dependency-plan.mjs", ["dependency-regressions", "repository-smoke"]],
-  ["scripts/docs/delivery-manifest.mjs", ["delivery-environments", "docs"]],
-  ["scripts/docs/ensure-project-manifest.mjs", ["docs", "repository-smoke"]],
-  [
-    "scripts/goals/repository-housekeeping.mjs",
-    ["delivery-environments", "framework-regressions", "repository-smoke"],
-  ],
-  [
-    "scripts/repository/repository-housekeeping-files.mjs",
-    ["framework-regressions", "repository-smoke"],
-  ],
-  [
-    "scripts/repository/repository-housekeeping-transaction.mjs",
-    ["framework-regressions", "repository-smoke"],
-  ],
-  ["scripts/framework/framework-version.mjs", ["framework-version", "framework-regressions"]],
-  [
-    "scripts/framework/framework-installation-receipt.mjs",
-    ["framework-regressions", "repository-smoke"],
-  ],
-  ["scripts/repository/delivery-environment-discovery.mjs", ["delivery-environments"]],
-  [
-    "scripts/repository/runtime-lifecycle-mutex.mjs",
-    ["context-regressions", "dependency-regressions", "framework-regressions"],
-  ],
-  [
-    "scripts/repository/runtime-lifecycle-process.mjs",
-    ["dependency-regressions", "framework-regressions"],
-  ],
-  [
-    "scripts/repository/runtime-lifecycle-schema.mjs",
-    ["context-regressions", "dependency-regressions", "framework-regressions"],
-  ],
-  [
-    "scripts/repository/runtime-owned-state.mjs",
-    ["context-regressions", "dependency-regressions", "framework-regressions"],
-  ],
-  [
-    "scripts/repository/runtime-process-identity.mjs",
-    ["context-regressions", "dependency-regressions", "framework-regressions"],
-  ],
-  [
-    "scripts/repository/runtime-session-state.mjs",
-    ["context-regressions", "framework-regressions", "setup-regressions"],
-  ],
-  [
-    "scripts/repository/pnpm-workspace-manifests.mjs",
-    ["dependency-regressions", "repository-smoke", "setup-regressions"],
-  ],
-  ["scripts/verify/a11y.mjs", ["surface-quality"]],
-  ["scripts/verify/adaptive-surfaces.mjs", ["surface-quality"]],
-  ["scripts/verify/responsive.mjs", ["surface-quality"]],
-  ["scripts/verify/repository-smoke-content.mjs", ["repository-smoke"]],
-  ["scripts/verify/repository-smoke-inventory.mjs", ["repository-smoke"]],
-  ["scripts/verify/repository-smoke.mjs", ["repository-smoke"]],
-  ["scripts/verify/delivery-environments.mjs", ["delivery-environments"]],
-  ["scripts/verify/delivery-artifact.mjs", ["repository-smoke"]],
-  ["scripts/verify/external.mjs", ["repository-smoke"]],
-  ["scripts/verify/identity-access.mjs", ["identity-access"]],
-  ["scripts/verify/image-assets.mjs", ["surface-quality"]],
-  ["scripts/verify/localization.mjs", ["localization"]],
-  ["scripts/verify/licensing.mjs", ["licensing"]],
-  ["scripts/verify/licensing.test.mjs", ["licensing"]],
-  ["scripts/verify/tenant-isolation.mjs", ["tenant-isolation"]],
-  ["scripts/verify/verification-admission-commands.mjs", ["verification-entrypoints"]],
-  ["scripts/verify/verification-admission-registry.mjs", ["verification-entrypoints"]],
-  ["scripts/verify/white-label.mjs", ["white-label"]],
-  ["scripts/verify/seo.mjs", ["surface-quality"]],
-  ["scripts/verify/stack-standards.mjs", ["surface-quality"]],
-  ["scripts/verify/web-stack.mjs", ["surface-quality"]],
-]);

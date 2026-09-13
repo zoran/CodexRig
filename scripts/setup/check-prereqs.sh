@@ -8,8 +8,8 @@ if ! command -v node >/dev/null 2>&1; then
   echo "Bootstrap Node.js is unavailable. Run mise install --locked and use mise exec --locked." >&2
   exit 1
 fi
-required_node_version="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).stable.node.version' "$root/.codexrig/compatibility.json")"
-required_pnpm_version="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).stable.pnpm.version' "$root/.codexrig/compatibility.json")"
+required_node_version="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).stable.node.version' "$root/.codex/toolchain.json")"
+required_pnpm_version="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).stable.pnpm.version' "$root/.codex/toolchain.json")"
 if [[ ! "$required_node_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || ! "$required_pnpm_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "The compatibility matrix has invalid runtime versions." >&2
   exit 1
@@ -17,19 +17,13 @@ fi
 missing_system=()
 runtime_issues=()
 optional_missing=()
-check_export=0
 check_codex=0
 
 for argument in "$@"; do
   case "$argument" in
-    --export) check_export=1 ;;
     --codex) check_codex=1 ;;
-    --all)
-      check_export=1
-      check_codex=1
-      ;;
     --help | -h)
-      echo "Usage: bash scripts/setup/check-prereqs.sh [--export] [--codex] [--all]"
+      echo "Usage: bash scripts/setup/check-prereqs.sh [--codex]"
       exit 0
       ;;
     *)
@@ -70,13 +64,6 @@ else
   runtime_issues+=("pnpm@${required_pnpm_version}")
 fi
 
-if ((check_export)); then
-  if ! command -v tar >/dev/null 2>&1; then
-    optional_missing+=("GNU tar (project export)")
-  elif [[ "$(tar --version 2>/dev/null | head -n 1)" != *"GNU tar"* ]]; then
-    optional_missing+=("GNU tar with deterministic archive options (project export)")
-  fi
-fi
 if ((check_codex)) && ! command -v codex >/dev/null 2>&1; then
   optional_missing+=("codex (system-wide host CLI)")
 fi

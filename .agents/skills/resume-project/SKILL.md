@@ -62,7 +62,7 @@ that successfully sealed a terminal critical handover may never receive it or ac
 
 Use `$project-implementation` for the recovered implementation and `$task-quality` at its real
 acceptance boundary. Recovery is not completion; unresolved integration, ownership, publication or
-mandatory post-exit reset remains an explicit blocker. Never manually delete live runtime or an
-actual worktree directory. Critical-document changes follow the separate confirmation and
-preservation review in
+policy-required post-exit cleanup remains an explicit blocker; do not infer an extra cleanup task.
+Never manually delete live runtime or an actual worktree directory. Critical-document changes follow
+the separate confirmation and preservation review in
 [Canonical Owners](../../../instructions.md#context-economy-and-canonical-owners).

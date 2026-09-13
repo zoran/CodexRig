@@ -75,14 +75,13 @@ if ! command -v node >/dev/null 2>&1; then
   echo "Bootstrap Node.js is unavailable. Run mise install --locked, then retry inside mise exec --locked." >&2
   exit 127
 fi
-node scripts/framework/maintain-toolchain.mjs --startup
+node scripts/deps/maintain-toolchain.mjs --startup
 hash -r
 (
   env -u CODEX_HOME mise exec --locked -- node scripts/deps/verify-pnpm-execution-policy.mjs
   env -u CODEX_HOME mise exec --locked -- bash scripts/setup/check-prereqs.sh --codex
   CODEX_HOME="$root" mise exec --locked -- node scripts/setup/validate-codex-model-policy.mjs
-  env -u CODEX_HOME mise exec --locked -- node scripts/verify/licensing.mjs
-  env -u CODEX_HOME mise exec --locked -- node scripts/framework/framework-doctor.mjs
+  env -u CODEX_HOME mise exec --locked -- pnpm tooling:doctor
 )
 codex_executable="$(command -v codex)"
 cd "$root"

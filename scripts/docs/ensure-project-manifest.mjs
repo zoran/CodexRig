@@ -8,7 +8,6 @@ import {
   initialDeliveryConfiguration,
   parseDeliveryConfiguration,
 } from "../contracts/delivery-configuration.mjs";
-import { isReusableFrameworkSource } from "../contracts/framework-contract.mjs";
 import { futureModulesPath, projectManifestPath } from "./document-scope.mjs";
 import { renderDeliveryManifestProjection } from "./delivery-manifest.mjs";
 import {
@@ -32,17 +31,11 @@ const leanSections = [
   "Constraints And Decisions",
   "Maintenance",
 ];
-const sourceFramework = isReusableFrameworkSource(root);
 const deliveryPath = path.join(root, ...deliveryConfigurationPath.split("/"));
 const defaultDeliveryProjection = renderDeliveryManifestProjection({
-  configuration: sourceFramework
-    ? null
-    : parseDeliveryConfiguration(
-        existsSync(deliveryPath)
-          ? readFileSync(deliveryPath, "utf8")
-          : initialDeliveryConfiguration(),
-      ),
-  sourceFramework,
+  configuration: existsSync(deliveryPath)
+    ? parseDeliveryConfiguration(readFileSync(deliveryPath, "utf8"))
+    : null,
 });
 
 const defaultManifest = initialProjectManifest({ deliveryProjection: defaultDeliveryProjection });

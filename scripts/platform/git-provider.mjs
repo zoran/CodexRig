@@ -3,7 +3,7 @@ import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-proce
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { readFrameworkContract } from "../contracts/framework-contract.mjs";
+import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 import {
   cleanGitEnvironment,
   isolatedGitArguments,
@@ -185,7 +185,7 @@ function ciEvidence(environment, contract) {
 export function detectGitProvider({
   root = platformRoot,
   environment = process.env,
-  contract = readFrameworkContract(root),
+  contract = readToolingConfiguration(root),
 } = {}) {
   const ci = ciEvidence(environment, contract);
   const remote = remoteEvidence(root, contract);

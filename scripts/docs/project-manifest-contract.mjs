@@ -6,7 +6,6 @@ import {
   isProductImplementationPath,
   normalizeProductPath,
 } from "../repository/product-roots.mjs";
-import { isReusableFrameworkSource } from "../contracts/framework-contract.mjs";
 import { listActiveFiles, repositoryRoot } from "../repository/source-inventory.mjs";
 import { deliveryManifestFindings } from "./delivery-manifest.mjs";
 import { projectDocumentOwners } from "./project-document-owners.mjs";
@@ -365,8 +364,8 @@ function moduleDependencyFindings({ entries, implementationFiles, root }) {
   return findings;
 }
 
-function sourceFrameworkCapabilityRoots(activeFiles, root) {
-  if (!isReusableFrameworkSource(root)) return [];
+function toolingCapabilityRoots(activeFiles, root) {
+  if (activeFiles.some((filePath) => filePath === "config/product.json")) return [];
 
   const roots = new Set();
   for (const filePath of activeFiles) {
@@ -394,7 +393,7 @@ export function projectManifestFindings({ content, root = repositoryRoot, relati
     .filter(Boolean)
     .filter((filePath) => isProductImplementationPath(filePath, layout))
     .filter((filePath) => !/[\/](?:\.gitkeep|\.keep)$/u.test(filePath));
-  const frameworkCapabilityRoots = sourceFrameworkCapabilityRoots(activeFiles, root);
+  const frameworkCapabilityRoots = toolingCapabilityRoots(activeFiles, root);
   const frameworkImplementationFiles = activeFiles.filter((filePath) =>
     frameworkCapabilityRoots.some((capabilityRoot) => covers(capabilityRoot, filePath)),
   );

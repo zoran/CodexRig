@@ -1,6 +1,6 @@
 /** Owns Markdown headings and local documentation fragment evidence for documentation contracts. */
 import path from "node:path";
-import { readRegularFrameworkFile } from "../contracts/framework-contract.mjs";
+import { readRepositoryFile } from "../filesystem/repository-files.mjs";
 import { markdownBodyForHeadingValidation } from "./document-scope.mjs";
 
 const maximumSectionSpanLines = 200;
@@ -179,7 +179,7 @@ export function resolveDocumentReference({ root, from, reference, fromContent })
   const content =
     relativePath === from && fromContent !== undefined
       ? fromContent
-      : readRegularFrameworkFile(root, relativePath);
+      : readRepositoryFile(root, relativePath);
   const findings = documentFragmentFindings(relativePath, content, fragment);
   if (findings.length) throw new Error(findings.join("; "));
   return { path: relativePath, fragment };

@@ -4,10 +4,10 @@ import { closeSync, constants, fstatSync, lstatSync, openSync, realpathSync } fr
 import path from "node:path";
 import process from "node:process";
 import {
-  frameworkRoot,
-  resolveFrameworkPath,
+  toolingRoot,
+  resolveRepositoryPath,
   serializeCanonicalJson,
-} from "../contracts/framework-contract.mjs";
+} from "../filesystem/repository-files.mjs";
 import { repositoryCodexRuntimeDirectory } from "./source-inventory.mjs";
 import {
   atomicReplaceOwnedFile,
@@ -62,7 +62,7 @@ const runtimeLifecycleGuardPath = `${repositoryCodexRuntimeDirectory}/${runtimeL
 const lifecycleCapabilities = new Map();
 export { repositoryRuntimeRootIdentity } from "./runtime-owned-state.mjs";
 function readRuntimeLifecycleLock(root) {
-  const target = resolveFrameworkPath(root, runtimeLifecycleLockPath);
+  const target = resolveRepositoryPath(root, runtimeLifecycleLockPath);
   const file = runtimeFile(root, runtimeLifecycleLockName, "Codex runtime lifecycle lock", 128_000);
   if (file.status === "absent") {
     closeRuntimeFile(file);
@@ -257,7 +257,7 @@ function assertCoordinatorQuiescent(record) {
   }
 }
 
-export function inspectRuntimeLifecycleLock({ root = frameworkRoot } = {}) {
+export function inspectRuntimeLifecycleLock({ root = toolingRoot } = {}) {
   const current = readRuntimeLifecycleLock(root);
   try {
     return Object.freeze({ owner: current.owner, path: current.path, status: current.status });
@@ -267,7 +267,7 @@ export function inspectRuntimeLifecycleLock({ root = frameworkRoot } = {}) {
 }
 
 export function acquireRuntimeLifecycleLock({
-  root = frameworkRoot,
+  root = toolingRoot,
   operation = "runtime-session",
   testHooks,
 } = {}) {
@@ -358,7 +358,7 @@ export function acquireRuntimeLifecycleLock({
   }
 }
 
-export function retainRuntimeLifecycleLock({ root = frameworkRoot, owner, operation } = {}) {
+export function retainRuntimeLifecycleLock({ root = toolingRoot, owner, operation } = {}) {
   const record = capabilityRecord(root, owner);
   if (operation !== record.operation) {
     throw new Error("Runtime lifecycle reentrancy requires the same delegated operation.");
@@ -366,19 +366,19 @@ export function retainRuntimeLifecycleLock({ root = frameworkRoot, owner, operat
   return capabilityHandle(record);
 }
 
-export function currentRuntimeLifecycleCapability({ root = frameworkRoot, operation } = {}) {
+export function currentRuntimeLifecycleCapability({ root = toolingRoot, operation } = {}) {
   const canonical = realpathSync.native(root);
   const record = lifecycleCapabilities.get(canonical);
   if (!record || (operation && record.operation !== operation)) return null;
   return [...record.handles][0] ?? null;
 }
 
-export function runtimeLifecycleGuardDescriptor({ root = frameworkRoot, owner } = {}) {
+export function runtimeLifecycleGuardDescriptor({ root = toolingRoot, owner } = {}) {
   return capabilityRecord(root, owner).descriptor;
 }
 
 /** Proves a coordinator has no pending or living child work before a mutation phase changes. */
-export function assertRuntimeLifecycleQuiescent({ root = frameworkRoot, owner } = {}) {
+export function assertRuntimeLifecycleQuiescent({ root = toolingRoot, owner } = {}) {
   const record = capabilityRecord(root, owner);
   if (record.kind !== "coordinator") {
     throw new Error("Only the lifecycle coordinator may assert repository mutation quiescence.");
@@ -387,7 +387,7 @@ export function assertRuntimeLifecycleQuiescent({ root = frameworkRoot, owner } 
 }
 
 export function createRuntimeLifecycleDelegation({
-  root = frameworkRoot,
+  root = toolingRoot,
   owner,
   operation,
   role,
@@ -412,7 +412,7 @@ export function createRuntimeLifecycleDelegation({
   return Object.freeze({ ...delegation });
 }
 
-export function cancelRuntimeLifecycleDelegation({ root = frameworkRoot, owner, token } = {}) {
+export function cancelRuntimeLifecycleDelegation({ root = toolingRoot, owner, token } = {}) {
   const record = capabilityRecord(root, owner);
   let removed = false;
   replaceLifecycleOwner(record.root, record.nonce, (current) => {
@@ -425,7 +425,7 @@ export function cancelRuntimeLifecycleDelegation({ root = frameworkRoot, owner, 
 }
 
 export function adoptRuntimeLifecycleDelegation({
-  root = frameworkRoot,
+  root = toolingRoot,
   operation,
   role,
   token,
@@ -496,7 +496,7 @@ export function adoptRuntimeLifecycleDelegation({
 
 export function registerRuntimeLifecycleDescendant({
   allowExisting = false,
-  root = frameworkRoot,
+  root = toolingRoot,
   owner,
   pid,
   role,
@@ -526,7 +526,7 @@ export function registerRuntimeLifecycleDescendant({
 }
 
 export function unregisterRuntimeLifecycleDescendant({
-  root = frameworkRoot,
+  root = toolingRoot,
   owner,
   registration,
 } = {}) {
@@ -548,7 +548,7 @@ export function unregisterRuntimeLifecycleDescendant({
 }
 
 export function releaseRuntimeLifecycleLock({
-  root = frameworkRoot,
+  root = toolingRoot,
   owner,
   finalize,
   testHooks,
@@ -599,7 +599,7 @@ function withSessionManagementCapability(root, testHooks, operation) {
 }
 
 export function clearStaleRuntimeSessionLease({
-  root = frameworkRoot,
+  root = toolingRoot,
   lifecycleCapability,
   testHooks,
 } = {}) {
@@ -612,7 +612,7 @@ export function clearStaleRuntimeSessionLease({
   );
 }
 
-export function issueRuntimeSessionLease({ root = frameworkRoot, pid, testHooks } = {}) {
+export function issueRuntimeSessionLease({ root = toolingRoot, pid, testHooks } = {}) {
   if (!Number.isSafeInteger(pid) || pid <= 0) {
     throw new Error("Codex runtime session lease requires a positive process id.");
   }
@@ -625,7 +625,7 @@ export function issueRuntimeSessionLease({ root = frameworkRoot, pid, testHooks 
   );
 }
 /** Atomically reserves the repository while the native resume picker selects a thread. */
-export function reserveRuntimeSessionLease({ root = frameworkRoot, pid, testHooks } = {}) {
+export function reserveRuntimeSessionLease({ root = toolingRoot, pid, testHooks } = {}) {
   if (!Number.isSafeInteger(pid) || pid <= 0) {
     throw new Error("Codex runtime session reservation requires a positive process id.");
   }
@@ -634,7 +634,7 @@ export function reserveRuntimeSessionLease({ root = frameworkRoot, pid, testHook
   );
 }
 export function activateRuntimeSessionLease({
-  root = frameworkRoot,
+  root = toolingRoot,
   pid,
   runtimeSessionId,
   codexSessionId,
@@ -651,7 +651,7 @@ export function activateRuntimeSessionLease({
   );
 }
 export function transitionRuntimeSessionWriterProcess({
-  root = frameworkRoot,
+  root = toolingRoot,
   pid,
   runtimeSessionId,
   transition,
@@ -669,7 +669,7 @@ export function transitionRuntimeSessionWriterProcess({
     }),
   );
 }
-export function releaseRuntimeSessionLease({ root = frameworkRoot, pid, testHooks } = {}) {
+export function releaseRuntimeSessionLease({ root = toolingRoot, pid, testHooks } = {}) {
   return withSessionManagementCapability(root, testHooks, () =>
     releaseRuntimeSessionLeaseState({ root, pid, testHooks }),
   );

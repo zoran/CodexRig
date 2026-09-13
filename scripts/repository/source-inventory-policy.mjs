@@ -81,6 +81,9 @@ export const portableCodexGitignorePatterns = Object.freeze([
   "!.codex/",
   "!.codex/config.toml",
   "!.codex/hooks.json",
+  "!.codex/tooling.json",
+  "!.codex/toolchain.json",
+  "!.codex/verification.json",
   "!.codex/README.md",
   "!.codex/agents/",
   ".codex/agents/*",
@@ -170,11 +173,17 @@ export function repositoryCodexHomeGitignoreFindings(content) {
     .map((pattern) => `missing exact root Codex isolation pattern ${pattern}`);
 }
 
-function isPortableCodexPath(relativePath) {
+export function isPortableCodexPath(relativePath) {
   return (
-    [".codex/README.md", ".codex/config.toml", ".codex/hooks.json", ".codex/agents"].includes(
-      relativePath,
-    ) || /^\.codex\/agents\/[a-z][a-z0-9_-]*\.toml$/u.test(relativePath)
+    [
+      ".codex/README.md",
+      ".codex/config.toml",
+      ".codex/hooks.json",
+      ".codex/tooling.json",
+      ".codex/toolchain.json",
+      ".codex/verification.json",
+      ".codex/agents",
+    ].includes(relativePath) || /^\.codex\/agents\/[a-z][a-z0-9_-]*\.toml$/u.test(relativePath)
   );
 }
 

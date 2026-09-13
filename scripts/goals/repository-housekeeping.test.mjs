@@ -182,19 +182,23 @@ test("ambiguous delivery hints fail closed until their target is explicitly clas
   assert.deepEqual(deliveryReconciliationPlan({ root, relativePaths }).blockingFindings, []);
 });
 
-test("the neutral framework never receives a generated delivery configuration", (t) => {
+test("a repository without required product configuration does not receive a delivery owner", (t) => {
   const root = fixture(t);
-  write(root, ".agents/skills/create-project-from-framework/SKILL.md", "# Generator\n");
+  rmSync(path.join(root, deliveryConfigurationPath));
+  write(
+    root,
+    ".codex/tooling.json",
+    readFileSync(new URL("../../.codex/tooling.json", import.meta.url), "utf8"),
+  );
   const plan = deliveryReconciliationPlan({
     root,
-    relativePaths: [
-      ".agents/skills/create-project-from-framework/SKILL.md",
-      deliveryConfigurationPath,
-      "docs/project.md",
-      "src/.gitkeep",
-    ],
+    relativePaths: ["docs/project.md", "src/.gitkeep"],
   });
-  assert.match(plan.blockingFindings.join("\n"), /neutral source framework/u);
+  assert.deepEqual(plan.blockingFindings, []);
+  assert.equal(
+    plan.writes.some((write) => write.relativePath === deliveryConfigurationPath),
+    false,
+  );
 });
 
 function housekeepingTemporaryPaths(root) {

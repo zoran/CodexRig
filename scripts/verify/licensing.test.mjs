@@ -25,11 +25,11 @@ function fixture(t) {
   return root;
 }
 
-test("framework and generated-project licensing material is complete", () => {
+test("source licensing and generated-output permission is complete", () => {
   assert.deepEqual(licensingFindings({ root: repositoryRoot }), []);
 });
 
-test("license, required notice, package metadata, and upgrade ownership fail closed", (t) => {
+test("source license, required notice and package metadata fail closed", (t) => {
   const root = fixture(t);
   writeFileSync(
     path.join(root, "LICENSE"),
@@ -45,29 +45,18 @@ test("license, required notice, package metadata, and upgrade ownership fail clo
   const packageJson = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
   delete packageJson.license;
   writeFileSync(path.join(root, "package.json"), `${JSON.stringify(packageJson, null, 2)}\n`);
-  const contract = JSON.parse(readFileSync(path.join(root, ".codexrig/framework.json"), "utf8"));
-  contract.upgrade.managedRoots = contract.upgrade.managedRoots.filter(
-    (relativePath) => !["LICENSE", "NOTICE"].includes(relativePath),
-  );
-  writeFileSync(
-    path.join(root, ".codexrig/framework.json"),
-    `${JSON.stringify(contract, null, 2)}\n`,
-  );
 
   const findings = licensingFindings({ root });
   assert.ok(findings.some((finding) => finding.startsWith("LICENSE:")));
   assert.ok(findings.some((finding) => finding.includes("exact CodexRig licensing")));
   assert.ok(findings.some((finding) => finding.includes("package.json")));
-  assert.ok(findings.some((finding) => finding.includes("managedRoots must include LICENSE")));
-  assert.ok(findings.some((finding) => finding.includes("managedRoots must include NOTICE")));
 });
 
-test("the public summary preserves the commercial project-only credit exception", (t) => {
+test("the public summary keeps source credit protection distinct from output permission", (t) => {
   const root = fixture(t);
   const readmePath = path.join(root, "README.md");
   const readme = readFileSync(readmePath, "utf8");
-  const protectedStatement =
-    /It\s+does\s+not\s+permit\s+their\s+removal\s+from\s+CodexRig\s+itself/u;
+  const protectedStatement = /does\s+not\s+permit\s+their\s+removal\s+from\s+CodexRig\s+itself/u;
   assert.match(readme, protectedStatement);
   writeFileSync(
     readmePath,

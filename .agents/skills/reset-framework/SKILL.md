@@ -44,10 +44,8 @@ exact list before using `--apply`, then require a clean preview. Runtime sanitat
 after every Codex session for the repository has ended; the launcher-owned runtime lease makes the
 reset fail closed otherwise. The publication orchestrator already performs these reset steps.
 
-Project generation uses the internal `--post-project-creation --apply` mode after publishing a new
-target. That restricted mode may remove only reset-owned process/export residue that is safe during
-the active session. It never migrates or deletes local runtime or SQLite/WAL state, and it never
-substitutes for the mandatory full reset after Codex exits.
+Project generation preserves source state. Its positive file selection excludes private process and
+runtime state, so generation never invokes reset or requires the source work cache to be empty.
 
 ## Workflow
 
@@ -70,22 +68,17 @@ substitutes for the mandatory full reset after Codex exits.
    startup attestations, and stale locks. Never rewrite Git history implicitly.
 5. Ensure `docs/project.md` remains the concise, product-neutral central truth. Remove
    product-specific source manually only when the user explicitly placed it in scope; the reset
-   script never guesses. Project generation may use the internal read-only
-   `--portable-source-baseline` probe; framework verification uses the equivalent
-   `--verification-source-baseline` only while its verification lock is active. These probes ignore
-   contained runtime state that cannot enter generated output or verification evidence, but still
-   reject process/planning residue and never substitute for publication cleanup.
+   script never guesses. Framework verification uses the internal read-only
+   `--verification-source-baseline` only while its verification lock is active. It ignores contained
+   runtime state but rejects process/planning residue and never substitutes for publication cleanup.
 6. Run the reset preview again. After applicable reviews, the publication workflow invokes adaptive
    `pnpm verify` admission once. Run the applied reset and clean preview once more after
    verification so any temporary state created by checks is gone while exact verification evidence
    is retained. The source-framework pre-push path repeats the read-only clean preview and fails
    closed if resettable state reappears.
-7. Commit or push only when the user explicitly requested those external mutations. Project
-   generation never performs them. Its success output always gives the exact post-exit full-reset
-   sequence—preview, review, apply, and clean preview—and prints the optional explicit
-   `framework:publish --message "<message>"` command only when the source worktree has changes. When
-   an active Codex process owns the runtime, do not delete open SQLite databases or WAL files from
-   inside that process.
+7. Commit or push only when the user explicitly requested those mutations. Project generation never
+   performs them or clears source context. When an active Codex process owns runtime, do not delete
+   open SQLite databases or WAL files from inside that process.
 
 Keep the result in code and configuration. Do not create reset reports, completion docs, or
 archives.

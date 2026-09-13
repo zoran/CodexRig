@@ -9,23 +9,21 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { readCompatibilityMatrix } from "../contracts/framework-contract.mjs";
+import { gitlabChildPipeline } from "./compatibility-matrix.mjs";
 import {
+  ciAdapterContractViolations,
   codexNpmPackageRecords,
   githubStableCodexInstallStep,
-  gitlabChildPipeline,
   gitlabMiseInstallBeforeScript,
   gitlabStableCodexInstallBeforeScript,
   miseNpmPackageRecords,
   verifyCodexArchives,
   verifyMiseArchive,
-} from "./compatibility-matrix.mjs";
-import {
-  ciAdapterContractViolations,
-  compatibilityFreshnessWarnings,
-} from "./framework-doctor.mjs";
+} from "../deps/toolchain-archives.mjs";
+import { compatibilityFreshnessWarnings } from "../setup/tooling-doctor.mjs";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..", "..");
-const matrixScript = fileURLToPath(new URL("./compatibility-matrix.mjs", import.meta.url));
+const archiveScript = fileURLToPath(new URL("../deps/toolchain-archives.mjs", import.meta.url));
 const currentMatrix = readCompatibilityMatrix();
 const reviewedIntegrities = currentMatrix.ci.miseNpmPackageIntegrities;
 const reviewedCodexIntegrities = {
@@ -89,7 +87,7 @@ test("mise archive verification rejects drift before returning an installable pa
 
     const cli = spawnSync(
       process.execPath,
-      [matrixScript, "--verify-mise-archive", stage, integrity],
+      [archiveScript, "--verify-mise-archive", stage, integrity],
       { encoding: "utf8", stdio: "pipe" },
     );
     assert.equal(cli.status, 0, cli.stderr);
@@ -101,7 +99,7 @@ test("mise archive verification rejects drift before returning an installable pa
       /does not match the reviewed integrity/,
     );
     assert.equal(
-      spawnSync(process.execPath, [matrixScript, "--verify-mise-archive", stage, integrity], {
+      spawnSync(process.execPath, [archiveScript, "--verify-mise-archive", stage, integrity], {
         encoding: "utf8",
         stdio: "pipe",
       }).status,

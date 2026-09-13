@@ -44,7 +44,7 @@ file and database.
 
 Run:
 
-`mise exec --locked -- node .agents/skills/create-project-from-framework/scripts/create-project-from-framework.mjs --name "<Project Name>" --description "<Confirmed Detailed Product Description>"`
+`mise exec --locked -- node scripts/framework/create-project-from-framework.mjs --name "<Project Name>" --description "<Confirmed Detailed Product Description>"`
 
 Run `mise install --locked` and then
 `mise exec --locked -- pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile` in the
@@ -52,36 +52,29 @@ source workspace first. Creation uses the source's locked runtime and pinned for
 generated Markdown deterministic. This is a source-only tooling hydration step, not the generated
 project's dependency freshness policy.
 
-Project creation must never change tracked or portable source-framework content or add the requested
-project name to source tests, documentation, or policy. The generator requires a clean
-portable-source reset baseline, which still rejects process/planning residue while ignoring active
-contained runtime state, snapshots the tracked and portable source state, rechecks it before
-publication, and discards staging if that state changes. After publication it invokes the reset
-boundary's restricted active-session cleanup, which removes only reset-owned nonportable
-process/export residue and deliberately preserves local runtime; it then rechecks the portable
-baseline and source state before retaining the target. Use neutral fixture names for generator
-regression coverage.
+The source-only recipe `.codexrig/project-tools.json` explicitly selects each reusable file, package
+command, development dependency and verification capability. Selection validates the real module,
+shell and command dependency closure; a newly added source file is excluded until selected.
+`--include-untracked` permits selected unpublished files, never a broad working-tree copy. The
+required mise runtime files may be untracked. Private files, work context, source release metadata,
+generator/export/updater/reset tooling, internal suites and compatibility experiments are excluded.
 
-The success output must state that no commit or push occurred and must always give the exact
-post-exit reset preview, review, apply, and clean-preview sequence for the source framework. Only
-when the source Git worktree has changes may it additionally print optional verify, status, stage,
-commit, and push commands. Those Git commands are guidance for the user, never generator actions.
+Creation preserves source content, including its current task context. It snapshots source state,
+prepares a new owned stage, validates it and rechecks source state before publication. A changed
+source or pre-existing target blocks publication. Generation performs no source reset, Git
+initialization, commit or push. The optional post-exit source publisher is guidance only when source
+changes exist; publication remains separately authorized.
 
-The default transfer uses the source repository's tracked files plus the required `mise.toml` and
-`mise.lock` runtime contract, which staged validation checks before publication. Other local drafts
-and ignored state cannot enter the new project. Use `--include-untracked` only when the user
-explicitly asks to transfer a working-tree snapshot.
+The generator creates product-owned AGENTS, instructions, README and technical manifest, a real
+empty `src/`, four typed configuration owners and optional requirements draft. Selected tools
+receive one consistent neutral protocol namespace. The output contains no CodexRig references,
+source credits, inherited LICENSE/NOTICE or installation receipts. The rights holder's output
+permission in source NOTICE authorizes this boundary; the product owner chooses licensing
+separately.
 
-Before publication, a complete selected-source transfer manifest must classify every inventoried
-path as either copied or excluded for a non-empty source-only reason. Every copied reusable file
-must remain byte-identical unless it is one of the explicit project identity/configuration
-transformations; the installation receipt and initial typed configurations are required project-only
-files. A supplied description adds its declared requirements draft; no brief adds no specification.
-An empty `src/.gitkeep` is allowed only when the selected source has no file in its required Product
-Root. A missing, unexpected, or undeclared changed file fails project creation. This invariant
-carries every still-active framework capability, including work introduced in earlier framework
-revisions, without copying retired or source-only generator/reset behavior into a product
-repository.
+Selected reusable bytes remain exact except for declared document, identity, namespace, local tool
+configuration and CI projections. Parity rejects missing, unexpected or undeclared changed output.
+Both stable CI adapters remain; source experiments and internal regression campaigns do not.
 
 After publication, run `mise install --locked`,
 `mise exec --locked -- node scripts/deps/install-compatible.mjs`, and
@@ -111,32 +104,27 @@ conversations and other transcriptless contexts remain inert.
 
 The generator owns the executable transfer and publication contract; do not reimplement it manually.
 Read the source's [Project Instructions](../../../instructions.md), the
-[portable transfer contract](../../../scripts/setup/portable-project-contract.mjs), and the staged
-validation result when evaluating a failure.
+[portable transfer contract](../../../scripts/framework/portable-project-contract.mjs), and the
+staged validation result when evaluating a failure.
 
 Confirm these generation-specific outcomes:
 
-- Every selected source path is classified; copied reusable bytes change only at declared identity
-  or configuration transformations. Both portable CI adapters and all current portable skills,
-  policy, hooks, roles and runtime controllers remain. Source-only generation/reset capabilities,
-  private native state, secrets, planning history and provider collaboration metadata do not
-  transfer.
-- The target has its installation receipt, real `src/`, pending manifest/intake draft, separate
-  typed product/delivery/tenancy/localization owners, and coherent product/package identity. Source
-  memory is excluded and memories are enabled only in the fresh target.
-- Validate from the copied staged validator: stable stage identity, no caller-selected stage path,
-  valid modules and contained resolvable relative imports. An existing outer target or changing
-  portable source blocks publication; never overwrite it.
-- Startup and lifecycle behavior retain the single current contract from
-  [Session Start](../../../instructions.md#session-start), including native resume, Astra/ultra,
-  explicit Dev-only YOLO, exactly two trusted session-only hooks and accepted-handover recovery.
-- Durable child policy remains current through
-  [Framework Lifecycle](../../../instructions.md#framework-lifecycle-compatibility-and-git-platforms)
-  and its policy projection. Do not repeat global architecture, autonomy, coordination, review,
-  cleanup or publication rules in this skill or invent a second generated authority.
-- Post-publication active-session cleanup changes no tracked/portable source or live native runtime.
-  Always print the exact post-exit full-reset sequence. Source-specific project facts never enter
-  framework source, tests or docs.
+- The explicit selection and dependency closure are complete. Output runs with the source checkout
+  unavailable; selected tools do not import or invoke excluded source capabilities.
+- A real `src/`, independent package identity/version, pending manifest or intake draft, and
+  separate product/delivery/tenancy/localization owners exist. Source memory is excluded; the fresh
+  target enables only its own native memory.
+- The source-owned validator checks the explicitly owned stage with stable directory/file identity,
+  contained imports, product boundaries, empty project hooks, complete configuration and secret
+  scanning. Validation tooling for generation stays in the source repository.
+- Native resume, permission controls, exact session hooks, leases, worktree isolation and stable
+  archive integrity remain effective. Invalid context or a tool error grants no new continuation
+  task. Only an existing authorized project task can drive continuation.
+- Adaptive verification discovers real product tests even for unknown changes or without Git
+  history. Retained runtime tests cover the selected safety boundary; source suites stay excluded.
+- README provides setup and document discovery; the manifest records current technical inventory;
+  requirements and UI references retain distinct owners. Source-private context and planning are
+  neither output inputs nor automatic cleanup targets.
 
 Report the generated path, package identity, actual verification and any failed boundary. No Git
 initialization, remote creation, commit or push occurs. Optional Git guidance is not permission to

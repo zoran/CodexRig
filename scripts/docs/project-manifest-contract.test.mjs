@@ -150,6 +150,11 @@ test("implemented files require exactly one real current module owner", (t) => {
 
 test("source-framework Codex policy is inventoried as one visible capability", (t) => {
   const root = frameworkFixture(t);
+  write(
+    root,
+    ".codex/tooling.json",
+    readFileSync(new URL("../../.codex/tooling.json", import.meta.url), "utf8"),
+  );
   write(root, ".agents/skills/create-project-from-framework/SKILL.md", "# Creator\n");
   write(root, ".codex/config.toml", 'model = "gpt-6-astra"\n');
   write(root, ".codex/agents/default.toml", 'name = "default"\n');

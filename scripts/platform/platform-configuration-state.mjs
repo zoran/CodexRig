@@ -15,7 +15,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { resolveFrameworkPath, serializeCanonicalJson } from "../contracts/framework-contract.mjs";
+import { resolveRepositoryPath, serializeCanonicalJson } from "../filesystem/repository-files.mjs";
 
 const stateRelativePath = ".project-state/platform-configuration.json";
 const lockRelativePath = ".project-state/platform-configuration.lock";
@@ -27,7 +27,7 @@ function stateDigest(plan) {
 }
 
 function statePath(root) {
-  const stateRoot = resolveFrameworkPath(root, ".project-state");
+  const stateRoot = resolveRepositoryPath(root, ".project-state");
   if (existsSync(stateRoot)) {
     const stats = lstatSync(stateRoot);
     if (stats.isSymbolicLink() || !stats.isDirectory()) {
@@ -36,12 +36,12 @@ function statePath(root) {
   } else {
     mkdirSync(stateRoot, { mode: 0o700 });
   }
-  return resolveFrameworkPath(root, stateRelativePath);
+  return resolveRepositoryPath(root, stateRelativePath);
 }
 
 function lockPath(root) {
   statePath(root);
-  return resolveFrameworkPath(root, lockRelativePath);
+  return resolveRepositoryPath(root, lockRelativePath);
 }
 
 function readLock(root) {

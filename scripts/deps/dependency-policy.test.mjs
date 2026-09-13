@@ -39,14 +39,14 @@ import { trustedPnpmCommand } from "./trusted-pnpm-command.mjs";
 import { inspectRuntimeLifecycleLock } from "../repository/runtime-session-lease.mjs";
 
 const transactionRoots = [];
-const sourceCompatibility = readFileSync(
-  path.resolve(import.meta.dirname, "..", "..", ".codexrig", "compatibility.json"),
+const sourceToolchain = readFileSync(
+  path.resolve(import.meta.dirname, "..", "..", ".codex", "toolchain.json"),
   "utf8",
 );
 
 function writeCompatibility(root) {
-  mkdirSync(path.join(root, ".codexrig"), { recursive: true });
-  writeFileSync(path.join(root, ".codexrig", "compatibility.json"), sourceCompatibility, "utf8");
+  mkdirSync(path.join(root, ".codex"), { recursive: true });
+  writeFileSync(path.join(root, ".codex", "toolchain.json"), sourceToolchain, "utf8");
 }
 
 async function waitForLifecycle(predicate, label, timeoutMilliseconds = 5_000) {
@@ -146,7 +146,7 @@ test("trusted dependency paths reject executable pnpm configuration before pnpm 
 
 test("trusted pnpm resolution rejects repository-local command shadowing", () => {
   const root = transactionFixture();
-  const current = JSON.parse(sourceCompatibility).stable;
+  const current = JSON.parse(sourceToolchain).stable;
   const decoy = path.join(root, "node_modules", ".bin", "pnpm");
   const toolRoot = mkdtempSync(path.join(os.tmpdir(), "trusted-pnpm-tool-"));
   transactionRoots.push(toolRoot);

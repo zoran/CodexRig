@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { after, test } from "node:test";
-import { copyPortableSetupFixture } from "./setup-regression-fixtures.mjs";
+import { copyPortableSetupFixture } from "./setup-regression-test-helpers.mjs";
 import {
   cleanupTemporaryRoots,
   initializeTrackedSource,
@@ -16,66 +16,10 @@ import {
 
 after(cleanupTemporaryRoots);
 
-function copyMissingRuntimeContracts(source, runtimeContracts) {
-  for (const runtimeContract of runtimeContracts) {
-    const target = path.join(source, runtimeContract);
-    if (existsSync(target)) continue;
-    mkdirSync(path.dirname(target), { recursive: true });
-    copyFileSync(path.join(root, runtimeContract), target);
-  }
-}
-
-test("clean project initialization preserves additional validated agent roles", () => {
+test("clean project initialization includes additional validated agent roles only after explicit selection", () => {
   const sourceParent = temporaryRoot("additional-agent-source-");
   const source = path.join(sourceParent, "source");
   copyPortableSetupFixture(source);
-  copyMissingRuntimeContracts(source, [
-    ".codex/hooks.json",
-    "mise.lock",
-    "mise.toml",
-    "scripts/context/portable-context-contract.mjs",
-    "scripts/context/session-stop-lifecycle.mjs",
-    "scripts/setup/session-control-hook-command.mjs",
-    "scripts/setup/startup-codex-process.mjs",
-    "scripts/setup/startup-runtime-executables.mjs",
-    "scripts/setup/startup-session-controller.mjs",
-    "scripts/terminal/terminal-output.test.mjs",
-    "scripts/deps/dependency-owner-normalization.test.mjs",
-    "scripts/goals/goal-publication-precondition.mjs",
-    "scripts/goals/goal-publication-precondition.test.mjs",
-    "scripts/repository/product-roots.mjs",
-    "scripts/repository/product-roots.test.mjs",
-    "scripts/repository/stable-file-snapshot.test.mjs",
-    "scripts/setup/codex-launcher.test.mjs",
-    "scripts/setup/setup-regression-fixtures.mjs",
-    "scripts/verify/format-project.mjs",
-    "scripts/verify/adaptive-cli.test.mjs",
-    "scripts/verify/adaptive-options.mjs",
-    "scripts/verify/verification-admission.mjs",
-    "scripts/verify/adaptive-runner-routing.test.mjs",
-    "scripts/verify/adaptive-runner-test-helpers.mjs",
-    "scripts/verify/adaptive-runner.test.mjs",
-    "scripts/verify/package-manifest.mjs",
-    "scripts/verify/package-manifest.test.mjs",
-    "scripts/verify/pre-push-steps.sh",
-    "scripts/verify/pre-push.test.mjs",
-    "scripts/verify/verification-evidence.mjs",
-    "scripts/verify/verification-evidence-record.mjs",
-    "scripts/verify/verification-evidence-integrity.test.mjs",
-    "scripts/verify/verification-evidence-test-helpers.mjs",
-    "scripts/verify/verification-evidence.test.mjs",
-    "scripts/verify/verification-entrypoints.mjs",
-    "scripts/verify/verification-executor.test.mjs",
-    "scripts/verify/verification-git-basis.test.mjs",
-    "scripts/verify/verification-risk-profile.mjs",
-    "scripts/verify/verification-record-helpers.mjs",
-    "scripts/verify/verification-runtime-identity.mjs",
-    "scripts/verify/verification-git-basis.mjs",
-    "scripts/verify/verification-session-lock.mjs",
-    "scripts/verify/verification-session-lock.test.mjs",
-    "scripts/verify/workspace-verification.mjs",
-    "scripts/web/update-sitemap-lastmod.test.mjs",
-  ]);
   const reviewerPath = path.join(source, ".codex", "agents", "reviewer.toml");
   const reviewer = readFileSync(path.join(source, ".codex", "agents", "default.toml"), "utf8")
     .replace('name = "default"', 'name = "reviewer"')
@@ -84,6 +28,10 @@ test("clean project initialization preserves additional validated agent roles", 
       'description = "Bounded read-only review of a completed implementation slice."',
     );
   writeFileSync(reviewerPath, reviewer, "utf8");
+  const selectionPath = path.join(source, ".codexrig/project-tools.json");
+  const selection = JSON.parse(readFileSync(selectionPath, "utf8"));
+  selection.capabilities["project-entry"].push(".codex/agents/reviewer.toml");
+  writeFileSync(selectionPath, JSON.stringify(selection));
   initializeTrackedSource(source);
 
   const outputParent = temporaryRoot("additional-agent-output-");
@@ -106,7 +54,13 @@ test("clean project initialization preserves additional validated agent roles", 
     "agents",
     "reviewer.toml",
   );
-  assert.equal(readFileSync(generatedReviewer, "utf8"), reviewer);
+  assert.equal(
+    readFileSync(generatedReviewer, "utf8"),
+    reviewer
+      .replaceAll("CODEXRIG", "PROJECT")
+      .replaceAll("CodexRig", "Project")
+      .replaceAll("codexrig", "project"),
+  );
 });
 
 test("clean project initialization preserves a safe project folder and ends at code", () => {
@@ -154,21 +108,10 @@ test("clean project initialization preserves a safe project folder and ends at c
   assert.equal(`${missing.stdout}${missing.stderr}`.includes(missingSource), false);
 });
 
-test("clean project initialization refuses a polluted source baseline", () => {
+test("clean project initialization preserves and excludes private source context", () => {
   const sourceParent = temporaryRoot("polluted-project-source-");
   const source = path.join(sourceParent, "source");
   copyPortableSetupFixture(source);
-  copyMissingRuntimeContracts(source, [
-    ".codex/hooks.json",
-    "mise.lock",
-    "mise.toml",
-    "scripts/context/session-stop-lifecycle.mjs",
-    "scripts/setup/session-control-hook-command.mjs",
-    "scripts/setup/startup-codex-process.mjs",
-    "scripts/setup/startup-runtime-executables.mjs",
-    "scripts/setup/startup-session-controller.mjs",
-    "scripts/verify/format-project.mjs",
-  ]);
   initializeTrackedSource(source);
   writeFileSync(path.join(source, "docs", "project-context.md"), "# Temporary context\n", "utf8");
 
@@ -181,27 +124,22 @@ test("clean project initialization refuses a polluted source baseline", () => {
     "--output-parent",
     outputParent,
   ]);
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Source framework baseline is not clean/);
-  assert.match(result.stderr, /docs\/project-context\.md/);
-  assert.equal(existsSync(path.join(outputParent, "PollutedSourceFixture")), false);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    readFileSync(path.join(source, "docs/project-context.md"), "utf8"),
+    "# Temporary context\n",
+  );
+  assert.equal(
+    existsSync(path.join(outputParent, "PollutedSourceFixture/code/docs/project-context.md")),
+    false,
+  );
 });
 
 test("clean project initialization refuses agent artifacts inside a product root", () => {
   const sourceParent = temporaryRoot("polluted-product-boundary-source-");
   const source = path.join(sourceParent, "source");
   copyPortableSetupFixture(source);
-  copyMissingRuntimeContracts(source, [
-    ".codex/hooks.json",
-    "mise.lock",
-    "mise.toml",
-    "scripts/context/session-stop-lifecycle.mjs",
-    "scripts/setup/session-control-hook-command.mjs",
-    "scripts/setup/startup-codex-process.mjs",
-    "scripts/setup/startup-runtime-executables.mjs",
-    "scripts/setup/startup-session-controller.mjs",
-    "scripts/verify/format-project.mjs",
-  ]);
+  mkdirSync(path.join(source, "src"), { recursive: true });
   writeFileSync(path.join(source, "src", "AGENTS.md"), "agent pollution\n", "utf8");
   initializeTrackedSource(source);
 

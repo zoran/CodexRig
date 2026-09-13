@@ -1,51 +1,11 @@
 {
-  "schemaVersion": 2,
-  "reviewedOn": "2026-09-12",
-  "ci": {
-    "codexNpmPackage": "@openai/codex",
-    "codexNpmPackageIntegrity": "sha512-FV/x1OHXYv/ifjf3mXj9ThTTAWcUZN6cGIRQRhRxkKNOPuImu1WW0c8ev1vUkE9XGH90dEnYG1tBjIkxRikg0w==",
-    "codexNpmPlatformIntegrities": {
-      "x64": "sha512-a4FI3A8sGtwGrOqltrPbrS2hajrHQG591EwmRfiRoLMb10VxdBtUGW4gu6IJVYENiYGA7k3P4jlRHEoCZU/s9Q==",
-      "arm64": "sha512-KmTCB6ST484zeYlPpKP/K5P/gRaYmt6TihVD+zotoe6O9q0JSBP+FYvCz4A/zZXR7xDOHURTSjHp0sD8wWS0YQ=="
-    },
-    "codexNpmPlatformPackages": {
-      "x64": "@openai/codex-linux-x64",
-      "arm64": "@openai/codex-linux-arm64"
-    },
-    "codexVersion": "0.154.0",
-    "miseLinuxX64Sha256": "32f644d8c291bb182f702c6d2b0dda9f8b01441e940d74d328aad5f08446b2fd",
-    "miseNpmPackageIntegrities": {
-      "x64": "sha512-u5i30oDxZYJUh7y2K2bWz4n+p3YTa9y1htcSiJPdBTH9XCMzdNhmhHFEKspBrmxyb9qZju6s/FN0oGl42rLEyg==",
-      "arm64": "sha512-SkXAScilkoXsJVCDg/V5A+3koMAqZUDQeCcvsNxUv7AbVgwkAyDYH2fPIWO8K5WewrU3OJCzn90Zf4v2mB6W9w=="
-    },
-    "miseNpmPackages": {
-      "x64": "@jdxcode/mise-linux-x64",
-      "arm64": "@jdxcode/mise-linux-arm64"
-    },
-    "miseVersion": "2026.9.5"
-  },
-  "stable": {
-    "node": {
-      "version": "24.21.0",
-      "range": ">=24.21.0 <25.0.0",
-      "channel": "lts"
-    },
-    "pnpm": {
-      "version": "11.26.0",
-      "range": ">=11.26.0 <12.0.0",
-      "channel": "latest-11"
-    },
-    "codex": {
-      "minimumVersion": "0.154.0",
-      "channel": "latest"
-    }
-  },
+  "schemaVersion": 3,
   "canaries": [
     {
       "id": "next-node-lts",
       "description": "Node.js 26 before its October 2026 LTS transition",
       "node": "26",
-      "pnpm": "11.26.0",
+      "pnpm": "11.27.0",
       "codex": "latest",
       "required": false
     },
@@ -61,7 +21,7 @@
       "id": "next-codex",
       "description": "The Codex CLI alpha channel on the stable toolchain",
       "node": "24.21.0",
-      "pnpm": "11.26.0",
+      "pnpm": "11.27.0",
       "codex": "alpha",
       "required": false
     }

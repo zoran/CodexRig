@@ -62,9 +62,9 @@ rather than repair; do not call a known-defective state clean.
    sequence, including orchestration housekeeping, `repo:housekeeping`, active-document currency,
    critical-document preservation review and fresh audit. Do not copy or reorder that sequence here.
 4. Invoke final `pnpm verify` once on the stable actual integration state under
-   [Verification](../../../instructions.md#verification). Required post-exit reset, publication on
-   central `main` and `pnpm goal:new` remain real gates; never bypass them or manufacture
-   completion.
+   [Verification](../../../instructions.md#verification). Follow the repository’s applicable
+   cleanup, publication and `pnpm goal:new` gates; never invent additional closure work or
+   manufacture completion.
 5. Any later repository edit reopens affected evidence, review and audit. Follow
    [Capacity And Drain](../../../instructions.md#guarded-and-critical-drain) before new work; a
    successful critical seal ends all actions immediately.

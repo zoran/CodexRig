@@ -1,82 +1,12 @@
 /** Owns verification risk profile behavior for the repository verification boundary. */
+import { readVerificationConfiguration } from "./verification-configuration.mjs";
 import { createHash } from "node:crypto";
 
 const digestPattern = /^[a-f0-9]{64}$/u;
 const pathPattern = /^[A-Za-z0-9._/-]+$/u;
 const riskIdPattern = /^[a-z0-9][a-z0-9-]*$/u;
 
-export const verificationRiskRegistry = Object.freeze([
-  { path: "scripts/git-hooks/pre-push", riskId: "pre-push-control-chain" },
-  {
-    path: "scripts/repository/git-runtime-isolation.mjs",
-    riskId: "git-runtime-isolation",
-  },
-  { path: "scripts/repository/source-inventory.mjs", riskId: "source-inventory" },
-  {
-    path: "scripts/repository/stable-file-snapshot.mjs",
-    riskId: "stable-source-snapshot",
-  },
-  { path: "scripts/verify/adaptive.mjs", riskId: "adaptive-entrypoint" },
-  { path: "scripts/verify/adaptive-options.mjs", riskId: "adaptive-entrypoint" },
-  { path: "scripts/verify/adaptive-runner.mjs", riskId: "verification-plan-routing" },
-  { path: "scripts/verify/adaptive-state.mjs", riskId: "changed-state-classification" },
-  { path: "scripts/setup/install-git-hooks.mjs", riskId: "pre-push-control-chain" },
-  { path: "scripts/setup/install-git-hooks.sh", riskId: "pre-push-control-chain" },
-  {
-    path: "scripts/setup/portable-project-contract.mjs",
-    riskId: "portable-project-publication",
-  },
-  { path: "scripts/setup/resolve-git-hooks-path.mjs", riskId: "pre-push-control-chain" },
-  {
-    path: "scripts/setup/stage-project-export.mjs",
-    riskId: "portable-project-publication",
-  },
-  {
-    path: "scripts/setup/validate-staged-project.mjs",
-    riskId: "portable-project-publication",
-  },
-  { path: "scripts/verify/pre-push.sh", riskId: "pre-push-control-chain" },
-  { path: "scripts/verify/pre-push-steps.sh", riskId: "pre-push-control-chain" },
-  {
-    path: "scripts/verify/verification-admission-decision.mjs",
-    riskId: "verification-admission",
-  },
-  { path: "scripts/verify/verification-admission.mjs", riskId: "verification-admission" },
-  {
-    path: "scripts/verify/verification-evidence.mjs",
-    riskId: "successful-evidence-publication",
-  },
-  {
-    path: "scripts/verify/verification-evidence-record.mjs",
-    riskId: "successful-evidence-publication",
-  },
-  {
-    path: "scripts/verify/verification-entrypoints.mjs",
-    riskId: "adaptive-entrypoint",
-  },
-  { path: "scripts/verify/verification-executor.mjs", riskId: "verification-execution" },
-  { path: "scripts/verify/verification-git-basis.mjs", riskId: "verification-git-basis" },
-  {
-    path: "scripts/verify/verification-risk-profile.mjs",
-    riskId: "verification-risk-profile",
-  },
-  {
-    path: "scripts/verify/verification-record-helpers.mjs",
-    riskId: "verification-record-encoding",
-  },
-  {
-    path: "scripts/verify/verification-runtime-identity.mjs",
-    riskId: "verification-runtime-identity",
-  },
-  {
-    path: "scripts/verify/verification-session-lock.mjs",
-    riskId: "verification-session-serialization",
-  },
-  {
-    path: "scripts/verify/workspace-verification.mjs",
-    riskId: "workspace-verification-routing",
-  },
-]);
+export const verificationRiskRegistry = Object.freeze(readVerificationConfiguration().risks);
 
 const riskByPath = new Map(
   verificationRiskRegistry.map((entry) => [entry.path, Object.freeze({ ...entry })]),

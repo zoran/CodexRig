@@ -23,12 +23,10 @@ test("selected suites replace duplicate focused files without losing admission o
   const cases = [
     ["scripts/context/context-lifecycle.test.mjs", "context-regressions"],
     ["scripts/setup/setup-regression.test.mjs", "setup-regressions"],
-    ["scripts/framework/framework-lifecycle.test.mjs", "framework-regressions"],
+    ["scripts/setup/startup-state.test.mjs", "framework-regressions"],
   ];
   const plan = route([
-    "scripts/context/portable-context-required-content.mjs",
-    ".agents/skills/create-project-from-framework/scripts/generated-codex-config.mjs",
-    ".codexrig/framework.json",
+    "scripts/repository/runtime-session-state.mjs",
     ...cases.map(([testPath]) => testPath),
   ]);
   const owners = new Map(
@@ -173,8 +171,7 @@ test("removed framework sources use current baseline and lifecycle owners withou
 
   assert.equal(plan.admission.mode, "targeted");
   assert.deepEqual(plan.admission.uncoveredFullRelevantPaths, []);
-  assert.ok(owners.includes("framework-regressions"));
-  assert.ok(owners.includes("repository-smoke"));
+  assert.deepEqual(owners, ["repository-smoke"]);
 });
 
 test("license and required-notice changes route to the licensing owner", () => {
@@ -436,7 +433,7 @@ test("direct verifier and support files route exact smallest consumers", () => {
 
 test("moved and shared framework boundaries retain focused verifier owners", () => {
   const expectedOwners = [
-    ["scripts/contracts/framework-contract.mjs", "scripts/framework/framework-lifecycle.test.mjs"],
+    ["scripts/contracts/framework-contract.mjs", "scripts/setup/startup-state.test.mjs"],
     ["scripts/contracts/mise-toolchain-configuration.mjs", "scripts/verify/repository-smoke.mjs"],
     ["scripts/contracts/portable-toml.mjs", "scripts/setup/setup-regression.test.mjs"],
     ["scripts/docs/document-scope.mjs", "scripts/docs/document-scope.test.mjs"],
@@ -487,7 +484,7 @@ test("moved and shared framework boundaries retain focused verifier owners", () 
       "scripts/repository/worktree-recovery-output.mjs",
       "scripts/goals/repository-housekeeping.test.mjs",
     ],
-    ["scripts/setup/startup-attestation.mjs", "scripts/framework/framework-lifecycle.test.mjs"],
+    ["scripts/setup/startup-attestation.mjs", "scripts/setup/startup-state.test.mjs"],
     ["scripts/setup/startup-attestation.mjs", "scripts/setup/setup-regression.test.mjs"],
     ["scripts/setup/session-control-hook-command.mjs", "scripts/setup/setup-regression.test.mjs"],
     ["scripts/setup/startup-runtime-executables.mjs", "scripts/setup/setup-regression.test.mjs"],

@@ -7,7 +7,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { runStopLifecycle } from "../context/session-stop-lifecycle.mjs";
-import { frameworkRoot } from "../contracts/framework-contract.mjs";
+import { toolingRoot } from "../filesystem/repository-files.mjs";
 import {
   inspectRuntimeSessionLease,
   invalidRuntimeSessionLeaseErrorCode,
@@ -68,7 +68,7 @@ function controllerUsage() {
 }
 
 /** Parses only the closed argument shape emitted by the canonical Bash launcher. */
-export function parseSessionControllerArguments(argv, root = frameworkRoot) {
+export function parseSessionControllerArguments(argv, root = toolingRoot) {
   if (argv.length !== 6 || argv[2] !== "--control-policy" || argv[4] !== "--codex-executable") {
     throw new Error(controllerUsage());
   }
@@ -475,7 +475,7 @@ async function verifyTrustedSessionControlHooks({ codexExecutable, environment, 
 /** Runs the entire post-bootstrap session from already-loaded code. */
 export async function runStartupSessionController({
   argv = process.argv,
-  root = frameworkRoot,
+  root = toolingRoot,
 } = {}) {
   const options = parseSessionControllerArguments(argv, root);
   const runtimeBinding = resolveStartupRuntimeExecutables({
@@ -553,7 +553,7 @@ export async function runStartupSessionController({
 }
 
 /** Formats a bounded operator action without adding an alternate runtime-state reader. */
-export function startupControllerFailureMessage(error, root = frameworkRoot) {
+export function startupControllerFailureMessage(error, root = toolingRoot) {
   const failure = `Codex session controller failed: ${formatContextError(error, root)}`;
   if (error?.code !== invalidRuntimeSessionLeaseErrorCode) return failure;
   return (

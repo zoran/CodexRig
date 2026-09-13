@@ -35,8 +35,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Primary flow: the launcher validates and isolates a Codex session; SessionStart binds its private
   lease/recovery state and injects the resilient repository-reconstruction gate; tracked roles,
   skills, policy, and scripts guide resumed or new work; generated projects receive the portable
-  surface and an installation receipt; verification selects evidence from current repository risk
-  and delivery identity.
+  surface with independently owned local tool configuration; verification selects evidence from
+  current repository risk and delivery identity.
 - Durable state: tracked source, configuration, contracts, documentation, tests, and lockfiles.
   `.codex/runtime/` and `.project-state/` are disposable local state.
 - Delivery state: no product deployment is integrated in this neutral source.
@@ -52,11 +52,11 @@ upgradeable product repositories while deliberately defining no child product or
   delivery orchestration lives under `scripts/platform` and `scripts/setup`, while goal housekeeping
   lives under `scripts/goals`; none is mixed into a product runtime root.
 
-<!-- codexrig:delivery-inventory:start -->
+<!-- project:delivery-inventory:start -->
 
-- Product delivery inventory: this neutral framework source has no integrated product environment.
+- Product delivery inventory: no integrated product environment.
 
-<!-- codexrig:delivery-inventory:end -->
+<!-- project:delivery-inventory:end -->
 
 ### Active Module Inventory
 
@@ -140,7 +140,7 @@ upgradeable product repositories while deliberately defining no child product or
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/filesystem`.
 - Focused verifier:
-  `node --test scripts/framework/framework-lifecycle.test.mjs scripts/verify/api-security.test.mjs scripts/verify/localization.test.mjs scripts/verify/white-label.test.mjs`
+  `node --test scripts/setup/startup-state.test.mjs scripts/verify/api-security.test.mjs scripts/verify/localization.test.mjs scripts/verify/white-label.test.mjs`
 - Steward: Framework lifecycle maintainer.
 
 #### Owned Filesystem Safety
@@ -159,7 +159,7 @@ upgradeable product repositories while deliberately defining no child product or
   plane.
 - Allowed dependencies: None.
 - Focused verifier:
-  `node --test scripts/framework/framework-lifecycle.test.mjs scripts/deps/dependency-policy.test.mjs`
+  `node --test scripts/setup/startup-state.test.mjs scripts/deps/dependency-policy.test.mjs`
 - Steward: Framework filesystem safety maintainer.
 
 #### Dependency Management
@@ -168,7 +168,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Responsibility: Resolves, installs, reports, and updates the newest compatible dependency graph
   allowed by tracked ranges, pins, engines, peers, and supply-chain policy. Also reproduces an
   existing lockfile offline for source housekeeping and toolchain maintenance, and stages complete
-  workspace inputs without changing their policy.
+  workspace inputs without changing their policy. Canonical startup invokes the same owner's
+  compatible local toolchain, host CLI and reviewed stable CI maintenance.
 - Runtime and technology: Node.js ESM orchestrating the pnpm and mise toolchain.
 - Public contract: `deps:install`, `deps:report`, and `deps:update*` commands; the
   lifecycle-delegated `install-compatible.mjs --reproduce-locked` and `--reproduce-toolchain`
@@ -177,7 +178,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Owned data and migrations: Managed changes to `package.json`, `pnpm-lock.yaml`, and approved
   dependency policy inputs; transient transaction state is disposable.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
-- Allowed dependencies: `scripts/filesystem`, `scripts/repository`, `scripts/terminal`.
+- Allowed dependencies: `scripts/contracts`, `scripts/filesystem`, `scripts/repository`,
+  `scripts/terminal`.
 - Focused verifier: `node --test scripts/deps/dependency-policy.test.mjs`
 - Steward: Dependency capability maintainer.
 
@@ -199,40 +201,34 @@ upgradeable product repositories while deliberately defining no child product or
   discovery.
 - Owned data and migrations: No mutable data; validates tracked documentation.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
-- Allowed dependencies: `scripts/contracts`, `scripts/repository`.
+- Allowed dependencies: `scripts/contracts`, `scripts/filesystem`, `scripts/repository`.
 - Focused verifier: `node --test scripts/docs/document-scope.test.mjs`
 - Steward: Documentation contract maintainer.
 
 #### Framework Lifecycle
 
 - Root: `scripts/framework`
-- Responsibility: Diagnoses framework health, derives the source release version from every change
-  since the unique live configured central-remote commit that matches the local tracking ref, and
-  performs receipt-backed, transactional, policy-aware child updates and compatibility reporting.
-  Before canonical startup it maintains compatible dependencies, Node.js, pnpm, mise, Codex and CI
-  tool/action pins through official release evidence and an isolated installation of the resolved
-  toolchain. Startup and repository verification consume the same local installation validator, so
-  an unrecorded managed-file edit cannot pass verification while preventing the next start.
-- Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
-- Public contract: `framework:doctor`, `framework:version`, `framework:upgrade`, and
-  `compatibility:matrix` commands; `frameworkInstallationFindings` provides local receipt
-  diagnostics to startup and verification consumers. `maintain-toolchain.mjs --startup` inventories
-  all worktrees before mutations and blocks competing writers; its explicit mode permits authorized
-  current-slice maintenance. Workflow authority:
-  [Repository Update Scope](../instructions.md#repository-update-scope), linked from the source
-  bootstrap and excluded from child policy and document generation.
-- Private internals: Conservative SemVer classification, current-schema target validation, three-way
-  planning, journals, ownership locks, rollback, receipt publication, dependency refresh, and policy
-  reconciliation plans.
-- Owned data and migrations: Child `.codexrig/installation.json` receipts and disposable
-  `.project-state/framework-upgrade/` transaction state. Project-owned compatibility/mise/CI
-  metadata and package-manager selection survive framework upgrades; maintenance updates only the
-  two package-manager receipt fields and preserves all other managed-code proofs.
-- Tenant isolation: Not applicable; source-framework capability with no child product data plane.
-- Allowed dependencies: `scripts/contracts`, `scripts/deps`, `scripts/docs`, `scripts/filesystem`,
-  `scripts/platform`, `scripts/repository`, `scripts/terminal`.
+- Responsibility: Diagnoses the source contract, derives source releases against the verified
+  central remote, maintains source compatibility experiments and applies explicitly requested
+  project-tool migrations. Generated projects contain none of this module.
+- Runtime and technology: Node.js ESM on the declared toolchain.
+- Public contract: `framework:doctor`, `framework:version`, `framework:upgrade`,
+  `compatibility:matrix` and the source housekeeping adapter. Migration requires an explicit target
+  and pristine generated reference; target-owned documents, product code and identity are preserved.
+- Private internals: Conservative SemVer classification, three-way file/package comparison, exact
+  target runtime exclusion, conflict planning, transactional journal and rollback. Non-current
+  reference metadata is compared as opaque bytes, never interpreted as an older private schema.
+- Owned data and migrations: Source `.codexrig/framework.json` release identity and
+  `.codexrig/compatibility.json` nonblocking experiments; temporary target
+  `.project-state/framework-upgrade/` journals disappear after settlement. Source selection is
+  `.codexrig/project-tools.json`; products have no installation receipt or source release identity.
+  The same generation owner emits sibling trees and archives from explicit selection and templates.
+- Tenant isolation: Not applicable; no product data plane.
+- Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/deps`, `scripts/docs`,
+  `scripts/filesystem`, `scripts/goals`, `scripts/platform`, `scripts/repository`, `scripts/setup`,
+  `scripts/terminal`, `scripts/verify`.
 - Focused verifier:
-  `node --test scripts/framework/framework-version.test.mjs scripts/framework/framework-lifecycle.test.mjs`
+  `node --test scripts/framework/framework-version.test.mjs scripts/framework/framework-upgrade.test.mjs scripts/framework/compatibility-integrity.test.mjs`
 - Steward: Framework lifecycle maintainer.
 
 #### Git Hook Adapter
@@ -285,7 +281,7 @@ upgradeable product repositories while deliberately defining no child product or
   release metadata; no external environment or product data.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/deps`, `scripts/docs`, `scripts/filesystem`,
-  `scripts/framework`, `scripts/repository`, `scripts/terminal`, `scripts/verify`.
+  `scripts/repository`, `scripts/terminal`, `scripts/verify`.
 - Focused verifier:
   `node --test scripts/goals/repository-housekeeping.test.mjs scripts/goals/goal-publication-precondition.test.mjs`
 - Steward: Goal lifecycle maintainer.
@@ -301,7 +297,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Owned data and migrations: Disposable local reconciliation state; remote changes occur only on an
   explicit primary-owned apply.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
-- Allowed dependencies: `scripts/contracts`, `scripts/repository`.
+- Allowed dependencies: `scripts/contracts`, `scripts/filesystem`, `scripts/repository`,
+  `scripts/terminal`.
 - Focused verifier: `node --test scripts/platform/platform-lifecycle.test.mjs`
 - Steward: Platform integration maintainer.
 
@@ -338,7 +335,7 @@ upgradeable product repositories while deliberately defining no child product or
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/filesystem`.
 - Focused verifier:
-  `node --test scripts/repository/source-inventory.test.mjs scripts/repository/worktree-recovery.test.mjs scripts/framework/framework-lifecycle.test.mjs scripts/context/context-lifecycle.test.mjs`
+  `node --test scripts/repository/source-inventory.test.mjs scripts/repository/worktree-recovery.test.mjs scripts/setup/startup-state.test.mjs scripts/context/context-lifecycle.test.mjs`
 - Steward: Repository boundary maintainer.
 
 #### Secret Classification
@@ -375,7 +372,9 @@ upgradeable product repositories while deliberately defining no child product or
   parent-bound launcher, without renewing its startup proof, acquiring writer ownership, replacing
   recovery, or entering durable reconstruction and Stop continuation. The capability also validates
   portable configuration and staged white-label tenant-capable projects, installs hooks, initializes
-  repositories, and exports the portable surface.
+  repositories, and exports explicitly selected independent projects. Source-only generation/export
+  uses one recipe and source-owned staged validator. Local `.codex/tooling.json`, toolchain and
+  verification configuration provide the retained tools' contracts without source metadata.
 - Runtime and technology: Node.js ESM and Bash on the mise-pinned framework toolchain.
 - Public contract: `codex:start`, `codex:validate`, `setup`, `hooks:install`, and `project:export`.
 - Private internals: Atomic native-picker reservation and authenticated selected-session binding,
@@ -389,10 +388,10 @@ upgradeable product repositories while deliberately defining no child product or
   `.codex/runtime/cache/codexrig/` plus the installed local Git hook. Repository Boundaries owns the
   short-lived writer lease and separate latest-session recovery marker that Setup coordinates.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
-- Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/docs`,
-  `scripts/filesystem`, `scripts/repository`, `scripts/terminal`, `scripts/verify`.
+- Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/deps`, `scripts/docs`,
+  `scripts/filesystem`, `scripts/platform`, `scripts/repository`, `scripts/terminal`.
 - Focused verifier:
-  `node --test scripts/setup/setup-regression.test.mjs scripts/setup/codex-launcher.test.mjs scripts/setup/startup-session-controller.test.mjs scripts/framework/framework-lifecycle.test.mjs`
+  `node --test scripts/setup/setup-regression.test.mjs scripts/setup/codex-launcher.test.mjs scripts/setup/startup-session-controller.test.mjs scripts/setup/startup-state.test.mjs`
 - Steward: Setup capability maintainer.
 
 #### Stack Detection
@@ -427,9 +426,9 @@ upgradeable product repositories while deliberately defining no child product or
 - Root: `scripts/verify`
 - Responsibility: Routes changed-path and full checks, binds successful evidence to source, runtime,
   Git basis, delivery environment, verified artifact/configuration bytes and a target-specific plan,
-  rejects product identity/framework-brand leakage, checks delivery-inventory drift, enforces
-  Identity and Access/provider/public-contract and tenant-isolation boundaries, enforces physical
-  surface and cross-surface import separation, checks responsive multi-device hazards,
+  rejects duplicated public product identity and tooling imports, checks delivery-inventory drift,
+  enforces Identity and Access/provider/public-contract and tenant-isolation boundaries, enforces
+  physical surface and cross-surface import separation, checks responsive multi-device hazards,
   localization/source-language truth, product-stack drift, and source/declaration-header currency,
   and performs repository quality gates.
 - Runtime and technology: Node.js ESM orchestration plus bounded Bash verifier adapters.
@@ -441,8 +440,8 @@ upgradeable product repositories while deliberately defining no child product or
   ignored `.codex/runtime/`; no product data or migrations.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/deps`, `scripts/docs`,
-  `scripts/filesystem`, `scripts/framework`, `scripts/repository`, `scripts/security`,
-  `scripts/stack`, `scripts/terminal`, `scripts/web`.
+  `scripts/filesystem`, `scripts/repository`, `scripts/security`, `scripts/setup`, `scripts/stack`,
+  `scripts/terminal`, `scripts/web`.
 - Focused verifier: `node --test scripts/verify/adaptive-cli.test.mjs`
 - Steward: Verification capability maintainer.
 
@@ -464,8 +463,8 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `4.4.1`.
-- Framework contract schema: `2`.
+- Framework version: `5.0.0`.
+- Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->
 
@@ -479,9 +478,10 @@ upgradeable product repositories while deliberately defining no child product or
   neutral source.
 - Tracked `.codex/`, `.agents/`, `.codexrig/`, and `scripts/` surfaces are user-inspectable. Only
   sensitive or disposable runtime state is ignored; normative framework policy is never hidden.
-- Generated projects can preview and apply a reviewed source update; the source framework can target
-  a child. Managed capabilities update transactionally while project-owned truth is reconciled by
-  stable policy identity instead of blind document replacement.
+- Explicit project-tool migrations run from the source framework against a supplied pristine
+  generated reference. Three-way file comparison detects conflicts, and the target's own runtime
+  lock protects the complete transaction through cleanup. Project documents and product identity are
+  preserved; generated projects contain no self-updater or installation receipt.
 
 ## Maintenance
 

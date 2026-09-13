@@ -40,10 +40,9 @@ import {
 } from "../../../../scripts/deps/dependency-transaction-state.mjs";
 import { openFrameworkRuntimeStatus, removeResetCandidate } from "./reset-framework.mjs";
 import { startupControllerFailureMessage } from "../../../../scripts/setup/startup-session-controller.mjs";
-import { postProjectCreationGuidance } from "../../create-project-from-framework/scripts/source-readiness.mjs";
 
 const script = path.join(path.dirname(fileURLToPath(import.meta.url)), "reset-framework.mjs");
-const frameworkRoot = path.resolve(path.dirname(script), "..", "..", "..", "..");
+const toolingRoot = path.resolve(path.dirname(script), "..", "..", "..", "..");
 
 function write(root, relativePath, content = "fixture\n", mode) {
   const filePath = path.join(root, ...relativePath.split("/"));
@@ -125,9 +124,8 @@ test("operator reset guidance executes preview, apply, and clean preview through
   const error = new Error("Fixture private lease is not current.");
   error.code = invalidRuntimeSessionLeaseErrorCode;
   const guidance = [
-    ["startup recovery", startupControllerFailureMessage(error, frameworkRoot)],
-    ["README recovery", readFileSync(path.join(frameworkRoot, "README.md"), "utf8")],
-    ["project creation", postProjectCreationGuidance({ sourceHasChanges: false }).join("\n")],
+    ["startup recovery", startupControllerFailureMessage(error, toolingRoot)],
+    ["README recovery", readFileSync(path.join(toolingRoot, "README.md"), "utf8")],
   ];
   for (const [label, content] of guidance) {
     await t.test(label, () => {
@@ -144,7 +142,7 @@ test("operator reset guidance executes preview, apply, and clean preview through
           .filter(Boolean);
         for (const [index, [executable, ...args]] of commands.entries()) {
           const result = spawnSync(executable, [...args, "--root", root], {
-            cwd: frameworkRoot,
+            cwd: toolingRoot,
             encoding: "utf8",
             env: { ...process.env, CODEX_HOME: "" },
             input: "",
@@ -179,17 +177,19 @@ test("reset preserves reusable startup repairs and their release metadata byte f
   const root = fixture();
   t.after(() => rmSync(root, { force: true, recursive: true }));
   const preservedPaths = [
+    ".codex/tooling.json",
+    ".codex/toolchain.json",
+    ".codex/verification.json",
     ".codexrig/framework.json",
     "package.json",
     "README.md",
     "docs/project.md",
     "scripts/docs/delivery-manifest.mjs",
     "scripts/framework/framework-doctor.mjs",
-    "scripts/framework/framework-lifecycle.test.mjs",
+    "scripts/setup/startup-state.test.mjs",
     "scripts/goals/repository-housekeeping.test.mjs",
     "scripts/verify/language.mjs",
     "scripts/verify/language.test.mjs",
-    "scripts/verify/repository-smoke-content.mjs",
     "scripts/verify/repository-smoke.mjs",
     "scripts/verify/adaptive-runner.mjs",
     "scripts/verify/verification-admission.mjs",
@@ -197,7 +197,7 @@ test("reset preserves reusable startup repairs and their release metadata byte f
   const expected = new Map(
     preservedPaths.map((relativePath) => [
       relativePath,
-      readFileSync(path.join(frameworkRoot, relativePath), "utf8"),
+      readFileSync(path.join(toolingRoot, relativePath), "utf8"),
     ]),
   );
   for (const [relativePath, content] of expected) write(root, relativePath, content);
@@ -385,86 +385,6 @@ test("the shared runtime lifecycle lock closes reset and session-start races", (
   }
 });
 
-test("post-project-creation cleanup removes safe residue while preserving active runtime", (t) => {
-  const root = fixture("reset-framework-post-creation-");
-  t.after(() => rmSync(root, { force: true, recursive: true }));
-  write(root, "docs/planning/current-goal.md", "# Safe process residue\n");
-  write(root, ".project-state/generator/transaction.json", "{}\n");
-  write(root, "dist/exports/generated.tar.gz", "generated\n");
-  write(root, ".codex/runtime/logs_2.sqlite", "active runtime\n");
-  write(root, "history.jsonl", "active loose-root runtime\n");
-  issueRuntimeSessionLease({ root, pid: process.pid });
-  t.after(() => {
-    if (existsSync(path.join(root, ".codex/runtime/codexrig-session.json"))) {
-      releaseRuntimeSessionLease({ root, pid: process.pid });
-    }
-  });
-
-  const preview = run(root, ["--post-project-creation"]);
-  assert.equal(preview.status, 1);
-  assert.match(preview.stdout, /docs\/planning/);
-  assert.match(preview.stdout, /\.project-state/);
-  assert.match(preview.stdout, /dist\/exports/);
-  assert.doesNotMatch(preview.stdout, /logs_2\.sqlite|history\.jsonl/);
-  assert.match(preview.stdout, /--post-project-creation --apply/);
-
-  const applied = run(root, ["--post-project-creation", "--apply"]);
-  assert.equal(applied.status, 0, applied.stderr);
-  assert.match(applied.stdout, /active-session cleanup complete/);
-  for (const removed of ["docs/planning", ".project-state", "dist/exports"]) {
-    assert.equal(existsSync(path.join(root, ...removed.split("/"))), false, removed);
-  }
-  for (const preserved of [
-    ".codex/runtime/logs_2.sqlite",
-    ".codex/runtime/codexrig-session.json",
-    "history.jsonl",
-  ]) {
-    assert.equal(existsSync(path.join(root, ...preserved.split("/"))), true, preserved);
-  }
-  const clean = run(root, ["--post-project-creation"]);
-  assert.equal(clean.status, 0, clean.stderr);
-  assert.match(clean.stdout, /local runtime are deferred until Codex exits/);
-});
-
-test("post-project-creation cleanup cannot overlap an active dependency transaction", (t) => {
-  const root = fixture("reset-framework-post-creation-dependency-");
-  t.after(() => rmSync(root, { force: true, recursive: true }));
-  write(root, ".project-state/generator/transaction.json", "{}\n");
-  const dependency = acquireDependencyTransactionLock(root);
-
-  const contested = run(root, ["--post-project-creation", "--apply"]);
-  assert.equal(contested.status, 1);
-  assert.match(contested.stderr, /runtime lifecycle operation is active/u);
-  assert.equal(
-    readFileSync(path.join(root, ".project-state/generator/transaction.json"), "utf8"),
-    "{}\n",
-  );
-
-  releaseDependencyTransactionLock(dependency);
-  const applied = run(root, ["--post-project-creation", "--apply"]);
-  assert.equal(applied.status, 0, applied.stderr);
-  assert.equal(existsSync(path.join(root, ".project-state")), false);
-});
-
-test("portable source baseline ignores contained active runtime but not process documents", (t) => {
-  const root = fixture("reset-framework-portable-source-");
-  issueRuntimeSessionLease({ root, pid: process.pid });
-  t.after(() => {
-    releaseRuntimeSessionLease({ root, pid: process.pid });
-    rmSync(root, { force: true, recursive: true });
-  });
-  write(root, "history.jsonl", "active pre-lease fixture\n");
-
-  const clean = run(root, ["--portable-source-baseline"]);
-  assert.equal(clean.status, 0, clean.stderr);
-  assert.match(clean.stdout, /portable source baseline is clean/);
-
-  write(root, "docs/planning/current-goal.md", "# Process residue\n");
-  const blocked = run(root, ["--portable-source-baseline"]);
-  assert.equal(blocked.status, 1);
-  assert.match(blocked.stdout, /docs\/planning/);
-});
-
 test(
   "reset refuses loose-root runtime files still held open by a pre-lease process",
   { skip: process.platform !== "linux" },
@@ -555,7 +475,7 @@ test("clean preview tolerates only the currently active verification lock", (t) 
   assert.match(strictPreview.stdout, /Framework baseline is clean/);
   const preview = run(root, ["--verification-source-baseline"]);
   assert.equal(preview.status, 0, preview.stderr);
-  assert.match(preview.stdout, /Framework portable source baseline is clean/);
+  assert.match(preview.stdout, /Framework verification source baseline is clean/);
 });
 
 test("reset unlinks top-level and nested runtime symlinks without touching their targets", (t) => {

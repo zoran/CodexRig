@@ -28,15 +28,15 @@ verify:
       /var/lib/apt/lists/*
     - |
       case "$(uname -m)" in
-        x86_64|amd64) mise_package='@jdxcode/mise-linux-x64'; mise_integrity='sha512-u5i30oDxZYJUh7y2K2bWz4n+p3YTa9y1htcSiJPdBTH9XCMzdNhmhHFEKspBrmxyb9qZju6s/FN0oGl42rLEyg==' ;;
-        aarch64|arm64) mise_package='@jdxcode/mise-linux-arm64'; mise_integrity='sha512-SkXAScilkoXsJVCDg/V5A+3koMAqZUDQeCcvsNxUv7AbVgwkAyDYH2fPIWO8K5WewrU3OJCzn90Zf4v2mB6W9w==' ;;
+        x86_64|amd64) mise_package='@jdxcode/mise-linux-x64'; mise_integrity='sha512-NbEnJDRld7mgwrrHbdbMzQqXCcXW8xkxmS9yJJMucSRTV3xY5hyp6nTakKl2LuaUaT6Sb1lZC4v3o8pwhAZhcQ==' ;;
+        aarch64|arm64) mise_package='@jdxcode/mise-linux-arm64'; mise_integrity='sha512-MGeI+WUrlkLuybNdaxmtEEej0J+M/TS3i9+gXA9bFmhLA/kWTtfOlV4qmg8BN8tLWVAVzwWH2uCfF6zjp20tRg==' ;;
         *) echo "Unsupported GitLab runner architecture: $(uname -m)" >&2; exit 1 ;;
       esac
       mise_stage="$(umask 077 && mktemp -d)"
-      npm pack --ignore-scripts --pack-destination "$mise_stage" "${mise_package}@2026.9.5" >/dev/null
-      mise_archive="$(node scripts/framework/compatibility-matrix.mjs --verify-mise-archive "$mise_stage" "$mise_integrity")"
+      npm pack --ignore-scripts --pack-destination "$mise_stage" "${mise_package}@2026.9.6" >/dev/null
+      mise_archive="$(node scripts/deps/toolchain-archives.mjs --verify-mise-archive "$mise_stage" "$mise_integrity")"
       npm install --global "$mise_archive" --ignore-scripts --offline
-    - npm install --global pnpm@11.26.0 --ignore-scripts
+    - npm install --global pnpm@11.27.0 --ignore-scripts
     - |
       case "$(uname -m)" in
         x86_64|amd64) codex_architecture='x64'; codex_platform_package='@openai/codex-linux-x64'; codex_platform_integrity='sha512-a4FI3A8sGtwGrOqltrPbrS2hajrHQG591EwmRfiRoLMb10VxdBtUGW4gu6IJVYENiYGA7k3P4jlRHEoCZU/s9Q==' ;;
@@ -54,7 +54,7 @@ verify:
       npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm cache add "${codex_package}@${codex_version}"
       npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm cache add "${codex_platform_package}@npm:${codex_package}@${codex_version}-linux-${codex_architecture}"
       npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm pack --ignore-scripts --pack-destination "$codex_stage" "${codex_package}@${codex_version}" "${codex_package}@${codex_version}-linux-${codex_architecture}" >/dev/null
-      node scripts/framework/compatibility-matrix.mjs --verify-codex-archives "$codex_stage" "$codex_wrapper_integrity" "$codex_platform_integrity" >/dev/null
+      node scripts/deps/toolchain-archives.mjs --verify-codex-archives "$codex_stage" "$codex_wrapper_integrity" "$codex_platform_integrity" >/dev/null
       npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm install --global "${codex_package}@${codex_version}" --ignore-scripts --offline
       rm -rf -- "$codex_install_root"
       trap - EXIT

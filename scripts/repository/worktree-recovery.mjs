@@ -4,7 +4,7 @@ import { spawnSyncWithBoundedIo as spawnSync } from "./runtime-process-io.mjs";
 import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { TextDecoder } from "node:util";
-import { frameworkRoot } from "../contracts/framework-contract.mjs";
+import { toolingRoot } from "../filesystem/repository-files.mjs";
 import {
   cleanGitEnvironment,
   isolatedGitArguments,
@@ -496,7 +496,7 @@ function preserveAmbiguousCurrentInventory(currentRoot, worktrees, pruneTransact
 }
 
 /** Inventories the current root and all safe same-clone worktrees without transcript or Git mutation. */
-export function inspectRepositoryWorktrees({ root = frameworkRoot } = {}) {
+export function inspectRepositoryWorktrees({ root = toolingRoot } = {}) {
   const currentRoot = canonicalWorktreePath(root);
   let metadata;
   try {
@@ -580,7 +580,7 @@ function hasUnsafeWriterForGitMutation(inventory) {
 
 /** Clears stale coordination state while preserving recovery metadata and every worktree file. */
 export function reconcileRepositoryWorktreeState({
-  root = frameworkRoot,
+  root = toolingRoot,
   apply = false,
   lifecycleCapability,
   testHooks,
