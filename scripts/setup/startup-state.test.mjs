@@ -868,7 +868,7 @@ test("startup attestation accepts only the YOLO permission mode for a YOLO launc
   assert.equal(releaseCurrentRuntimeSession(root), true);
 });
 
-test("picker attestation binds one authenticated session and rejects later identity changes", () => {
+test("durable session switches require a fresh launcher even after startup proof expiry", () => {
   const root = attestationFixture();
   const controlPolicy = startupControlPolicies.default;
   issueRuntimeSessionLease({ root, pid: process.pid });
@@ -881,19 +881,28 @@ test("picker attestation binds one authenticated session and rejects later ident
     nonce: issued.nonce,
     hookInput: sessionStartHookInput(root, { session_id: selectedId, source: "resume" }),
   });
-  assert.throws(
-    () =>
-      verifyStartupAttestation({
-        root,
-        controlPolicy,
-        nonce: issued.nonce,
-        hookInput: sessionStartHookInput(root, {
-          session_id: "01b01234-5678-7abc-8def-0123456789ab",
-          source: "resume",
-        }),
-      }),
-    /already bound to a different/u,
-  );
+  const leaseBefore = inspectRuntimeSessionLease({ root }).lease;
+  const recoveryBefore = inspectRuntimeSessionRecovery({ root }).recovery;
+  for (const source of ["startup", "resume"]) {
+    for (const now of [issued.attestation.expiresAt + 1, issued.attestation.issuedAt + 1]) {
+      assert.throws(
+        () =>
+          verifyStartupAttestation({
+            root,
+            controlPolicy,
+            nonce: issued.nonce,
+            now: () => now,
+            hookInput: sessionStartHookInput(root, {
+              session_id: "01b01234-5678-7abc-8def-0123456789ab",
+              source,
+            }),
+          }),
+        /launcher is already bound to another durable Codex session/u,
+      );
+      assert.deepEqual(inspectRuntimeSessionLease({ root }).lease, leaseBefore);
+      assert.deepEqual(inspectRuntimeSessionRecovery({ root }).recovery, recoveryBefore);
+    }
+  }
   assert.equal(inspectRuntimeSessionLease({ root }).lease.codexSessionId, selectedId);
   assert.equal(releaseCurrentRuntimeSession(root), true);
 });

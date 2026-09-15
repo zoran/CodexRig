@@ -139,6 +139,9 @@ recovery, or context. The initial attestation's 30-minute window therefore does 
 side conversation can open. Their Stop events do not run the parent's continuation lifecycle; see
 [the canonical session contract](../instructions.md#session-start).
 
+Each launcher binds one durable session. A switch to another chat through `/new` or `/resume` needs
+a full restart; see the [handover and restart steps](../README.md#essential-commands).
+
 The primary then begins with `pnpm worktree:status -- --json`, which inventories every same-clone
 worktree and safe latest-session marker without spending the bounded attestation-hook runtime on a
 potentially large or inconsistent Git graph. Per-root inconsistencies stay visible while safe

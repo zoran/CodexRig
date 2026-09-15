@@ -184,6 +184,7 @@ function controllerFixture() {
       'if(behavior==="cancel-picker")process.exit(0);',
       "const skipSessionStart=false;",
       'if(!skipSessionStart){const started=spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[0].command],{cwd:root,encoding:"utf8",env:process.env,input:sessionInput,stdio:"pipe"});if(started.status!==0||JSON.parse(started.stdout).continue!==true){process.stderr.write(started.stderr+started.stdout);process.exit(90);}}',
+      'if(behavior==="switch-session"){const next={...JSON.parse(sessionInput),session_id:"01a06666-5678-7abc-8def-0123456789ab",source:"startup",transcript_path:path.join(root,"next-session.jsonl")};const started=spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[0].command],{cwd:root,encoding:"utf8",env:process.env,input:JSON.stringify(next),stdio:"pipe"});process.stderr.write(started.stderr+started.stdout);process.exit(0);}',
       'if(behavior==="side-lifecycle"){',
       '  const assert=require("node:assert/strict");',
       '  const statePaths=[".codex/runtime/codexrig-session.json",".codex/runtime/codexrig-session-recovery.json"];',
@@ -392,6 +393,29 @@ test("native picker can start a new session through the same authenticated lifec
   const result = runController(fixture, { behavior: "new-session" });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(inspectRuntimeSessionRecovery({ root: fixture.project }).status, "present");
+});
+
+test("an in-process chat switch explains restart, preserves recovery, and permits a fresh launch", () => {
+  const fixture = controllerFixture();
+  const rejected = runController(fixture, { behavior: "switch-session" });
+  assert.notEqual(rejected.status, 0);
+  assert.match(rejected.stderr, /"continue":false/u);
+  assert.match(rejected.stderr, /launcher is already bound to another durable Codex session/u);
+  assert.match(rejected.stderr, /Exit Codex completely with \/quit/u);
+  assert.match(rejected.stderr, /bash scripts\/setup\/start-codex\.sh/u);
+  assert.equal(inspectRuntimeSessionLease({ root: fixture.project }).status, "absent");
+  assert.equal(capturedCalls(fixture).length, 1);
+  assert.equal(
+    inspectRuntimeSessionRecovery({ root: fixture.project }).recovery.codexSessionId,
+    capturedCalls(fixture)[0].sessionId,
+  );
+
+  const restarted = runController(fixture, { behavior: "different-selection" });
+  assert.equal(restarted.status, 0, restarted.stderr);
+  assert.equal(
+    inspectRuntimeSessionRecovery({ root: fixture.project }).recovery.codexSessionId,
+    capturedCalls(fixture)[1].sessionId,
+  );
 });
 
 test("side lifecycle preserves parent ownership after source edits and isolates a rejected side start", () => {

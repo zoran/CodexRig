@@ -454,6 +454,11 @@ function main() {
     const handover = createCriticalBudgetHandover();
     console.log(`Critical-budget handover sealed: ${handover.relativePath}`);
     console.log("Stop now. Do not run another task, tool, follow-up, or automatic continuation.");
+    console.log(
+      "Developer: exit Codex completely with /quit, then run bash scripts/setup/start-codex.sh " +
+        "from the project root in your terminal. /new and /resume do not restart the launcher. " +
+        "Accept this handover when the new session announces it.",
+    );
     return;
   }
   if (args.length === 2 && args[0] === "receive") {

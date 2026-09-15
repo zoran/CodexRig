@@ -1065,6 +1065,14 @@ SessionStart cannot be reported as successful activation. Any attestation drift 
 instead of blessing changed startup code. No repository script, mise configuration, or package is
 loaded or executed after admission; the selected session performs the complete reconstruction above.
 
+Each launcher binds one durable Codex session. Switching to another chat with `/new` or `/resume`
+inside the same CLI retains that launcher and is rejected before startup-proof expiry or source
+drift can obscure the session-binding reason. To switch durable sessions, including after a critical
+handover, the developer exits Codex completely with `/quit` and runs
+`bash scripts/setup/start-codex.sh` from the project root in the terminal. The later session may
+accept the preserved handover. A restart neither requires deleting runtime nor extends the old
+attestation; the new launcher issues its own proof.
+
 Codex retains the injected hook definitions in its in-memory hook registry before the writable
 session begins. Both lifecycle commands are the same embedded Node-built-in-only client, bound by
 environment to the controller's exact Node executable and private loopback token; they resolve no
@@ -1938,9 +1946,11 @@ repository action of the session. The command atomically writes and re-reads one
 repository-bound prompt under ignored `tmp/codexrig-handovers/`. A successful seal is an absolute
 terminal boundary: do not call another tool, run a check or housekeeping step, start or continue a
 task/slice, send a follow-up or agent message, or allow the Stop hook to continue automatically.
-Return only the concise user-facing handover path and stop completely. A failed seal is not a stop
-claim; repair only the bounded sealing prerequisite while capacity safely permits, otherwise report
-the concrete blocker without inventing a successful handover.
+Return only the concise user-facing handover path and the developer's full-restart instruction from
+[Session Start](#session-start), then stop completely. This instruction authorizes no further agent
+action in the sealing session. A failed seal is not a stop claim; repair only the bounded sealing
+prerequisite while capacity safely permits, otherwise report the concrete blocker without inventing
+a successful handover.
 
 The primary and every subagent re-check usage after discovery, a material scope change, a long tool
 result, and before any follow-up. When an envelope or completion reserve is threatened, stop

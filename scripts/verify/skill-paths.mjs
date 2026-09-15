@@ -4,7 +4,7 @@ import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { format as formatWithPrettier } from "prettier";
-import { repositoryRoot } from "../repository/source-inventory.mjs";
+import { isPrivateCodexRuntimePath, repositoryRoot } from "../repository/source-inventory.mjs";
 
 const skillsRoot = path.join(repositoryRoot, ".agents", "skills");
 const failures = [];
@@ -169,10 +169,7 @@ const trackedCodex = spawnSync("git", ["ls-files", "-z", "--", ".codex"], {
 });
 if (trackedCodex.status === 0) {
   for (const trackedPath of trackedCodex.stdout.split("\0").filter(Boolean)) {
-    if (
-      ![".codex/README.md", ".codex/config.toml", ".codex/hooks.json"].includes(trackedPath) &&
-      !/^\.codex\/agents\/[a-z][a-z0-9_-]*\.toml$/.test(trackedPath)
-    ) {
+    if (isPrivateCodexRuntimePath(trackedPath)) {
       failures.push(`${trackedPath} must remain ignored Codex runtime state`);
     }
   }

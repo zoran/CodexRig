@@ -109,6 +109,11 @@ bash scripts/setup/start-codex.sh
 Use \`--yolo\` only for an explicitly authorized Dev session; use \`--no-alt-screen\` when needed.
 Enter prompts after native session selection. Restart through the launcher after runtime-tool changes.
 
+After a critical handover, exit Codex completely with \`/quit\`, then run
+\`bash scripts/setup/start-codex.sh\` from this root in your terminal. Accept the preserved handover
+when the new session announces it. \`/new\` and \`/resume\` inside the running CLI retain the old
+launcher and cannot replace this restart. Keep the handover and runtime files intact.
+
 ## First Prompt: Define The Project
 
 Read the current definition and any linked specification with Codex. Refine and confirm users,

@@ -44,6 +44,13 @@ Executable or unknown ignored runtime configuration, missing startup modules, un
 hook mismatch blocks startup. Do not disable these checks. After changing runtime tooling, exit and
 restart through the launcher; preserve the private files needed by any active native session.
 
+Each launcher binds one durable session. To switch to another chat, including after a critical
+handover, the developer exits Codex completely with `/quit` and runs
+`bash scripts/setup/start-codex.sh` from the project root in the terminal. `/new` and `/resume`
+inside the running CLI retain its existing launcher and cannot replace this restart. The later
+session may accept the preserved handover; no manual runtime deletion or extension of the old proof
+is needed.
+
 ### Startup Repository Reconstruction
 
 Before intake or writes, read AGENTS.md, README, this file, the manifest and its linked requirements
@@ -258,7 +265,9 @@ limit check; no purchase, paid overage, account/model switch or user Goal-budget
 At critical state start no work. Drain only provenance-bound agents/tasks at safe boundaries, update
 the bounded context with the exact Critical Budget Drain attestation, then run
 `pnpm handover:create -- --critical` as the final repository action. After a successful seal stop
-completely: no tool, agent contact, check or automatic continuation. Required attestation:
+completely: no tool, agent contact, check or automatic continuation. Return only the handover path
+and the developer's full-restart instruction from [Session Start](#session-start); this authorizes
+no further action in the sealing session. Required attestation:
 
 ```text
 ## Critical Budget Drain

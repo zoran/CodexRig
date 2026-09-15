@@ -163,7 +163,10 @@ function boundedRequestBody(request) {
 }
 
 function sessionStartFailure(error, root) {
-  const reason = `CodexRig startup verification failed: ${formatContextError(error, root)}. Start with bash scripts/setup/start-codex.sh.`;
+  const reason =
+    `CodexRig startup verification failed: ${formatContextError(error, root)} ` +
+    "Exit Codex completely with /quit, then run bash scripts/setup/start-codex.sh " +
+    "from the project root in your terminal.";
   return { continue: false, stopReason: reason, systemMessage: reason };
 }
 

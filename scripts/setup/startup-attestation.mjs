@@ -579,6 +579,17 @@ export function verifyStartupAttestation({
     }
     return null;
   }
+  // Report the existing one-session boundary before an expired or edited startup basis obscures
+  // it. Activation still enforces ownership atomically in the runtime lease owner.
+  if (
+    runtimeLease.lease.phase === "active" &&
+    runtimeLease.lease.codexSessionId !== input.session_id
+  ) {
+    throw new Error(
+      "This launcher is already bound to another durable Codex session. " +
+        "Switching chats with /new or /resume does not start a fresh launcher.",
+    );
+  }
   const effectiveControlPolicy = startupControlPolicy(controlPolicy);
   const basis = validateCurrentAttestationBasis({
     root,

@@ -108,7 +108,10 @@ pnpm framework:publish --message "<commit message>"  # after exiting Codex
 ```
 
 The handover command is not routine housekeeping. After it reports a sealed path, the Codex session
-must stop without another action.
+must stop without another action. To continue from that handover, exit Codex completely with
+`/quit`, then run `bash scripts/setup/start-codex.sh` from the project root in your terminal. Accept
+the handover when the new session announces it. `/new` and `/resume` inside the running CLI retain
+its existing launcher; they cannot replace this restart. Keep the handover and runtime files intact.
 
 To finish framework work, the existing `framework:publish` script runs the complete cleanup,
 verification, commit and push sequence. After reviewing all source changes, exit every Codex session

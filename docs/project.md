@@ -368,13 +368,15 @@ upgradeable product repositories while deliberately defining no child product or
   its private issue-time gate secret and persist completion; a wrapper exit code alone is
   insufficient, and cancellation before SessionStart creates no activation or recovery record. The
   embedded built-in-only client is bound to the controller's exact Node executable and token-bound
-  loopback endpoint. Transcriptless native side conversations are acknowledged only under the active
-  parent-bound launcher, without renewing its startup proof, acquiring writer ownership, replacing
-  recovery, or entering durable reconstruction and Stop continuation. The capability also validates
-  portable configuration and staged white-label tenant-capable projects, installs hooks, initializes
-  repositories, and exports explicitly selected independent projects. Source-only generation/export
-  uses one recipe and source-owned staged validator. Local `.codex/tooling.json`, toolchain and
-  verification configuration provide the retained tools' contracts without source metadata.
+  loopback endpoint. Durable chat switches report the existing session binding before startup-proof
+  expiry or input drift, directing the developer to a full launcher restart. Transcriptless native
+  side conversations are acknowledged only under the active parent-bound launcher, without renewing
+  its startup proof, acquiring writer ownership, replacing recovery, or entering durable
+  reconstruction and Stop continuation. The capability also validates portable configuration and
+  staged white-label tenant-capable projects, installs hooks, initializes repositories, and exports
+  explicitly selected independent projects. Source-only generation/export uses one recipe and
+  source-owned staged validator. Local `.codex/tooling.json`, toolchain and verification
+  configuration provide the retained tools' contracts without source metadata.
 - Runtime and technology: Node.js ESM and Bash on the mise-pinned framework toolchain.
 - Public contract: `codex:start`, `codex:validate`, `setup`, `hooks:install`, and `project:export`.
 - Private internals: Atomic native-picker reservation and authenticated selected-session binding,
@@ -463,7 +465,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `5.0.0`.
+- Framework version: `5.1.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->
