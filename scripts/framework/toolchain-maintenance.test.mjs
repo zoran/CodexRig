@@ -251,6 +251,7 @@ for (const failure of ["network", "peer", "reproduce", "concurrent", "pending", 
       calls.push([command, ...args]);
       if (args[0] === "--version") return matrix.ci.miseVersion;
       if (args.includes("--stage-toolchain")) {
+        assert.equal(args.at(-1), root);
         if (failure === "peer") throw new Error("peer dependency conflict");
         write(options.cwd, "pnpm-lock.yaml", "lockfileVersion: '9.0'\n# refreshed fixture\n");
         if (failure === "concurrent") write(root, "package.json", '{"name":"concurrent-owner"}\n');

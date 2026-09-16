@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { formatContextError } from "../terminal/terminal-output.mjs";
+import { formatContextError, sanitizeMultilineForTerminal } from "../terminal/terminal-output.mjs";
 import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycle-process.mjs";
 import {
   adoptRuntimeLifecycleDelegation,
@@ -163,11 +163,38 @@ function runPnpm(spawnPnpm, args, cwd, projectRoot, lifecycleCapability) {
   });
 }
 
-function commandFailure(result, label) {
-  if (result.error) {
-    return new DependencyTransactionError(`${label} failed to start: ${result.error.message}`);
-  }
-  return new DependencyTransactionError(`${label} failed with status ${result.status}.`);
+function commandFailure(result, label, projectRoot) {
+  const reason = result.error ? "failed to start" : `failed with status ${result.status}`;
+  const output = sanitizeMultilineForTerminal(
+    [result.error?.message, result.stdout, result.stderr].filter(Boolean).join("\n"),
+    projectRoot,
+  );
+  // pnpm reports errors on stdout after progress output; retain the cause within CLI bounds.
+  const errorIndex = output.search(/(?:\[)?ERR_PNPM_[A-Z0-9_]+/u);
+  const diagnostic = formatContextError(
+    errorIndex < 0 ? output : output.slice(errorIndex),
+    projectRoot,
+  );
+  return new DependencyTransactionError(`${label} ${reason}.${diagnostic ? ` ${diagnostic}` : ""}`);
+}
+
+function installationStoreArgs(options, projectRoot, lifecycleCapability) {
+  if (!options.installationRoot) return [];
+  // Resolve with the candidate pnpm, but in the final root: the default store is filesystem-local,
+  // and a configured relative store is relative to that root, not to either temporary stage.
+  const result = runPnpm(
+    options.spawnPnpm ?? spawnSync,
+    ["store", "path"],
+    realpathSync.native(options.installationRoot),
+    projectRoot,
+    lifecycleCapability,
+  );
+  if (result.error || result.status !== 0)
+    throw commandFailure(result, "Installation store path lookup", projectRoot);
+  const storeDirectory = String(result.stdout ?? "").trim();
+  if (!path.isAbsolute(storeDirectory) || /[\0\r\n]/u.test(storeDirectory))
+    throw new DependencyTransactionError("Installation store path must be one absolute path.");
+  return ["--store-dir", storeDirectory];
 }
 
 function copyDependencyStage(projectRoot, stageRoot, inputs) {
@@ -260,7 +287,7 @@ export function reproduceLockedDependencies(options = {}) {
     verifyInputRecords(projectRoot, inputs);
     if (result.error || result.status !== 0) {
       throw new DependencyTransactionError(
-        `${commandFailure(result, "Offline frozen dependency reproduction").message} Installation is incomplete; no registry resolution was requested.`,
+        `${commandFailure(result, "Offline frozen dependency reproduction", projectRoot).message} Installation is incomplete; no registry resolution was requested.`,
       );
     }
     return { lockfileUpdated: false, manifestCount: manifests.length };
@@ -270,6 +297,7 @@ export function reproduceLockedDependencies(options = {}) {
 export function installLatestCompatibleDependencies(options = {}) {
   const spawnPnpm = options.spawnPnpm ?? spawnSync;
   return withDependencyInstallation(options, ({ inputs, lock, manifests, projectRoot }) => {
+    const storeArgs = installationStoreArgs(options, projectRoot, lock.lifecycleCapability);
     const original = readOptionalFile(projectRoot, "pnpm-lock.yaml");
     const lockfilePath = safeRepositoryPath(projectRoot, "pnpm-lock.yaml");
     const lockfileMode = lstatSync(lockfilePath).mode & 0o777;
@@ -282,14 +310,14 @@ export function installLatestCompatibleDependencies(options = {}) {
       copyDependencyStage(projectRoot, stageRoot, inputs);
       const update = runPnpm(
         spawnPnpm,
-        compatibleUpdateArgs,
+        [...compatibleUpdateArgs, ...storeArgs],
         stageRoot,
         projectRoot,
         lock.lifecycleCapability,
       );
       if (update.error || update.status !== 0) {
         throw new DependencyTransactionError(
-          `${commandFailure(update, "Compatible registry resolution").message} Dependency freshness is indeterminate; durable project inputs were left unchanged.`,
+          `${commandFailure(update, "Compatible registry resolution", projectRoot).message} Dependency freshness is indeterminate; durable project inputs were left unchanged.`,
         );
       }
       const refreshed = refreshedLockfile(stageRoot, inputs);
@@ -301,7 +329,7 @@ export function installLatestCompatibleDependencies(options = {}) {
 
       const install = runPnpm(
         spawnPnpm,
-        compatibleInstallArgs,
+        [...compatibleInstallArgs, ...storeArgs],
         projectRoot,
         projectRoot,
         lock.lifecycleCapability,
@@ -313,7 +341,7 @@ export function installLatestCompatibleDependencies(options = {}) {
           rollbackSummary = "The prior lockfile was restored";
         }
         throw new DependencyTransactionError(
-          `${commandFailure(install, "Frozen dependency installation").message} ${rollbackSummary}; installation is incomplete.`,
+          `${commandFailure(install, "Frozen dependency installation", projectRoot).message} ${rollbackSummary}; installation is incomplete.`,
         );
       }
       try {
@@ -390,8 +418,11 @@ function main() {
     reproduceMaintenanceInstallation("toolchain-dependency");
     return;
   }
-  if (args.length === 1 && args[0] === "--stage-toolchain") {
-    installLatestCompatibleDependencies({ projectRoot: process.cwd() });
+  if (args.length === 2 && args[0] === "--stage-toolchain") {
+    installLatestCompatibleDependencies({
+      projectRoot: process.cwd(),
+      installationRoot: args[1],
+    });
     return;
   }
   if (args.length > 0) throw new Error("Unsupported dependency installation arguments.");

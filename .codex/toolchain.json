@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedOn": "2026-09-15",
+  "reviewedOn": "2026-09-16",
   "ci": {
     "codexNpmPackage": "@openai/codex",
     "codexNpmPackageIntegrity": "sha512-FV/x1OHXYv/ifjf3mXj9ThTTAWcUZN6cGIRQRhRxkKNOPuImu1WW0c8ev1vUkE9XGH90dEnYG1tBjIkxRikg0w==",
@@ -13,16 +13,16 @@
       "arm64": "@openai/codex-linux-arm64"
     },
     "codexVersion": "0.154.0",
-    "miseLinuxX64Sha256": "ff182b17e78d2ae09b5ae3ff3c032eed061e6c2a6b2d4a03ce959d4d74c4b7dd",
+    "miseLinuxX64Sha256": "bd481434a65ede6b2ec6162b88f129e5c6b94cf9de808b8ee7c6f027b13b4589",
     "miseNpmPackageIntegrities": {
-      "x64": "sha512-VJSb8ML+Cpsy0HxdfIxmx0RuA4GdOpuXAcK19Yyv3kdzJTXx/XAn1B4JROy5V2qIDCeEQXD86Bv5xGcCJyAfvQ==",
-      "arm64": "sha512-xxIhNgHJzcDtRMsxPy78RNKWeQRpo0sXrZXgbDgcSGxXS5Z0uxXeRxYWfSMvxTYxr0c3FQeWv9b1A4PwS1fNOA=="
+      "x64": "sha512-pCn9teELM6Ed0VtZ83ZxEMtP6B8jphTRbQaaWzHScw8zFtRS+4zfeKGgoGstiNAVMBRrFO0X1RyY82xv5RMUtQ==",
+      "arm64": "sha512-2qoCdNCRptUTg2nATQmDQXQIPYS8dGwmDooQOQzQZS9oFdLoE/POSbMwtPioMYySVhRksoC0P6TtHgJ6JpvrHA=="
     },
     "miseNpmPackages": {
       "x64": "@jdxcode/mise-linux-x64",
       "arm64": "@jdxcode/mise-linux-arm64"
     },
-    "miseVersion": "2026.9.8"
+    "miseVersion": "2026.9.9"
   },
   "stable": {
     "node": {

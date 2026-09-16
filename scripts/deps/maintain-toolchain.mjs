@@ -184,6 +184,7 @@ export async function maintainToolchain({
         "node",
         path.join(toolingRoot, "scripts/deps/install-compatible.mjs"),
         "--stage-toolchain",
+        root,
       ],
       stageOptions,
     );

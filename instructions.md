@@ -1205,13 +1205,16 @@ reconciliation.
 
 Maintenance stages the complete workspace inputs and candidate toolchain, preserves the locked
 platform inventory through native mise, and resolves and installs the newest compatible dependency
-graph with strict peers/engines and disabled lifecycle scripts/hooks. Only a successful candidate
-and unchanged original inputs permit a recoverable batch of compatibility metadata, mise files, CI
-pins, package-manager field, and lockfile. Final offline reproduction must succeed; otherwise the
-batch rolls back, preserving concurrent edits as a recovery blocker. An interrupted complete batch
-is recovered as current state and its derived installation is reproduced on retry before admission.
-An unchanged version with different published archive digests or a moved existing CI action tag is
-an error. Registry failure is indeterminate freshness and never authorizes cached fallback.
+graph with strict peers/engines and disabled lifecycle scripts/hooks. The candidate pnpm resolves
+its store in the final project root and fills that same store during staging, so offline publication
+works across filesystems and relative store configurations. Failed commands retain bounded,
+sanitized package-manager diagnostics. Only a successful candidate and unchanged original inputs
+permit a recoverable batch of compatibility metadata, mise files, CI pins, package-manager field,
+and lockfile. Final offline reproduction must succeed; otherwise the batch rolls back, preserving
+concurrent edits as a recovery blocker. An interrupted complete batch is recovered as current state
+and its derived installation is reproduced on retry before admission. An unchanged version with
+different published archive digests or a moved existing CI action tag is an error. Registry failure
+is indeterminate freshness and never authorizes cached fallback.
 
 Local `.codex/toolchain.json`, mise files and stable CI own their actual tool pins independently of
 source releases. Maintenance does not read an installation receipt or initiate framework work.

@@ -168,8 +168,11 @@ upgradeable product repositories while deliberately defining no child product or
 - Responsibility: Resolves, installs, reports, and updates the newest compatible dependency graph
   allowed by tracked ranges, pins, engines, peers, and supply-chain policy. Also reproduces an
   existing lockfile offline for source housekeeping and toolchain maintenance, and stages complete
-  workspace inputs without changing their policy. Canonical startup invokes the same owner's
-  compatible local toolchain, host CLI and reviewed stable CI maintenance.
+  workspace inputs without changing their policy. Staged installation resolves and fills the final
+  project's pnpm store, including when temporary staging is on another filesystem or the project
+  configures a relative store. Failures retain bounded, sanitized pnpm diagnostics. Canonical
+  startup invokes the same owner's compatible local toolchain, host CLI and reviewed stable CI
+  maintenance.
 - Runtime and technology: Node.js ESM orchestrating the pnpm and mise toolchain.
 - Public contract: `deps:install`, `deps:report`, and `deps:update*` commands; the
   lifecycle-delegated `install-compatible.mjs --reproduce-locked` and `--reproduce-toolchain`
@@ -465,7 +468,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `5.1.0`.
+- Framework version: `5.2.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->
