@@ -32,8 +32,8 @@ jobs:
       - run: node scripts/deps/verify-pnpm-execution-policy.mjs
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          version: 2026.9.9
-          sha256: bd481434a65ede6b2ec6162b88f129e5c6b94cf9de808b8ee7c6f027b13b4589
+          version: 2026.9.11
+          sha256: 6e39ee1ffa926a1f64814efbf1d26c3f617255e2a6ba6152e3c8a5135fa5a35f
           install: false
           cache: false
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -48,13 +48,13 @@ jobs:
         shell: bash
         run: |
           case "$(uname -m)" in
-            x86_64|amd64) codex_architecture='x64'; codex_platform_package='@openai/codex-linux-x64'; codex_platform_integrity='sha512-a4FI3A8sGtwGrOqltrPbrS2hajrHQG591EwmRfiRoLMb10VxdBtUGW4gu6IJVYENiYGA7k3P4jlRHEoCZU/s9Q==' ;;
-            aarch64|arm64) codex_architecture='arm64'; codex_platform_package='@openai/codex-linux-arm64'; codex_platform_integrity='sha512-KmTCB6ST484zeYlPpKP/K5P/gRaYmt6TihVD+zotoe6O9q0JSBP+FYvCz4A/zZXR7xDOHURTSjHp0sD8wWS0YQ==' ;;
+            x86_64|amd64) codex_architecture='x64'; codex_platform_package='@openai/codex-linux-x64'; codex_platform_integrity='sha512-atv3HF0mubqB0J/XkQ2JopqKzXJ+/7aQtTB2MkJ9MrraujMIz8zbCCLylLkN3PzpVGTJzzQFN/wD1oq8oJPJKg==' ;;
+            aarch64|arm64) codex_architecture='arm64'; codex_platform_package='@openai/codex-linux-arm64'; codex_platform_integrity='sha512-X3fRXm2orhJ3KeB8LgKym4XDUiQaqaOGuaa181bcHTsQI7C8m6tcQQbQsKDzT/2IibikzgYL82jvsgMbq43jww==' ;;
             *) echo "Unsupported stable Codex CI architecture: $(uname -m)" >&2; exit 1 ;;
           esac
           codex_package='@openai/codex'
-          codex_version='0.154.0'
-          codex_wrapper_integrity='sha512-FV/x1OHXYv/ifjf3mXj9ThTTAWcUZN6cGIRQRhRxkKNOPuImu1WW0c8ev1vUkE9XGH90dEnYG1tBjIkxRikg0w=='
+          codex_version='0.155.1'
+          codex_wrapper_integrity='sha512-02fAAGyBtlA1zPjEo3kTj/bOSYbPz5DvjLwRZJdV7weFFEDzNFOMjQGmZ/+5CuirYV0hE+AZTrnjzwXYU4AdAQ=='
           codex_install_root="$(umask 077 && mktemp -d)"
           codex_stage="$codex_install_root/stage"
           codex_cache="$codex_install_root/cache"
@@ -109,8 +109,8 @@ jobs:
           persist-credentials: false
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          version: 2026.9.9
-          sha256: bd481434a65ede6b2ec6162b88f129e5c6b94cf9de808b8ee7c6f027b13b4589
+          version: 2026.9.11
+          sha256: 6e39ee1ffa926a1f64814efbf1d26c3f617255e2a6ba6152e3c8a5135fa5a35f
           install: false
           cache: false
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0

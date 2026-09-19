@@ -85,6 +85,7 @@ boundaries and handling of an optional creation brief.
 - [Project definition intake](instructions.md#first-prompt-project-definition-intake)
 - [Documentation ownership and discovery](instructions.md#documentation-ownership)
 - [Architecture and product boundaries](instructions.md#modular-architecture-parallel-ownership-and-integration)
+- [Parallel development and the four-subagent default](instructions.md#admission-intelligence-and-provenance)
 - [Delivery and verification](instructions.md#delivery-environments)
 - [Session and agent configuration](.codex/README.md)
 

@@ -14,7 +14,9 @@ committed.
 Root `developer_instructions` in the tracked config make the primary the sole orchestrator, inject
 the [long-session continuation and course contract](../instructions.md#long-session-course-checks),
 bind owned-work provenance, require exact GPT Astra/`ultra` parity, and enforce the critical drain
-and terminal stop. `[agents]` owns the four-thread ceiling and matching global defaults;
+and terminal stop. They also carry the
+[parallel-development default](../instructions.md#admission-intelligence-and-provenance).
+`[agents]` owns the four-thread ceiling and matching global defaults;
 `.codex/agents/*.toml` injects bounded role behavior. This is an executable policy layer, not a
 documentation shortcut. `pnpm codex:validate` rejects missing markers, divergent intelligence,
 unsafe permissions, or incomplete drain policy.

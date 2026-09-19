@@ -241,11 +241,19 @@ product work or impose another cleanup task.
 
 ## Subagent Orchestration And Integration Authority
 
-At most four live subagents, only for substantial disjoint work. Never override the configured GPT
-Astra/ultra model pair. Register owned agents and background tasks with repository/session identity,
-exact scope, returned identity, checkpoint, safe boundary and cancellation provenance. One host
-represents one developer; visible local changes are developer-owned, but process control requires
-exact provenance. Different clones need explicit coordination; a local lease cannot prove them idle.
+Parallel development is the default: plan for and use four concurrent subagents in addition to the
+primary whenever substantial independent work, safe write isolation, permissions, confirmed capacity
+and integration permit. Reassess useful parallel work at slice boundaries without waiting for the
+user to request it. Keep at most four live; use fewer or work serially for small tasks, dependent
+work or insufficient permissions, isolation or capacity, and briefly state why. Each delegation must
+advance the authorized outcome and justify its coordination and integration cost; never invent work
+or split cohesive changes merely to fill slots. Subagents never delegate further. Never override the
+configured GPT Astra/ultra model pair.
+
+Register owned agents and background tasks with repository/session identity, exact scope, returned
+identity, checkpoint, safe boundary and cancellation provenance. One host represents one developer;
+visible local changes are developer-owned, but process control requires exact provenance. Different
+clones need explicit coordination; a local lease cannot prove them idle.
 
 Before child tools, require effective sandbox, approvals, network and checkout. Read-only roles stop
 on broader live overrides. An explicitly selected worker may accept this primary's authorized YOLO

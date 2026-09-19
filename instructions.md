@@ -1819,15 +1819,21 @@ management or internal suites. Independent third-party licenses remain applicabl
 
 ### Admission, Intelligence, And Provenance
 
-Subagents are a concurrency tool, not a default task ritual. Use them only when at least two
-substantial, independent slices can proceed without shared module, contract, schema, migration, or
-file conflicts and the saved critical-path time clearly outweighs coordination, token cost, and
-integration. Configured concurrency is a ceiling, not a target: by default the primary may have at
-most four live subagent threads and may start at most four in one coordination wave, excluding the
-primary. Use fewer whenever independence, isolation, budget, or integration capacity is weaker. More
-requires an explicit user override for the current outcome plus a fresh budget and conflict check;
-never persist that override by silently raising the repository default. Subagents never spawn or
-delegate to further agents.
+Parallel development is the default. The primary should plan for and use four concurrent subagents,
+in addition to the primary, whenever substantial independent slices, safe write isolation, confirmed
+capacity, and integration capacity permit. Identify useful parallel work during planning and
+reassess it at slice boundaries; do not wait for the user to request delegation. Each delegated
+slice must advance the authorized outcome without shared module, contract, schema, migration, or
+file conflicts, and its benefit must outweigh coordination, token cost, and integration.
+
+Four concurrent subagents are the normal target when those conditions hold and remain the default
+ceiling: keep at most four live subagent threads and start at most four in one coordination wave,
+excluding the primary. Use fewer, or work serially, when the task is small, dependencies require
+sequencing, or independence, permissions, confirmed capacity, or integration capacity is
+insufficient; briefly state the limiting reason. Do not invent work or split cohesive changes merely
+to fill slots. More than four requires an explicit user override for the current outcome plus a
+fresh budget and conflict check; never persist that override by silently raising the repository
+default. Subagents never spawn or delegate to further agents.
 
 This authority is injected as well as documented. Root `developer_instructions` in tracked
 `.codex/config.toml` bind the primary orchestrator, ownership/provenance boundary, intelligence

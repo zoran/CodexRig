@@ -136,13 +136,15 @@ procedures.
   Register each owned subagent/background task with repository/session/scope, returned identity,
   checkpoint, safe boundary and cancellation provenance. Account-/host-wide process listings are
   discovery only; foreign or ambiguous processes are never contacted, signalled, counted or closed.
-- Use at most four live subagents for substantial disjoint work. Primary, global delegated defaults
-  and roles use the exact same configured GPT Astra model with `ultra` reasoning; no spawn override.
-  Check effective permissions before child tools: read-only roles stop on broader overrides; an
-  explicit writer may accept this primary's authorized YOLO only for its exact disjoint write set.
-  That grants no network, credentials, external mutation, delegation, commit, push, publish or
-  deploy. The primary integrates and owns protected policy/skill/role files; shared-checkout
-  isolation is logical.
+- Default to parallel development with four concurrent subagents in addition to the primary when
+  substantial disjoint work, permissions, confirmed capacity and integration permit. Keep at most
+  four live; use fewer or work serially when those conditions do not hold, briefly state why, and
+  never invent work to fill slots. Primary, global delegated defaults and roles use the exact same
+  configured GPT Astra model with `ultra` reasoning; no spawn override. Check effective permissions
+  before child tools: read-only roles stop on broader overrides; an explicit writer may accept this
+  primary's authorized YOLO only for its exact disjoint write set. That grants no network,
+  credentials, external mutation, delegation, commit, push, publish or deploy. The primary
+  integrates and owns protected policy/skill/role files; shared-checkout isolation is logical.
 - The primary accepts handoffs, actively closes completed owned agents and releases ownership/slots.
   Mirror every direct peer message and response to the primary; otherwise route through the primary.
   Reassess capacity without assuming a billing period or unit. A reliable binding percentage at 10%

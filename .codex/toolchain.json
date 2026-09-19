@@ -1,28 +1,28 @@
 {
   "schemaVersion": 1,
-  "reviewedOn": "2026-09-16",
+  "reviewedOn": "2026-09-19",
   "ci": {
     "codexNpmPackage": "@openai/codex",
-    "codexNpmPackageIntegrity": "sha512-FV/x1OHXYv/ifjf3mXj9ThTTAWcUZN6cGIRQRhRxkKNOPuImu1WW0c8ev1vUkE9XGH90dEnYG1tBjIkxRikg0w==",
+    "codexNpmPackageIntegrity": "sha512-02fAAGyBtlA1zPjEo3kTj/bOSYbPz5DvjLwRZJdV7weFFEDzNFOMjQGmZ/+5CuirYV0hE+AZTrnjzwXYU4AdAQ==",
     "codexNpmPlatformIntegrities": {
-      "x64": "sha512-a4FI3A8sGtwGrOqltrPbrS2hajrHQG591EwmRfiRoLMb10VxdBtUGW4gu6IJVYENiYGA7k3P4jlRHEoCZU/s9Q==",
-      "arm64": "sha512-KmTCB6ST484zeYlPpKP/K5P/gRaYmt6TihVD+zotoe6O9q0JSBP+FYvCz4A/zZXR7xDOHURTSjHp0sD8wWS0YQ=="
+      "x64": "sha512-atv3HF0mubqB0J/XkQ2JopqKzXJ+/7aQtTB2MkJ9MrraujMIz8zbCCLylLkN3PzpVGTJzzQFN/wD1oq8oJPJKg==",
+      "arm64": "sha512-X3fRXm2orhJ3KeB8LgKym4XDUiQaqaOGuaa181bcHTsQI7C8m6tcQQbQsKDzT/2IibikzgYL82jvsgMbq43jww=="
     },
     "codexNpmPlatformPackages": {
       "x64": "@openai/codex-linux-x64",
       "arm64": "@openai/codex-linux-arm64"
     },
-    "codexVersion": "0.154.0",
-    "miseLinuxX64Sha256": "bd481434a65ede6b2ec6162b88f129e5c6b94cf9de808b8ee7c6f027b13b4589",
+    "codexVersion": "0.155.1",
+    "miseLinuxX64Sha256": "6e39ee1ffa926a1f64814efbf1d26c3f617255e2a6ba6152e3c8a5135fa5a35f",
     "miseNpmPackageIntegrities": {
-      "x64": "sha512-pCn9teELM6Ed0VtZ83ZxEMtP6B8jphTRbQaaWzHScw8zFtRS+4zfeKGgoGstiNAVMBRrFO0X1RyY82xv5RMUtQ==",
-      "arm64": "sha512-2qoCdNCRptUTg2nATQmDQXQIPYS8dGwmDooQOQzQZS9oFdLoE/POSbMwtPioMYySVhRksoC0P6TtHgJ6JpvrHA=="
+      "x64": "sha512-GvGK0TwsVA2ovjJEGVXIphy8PD+PE1tOhwSRZa/W1ZuSWN7XJ14PQu5G9u9t5bsMp4ueewqvR24mAPSCJksK3Q==",
+      "arm64": "sha512-a7SOL4khFLfkD/1+F9A93YJzLdf2v5mH3On/6y5ZCgH9zzA+pOLDAwnZaYb29QmiaBvGnlWCetiaxlW5SFCQqQ=="
     },
     "miseNpmPackages": {
       "x64": "@jdxcode/mise-linux-x64",
       "arm64": "@jdxcode/mise-linux-arm64"
     },
-    "miseVersion": "2026.9.9"
+    "miseVersion": "2026.9.11"
   },
   "stable": {
     "node": {
@@ -36,7 +36,7 @@
       "channel": "latest-11"
     },
     "codex": {
-      "minimumVersion": "0.154.0",
+      "minimumVersion": "0.155.1",
       "channel": "latest"
     }
   }

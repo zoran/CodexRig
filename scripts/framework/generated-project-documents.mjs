@@ -82,8 +82,11 @@ omit real product tests. Tool failures are bounded findings, not a new maintenan
 
 Portable startup requests on-request approval and network-disabled workspace-write. Explicit Dev
 \`--yolo\` changes runtime permissions only within existing authority. No unapproved staging/prod,
-commit or push. Admit at most four disjoint subagents with exact GPT Astra/ultra parity, effective
-permission checks, provenance and a completion reserve. At critical capacity drain owned work and
+commit or push. Default to parallel development with four concurrent subagents in addition to the
+primary when substantial disjoint work, permissions, confirmed capacity and integration permit.
+Keep at most four live; use fewer or work serially when necessary, briefly state why, and never
+invent work to fill slots. Require exact GPT Astra/ultra parity, effective permission checks,
+provenance and a completion reserve. At critical capacity drain owned work and
 seal with \`pnpm handover:create -- --critical\` as the final action, then stop completely.
 
 Keep private state inside this root's ignored CODEX_HOME. Never delete active runtime or a worktree

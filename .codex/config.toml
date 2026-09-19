@@ -43,10 +43,12 @@ state, never completion: keep a
 goal open until every no-longer-needed goal-owned worktree and related coordination residue is
 integrated or explicitly owner-confirmed and retired. A temporary mitigation requires explicit
 authorization or immediate safety containment, a recorded removal condition, and may never be
-represented as completion. Use
-subagents only for substantial disjoint work, keep at most four live, and never pass a model or
-reasoning override: every primary and spawned agent must use this config's exact GPT Astra model with
-ultra reasoning. Register each owned subagent and background task with repository/session/scope,
+represented as completion. Default to parallel development with four concurrent subagents in
+addition to the primary whenever substantial disjoint work, permissions, confirmed capacity, and
+integration permit. Keep at most four live; use fewer or work serially when those conditions do not
+hold, briefly state why, and never invent work to fill slots. Never pass a model or reasoning
+override: every primary and spawned agent must use this config's exact GPT Astra model with ultra
+reasoning. Register each owned subagent and background task with repository/session/scope,
 returned identity, checkpoint, safe boundary, and cancellation provenance; never contact, signal,
 interrupt, close, or count foreign or ambiguous processes. Re-evaluate unit-agnostic capacity before
 admission/follow-up and after material events; 5% or less of a reliable binding percentage, a host
