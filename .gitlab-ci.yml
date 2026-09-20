@@ -28,12 +28,12 @@ verify:
       /var/lib/apt/lists/*
     - |
       case "$(uname -m)" in
-        x86_64|amd64) mise_package='@jdxcode/mise-linux-x64'; mise_integrity='sha512-GvGK0TwsVA2ovjJEGVXIphy8PD+PE1tOhwSRZa/W1ZuSWN7XJ14PQu5G9u9t5bsMp4ueewqvR24mAPSCJksK3Q==' ;;
-        aarch64|arm64) mise_package='@jdxcode/mise-linux-arm64'; mise_integrity='sha512-a7SOL4khFLfkD/1+F9A93YJzLdf2v5mH3On/6y5ZCgH9zzA+pOLDAwnZaYb29QmiaBvGnlWCetiaxlW5SFCQqQ==' ;;
+        x86_64|amd64) mise_package='@jdxcode/mise-linux-x64'; mise_integrity='sha512-mO+e8dotFDTC1C4mfei147N6SdfrTHJVsDkuxLU0446dnxUi4Wejm/DcfxBrVpF5EQiLJNKkv3mvQ/xHpefhOw==' ;;
+        aarch64|arm64) mise_package='@jdxcode/mise-linux-arm64'; mise_integrity='sha512-avxKfioFsBgNlcjxW9s5A0bcu548hz1gSuoswJNgTaueKoFNZFxroL2s6RgYIV+AHt8W7ez5e5Mjx7xSZgxojw==' ;;
         *) echo "Unsupported GitLab runner architecture: $(uname -m)" >&2; exit 1 ;;
       esac
       mise_stage="$(umask 077 && mktemp -d)"
-      npm pack --ignore-scripts --pack-destination "$mise_stage" "${mise_package}@2026.9.11" >/dev/null
+      npm pack --ignore-scripts --pack-destination "$mise_stage" "${mise_package}@2026.9.12" >/dev/null
       mise_archive="$(node scripts/deps/toolchain-archives.mjs --verify-mise-archive "$mise_stage" "$mise_integrity")"
       npm install --global "$mise_archive" --ignore-scripts --offline
     - npm install --global pnpm@11.27.0 --ignore-scripts

@@ -18,6 +18,7 @@ import {
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { format } from "prettier";
 import {
@@ -34,6 +35,16 @@ import {
   applyHousekeepingWrites,
   recoverInterruptedHousekeepingWrites,
 } from "../repository/repository-housekeeping-transaction.mjs";
+
+test("the portable housekeeping CLI handles help and rejects invalid options before mutation", () => {
+  const script = fileURLToPath(new URL("./repository-housekeeping.mjs", import.meta.url));
+  const help = spawnSync(process.execPath, [script, "--help"], { encoding: "utf8" });
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /Usage: pnpm repo:housekeeping/u);
+  const invalid = spawnSync(process.execPath, [script, "--invalid"], { encoding: "utf8" });
+  assert.equal(invalid.status, 1);
+  assert.match(invalid.stderr, /Unknown repository housekeeping option/u);
+});
 
 function fixture(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), "repository-housekeeping-"));

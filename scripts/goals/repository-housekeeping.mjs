@@ -149,6 +149,10 @@ export async function runRepositoryHousekeeping(options, { reconcileOwnedState }
   }
 }
 
+async function main() {
+  await runRepositoryHousekeeping(parseArgs(process.argv.slice(2)));
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch((error) => {
     console.error(`Repository housekeeping failed: ${formatContextError(error, repositoryRoot)}`);
