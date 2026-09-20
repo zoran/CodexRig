@@ -87,6 +87,7 @@ boundaries and handling of an optional creation brief.
 - [Architecture and product boundaries](instructions.md#modular-architecture-parallel-ownership-and-integration)
 - [Parallel development and the four-subagent default](instructions.md#admission-intelligence-and-provenance)
 - [Delivery and verification](instructions.md#delivery-environments)
+- [Infrastructure and application permission design](instructions.md#permission-design)
 - [Session and agent configuration](.codex/README.md)
 
 ## Essential Commands

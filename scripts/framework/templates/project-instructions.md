@@ -290,3 +290,26 @@ Keep credentials, personal paths, native transcripts/memories, runtime identitie
 and verification evidence out of tracked source and product artifacts. This repository's private
 native state belongs only in its own ignored `CODEX_HOME`. The project owner selects project
 licensing terms before distribution. Preserve applicable third-party licenses.
+
+### Permission Design
+
+For cloud infrastructure (including AWS, Google Cloud, and comparable providers) and applications
+themselves, prefer broader, reusable roles and permission bundles that cover complete authorized
+workflows. Apply this default to operator access, application users, internal services, service
+accounts, and deployment automation. Use a small, understandable set of roles at the relevant
+project, service, team, or environment boundary so routine work does not require repeated permission
+changes.
+
+Do not introduce separate grants, custom policies, or approval steps for every API action, resource,
+screen, or workflow step without a concrete benefit. Finer granularity needs a material security,
+tenant-isolation, sensitive-data, or regulatory requirement that justifies its development,
+deployment, support, and maintenance cost. Prefer an existing role that covers the responsibility
+over a bespoke permission matrix when both satisfy those requirements. Least privilege means
+bounding the role to its authorized responsibility; it does not require the smallest technically
+expressible grant.
+
+Preserve server-side authorization, tenant and sensitive-data isolation, environment boundaries,
+revocation, and existing external-action approval requirements. Broader roles remain bounded by
+their authorized responsibility; unrestricted global administration is not the automatic default.
+Reviewers must assess the actual access risk and operational cost instead of treating finer
+granularity as inherently better.

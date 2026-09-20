@@ -468,7 +468,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `5.3.0`.
+- Framework version: `5.4.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

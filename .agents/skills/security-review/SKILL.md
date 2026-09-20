@@ -20,9 +20,11 @@ Review the implemented change and report findings; do not edit files.
 2. Review authentication independently from authorization. Check authenticator enrollment, binding,
    recovery, reset, revocation, step-up/reauthentication, throttling and enumeration resistance;
    then check deny-by-default server-side policy decisions for every protected action and resource,
-   horizontal and vertical access, tenant/relationship context, least privilege, and revocation.
-   Never accept token presence, UI state, caller-supplied user/tenant/role, or network location as
-   the authorization decision.
+   horizontal and vertical access, tenant/relationship context, role scope, and revocation. Apply
+   [Permission Design](../../../instructions.md#permission-design) to infrastructure and application
+   roles; require a concrete risk benefit before recommending finer permission granularity. Never
+   accept token presence, UI state, caller-supplied user/tenant/role, or network location as the
+   authorization decision.
 3. Review principal/account and user-management lifecycle separately from domain-specific profile
    data. Check creation, linking, suspension, deletion, retention, impersonation/admin paths, audit,
    provider reconciliation, orphan prevention, and cross-tenant isolation.

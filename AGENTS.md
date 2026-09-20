@@ -99,6 +99,9 @@ procedures.
   Identity and Access owns auth, authorization, users, sessions and provider adapters behind ports;
   material changes use `$security-review` and `pnpm auth:check`. Keep tenant isolation
   deny-by-default.
+- For cloud infrastructure and applications themselves, prefer broader reusable roles covering
+  complete authorized workflows. Follow [Permission Design](instructions.md#permission-design);
+  finer granularity requires a concrete benefit that justifies its operational cost.
 - Source, identifiers, filenames, tests and technical headers are English; user-facing locales are
   confirmed separately and changed copy uses `$native-language-content-review`. Hand-authored text
   has a format-native purpose/owner header; public types document invariants and Markdown has one
