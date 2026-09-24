@@ -9,10 +9,10 @@ Deliver correct behavior at the owning boundary, proportionate evidence, secure 
 smallest durable explanation another developer actually needs. Production code defaults to cohesive,
 replaceable modules with explicit contracts so a change remains local, integrations remain
 reviewable, and developers or Codex orchestrators can work in parallel without sharing an implicit
-write surface. Every new feature and every other complex task nevertheless requires thorough
-planning, explicit goals and slices, iterative review to a clean result, and a fresh audit. Keep
-that work decision-relevant and in the approved workflow surfaces instead of multiplying permanent
-project-management files or ceremonial prose.
+write surface. Every new feature and every other extensive, complex, or materially risky task
+requires planning before implementation, useful goals and slices, iterative review to a clean
+result, and a fresh audit. Keep that work decision-relevant and in the approved workflow surfaces
+instead of multiplying permanent project-management files or ceremonial prose.
 
 Normal implementation should primarily change product code, tests, and necessary configuration.
 Repository process artifacts are overhead unless the user explicitly requests one as a deliverable.
@@ -117,12 +117,13 @@ current write unsafe—not merely because more conversation is possible.
 
 ## Product-First Delivery And Verification Economy
 
-Start every new feature and every other complex task with a thorough, decision-ready plan before
-implementation. Convert the authorized outcome into explicit goals with success conditions and
-ordered, reviewable slices, then implement the largest coherent, currently unblocked slice that can
-be verified safely. Planning, review, and audit depth must match the task's complexity and resolve
-material decisions; they stay useful by focusing on product behavior, owning configuration, risks,
-and evidence rather than process prose or status artifacts.
+Automatically start every new feature and every other extensive, complex, or materially risky task
+with the decision-ready plan, review, and fresh audit from
+[Planning](#planning-goals-slices-review-loops-and-audits) before implementation. Use goals and
+slices where they clarify acceptance or dependencies, then implement the largest coherent, currently
+unblocked slice that can be verified safely. Planning, review, and audit depth must match the task's
+complexity and resolve material decisions; they stay useful by focusing on product behavior, owning
+configuration, risks, and evidence rather than process prose or status artifacts.
 
 Use the verification layers deliberately:
 
@@ -210,9 +211,13 @@ causes a pause or a change of direction, identify that skill and the applicable 
 Explicit user instructions take precedence over skill guidelines, never over higher-priority host,
 permission, safety, or publication constraints.
 
-Codex owns native Goals, plans, sessions, subagents, approvals, models, and their controls. Use
-native Goals for an explicitly requested durable objective with a clear stopping condition; do not
-create a Goal or assign a token budget merely because a task is substantial. Prefer native
+Codex owns native Goals, plans, sessions, subagents, approvals, models, and their controls. Planning
+goals describe acceptance milestones; they do not themselves create native Goals. Use a native Goal
+when the user explicitly requests one or expressly delegates need-based Goal use, and the authorized
+objective benefits from durable continuation across turns with a verifiable stopping condition.
+Honor that delegation without asking again; reuse an existing matching Goal rather than replacing
+unfinished work. A substantial task alone does not authorize native Goal creation. Set a token
+budget only when explicitly requested, and never raise a user-set budget. Prefer native
 pause/resume/clear controls when the user requests them. Native Goal completion, one successful
 check, and a finished slice are not proof that the broader authorized outcome is complete.
 `pnpm goal:new` is a repository publication check, not a native Goal creator or task store. Keep
@@ -279,16 +284,31 @@ closure sequence below; do not distribute, reorder, or silently omit its gates.
 
 ## Planning, Goals, Slices, Review Loops, And Audits
 
-For every new feature and every other complex task, complete a thorough planning phase before
-implementation begins. Keep the plan in the conversation unless the bounded multi-session context
-exception below applies. The plan is decision-ready only when it identifies:
+Automatically plan before implementing every new feature and every other extensive, complex, or
+materially risky task. Extent includes multiple dependent steps or owners and substantial acceptance
+coverage even when each edit is simple. Complexity includes consequential unknowns, interacting
+contracts, or difficult failure modes; material risk can require planning even for a small diff. For
+a routine, isolated, low-risk edit, a brief outcome/owner/check statement suffices. Do not make the
+user request planning separately or introduce a plan-approval pause when implementation is already
+authorized. A read-only or plan-only request remains within that authority.
+
+Use the native plan facility when available; otherwise keep the current plan in the conversation.
+Only the bounded multi-session context exception below permits a working-context copy. Update the
+plan as evidence or accepted steering changes its decisions; do not create a second task store or
+re-plan settled work without new evidence. The plan is decision-ready only when it identifies:
 
 - the authorized outcome, user-visible success conditions, scope, and non-goals;
 - current-system evidence, owning boundaries, affected consumers, and relevant dependencies;
 - material product, architecture, data, migration, security, privacy, operational, and compatibility
   decisions or explicit unknowns that must be resolved before a dependent slice starts;
-- the goal sequence, each goal's acceptance evidence, and ordered slices with a concrete outcome,
-  dependencies, likely files or owners, risks, and focused verification;
+- the acceptance evidence and ordered slices with a concrete outcome, dependencies, likely files or
+  owners, risks, and focused verification; introduce intermediate goals only when distinct
+  acceptance or dependency boundaries help, and assess native Goal suitability under
+  [Authorized Work And Native Codex](#authorized-work-and-native-codex);
+- the current parallelism decision under
+  [Subagent Orchestration](#subagent-orchestration-and-integration-authority): useful independent
+  assignments, dependencies, read/write ownership, admission evidence and integration order; target
+  four subagents in addition to the primary when admissible, otherwise state the limiting reason;
 - review surfaces, audit criteria, cleanup expectations, publication boundaries, and any point that
   genuinely requires user or external input.
 
@@ -296,6 +316,9 @@ Review the plan for omissions, contradictions, unsafe assumptions, and unnecessa
 every relevant finding and repeat the plan review until none remains, then perform a fresh plan
 audit against the request, manifest, repository state, and downstream system before implementation.
 If that audit finds a relevant issue, correct the plan, repeat the review loop, and audit again.
+Audit afresh from the authorized outcome and actual system, including a representative path through
+affected owners and consumers; merely rereading the prior findings is insufficient. Once the plan
+passes, continue the authorized implementation without waiting for another continue prompt.
 
 Treat a slice as the normal executable step: one coherent, bounded outcome that advances its current
 goal and can be reviewed and verified independently. Keep one current goal and one current slice
@@ -377,7 +400,7 @@ After every completed slice:
    dependency or promotion input.
 3. Review the result for correctness, acceptance criteria, regressions, root-cause quality,
    maintainability, security/privacy where applicable, documentation drift, and whole-system impact.
-4. Fix every relevant, reproducible finding within the authorized scope, batch same-root-cause
+4. Fix every relevant, evidence-backed finding within the authorized scope, batch same-root-cause
    corrections, and rerun only affected focused evidence.
 5. Repeat review, repair, and focused verification until no relevant finding remains.
 6. Only from that clean reviewed state, perform a fresh audit against the plan, current goal,
@@ -393,11 +416,22 @@ After every completed slice:
    no-longer-needed item or retain a concrete blocker and its resolution condition before the slice
    is accepted.
 
-A finding is relevant when it is reproducible and affects the authorized outcome, acceptance
-criteria, correctness, safety, maintainability, documented behavior, or a touched owner or consumer.
-False positives, duplicates, and unrelated suggestions do not block closure, but classify them
-explicitly in the conversation rather than silently ignoring them. Review and audit findings remain
-conversation state; do not create review logs, audit reports, or per-slice documents.
+For both plans and implemented slices, a relevant finding needs concrete evidence: a reproducible
+defect, a demonstrated contradiction or omission, or a plausible material failure path. Explain its
+consequence for the authorized outcome, acceptance, correctness, safety, documented behavior, or the
+maintainability of affected owners and consumers. A touched file or a personal preference alone does
+not make a finding relevant. Planning risks need evidence and impact, not an already-existing
+implementation failure. Classify false positives, duplicates, unrelated suggestions, and optional
+micro-optimizations explicitly; they do not block closure or authorize extra work.
+
+Neither review loop has a fixed iteration limit: continue until no relevant finding remains, then
+audit the clean current state. An audit finding always reopens the affected review and repair loop.
+Do not manufacture new rounds, polish, abstractions, benchmarks, tests, or research after sufficient
+evidence; additional work must change an acceptance result or a material risk. If a relevant finding
+cannot be resolved within current authority or available evidence, state the blocker and resolution
+condition, continue safe independent work, and never declare that affected state clean. Review and
+audit findings remain conversation state; do not create review logs, audit reports, or per-slice
+documents.
 
 ### Completed-Goal Closure And Repository Housekeeping
 
@@ -1066,7 +1100,7 @@ instead of blessing changed startup code. No repository script, mise configurati
 loaded or executed after admission; the selected session performs the complete reconstruction above.
 
 Each launcher binds one durable Codex session. Switching to another chat with `/new` or `/resume`
-inside the same CLI retains that launcher and is rejected before startup-proof expiry or source
+inside the same CLI retains that launcher and is rejected before invalid startup state or source
 drift can obscure the session-binding reason. To switch durable sessions, including after a critical
 handover, the developer exits Codex completely with `/quit` and runs
 `bash scripts/setup/start-codex.sh` from the project root in the terminal. The later session may
@@ -1080,10 +1114,10 @@ repository path. A changed Codex hash algorithm, managed-hooks-only requirement,
 other trust mismatch releases the launcher reservation and blocks the writable Codex session. The
 trusted `SessionStart` route matches only `startup` or `resume` and never changes tracked source or
 external state. The preloaded controller validates the launcher nonce, the hook-reported effective
-permission mode and model against the attested control/model policy, attestation lifetime,
-repository identity, critical-input hashes, and Node.js/pnpm/Codex versions, then atomically binds
-the verified Codex session and exact recovery marker inside ignored private `.codex/runtime/`. It
-injects the mandatory reconstruction gate but deliberately leaves the potentially slow complete
+permission mode and model against the attested control/model policy, attestation binding, repository
+identity, critical-input hashes, and Node.js/pnpm/Codex versions, then atomically binds the verified
+Codex session and exact recovery marker inside ignored private `.codex/runtime/`. It injects the
+mandatory reconstruction gate but deliberately leaves the potentially slow complete
 Git/worktree/session inventory to the primary's first `pnpm worktree:status -- --json` action, so a
 large or inconsistent worktree set cannot exhaust the bounded attestation hook. A missing, stale,
 warning-bearing, additional, or mismatched proof ends the turn and points to the canonical launcher.
@@ -1091,6 +1125,15 @@ The controller derives trust only for the two exact synthetic session definition
 narrow result before binding the foreground writer. Separate user, project-file, or plugin hooks are
 outside this canonical lifecycle contract and therefore block startup instead of receiving derived
 trust; the framework never enables a global trust bypass.
+
+The attestation deadline bounds machine-controlled admission through the exact Codex PID handoff.
+After that binding, time spent in the native picker or the same durable session does not expire its
+proof. Verification instead requires the original in-memory attestation to match persisted state,
+the exact controller caller, and individually live controller, supervisor and Codex process
+identities. The proof is never renewed, and root, nonce, input, toolchain and policy checks still
+apply. An aggregate active lease alone is insufficient; missing, changed or inactive bindings fail
+closed. Until the exact Codex PID is bound, the original deadline remains mandatory, including a
+SessionStart that wins the handoff race.
 
 Durable SessionStart events require a non-empty `transcript_path` and the complete startup proof.
 Native `/side` conversations and other in-memory forks report an explicit null `transcript_path`.
@@ -1846,8 +1889,26 @@ Parallel development is the default. The primary should plan for and use four co
 in addition to the primary, whenever substantial independent slices, safe write isolation, confirmed
 capacity, and integration capacity permit. Identify useful parallel work during planning and
 reassess it at slice boundaries; do not wait for the user to request delegation. Each delegated
-slice must advance the authorized outcome without shared module, contract, schema, migration, or
-file conflicts, and its benefit must outweigh coordination, token cost, and integration.
+slice must advance the authorized outcome without conflicting writes to modules, contracts, schemas,
+migrations, files, or generated artifacts, and its benefit must outweigh coordination, token cost,
+and integration.
+
+Make the parallelism decision concrete in the current plan: identify which assignments are ready
+now, their expected outcome and focused evidence, exact read/write scope, dependency boundaries,
+selected role, checkpoint, and primary integration order. Include discovery, implementation, tests,
+or review only where they provide independent useful work; four is not a prescribed role checklist.
+Planning discovery may run in parallel before the plan audit, but no delegated implementation may
+bypass that audit or an unresolved material decision. Once admission passes, start the ready
+assignments concurrently rather than merely listing agents or running independent assignments one
+after another. The primary continues disjoint integration or other useful work and remains the sole
+owner of protected policy and shared decisions.
+
+Reassess the runnable set after discovery, a material result or handoff, and every slice boundary.
+Accept handoffs, close completed owned threads through supported native controls, and confirm the
+slot is released before replacement; an idle or completed-but-open thread is not a free slot.
+Recheck capacity, effective permissions and ownership for every new assignment or follow-up. A phase
+that was necessarily serial does not make the rest of the outcome serial; conversely, an earlier
+four-agent wave never authorizes four agents after the conditions change.
 
 Four concurrent subagents are the normal target when those conditions hold and remain the default
 ceiling: keep at most four live subagent threads and start at most four in one coordination wave,
@@ -2206,9 +2267,9 @@ cannot authorize another goal. Ignored project-local Codex runtime and verificat
 count as unfinished work.
 
 Use a bounded scope for each review iteration, but repeat the iteration after fixes until no
-relevant, reproducible finding remains. Add specialized security, UI/UX, content, image, or search
-review only for surfaces that actually changed. Once reviews are clean, perform a fresh whole-goal
-audit before publication admission. Any audit finding reopens focused repair and the
+relevant, evidence-backed finding remains. Add specialized security, UI/UX, content, image, or
+search review only for surfaces that actually changed. Once reviews are clean, perform a fresh
+whole-goal audit before publication admission. Any audit finding reopens focused repair and the
 review-and-repair loop before the audit is repeated. Keep every review and audit in the
 conversation; do not create process documents.
 

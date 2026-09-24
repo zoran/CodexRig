@@ -36,6 +36,7 @@ import {
   validCodexSessionId,
 } from "../repository/runtime-session-lease.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
+import { inspectProcessIdentity } from "../repository/runtime-process-identity.mjs";
 import { startupExecutableClosurePaths } from "./startup-executable-closure.mjs";
 import { validateStartupRuntimeExecutables } from "./startup-runtime-executables.mjs";
 import { parsePortableCodexConfig } from "./validate-codex-config.mjs";
@@ -477,16 +478,35 @@ function validateCurrentAttestationBasis({
     throw new Error("Launcher attestation changed after the resume attempt began.");
   }
   const attestation = expectedAttestation ?? persistedAttestation;
-  const currentTime = now();
   if (
     !Number.isSafeInteger(attestation.issuedAt) ||
     !Number.isSafeInteger(attestation.expiresAt) ||
-    attestation.issuedAt > currentTime + 60_000 ||
-    currentTime > attestation.expiresAt ||
     attestation.expiresAt - attestation.issuedAt !==
       contract.startup.attestationMaxAgeSeconds * 1000
   ) {
-    throw new Error("Launcher attestation is stale or has an invalid lifetime.");
+    throw new Error("Launcher attestation has an invalid lifetime.");
+  }
+  if (runtimeLease.lease.writerPhase === "bound") {
+    // The deadline admits the machine-controlled writer handoff, not human time in the picker.
+    // After binding, only this exact live controller and its unchanged issue-time proof may
+    // verify the session; neither persisted state alone nor an aggregate active lease suffices.
+    const { process: controller, writerProcess, codexProcess } = runtimeLease.lease;
+    if (
+      expectedAttestation === undefined ||
+      controller.pid !== process.pid ||
+      [controller, writerProcess, codexProcess].some(
+        (identity) => inspectProcessIdentity(identity) !== "active",
+      )
+    ) {
+      throw new Error(
+        "Startup verification requires its live issue-time launcher and Codex process.",
+      );
+    }
+  } else {
+    const currentTime = now();
+    if (attestation.issuedAt > currentTime + 60_000 || currentTime > attestation.expiresAt) {
+      throw new Error("Launcher attestation expired before its Codex process was bound.");
+    }
   }
   if (nonce !== undefined && !equalHash(attestation.nonceSha256, nonce)) {
     throw new Error("Canonical launcher nonce does not match the attestation.");
@@ -579,7 +599,7 @@ export function verifyStartupAttestation({
     }
     return null;
   }
-  // Report the existing one-session boundary before an expired or edited startup basis obscures
+  // Report the existing one-session boundary before an edited or invalid startup basis obscures
   // it. Activation still enforces ownership atomically in the runtime lease owner.
   if (
     runtimeLease.lease.phase === "active" &&

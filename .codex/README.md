@@ -12,6 +12,8 @@ coordination alone stays in ignored `.codex/runtime/`. Neither is copied between
 committed.
 
 Root `developer_instructions` in the tracked config make the primary the sole orchestrator, inject
+[automatic planning and the review/audit contract](../instructions.md#planning-goals-slices-review-loops-and-audits)
+for new features and extensive, complex, or materially risky work, carry
 the [long-session continuation and course contract](../instructions.md#long-session-course-checks),
 bind owned-work provenance, require exact GPT Astra/`ultra` parity, and enforce the critical drain
 and terminal stop. They also carry the
@@ -21,7 +23,15 @@ and terminal stop. They also carry the
 documentation shortcut. `pnpm codex:validate` rejects missing markers, divergent intelligence,
 unsafe permissions, or incomplete drain policy.
 
-Long-session guidance uses this native instruction layer and the existing bounded Stop reminder.
+The four-thread ceiling excludes the primary. Planning names the currently useful independent
+assignments and their admission conditions; the primary starts admitted work concurrently and
+reassesses after discovery, handoffs and slice boundaries. An open idle thread still occupies a
+slot. Generated projects retain this configuration and the role policies, with their own workflow
+instructions; a numeric ceiling alone does not cause delegation.
+
+Planning uses the native instruction layer; native Goals follow the
+[explicit request or need-based delegation boundary](../instructions.md#authorized-work-and-native-codex).
+Long-session guidance uses this same instruction layer and the existing bounded Stop reminder.
 It adds no scheduler, account monitor, or hook. Changed tracked instructions and preloaded Stop code
 take effect on the next canonical launch; editing them does not reload an already-running session.
 Static validation proves configuration and packaging, not model obedience over hours of work.

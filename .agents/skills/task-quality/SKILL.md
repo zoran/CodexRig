@@ -41,9 +41,11 @@ Use the applicable specialized procedure, not every available skill:
 
 Report findings in the conversation with location, failure mode, evidence and acceptance impact.
 Avoid duplicate findings across reviews. When external evidence supports a decision, check current
-primary-source applicability. Fix relevant reproducible findings in finish mode, batch by root
-cause, and repeat only affected review/evidence until none remains. In review-only mode, report
-rather than repair; do not call a known-defective state clean.
+primary-source applicability. Apply the evidence and relevance criteria from
+[Slice Acceptance](../../../instructions.md#best-available-engineering-not-quick-fixes): fix
+relevant evidence-backed findings in finish mode, batch by root cause, and repeat only affected
+review/evidence until none remains. In review-only mode, report rather than repair; do not call a
+known-defective state clean.
 
 ## Audit And Settle
 

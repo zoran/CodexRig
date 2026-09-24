@@ -182,6 +182,7 @@ function controllerFixture() {
       'const source=behavior==="new-session"?"startup":"resume";',
       'const sessionInput=JSON.stringify({cwd:root,hook_event_name:"SessionStart",model:"gpt-6-astra",permission_mode:permissionMode,session_id:sessionId,source,transcript_path:path.join(root,"session.jsonl")});',
       'if(behavior==="cancel-picker")process.exit(0);',
+      'if(behavior==="delayed-picker"){waitForCodexBinding();writeFileSync(path.join(root,"picker-clock-advanced"),"ready");}',
       "const skipSessionStart=false;",
       'if(!skipSessionStart){const started=spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[0].command],{cwd:root,encoding:"utf8",env:process.env,input:sessionInput,stdio:"pipe"});if(started.status!==0||JSON.parse(started.stdout).continue!==true){process.stderr.write(started.stderr+started.stdout);process.exit(90);}}',
       'if(behavior==="switch-session"){const next={...JSON.parse(sessionInput),session_id:"01a06666-5678-7abc-8def-0123456789ab",source:"startup",transcript_path:path.join(root,"next-session.jsonl")};const started=spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[0].command],{cwd:root,encoding:"utf8",env:process.env,input:JSON.stringify(next),stdio:"pipe"});process.stderr.write(started.stderr+started.stdout);process.exit(0);}',
@@ -253,9 +254,26 @@ function runController(
     "setup",
     "startup-session-controller.mjs",
   );
+  // Advance only the controller's clock after the real child-PID handoff. This exercises the
+  // authenticated hook path after an hour in the picker without a wall-clock sleep or new proof.
+  const clockSource = [
+    'import { existsSync } from "node:fs";',
+    `const marker = ${JSON.stringify(path.join(fixture.project, "picker-clock-advanced"))};`,
+    "const originalNow = Date.now;",
+    "Date.now = () => originalNow() + (existsSync(marker) ? 3_600_000 : 0);",
+  ].join("\n");
   return run(
     process.execPath,
-    [controller, "--control-policy", controlPolicy, "--codex-executable", fixture.codexExecutable],
+    [
+      ...(behavior === "delayed-picker"
+        ? ["--import", `data:text/javascript,${encodeURIComponent(clockSource)}`]
+        : []),
+      controller,
+      "--control-policy",
+      controlPolicy,
+      "--codex-executable",
+      fixture.codexExecutable,
+    ],
     {
       cwd: fixture.project,
       env: {
@@ -331,7 +349,13 @@ test("controller accepts non-executable Codex model preferences beneath project 
   mkdirSync(runtimeDirectory, { recursive: true, mode: 0o700 });
   writeFileSync(
     path.join(runtimeDirectory, "config.toml"),
-    ['model = "gpt-6-astra"', 'model_reasoning_effort = "max"', ""].join("\n"),
+    [
+      'model = "gpt-6-astra"',
+      'model_reasoning_effort = "max"',
+      "[tui]",
+      "screen_reader_detection_done = true",
+      "",
+    ].join("\n"),
     { encoding: "utf8", mode: 0o600 },
   );
 
@@ -353,6 +377,18 @@ test("native picker cancellation releases its lease without claiming a session",
   assert.equal(result.status, 0, result.stderr);
   assert.equal(inspectRuntimeSessionLease({ root: fixture.project }).status, "absent");
   assert.equal(inspectRuntimeSessionRecovery({ root: fixture.project }).status, "absent");
+});
+
+test("native picker selection remains valid after an hour in its live launcher", () => {
+  const fixture = controllerFixture();
+  const result = runController(fixture, { behavior: "delayed-picker" });
+  assert.equal(result.status, 0, result.stderr);
+  const [selected] = capturedCalls(fixture);
+  assert.equal(inspectRuntimeSessionLease({ root: fixture.project }).status, "absent");
+  assert.equal(
+    inspectRuntimeSessionRecovery({ root: fixture.project }).recovery.codexSessionId,
+    selected.sessionId,
+  );
 });
 
 test("native picker failure never starts an automatic replacement session", () => {

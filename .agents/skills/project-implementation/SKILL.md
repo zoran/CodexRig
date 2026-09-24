@@ -23,18 +23,24 @@ approvals persist within scope, additive questions return to the active outcome,
 respected, and neither user absence nor an intermediate result is completion. Never end at "ready to
 implement" when implementation is already authorized.
 
-Before a new feature or other complex task, complete the decision-ready plan, review and fresh audit
-from [Planning](../../../instructions.md#product-first-delivery-and-verification-economy). Keep the
-plan in the conversation, or the sole bounded project-context cache when its lifecycle applies.
-Identify the user outcome, non-goals, acceptance evidence, material unknowns and tradeoffs, affected
-owners/consumers, ordered slices, integration, and recovery. Do not reopen an already settled choice
-without new evidence. Before extra work, identify the outcome, blocker or material risk it improves.
+Automatically complete the decision-ready plan, review to no relevant findings, and fresh plan audit
+before a new feature or other extensive, complex, or materially risky task. Follow
+[Planning](../../../instructions.md#planning-goals-slices-review-loops-and-audits) for triggers,
+proportionate plan depth, native Goal suitability, and the evidence that makes a finding relevant.
+Audit findings reopen the affected loop; a clean plan leads directly into authorized implementation.
+Use the native plan facility or conversation and only the sole bounded project-context cache when
+its lifecycle applies. Reuse settled decisions unless new evidence changes them. Before extra work,
+identify the outcome, blocker or material risk it improves; do not invent review rounds or optional
+micro-optimizations after sufficient evidence.
 
 Complete
 [Startup Repository Reconstruction](../../../instructions.md#startup-repository-reconstruction) and
 the pre-slice coordination check before writing or expanding the write set. One primary owns
-integration; every writer has an exact disjoint scope. Read the established requirements and design
-owners linked from the manifest under
+integration; every writer has an exact disjoint scope. Make the plan's parallelism decision under
+[Subagent Orchestration](../../../instructions.md#subagent-orchestration-and-integration-authority):
+use four useful concurrent subagents when admissible, otherwise state the actual limit and reassess
+after discovery, handoffs and slice boundaries. Read the established requirements and design owners
+linked from the manifest under
 [Documentation Ownership](../../../instructions.md#documentation-ownership), then current source,
 nearest package/build/test configuration and relevant durable decisions. Use
 [Context And Skills](../../../instructions.md#context-and-skills) for manifest-led discovery, scoped

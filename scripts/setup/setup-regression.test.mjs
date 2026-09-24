@@ -340,12 +340,22 @@ test("runtime Codex config permits only non-executable repository-local metadata
     "hide_rate_limit_model_nudge = true",
     "[tui]",
     'theme = "codex"',
+    "screen_reader_detection_done = true",
     "[tui.model_availability_nux]",
     "gpt-6-astra = 2",
     "",
   ].join("\n");
   writeFileSync(runtimeConfig, safe, { encoding: "utf8", mode: 0o600 });
   assert.equal(validateRuntimeCodexConfig(fixture).status, "present");
+  writeFileSync(
+    runtimeConfig,
+    safe.replace("screen_reader_detection_done = true", "screen_reader_detection_done = false"),
+  );
+  assert.equal(validateRuntimeCodexConfig(fixture).status, "present");
+  for (const invalid of ['"true"', "1", "[]"]) {
+    writeFileSync(runtimeConfig, `[tui]\nscreen_reader_detection_done = ${invalid}\n`);
+    assert.throws(() => validateRuntimeCodexConfig(fixture), /terminal preference is unsupported/u);
+  }
 
   for (const unsafe of [
     'notify = ["sh", "-c", "run-project-code"]\n',
@@ -557,23 +567,17 @@ test("startup attestation binds the complete preloaded controller closure", () =
   }
   assert.equal(
     verifyStartupAttestation({
-      controlPolicy: startupControlPolicies.default,
+      ...verification,
       hookInput,
-      nonce: issued.nonce,
-      root: fixture,
-      runtimeExecutables,
     }).schemaVersion,
     7,
   );
 
   const activeLease = inspectRuntimeSessionLease({ root: fixture }).lease;
-  const recovery = inspectRuntimeSessionRecovery({ root: fixture }).recovery;
   const expiredNow = () => issued.attestation.expiresAt + 1;
   verification.now = expiredNow;
-  assert.throws(
-    () => verifyStartupAttestation({ ...verification, hookInput }),
-    /stale or has an invalid lifetime/u,
-  );
+  assert.equal(verifyStartupAttestation({ ...verification, hookInput }).schemaVersion, 7);
+  const recovery = inspectRuntimeSessionRecovery({ root: fixture }).recovery;
   assert.equal(verifyStartupAttestation({ ...verification, hookInput: sideInput }), null);
   assert.throws(
     () =>
@@ -597,11 +601,8 @@ test("startup attestation binds the complete preloaded controller closure", () =
   assert.throws(
     () =>
       verifyStartupAttestation({
-        controlPolicy: startupControlPolicies.default,
+        ...verification,
         hookInput,
-        nonce: issued.nonce,
-        root: fixture,
-        runtimeExecutables,
       }),
     /startup-critical input changed/u,
   );

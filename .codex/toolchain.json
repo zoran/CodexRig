@@ -1,28 +1,28 @@
 {
   "schemaVersion": 1,
-  "reviewedOn": "2026-09-20",
+  "reviewedOn": "2026-09-24",
   "ci": {
     "codexNpmPackage": "@openai/codex",
-    "codexNpmPackageIntegrity": "sha512-02fAAGyBtlA1zPjEo3kTj/bOSYbPz5DvjLwRZJdV7weFFEDzNFOMjQGmZ/+5CuirYV0hE+AZTrnjzwXYU4AdAQ==",
+    "codexNpmPackageIntegrity": "sha512-nI1iVl/n2SO2lSvlwEsJx63zdSI4C4Me2gR7AG0OWMJiGSakz2tY2hx43E39Zq5aEoeB5bZjJXzp5Sqhog6vyA==",
     "codexNpmPlatformIntegrities": {
-      "x64": "sha512-atv3HF0mubqB0J/XkQ2JopqKzXJ+/7aQtTB2MkJ9MrraujMIz8zbCCLylLkN3PzpVGTJzzQFN/wD1oq8oJPJKg==",
-      "arm64": "sha512-X3fRXm2orhJ3KeB8LgKym4XDUiQaqaOGuaa181bcHTsQI7C8m6tcQQbQsKDzT/2IibikzgYL82jvsgMbq43jww=="
+      "x64": "sha512-2ePo0wgOcnONKsuzp8vBjOmNY+IdsKaouaDDIdiKq9HOWNuV/GI22OeXft2A/1GaoL71ictO0/pLAsCEnQ6wew==",
+      "arm64": "sha512-sTEHk31C12dqzJdjZ2u9KLFCXKL04KyCM+QheSjdQI8uzmVJS7aEF2/qAqFxXwk/jwMzC9u7IihfoIlAGR6YsA=="
     },
     "codexNpmPlatformPackages": {
       "x64": "@openai/codex-linux-x64",
       "arm64": "@openai/codex-linux-arm64"
     },
-    "codexVersion": "0.155.1",
-    "miseLinuxX64Sha256": "e79ae57945034903aee8aa2ea66b4c7ca9cd4f4edd5a8a78a589cbae6d0f428a",
+    "codexVersion": "0.156.1",
+    "miseLinuxX64Sha256": "a72f49916b33ba952ba398046c5cc91a58238f0b718fee1d938206ef2af21c6d",
     "miseNpmPackageIntegrities": {
-      "x64": "sha512-mO+e8dotFDTC1C4mfei147N6SdfrTHJVsDkuxLU0446dnxUi4Wejm/DcfxBrVpF5EQiLJNKkv3mvQ/xHpefhOw==",
-      "arm64": "sha512-avxKfioFsBgNlcjxW9s5A0bcu548hz1gSuoswJNgTaueKoFNZFxroL2s6RgYIV+AHt8W7ez5e5Mjx7xSZgxojw=="
+      "x64": "sha512-mdTmAQpmtEweUJl6ihP7tWpZneuQvLmunqkSTOxY/5gfCUXdurGJVzpG1YJ/c+2+WuXPGMbbOU4mQjApe5nJ8g==",
+      "arm64": "sha512-fu3rawmYN8WSv9d11r/HQgbJ0P0eW5f0dS/oWD7186IOi98WOoMZ5G2Jxnv5FNvVwMAHhAvlTxEMQK/kVpK+Nw=="
     },
     "miseNpmPackages": {
       "x64": "@jdxcode/mise-linux-x64",
       "arm64": "@jdxcode/mise-linux-arm64"
     },
-    "miseVersion": "2026.9.12"
+    "miseVersion": "2026.9.13"
   },
   "stable": {
     "node": {
@@ -31,12 +31,12 @@
       "channel": "lts"
     },
     "pnpm": {
-      "version": "11.27.0",
+      "version": "11.27.1",
       "range": ">=11.26.0 <12.0.0",
       "channel": "latest-11"
     },
     "codex": {
-      "minimumVersion": "0.155.1",
+      "minimumVersion": "0.156.1",
       "channel": "latest"
     }
   }

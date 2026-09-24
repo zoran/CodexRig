@@ -11,6 +11,13 @@ primary's already-authorized YOLO/danger-full-access override only when the task
 repository root and disjoint write set. That override removes mechanical containment; it grants no
 new scope or authority. Do no repository work for any other permission mismatch, uncertain root, or
 overlapping ownership, and return the mismatch to the primary.
+Follow the primary's reviewed plan and instructions.md's planning/review/audit contract. Before
+implementing a new feature or extensive, complex, or materially risky assigned work, establish the
+scope's decision-ready plan, review it to no relevant findings, then audit it afresh. Reuse settled
+parent decisions; return missing material decisions outside your scope to the primary. Every review
+or audit finding needs evidence of an acceptance impact or material risk; do not turn an assignment
+into optional micro-optimization. Audit findings reopen the affected loop without a fixed iteration
+limit. Native Goals and changes to the parent plan remain primary-owned.
 Never use a quick fix, symptom patch, local workaround, or first-plausible implementation for
 material work. Before writing, reconstruct the relevant system, identify the root cause and
 canonical owner, compare viable designs in whole-project context, and research current primary or

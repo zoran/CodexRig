@@ -760,6 +760,7 @@ test("startup attestation binds nonce, root, lifetime, inputs, and tool versions
       () =>
         verifyStartupAttestation({
           root,
+          expectedAttestation: issued.attestation,
           hookInput: candidate,
           nonce: issued.nonce,
           now: () => now + 1,
@@ -770,6 +771,7 @@ test("startup attestation binds nonce, root, lifetime, inputs, and tool versions
   }
   const verified = verifyStartupAttestation({
     root,
+    expectedAttestation: issued.attestation,
     hookInput,
     nonce: issued.nonce,
     now: () => now + 1,
@@ -803,6 +805,7 @@ test("startup attestation binds nonce, root, lifetime, inputs, and tool versions
     () =>
       verifyStartupAttestation({
         root,
+        expectedAttestation: issued.attestation,
         hookInput,
         nonce: issued.nonce,
         now: () => now + 1,
@@ -815,6 +818,7 @@ test("startup attestation binds nonce, root, lifetime, inputs, and tool versions
     () =>
       verifyStartupAttestation({
         root,
+        expectedAttestation: issued.attestation,
         hookInput,
         nonce: "x".repeat(43),
         now: () => now + 1,
@@ -826,6 +830,7 @@ test("startup attestation binds nonce, root, lifetime, inputs, and tool versions
     () =>
       verifyStartupAttestation({
         root,
+        expectedAttestation: issued.attestation,
         hookInput,
         nonce: issued.nonce,
         now: () => now + 1,
@@ -838,6 +843,7 @@ test("startup attestation binds nonce, root, lifetime, inputs, and tool versions
     () =>
       verifyStartupAttestation({
         root,
+        expectedAttestation: issued.attestation,
         hookInput,
         nonce: issued.nonce,
         now: () => now + 1,
@@ -859,6 +865,7 @@ test("startup attestation accepts only the YOLO permission mode for a YOLO launc
   });
   const verified = verifyStartupAttestation({
     root,
+    expectedAttestation: issued.attestation,
     hookInput: sessionStartHookInput(root, { permission_mode: "bypassPermissions" }),
     nonce: issued.nonce,
     controlPolicy,
@@ -877,6 +884,7 @@ test("durable session switches require a fresh launcher even after startup proof
   const selectedId = "01a01234-5678-7abc-8def-0123456789ab";
   verifyStartupAttestation({
     root,
+    expectedAttestation: issued.attestation,
     controlPolicy,
     nonce: issued.nonce,
     hookInput: sessionStartHookInput(root, { session_id: selectedId, source: "resume" }),
@@ -889,6 +897,7 @@ test("durable session switches require a fresh launcher even after startup proof
         () =>
           verifyStartupAttestation({
             root,
+            expectedAttestation: issued.attestation,
             controlPolicy,
             nonce: issued.nonce,
             now: () => now,
@@ -907,7 +916,7 @@ test("durable session switches require a fresh launcher even after startup proof
   assert.equal(releaseCurrentRuntimeSession(root), true);
 });
 
-test("startup attestation rejects expired launcher state", () => {
+test("startup attestation rejects expired admission before binding Codex", () => {
   const root = attestationFixture();
   const controlPolicy = startupControlPolicies.default;
   issueRuntimeSessionLease({ root, pid: process.pid });
@@ -920,6 +929,7 @@ test("startup attestation rejects expired launcher state", () => {
     () =>
       verifyStartupAttestation({
         root,
+        expectedAttestation: issued.attestation,
         hookInput: sessionStartHookInput(root, {
           source: "resume",
         }),
@@ -927,8 +937,144 @@ test("startup attestation rejects expired launcher state", () => {
         now: () => 2_801_000,
         controlPolicy,
       }),
-    /stale/,
+    /expired before its Codex process was bound/u,
   );
+  assert.throws(
+    () =>
+      bindStartupSessionWriter(root, process.pid, process.pid, {
+        controlPolicy,
+        expectedAttestation: issued.attestation,
+        nonce: issued.nonce,
+        now: () => issued.attestation.expiresAt + 1,
+      }),
+    /expired before its Codex process was bound/u,
+  );
+  assert.equal(inspectRuntimeSessionLease({ root }).lease.writerPhase, "unbound");
+  assert.equal(inspectRuntimeSessionRecovery({ root }).status, "absent");
+  assert.equal(releaseCurrentRuntimeSession(root), true);
+});
+
+test("bound picker and same-session verification use live ownership without renewing proof", () => {
+  for (const source of ["startup", "resume"]) {
+    const root = attestationFixture();
+    const controlPolicy = startupControlPolicies.default;
+    const issued = reserveStartupAttestation(root, process.pid, { controlPolicy });
+    const verification = {
+      root,
+      controlPolicy,
+      expectedAttestation: issued.attestation,
+      nonce: issued.nonce,
+    };
+    bindStartupSessionWriter(root, process.pid, process.pid, verification);
+    const statePath = path.join(root, ".codex/runtime/cache/codexrig/startup-attestation.json");
+    const originalProof = readFileSync(statePath, "utf8");
+    const hookInput = sessionStartHookInput(root, { source });
+    for (const currentTime of [
+      issued.attestation.expiresAt + 3_600_000,
+      issued.attestation.issuedAt - 120_000,
+    ]) {
+      assert.equal(
+        verifyStartupAttestation({ ...verification, hookInput, now: () => currentTime })
+          .sessionSource,
+        source,
+      );
+      assert.equal(readFileSync(statePath, "utf8"), originalProof);
+      assert.equal(
+        inspectRuntimeSessionRecovery({ root }).recovery.codexSessionId,
+        hookInput.session_id,
+      );
+    }
+    write(root, "package.json", "{}\n");
+    assert.throws(
+      () =>
+        verifyStartupAttestation({
+          ...verification,
+          hookInput,
+          now: () => issued.attestation.expiresAt + 1,
+        }),
+      /startup-critical input changed/u,
+    );
+    assert.equal(releaseCurrentRuntimeSession(root), true);
+  }
+});
+
+test("bound verification rejects missing or replaced issue-time proof even after the deadline", () => {
+  const root = attestationFixture();
+  const controlPolicy = startupControlPolicies.default;
+  const issued = reserveStartupAttestation(root, process.pid, { controlPolicy });
+  const verification = {
+    root,
+    controlPolicy,
+    expectedAttestation: issued.attestation,
+    nonce: issued.nonce,
+  };
+  bindStartupSessionWriter(root, process.pid, process.pid, verification);
+  const hookInput = sessionStartHookInput(root);
+  for (const currentTime of [issued.attestation.issuedAt + 1, issued.attestation.expiresAt + 1]) {
+    assert.throws(
+      () =>
+        verifyStartupAttestation({
+          ...verification,
+          hookInput,
+          expectedAttestation: undefined,
+          now: () => currentTime,
+        }),
+      /requires its live issue-time launcher and Codex process/u,
+    );
+  }
+  const statePath = path.join(root, ".codex/runtime/cache/codexrig/startup-attestation.json");
+  writeFileSync(
+    statePath,
+    serializeCanonicalJson({ ...issued.attestation, expiresAt: issued.attestation.expiresAt + 1 }),
+  );
+  assert.throws(
+    () =>
+      verifyStartupAttestation({
+        ...verification,
+        hookInput,
+        now: () => issued.attestation.expiresAt + 1,
+      }),
+    /attestation changed after the resume attempt began/u,
+  );
+  assert.equal(inspectRuntimeSessionLease({ root }).lease.phase, "launching");
+  assert.equal(inspectRuntimeSessionRecovery({ root }).status, "absent");
+  assert.equal(releaseCurrentRuntimeSession(root), true);
+});
+
+test("bound verification requires every exact process, not aggregate lease liveness", () => {
+  const root = attestationFixture();
+  const controlPolicy = startupControlPolicies.default;
+  const issued = reserveStartupAttestation(root, process.pid, { controlPolicy });
+  const verification = {
+    root,
+    controlPolicy,
+    expectedAttestation: issued.attestation,
+    nonce: issued.nonce,
+  };
+  bindStartupSessionWriter(root, process.pid, process.pid, verification);
+  const statePath = path.join(root, ".codex/runtime/codexrig-session.json");
+  const originalLease = readFileSync(statePath, "utf8");
+  try {
+    for (const field of ["process", "writerProcess", "codexProcess"]) {
+      const candidate = JSON.parse(originalLease);
+      candidate[field].pid = definitelyStalePid;
+      writeFileSync(statePath, serializeCanonicalJson(candidate));
+      assert.equal(inspectRuntimeSessionLease({ root }).status, "active");
+      assert.throws(
+        () =>
+          verifyStartupAttestation({
+            ...verification,
+            hookInput: sessionStartHookInput(root),
+            now: () => issued.attestation.expiresAt + 1,
+          }),
+        /requires its live issue-time launcher and Codex process/u,
+      );
+      assert.equal(inspectRuntimeSessionRecovery({ root }).status, "absent");
+    }
+  } finally {
+    writeFileSync(statePath, originalLease);
+    assert.equal(releaseCurrentRuntimeSession(root), true);
+  }
 });
 
 test("startup attestation rejects a missing runtime session lease", () => {
@@ -942,6 +1088,7 @@ test("startup attestation rejects a missing runtime session lease", () => {
     () =>
       verifyStartupAttestation({
         root,
+        expectedAttestation: issued.attestation,
         hookInput: sessionStartHookInput(root),
         nonce: issued.nonce,
         now: () => now + 1,

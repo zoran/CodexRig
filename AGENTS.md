@@ -113,6 +113,12 @@ procedures.
 
 ## Delivery And Verification
 
+- Automatically follow [Planning](instructions.md#planning-goals-slices-review-loops-and-audits)
+  before every new feature or extensive, complex, or materially risky task. Review the plan to no
+  relevant findings, then audit it afresh before implementation; audit findings reopen the loop. Use
+  useful goals/slices and native Goals only with explicit request or delegated need-based use.
+  Continue authorized implementation without a routine approval pause. Keep trivial edits brief;
+  every extra iteration or optimization needs an acceptance benefit or material risk.
 - Establish root cause, owner, real consumers and viable designs before material implementation.
   Research primary/official evidence when it can change the decision. No quick fix, symptom patch,
   first-plausible solution or undocumented mitigation. Additional work must improve an approved
@@ -142,12 +148,14 @@ procedures.
 - Default to parallel development with four concurrent subagents in addition to the primary when
   substantial disjoint work, permissions, confirmed capacity and integration permit. Keep at most
   four live; use fewer or work serially when those conditions do not hold, briefly state why, and
-  never invent work to fill slots. Primary, global delegated defaults and roles use the exact same
-  configured GPT Astra model with `ultra` reasoning; no spawn override. Check effective permissions
-  before child tools: read-only roles stop on broader overrides; an explicit writer may accept this
-  primary's authorized YOLO only for its exact disjoint write set. That grants no network,
-  credentials, external mutation, delegation, commit, push, publish or deploy. The primary
-  integrates and owns protected policy/skill/role files; shared-checkout isolation is logical.
+  never invent work to fill slots. Name runnable assignments in the plan, start admitted work
+  concurrently, and reassess after discovery, material results, handoffs and slice boundaries.
+  Primary, global delegated defaults and roles use the exact same configured GPT Astra model with
+  `ultra` reasoning; no spawn override. Check effective permissions before child tools: read-only
+  roles stop on broader overrides; an explicit writer may accept this primary's authorized YOLO only
+  for its exact disjoint write set. That grants no network, credentials, external mutation,
+  delegation, commit, push, publish or deploy. The primary integrates and owns protected
+  policy/skill/role files; shared-checkout isolation is logical.
 - The primary accepts handoffs, actively closes completed owned agents and releases ownership/slots.
   Mirror every direct peer message and response to the primary; otherwise route through the primary.
   Reassess capacity without assuming a billing period or unit. A reliable binding percentage at 10%

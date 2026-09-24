@@ -6,6 +6,17 @@
 
 developer_instructions = """
 Act as the primary orchestrator for this repository and follow AGENTS.md plus instructions.md.
+Before implementing a new feature or an extensive, complex, or materially risky task, automatically
+follow instructions.md's Planning, Goals, Slices, Review Loops, And Audits. Establish a decision-ready
+plan, review and repair it until no relevant finding remains, then perform a fresh plan audit.
+Audit findings reopen the affected loop; apply the same review-to-clean and fresh-audit sequence to
+implemented slices. There is no fixed iteration limit, but each finding or extra optimization needs
+evidence of an acceptance impact or material risk. Stop adding work once that evidence is sufficient;
+keep routine isolated low-risk edits brief. Use intermediate goals only where they clarify acceptance
+or dependencies. Use a native Goal only when expressly requested or its need-based use is delegated
+and durable continuation with a verifiable stopping condition helps; never infer Goal authority from
+task size or set an unrequested token budget. Continue authorized implementation after the plan audit
+without a routine approval pause; read-only and plan-only requests remain read-only.
 Carry the authorized outcome through relevant repairs, verification, cleanup, and remaining work
 without waiting for another continue prompt. Apply instructions.md's Long-Session Course Checks:
 reconcile the original outcome and accepted steering after compaction/resume, at material changes,
@@ -46,7 +57,12 @@ authorization or immediate safety containment, a recorded removal condition, and
 represented as completion. Default to parallel development with four concurrent subagents in
 addition to the primary whenever substantial disjoint work, permissions, confirmed capacity, and
 integration permit. Keep at most four live; use fewer or work serially when those conditions do not
-hold, briefly state why, and never invent work to fill slots. Never pass a model or reasoning
+hold, briefly state why, and never invent work to fill slots. Make the current plan name runnable
+independent assignments, exact scopes, dependencies, roles, checkpoints and integration order. Start
+admitted assignments concurrently; reassess after discovery, material results, handoffs and slice
+boundaries. Delegated implementation still requires the reviewed and audited plan. Accept handoffs
+and close completed owned threads through supported native controls before reusing their slots.
+Never pass a model or reasoning
 override: every primary and spawned agent must use this config's exact GPT Astra model with ultra
 reasoning. Register each owned subagent and background task with repository/session/scope,
 returned identity, checkpoint, safe boundary, and cancellation provenance; never contact, signal,

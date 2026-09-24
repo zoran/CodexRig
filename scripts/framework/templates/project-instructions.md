@@ -15,9 +15,13 @@ Continue authorized implementation through relevant repairs, verification and cl
 cancellation and approval gates, including “approve the static UI before application
 implementation.” A requirements draft, a work-state marker, a tool diagnostic, or a successful check
 grants no new authority. A status question does not cancel active work. Never invent another task to
-remain busy. Use native plans, sessions, approvals and subagents. Create a native Goal only on
-explicit request; `goal:new` checks publication and never creates a Goal. Do not add a scheduler or
-second task store.
+remain busy. Use native plans, sessions, approvals and subagents. Planning goals are acceptance
+milestones, not automatically native Goals. Use a native Goal when explicitly requested or when the
+user expressly delegates need-based Goal use and durable continuation across turns with a verifiable
+stopping condition helps. Honor that delegation without asking again; reuse an existing matching
+Goal instead of replacing unfinished work. Task size alone grants no Goal authority. Set a token
+budget only when explicitly requested; never raise a user-set budget. `goal:new` checks publication
+and never creates a Goal. Do not add a scheduler or second task store.
 
 ### Long-Session Course Checks
 
@@ -84,11 +88,46 @@ later; do not duplicate a specification or overwrite a maintained project docume
 
 ## Product-First Delivery And Verification Economy
 
-Plan material work before writing: outcome, acceptance, owners/consumers, viable designs, risks,
-ordered coherent slices, evidence and real authority boundaries. One writer owns each surface.
-Review the plan, fix omissions and audit it before implementation. After each nontrivial slice,
-perform `$system-coherence`, trace an assembled flow, fix relevant findings, repeat focused evidence
-to zero findings and audit again. Run `pnpm worktree:status -- --json` at every completed slice.
+Follow [Planning](#planning-goals-slices-review-loops-and-audits) before material implementation and
+keep evidence proportional to the outcome and risks. One writer owns each surface. Run
+`pnpm worktree:status -- --json` at every completed slice.
+
+## Planning, Goals, Slices, Review Loops, And Audits
+
+Automatically plan before implementing every new feature or other extensive, complex, or materially
+risky task. Multiple dependent steps or owners and substantial acceptance coverage count as extent
+even when individual edits are simple. Consequential unknowns, interacting contracts and difficult
+failure modes require planning even for a small diff. A routine isolated low-risk edit needs only a
+brief outcome/owner/check statement. Preserve plan-only or read-only authority and explicit approval
+gates; otherwise continue authorized implementation after planning without a routine pause.
+
+Use the native plan facility when available, otherwise the conversation; only the bounded project
+context lifecycle permits a working-context copy. Establish outcome, acceptance, non-goals, current
+system evidence, owners/consumers, viable designs, material decisions/unknowns, risks, ordered
+coherent slices, focused evidence, audit criteria, cleanup and real authority boundaries. Use
+intermediate goals only where distinct acceptance or dependencies help; assess native Goal
+suitability under [Authorized Work And Native Codex](#authorized-work-and-native-codex). Update the
+current plan on new evidence or accepted steering; do not duplicate task state or reopen settled
+decisions without cause.
+
+Include the current parallelism decision from
+[Subagent Orchestration](#subagent-orchestration-and-integration-authority): useful independent
+assignments, dependencies, exact read/write scopes, roles, admission evidence, checkpoints and
+integration order. Target four subagents plus the primary when admissible; otherwise state the
+concrete limiting reason.
+
+Review the plan, repair every relevant omission, contradiction or unsafe assumption, and repeat
+until no relevant finding remains. Then audit afresh against the request and actual system,
+including a representative path through affected owners and consumers. An audit finding reopens the
+affected review/repair loop; audit again only from a clean reviewed state before implementation.
+
+After each nontrivial slice, perform `$system-coherence`, trace an assembled flow, repair relevant
+findings and repeat affected review and focused evidence until none remains. Then perform a fresh
+audit against outcome, plan, manifest and consumers; audit findings reopen the same loop. Neither
+plan nor implementation review has a fixed iteration limit. The relevance and proportionality
+criteria below prevent optional work from extending either loop after sufficient evidence. A real
+authority or evidence blocker stays explicit with its resolution condition; continue safe
+independent work and never label the affected state clean.
 
 ## Best-Available Engineering, Not Quick Fixes
 
@@ -98,6 +137,15 @@ change the decision. Avoid symptom patches, speculative hardening and cleanup wi
 benefit or material risk. A temporary mitigation needs explicit authority or immediate containment,
 a removal condition and an honest unfinished follow-up. Speed or quota pressure never lowers
 quality.
+
+For both plans and implementation, a relevant finding needs evidence of a reproducible defect,
+demonstrated omission/contradiction, or plausible material failure path and its consequence for the
+authorized outcome, acceptance, correctness, safety, documented behavior or maintainability. A
+planning risk does not require an existing implementation failure. A touched file or personal
+preference alone is insufficient. Classify duplicates, false positives, unrelated suggestions and
+optional micro-optimizations; they do not block closure or authorize extra work. Add no review
+rounds, polish, abstractions, benchmarks, tests or research unless they change acceptance or a
+material risk.
 
 ## Current Contracts Only
 
@@ -249,6 +297,19 @@ work or insufficient permissions, isolation or capacity, and briefly state why. 
 advance the authorized outcome and justify its coordination and integration cost; never invent work
 or split cohesive changes merely to fill slots. Subagents never delegate further. Never override the
 configured GPT Astra/ultra model pair.
+
+Make the plan name assignments that can start now with an outcome, focused evidence, exact scope,
+dependency boundary, selected role, checkpoint and primary integration order. Choose discovery,
+implementation, test or review work for actual independence and benefit, not a fixed four-role
+checklist. Planning discovery may run before the plan audit; delegated implementation must wait for
+that audit and resolution of material decisions. Start admitted assignments concurrently, and let
+the primary continue disjoint useful work while owning shared decisions and integration.
+
+Reassess after discovery, material results, handoffs and every slice boundary. An initially serial
+phase does not make later independent work serial. Accept handoffs and close completed owned threads
+through supported native controls; confirm slot release before replacement, since idle or
+completed-but-open threads still occupy slots. Recheck capacity, permissions and ownership before
+every spawn or follow-up; an earlier admission does not carry forward after its conditions change.
 
 Register owned agents and background tasks with repository/session identity, exact scope, returned
 identity, checkpoint, safe boundary and cancellation provenance. One host represents one developer;

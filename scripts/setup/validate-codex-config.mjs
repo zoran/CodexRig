@@ -357,7 +357,11 @@ function validateRuntimeConfigDocument(value, root) {
         }
         continue;
       }
-      const schema = portablePolicy.get(`tui.${key}`);
+      // Codex persists this one-time accessibility probe as metadata, not portable policy.
+      const schema =
+        key === "screen_reader_detection_done"
+          ? { type: "boolean" }
+          : portablePolicy.get(`tui.${key}`);
       if (!schema || !valueMatchesSchema(entry, schema)) {
         throw new CodexConfigError(
           "Repository-local Codex runtime terminal preference is unsupported.",
