@@ -18,6 +18,7 @@ import {
   initialLocalizationConfiguration,
   localizationConfigurationPath,
 } from "../contracts/localization-configuration.mjs";
+import { documentContextSections } from "../docs/document-context.mjs";
 import { initialProjectManifest } from "../docs/initial-project-manifest.mjs";
 import { initialFutureModulesDocument } from "../docs/project-manifest-contract.mjs";
 import { initialRequirementsPath } from "../docs/project-document-policy.mjs";
@@ -28,29 +29,35 @@ import {
   writeRelative,
 } from "./generated-document-helpers.mjs";
 
-export function writeIdentityDocs(sourceRoot, targetRoot, projectName, description) {
-  const delivery = initialDeliveryConfiguration();
-  for (const [file, content] of [
-    [productConfigurationPath, initialProductConfiguration(projectName)],
-    [deliveryConfigurationPath, delivery],
-    [tenancyConfigurationPath, initialTenancyConfiguration()],
-    [localizationConfigurationPath, initialLocalizationConfiguration()],
-  ])
-    writeRelative(targetRoot, file, content);
-  if (description)
-    writeRelative(targetRoot, initialRequirementsPath, initialRequirementsDocument(description));
-  writeRelative(
-    targetRoot,
-    "instructions.md",
-    readFileSync(
-      path.join(sourceRoot, "scripts/framework/templates/project-instructions.md"),
-      "utf8",
-    ),
+/** Projects canonical shared policies into new and updated independent projects. */
+export function currentProjectInstructions(sourceRoot) {
+  const source = readFileSync(path.join(sourceRoot, "instructions.md"), "utf8");
+  const sections = documentContextSections("instructions.md", source);
+  let template = readFileSync(
+    path.join(sourceRoot, "scripts/framework/templates/project-instructions.md"),
+    "utf8",
   );
-  writeRelative(
-    targetRoot,
-    "AGENTS.md",
-    `# AGENTS.md
+  for (const [heading, marker] of [
+    ["Interpreting Examples And Scope", "<!-- current-examples-and-scope-policy -->"],
+    [
+      "Repository-Local Tool And Account Isolation",
+      "<!-- current-tool-account-isolation-policy -->",
+    ],
+    ["Repository Efficiency And Effectiveness", "<!-- current-repository-efficiency-policy -->"],
+  ]) {
+    const matches = sections.filter((section) => section.heading === heading);
+    if (matches.length !== 1 || template.split(marker).length !== 2)
+      throw new Error(`Shared policy ${heading} needs one canonical owner and one projection.`);
+    const section = matches[0];
+    const body = source.split(/\r?\n/u).slice(section.start, section.end).join("\n").trim();
+    template = template.replace(marker, body);
+  }
+  return template;
+}
+
+/** Current safe-entry projection, shared by generation and explicitly reviewed updates. */
+export function initialProjectAgents(projectName) {
+  return `# AGENTS.md
 
 This is the safe-entry guide for ${escapeMarkdownText(projectName)}. [Project Instructions](instructions.md)
 own this repository's workflow. Work only on its product outcome and accepted approvals.
@@ -58,13 +65,21 @@ Native work-state metadata grants no new task or implementation authority.
 
 ## Start And Reconstruct
 
-Start here with \`bash scripts/setup/start-codex.sh\`. Before intake or writes, read README,
-instructions, the current manifest and its requirements/design links. In the persistent main thread,
-read optional bounded project context and run \`pnpm worktree:status -- --json\`; inspect Git,
+Start here with \`bash scripts/setup/start-codex.sh\`. Before intake or writes run
+\`pnpm context:map\`; read relevant policy, manifest and requirements/design sections with
+\`pnpm context:read\`. Use README for needed commands; never recursively dump linked documents.
+When resuming authorized work read bounded project context. Always run
+\`pnpm worktree:status -- --json\`; inspect Git,
 upstream, untracked changes, every same-clone worktree/session and exact recovery metadata. Preserve
 ambiguous writers and broken worktree directories. A side conversation remains independent.
 
 ## Product Authority
+
+Treat examples as non-exhaustive; follow
+[Interpreting Examples And Scope](instructions.md#interpreting-examples-and-scope) across the
+authorized class and its future additions.
+All tools use [repository-local account and tool state](instructions.md#repository-local-tool-and-account-isolation);
+new tools must satisfy the same isolation boundary before authenticated use.
 
 A pending definition requires the focused requirements intake. A brief does not authorize code.
 Honor any static-UI acceptance gate before application implementation. README owns setup/use and
@@ -81,7 +96,10 @@ goals where useful, native Goals only with explicit request or delegated need-ba
 Repair at the actual owner, keep one current contract and one writer per surface, preserve user
 changes, and use relevant skills. After a slice, run focused evidence, system-coherence review to no
 relevant findings, a fresh audit and Worktree Settlement. Every extra iteration needs an acceptance
-benefit or material risk. Apply the Long-Session Course Checks in instructions.md.
+benefit or material risk. Every audit follows
+[Repository Efficiency And Effectiveness](instructions.md#repository-efficiency-and-effectiveness).
+Run \`pnpm context:check\` for instruction/context changes and preserve full requirements through
+bounded reads. Apply the Long-Session Course Checks in instructions.md.
 Stable tools and product checks are declared in \`.codex/verification.json\`; unknown paths must not
 omit real product tests. Tool failures are bounded findings, not a new maintenance campaign.
 
@@ -98,8 +116,22 @@ seal with \`pnpm handover:create -- --critical\` as the final action, then stop 
 
 Keep private state inside this root's ignored CODEX_HOME. Never delete active runtime or a worktree
 directory manually. Project licensing decisions belong to the project owner.
-`,
-  );
+`;
+}
+
+export function writeIdentityDocs(sourceRoot, targetRoot, projectName, description) {
+  const delivery = initialDeliveryConfiguration();
+  for (const [file, content] of [
+    [productConfigurationPath, initialProductConfiguration(projectName)],
+    [deliveryConfigurationPath, delivery],
+    [tenancyConfigurationPath, initialTenancyConfiguration()],
+    [localizationConfigurationPath, initialLocalizationConfiguration()],
+  ])
+    writeRelative(targetRoot, file, content);
+  if (description)
+    writeRelative(targetRoot, initialRequirementsPath, initialRequirementsDocument(description));
+  writeRelative(targetRoot, "instructions.md", currentProjectInstructions(sourceRoot));
+  writeRelative(targetRoot, "AGENTS.md", initialProjectAgents(projectName));
   writeRelative(
     targetRoot,
     "README.md",
@@ -110,14 +142,19 @@ This repository owns its product and a bounded set of inspectable development to
 ## Setup And Start
 
 \`\`\`bash
-mise install --locked
-mise exec --locked -- node scripts/deps/install-compatible.mjs
-mise exec --locked -- pnpm setup
+node scripts/deps/maintain-toolchain.mjs
+bash scripts/setup/run-project.sh pnpm setup
 bash scripts/setup/start-codex.sh
 \`\`\`
 
 Use \`--yolo\` only for an explicitly authorized Dev session; use \`--no-alt-screen\` when needed.
 Enter prompts after native session selection. Restart through the launcher after runtime-tool changes.
+
+If startup reports an invalid or unsupported private session lease, exit all sessions using this
+project. Its maintenance/update owner must reconstruct the installed runtime and restore the current
+contract through a reviewed, quiescent regeneration. Preserve product changes, accounts and native
+history. Do not delete \`.codex/runtime\` manually or run source-framework reset commands in this
+independent project. Retry the canonical launcher only after recovery has been validated.
 
 After a critical handover, exit Codex completely with \`/quit\`, then run
 \`bash scripts/setup/start-codex.sh\` from this root in your terminal. Accept the preserved handover
@@ -138,6 +175,17 @@ workflows, boundaries and acceptance before implementation. Preserve separate UI
 ${description ? "- [Requirements intake draft](docs/requirements.md)\n" : ""}
 ## Project Commands
 
+Use \`pnpm context:map\` for repository navigation, \`pnpm context:read -- <document> --outline\`
+for bounded reading and \`pnpm context:check\` for instruction growth.
+Use \`bash scripts/setup/run-project.sh <command> [arguments]\` from a host shell to execute
+through \`mise exec --locked\` with repository-local
+home and mutable state. Pins and artifact locks live in \`.codex/mise.toml\` and \`.codex/mise.lock\`,
+loaded explicitly so the outer host shell does not activate project tools after Codex exits.
+The launcher selects native embedded mode (\`--no-daemon\`) for its session-only hooks and settings.
+Follow the tool/account isolation policy before any authenticated use.
+Platform-policy apply reads the private \`.auth/git-platform.json\` file with exact fields
+\`schemaVersion\` (1), \`provider\`, \`hostname\`, \`repository\` (remote slug), and \`token\`;
+it never inherits a host token. Keep this file and its parent private and outside source control.
 Use \`pnpm tooling:doctor\` for local tool diagnosis, \`pnpm worktree:status -- --json\` for session
 inventory, \`pnpm verify:changed -- --print-plan\` for selected evidence and \`pnpm verify\` for final
 verification. \`pnpm repo:housekeeping -- --apply\` reconciles local repository facts. These commands

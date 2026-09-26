@@ -115,11 +115,12 @@ const credentialMechanismPattern =
 const sessionMechanismPattern = /^(?:iron-session|jose|jsonwebtoken)(?:\/|$)/iu;
 const sensitiveIdentityLogPattern =
   /\b(?:console|log(?:ger)?)\.(?:debug|error|info|log|trace|warn)\s*\([^\n)]*\b(?:accessToken|access_token|authorizationHeader|authorization_header|credentialSecret|credential_secret|idToken|id_token|password(?:Hash)?|password_hash|refreshToken|refresh_token|sessionSecret|session_secret|sessionToken|session_token)\b/iu;
+// Function names and domain words such as session/role are not implementation evidence. Keep
+// primitive credential verification and direct actor access checks distinct from port calls.
 const identityImplementationPatterns = Object.freeze([
-  /\b(?:async\s+)?(?:def|fn|func|function|fun)\s+(?:authenticate|authorize|checkPassword|createSession|enforcePermission|hasPermission|issueToken|login|requirePermission|rotateToken|signIn|validateSession|validateToken|verifyCredential|verifyMfa|verifyPassword|verifyPermission|verifyRole|verifyToken|verifyWebAuthn)\b/iu,
-  /(?<![.\w])(?:async\s+)?(?:authenticate|authorize|checkPassword|createSession|enforcePermission|hasPermission|issueToken|login|requirePermission|rotateToken|signIn|validateSession|validateToken|verifyCredential|verifyMfa|verifyPassword|verifyPermission|verifyRole|verifyToken|verifyWebAuthn)\s*\([^;{}]{0,500}\)\s*(?:=>|\{|throws\b)/iu,
   /\b(?:crypto\.subtle\.verify|passwordHasher\.(?:compare|verify)|verifyPasswordHash)\s*\([^;]{0,500}\b(?:credential|password|passwordHash|password_hash)\b/iu,
-  /\b(?:return|if)\b[^;{}]{0,500}\b(?:permission|role)\w*\b[^;{}]{0,500}(?:===?|==|\.contains\s*\(|\.has\s*\(|\bin\b)/iu,
+  /\b(?:return|if)\b[^;{}\n]{0,500}\b(?:password(?:Hash)?|password_hash|credentialSecret(?:Digest)?|credential_secret|sessionToken|session_token)\b(?:\s*\([^;{}\n]{0,160}\))?\s*(?:===?|==|!==?|!=|\.equals\s*\()\s*(?!(?:null|undefined|true|false)\b)(?:[A-Za-z_$0-9]|["'`] +["'`])/iu,
+  /\b(?:return|if)\b[^;{}\n]{0,500}\b(?:actor|principal|user|identity|member|claims)\s*\.\s*(?:permissions?|roles?)\b[^;{}\n]{0,160}(?:===?|==|\.(?:contains|has|includes)\s*\(|\bin\b)/iu,
   /\b(?:navigator\.credentials|PublicKeyCredential|WebAuthn|webauthn)\b[^;{}]{0,700}\b(?:authenticate|create|get|verify)\b/iu,
 ]);
 
@@ -194,7 +195,7 @@ function boundaryLayoutFindings(file, descriptor) {
 export function identityAccessFileFindings(file, { importResolver, productLayout }) {
   const findings = [];
   const descriptor = boundaryDescriptor(file.relativePath, productLayout);
-  const executable = executableSource(file.content);
+  const executable = executableSource(file.content, { preserveLiteralDelimiters: true });
   const sourceRoot = productRootFor(file.relativePath, productLayout);
   const relativeToSource = sourceRoot
     ? file.relativePath.slice(sourceRoot.length).replace(/^\//u, "")
@@ -336,7 +337,7 @@ function main() {
     return;
   }
   console.log(
-    "Identity and Access boundaries passed (authentication, authorization, identity lifecycle, sessions/tokens, and provider adapters).",
+    "Identity and Access structure and credential implementation heuristics passed; semantic flow review remains required.",
   );
 }
 

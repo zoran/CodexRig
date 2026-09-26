@@ -1,5 +1,6 @@
 /** Owns update sitemap lastmod behavior for the public web quality boundary. */
 import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
+import { cleanGitEnvironment } from "../repository/git-runtime-isolation.mjs";
 import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -227,7 +228,11 @@ function changedHtmlPaths(changedFrom, repositoryRoot, layout) {
   const result = spawnSync(
     "git",
     ["diff", "--name-only", "--diff-filter=ACMRTUXB", changedFrom, "--", ...layout.sourceRoots],
-    { cwd: repositoryRoot, encoding: "utf8" },
+    {
+      cwd: repositoryRoot,
+      env: cleanGitEnvironment(process.env, repositoryRoot),
+      encoding: "utf8",
+    },
   );
   if (result.status !== 0) throw new Error("git diff failed for provided --changed-from ref");
   return result.stdout

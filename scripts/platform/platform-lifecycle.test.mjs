@@ -1,7 +1,17 @@
 /** Verifies platform lifecycle behavior for the Git provider integration boundary. */
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  chmodSync,
+  symlinkSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
@@ -9,7 +19,10 @@ import {
   readToolingConfiguration,
   validateToolingConfiguration,
 } from "../contracts/tooling-configuration.mjs";
-import { configurePlatform, githubRulesetPayload } from "./configure-platform.mjs";
+import {
+  configurePlatform as configureActualPlatform,
+  githubRulesetPayload,
+} from "./configure-platform.mjs";
 import { detectGitProvider, parseGitRemoteUrl } from "./git-provider.mjs";
 import { gitlabApprovalRuleName } from "./gitlab-platform.mjs";
 import { platformApiRequest } from "./platform-api.mjs";
@@ -20,6 +33,8 @@ import {
   protectedBranch,
   response,
 } from "./platform-lifecycle-harness.mjs";
+
+import { readPlatformCredential } from "./platform-credentials.mjs";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..", "..");
 const contract = readToolingConfiguration(repositoryRoot);
@@ -45,6 +60,26 @@ function repository(remote) {
     assert.equal(result.status, 0, result.stderr);
   }
   return root;
+}
+
+async function configurePlatform(options) {
+  if (options.apply && options.root) {
+    const dir = path.join(options.root, ".auth");
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const detected = options.detected;
+    writeFileSync(
+      path.join(dir, "git-platform.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        provider: detected.provider,
+        hostname: detected.hostname,
+        repository: detected.slug,
+        token: "test-token",
+      }),
+      { mode: 0o600 },
+    );
+  }
+  return configureActualPlatform(options);
 }
 
 function githubDetection() {
@@ -159,7 +194,6 @@ test("platform configuration refuses an unowned host before I/O", async () => {
       apply: true,
       contract,
       detected: gitlabDetection({ hostname: "untrusted.example.test" }),
-      environment: { GITLAB_TOKEN: "test-token" },
       fetchImpl: async () => {
         calls += 1;
         return response(200, {});
@@ -234,7 +268,6 @@ test("GitHub previews without I/O and applies a verified owned ruleset", async (
     apply: true,
     contract,
     detected: githubDetection(),
-    environment: { GH_TOKEN: "test-token" },
     root: temporaryRoot(),
     fetchImpl: async (url, options) => {
       calls.push({ options, url });
@@ -262,7 +295,6 @@ test("GitHub pagination finds an existing owned ruleset without creating a dupli
     apply: true,
     contract,
     detected: githubDetection(),
-    environment: { GITHUB_TOKEN: "test-token" },
     root: temporaryRoot(),
     fetchImpl: async (url, options) => {
       calls.push({ options, url });
@@ -283,7 +315,6 @@ test("GitHub preferred serialization falls back and verifies the reduced policy"
     apply: true,
     contract,
     detected: githubDetection(),
-    environment: { GH_TOKEN: "test-token" },
     root: temporaryRoot(),
     fetchImpl: async (url, options) => {
       if (url.includes("?")) return response(200, []);
@@ -313,7 +344,6 @@ test("GitHub retains recovery state after failed read-back and resumes safely", 
       apply: true,
       contract,
       detected: githubDetection(),
-      environment: { GH_TOKEN: "secret-token" },
       root,
       fetchImpl: async (url, options) => {
         if (url.includes("?")) return response(200, []);
@@ -325,12 +355,11 @@ test("GitHub retains recovery state after failed read-back and resumes safely", 
   );
   const statePath = path.join(root, ".project-state", "platform-configuration.json");
   assert.equal(existsSync(statePath), true);
-  assert.equal(readFileSync(statePath, "utf8").includes("secret-token"), false);
+  assert.equal(readFileSync(statePath, "utf8").includes("test-token"), false);
   const resumed = await configurePlatform({
     apply: true,
     contract,
     detected: githubDetection(),
-    environment: { GH_TOKEN: "secret-token" },
     root,
     fetchImpl: async (url, options) => {
       if (url.includes("?")) return response(200, [{ id: 7, name: payload.name }]);
@@ -349,7 +378,6 @@ test("GitLab validates approval capability before making any change", async () =
       apply: true,
       contract,
       detected: gitlabDetection(),
-      environment: { GITLAB_TOKEN: "test-token" },
       root: temporaryRoot(),
       fetchImpl: async (url, options) => {
         calls.push({ options, url });
@@ -374,7 +402,6 @@ test("GitLab rejects a locked weaker approval setting before mutation", async ()
       apply: true,
       contract,
       detected: gitlabDetection(),
-      environment: { GITLAB_TOKEN: "test-token" },
       fetchImpl: harness.fetchImpl,
       root: temporaryRoot(),
     }),
@@ -389,7 +416,6 @@ test("GitLab reconciles and reads back the complete merge-request policy", async
     apply: true,
     contract,
     detected: gitlabDetection({ slug: "group/subgroup/project" }),
-    environment: { GITLAB_TOKEN: "test-token" },
     fetchImpl: harness.fetchImpl,
     root: temporaryRoot(),
   });
@@ -435,7 +461,6 @@ test("GitLab removes the owned approval rule when zero approvals are requested",
     apply: true,
     contract: zeroApprovals,
     detected: gitlabDetection(),
-    environment: { GITLAB_TOKEN: "test-token" },
     fetchImpl: harness.fetchImpl,
     root: temporaryRoot(),
   });
@@ -464,7 +489,6 @@ test("GitLab preserves visible approvers while updating an owned rule", async ()
     apply: true,
     contract,
     detected: gitlabDetection(),
-    environment: { GITLAB_TOKEN: "test-token" },
     fetchImpl: harness.fetchImpl,
     root: temporaryRoot(),
   });
@@ -494,7 +518,6 @@ test("GitLab preserves granular merge access and removes every granular direct-p
     apply: true,
     contract,
     detected: gitlabDetection(),
-    environment: { GITLAB_TOKEN: "test-token" },
     fetchImpl: harness.fetchImpl,
     root: temporaryRoot(),
   });
@@ -514,7 +537,6 @@ test("GitLab preferred serialization degrades progressively without weakening CI
     apply: true,
     contract,
     detected: gitlabDetection(),
-    environment: { GITLAB_TOKEN: "test-token" },
     fetchImpl: harness.fetchImpl,
     root: temporaryRoot(),
   });
@@ -539,7 +561,6 @@ test("GitLab uses the contract-owned self-hosted API base", async () => {
     apply: true,
     contract: selfHosted,
     detected: gitlabDetection({ hostname: "gitlab.example.test" }),
-    environment: { GITLAB_TOKEN: "test-token" },
     fetchImpl: harness.fetchImpl,
     root: temporaryRoot(),
   });
@@ -548,4 +569,55 @@ test("GitLab uses the contract-owned self-hosted API base", async () => {
       call.url.startsWith("https://gitlab.example.test:8443/custom/api/v4/projects/"),
     ),
   );
+});
+
+test("platform credentials stay private and bound to the selected repository without ambient fallback", async () => {
+  const root = temporaryRoot();
+  const detected = githubDetection();
+  let requests = 0;
+  await assert.rejects(
+    configureActualPlatform({
+      root,
+      contract,
+      detected,
+      apply: true,
+      environment: { GH_TOKEN: randomBytes(24).toString("hex") },
+      fetchImpl: async () => {
+        requests += 1;
+        throw new Error("must not send");
+      },
+    }),
+    /project-owned/u,
+  );
+  assert.equal(requests, 0);
+  assert.equal(existsSync(path.join(root, ".project-state")), false);
+  const dir = path.join(root, ".auth");
+  mkdirSync(dir, { mode: 0o700 });
+  const file = path.join(dir, "git-platform.json");
+  const profile = {
+    schemaVersion: 1,
+    provider: "github",
+    hostname: "github.com",
+    repository: "owner/project",
+    token: randomBytes(24).toString("hex"),
+  };
+  writeFileSync(file, JSON.stringify(profile), { mode: 0o600 });
+  assert.equal(readPlatformCredential(root, detected), profile.token);
+  assert.throws(
+    () => readPlatformCredential(root, { ...detected, slug: "another/project" }),
+    /different remote/u,
+  );
+  chmodSync(file, 0o644);
+  assert.throws(() => readPlatformCredential(root, detected), /private/u);
+  chmodSync(file, 0o600);
+  writeFileSync(file, JSON.stringify({ token: profile.token }).slice(0, -1));
+  assert.throws(
+    () => readPlatformCredential(root, detected),
+    (error) => error.message === "Project platform credential must be valid JSON.",
+  );
+  rmSync(file);
+  const outside = path.join(temporaryRoot(), "host-profile");
+  writeFileSync(outside, JSON.stringify(profile), { mode: 0o600 });
+  symlinkSync(outside, file);
+  assert.throws(() => readPlatformCredential(root, detected));
 });

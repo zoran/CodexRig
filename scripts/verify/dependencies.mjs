@@ -2,6 +2,7 @@
 import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import process from "node:process";
 import { readPolicy, root, validatePolicy } from "../deps/dependency-policy.mjs";
+import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
 
 const failures = validatePolicy(readPolicy());
 const lockCheck = spawnSync(
@@ -18,7 +19,7 @@ const lockCheck = spawnSync(
     cwd: root,
     encoding: "utf8",
     input: "",
-    env: { ...process.env, pnpm_config_ignore_pnpmfile: "true" },
+    env: pnpmHooksDisabledEnvironment(process.env, root),
     stdio: "pipe",
     timeout: 120_000,
   },

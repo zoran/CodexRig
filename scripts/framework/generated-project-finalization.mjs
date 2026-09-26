@@ -1,4 +1,8 @@
 /** Owns generated project finalization behavior for the portable clean-project generation boundary. */
+import {
+  prepareProjectToolDirectories,
+  projectToolEnvironment,
+} from "../repository/project-tool-environment.mjs";
 import { projectOutputText } from "./project-output-projection.mjs";
 import {
   readProjectToolSelection,
@@ -77,7 +81,12 @@ function validateTransferManifest(transferManifest) {
   }
 }
 
-function assertDeclaredConfigurationTransformations({ sourceRoot, targetRoot, transferManifest }) {
+function assertDeclaredConfigurationTransformations({
+  sourceRoot,
+  targetRoot,
+  transferManifest,
+  projectName,
+}) {
   const entries = new Map(transferManifest.files.map((entry) => [entry.relativePath, entry]));
   const sourceConfig = readStableRepositoryText({
     repositoryRoot: sourceRoot,
@@ -119,6 +128,9 @@ function assertDeclaredConfigurationTransformations({ sourceRoot, targetRoot, tr
     projectOutputText(
       projectToolingConfiguration(
         readFileSync(path.join(sourceRoot, ".codex/tooling.json"), "utf8"),
+        projectName ??
+          JSON.parse(readFileSync(path.join(targetRoot, ".codex/tooling.json"), "utf8")).startup
+            .displayName,
       ),
     )
   )
@@ -148,6 +160,7 @@ export function assertGeneratedProjectParity({
   targetRoot,
   transferManifest,
   projectDescription = "",
+  projectName,
 }) {
   validateTransferManifest(transferManifest);
   const includedPaths = transferManifest.files.map(({ relativePath }) => relativePath);
@@ -182,7 +195,12 @@ export function assertGeneratedProjectParity({
     fail(`Generated project transfer parity failed (${details.join("; ")}).`);
   }
 
-  assertDeclaredConfigurationTransformations({ sourceRoot, targetRoot, transferManifest });
+  assertDeclaredConfigurationTransformations({
+    sourceRoot,
+    targetRoot,
+    transferManifest,
+    projectName,
+  });
 
   const changedPaths = transferManifest.files
     .filter(({ relativePath }) => !transformedProjectPaths.has(relativePath))
@@ -216,11 +234,12 @@ export function updateGeneratedPackage(sourceRoot, targetRoot, packageName) {
   writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
 }
 
-export function runGeneratedNode(root, relativeScript, args = []) {
+export function runGeneratedNode(sourceRoot, root, relativeScript, args = []) {
+  prepareProjectToolDirectories(sourceRoot);
   const result = spawnSync(process.execPath, [path.join(root, relativeScript), ...args], {
     cwd: root,
     encoding: "utf8",
-    env: process.env,
+    env: projectToolEnvironment({ root: sourceRoot }),
     input: "",
     stdio: "pipe",
   });
@@ -235,9 +254,12 @@ export function formatGeneratedMarkdown(sourceRoot, targetRoot) {
   const formatterPath = path.join(sourceRoot, "node_modules", "prettier", "bin", "prettier.cjs");
   if (!existsSync(formatterPath)) {
     fail(
-      "Project initialization requires the framework's installed formatter. Run mise install --locked and then mise exec --locked -- pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile first.",
+      "Project initialization requires the framework's installed formatter. Run node scripts/deps/maintain-toolchain.mjs --locked first.",
     );
   }
+  // The source owns this formatter invocation. Its cache must never materialize inside the
+  // portable output, which is still an unpublished artifact rather than an active tool home.
+  prepareProjectToolDirectories(sourceRoot);
   const result = spawnSync(
     process.execPath,
     [
@@ -254,6 +276,7 @@ export function formatGeneratedMarkdown(sourceRoot, targetRoot) {
     ],
     {
       cwd: targetRoot,
+      env: projectToolEnvironment({ root: sourceRoot }),
       encoding: "utf8",
       input: "",
       stdio: "pipe",
@@ -338,6 +361,8 @@ export function assertGeneratedProjectClean(
       "config.toml",
       "hooks.json",
       "toolchain.json",
+      "mise.lock",
+      "mise.toml",
       "tooling.json",
       "verification.json",
     ]

@@ -160,6 +160,36 @@ test("documentation-only change receives one idempotent patch release", (t) => {
   assert.deepEqual(repeated.driftFindings, []);
 });
 
+test("portable schema changes require a major release without interpreting the old payload", (t) => {
+  const root = fixture(t);
+  const contractPath = ".codex/toolchain.json";
+  write(root, contractPath, JSON.stringify({ schemaVersion: 1, retiredShape: true }));
+  git(root, ["add", contractPath]);
+  git(root, ["commit", "--quiet", "-m", "publish portable contract"]);
+  git(root, ["push", "--quiet"]);
+  for (const current of [{ schemaVersion: 2, currentShape: true }, { currentShape: true }]) {
+    write(root, contractPath, JSON.stringify(current));
+    const plan = frameworkVersionReconciliationPlan({ root });
+    assert.equal(plan.requiredBump, "major");
+    assert.equal(plan.targetVersion, "3.0.0");
+  }
+  write(root, contractPath, JSON.stringify({ schemaVersion: 1, additiveField: true }));
+  assert.equal(frameworkVersionReconciliationPlan({ root }).requiredBump, "minor");
+});
+
+test("detached CI reviews the central baseline without gaining housekeeping write authority", (t) => {
+  const root = fixture(t);
+  git(root, ["checkout", "--detach", "--quiet"]);
+  git(root, ["config", "--remove-section", "branch.main"]);
+  assert.throws(() => frameworkVersionReconciliationPlan({ root }), /integration branch/u);
+  assert.deepEqual(frameworkVersionReconciliationPlan({ root, review: true }).driftFindings, []);
+  git(root, ["remote", "add", "ambiguous", root]);
+  assert.throws(
+    () => frameworkVersionReconciliationPlan({ root, review: true }),
+    /remote.*invalid/u,
+  );
+});
+
 for (const interrupted of [false, true]) {
   test(`housekeeping leaves guarded pnpm usable after ${interrupted ? "an interrupted" : "a new"} version change`, (t) => {
     const root = fixture(t);

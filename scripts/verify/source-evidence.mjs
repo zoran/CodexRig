@@ -88,8 +88,8 @@ export function sourceWithoutComments(value) {
   return output;
 }
 
-/** Removes comments and literal contents so prose cannot satisfy executable security evidence. */
-export function executableSource(value) {
+/** Removes comments and literal contents; optional delimiters retain literal operands, never their prose. */
+export function executableSource(value, { preserveLiteralDelimiters = false } = {}) {
   const source = sourceWithoutComments(value);
   let output = "";
   let index = 0;
@@ -115,7 +115,10 @@ export function executableSource(value) {
         else if (current === "\\") escaped = true;
         else if (current === quote) break;
       }
-      output += maskRange(source, start, index);
+      output +=
+        preserveLiteralDelimiters && source[index - 1] === quote && index > start + 1
+          ? quote + maskRange(source, start + 1, index - 1) + quote
+          : maskRange(source, start, index);
       continue;
     }
     output += character;

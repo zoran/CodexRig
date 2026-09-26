@@ -144,60 +144,64 @@ test("trusted dependency paths reject executable pnpm configuration before pnpm 
   assert.equal(existsSync(sentinel), false);
 });
 
-test("trusted pnpm resolution rejects repository-local command shadowing", () => {
-  const root = transactionFixture();
-  const current = JSON.parse(sourceToolchain).stable;
-  const decoy = path.join(root, "node_modules", ".bin", "pnpm");
-  const toolRoot = mkdtempSync(path.join(os.tmpdir(), "trusted-pnpm-tool-"));
-  transactionRoots.push(toolRoot);
-  const nodeExecutable = path.join(
-    toolRoot,
-    "installs",
-    "node",
-    current.node.version,
-    "bin",
-    "node",
-  );
-  const trusted = path.join(toolRoot, "installs", "pnpm", current.pnpm.version, "pnpm");
-  const magicPathDecoy = path.join(
-    toolRoot,
-    "external",
-    "installs",
-    "pnpm",
-    current.pnpm.version,
-    "pnpm",
-  );
-  mkdirSync(path.dirname(decoy), { recursive: true });
-  mkdirSync(path.dirname(nodeExecutable), { recursive: true });
-  mkdirSync(path.dirname(trusted), { recursive: true });
-  mkdirSync(path.dirname(magicPathDecoy), { recursive: true });
-  writeFileSync(decoy, "decoy\n");
-  writeFileSync(nodeExecutable, "node\n");
-  writeFileSync(trusted, "trusted\n");
-  writeFileSync(magicPathDecoy, "magic path decoy\n");
-  chmodSync(decoy, 0o755);
-  chmodSync(nodeExecutable, 0o755);
-  chmodSync(trusted, 0o755);
-  chmodSync(magicPathDecoy, 0o755);
-  const calls = [];
-  const command = trustedPnpmCommand({
-    repositoryRoot: root,
-    environment: {
-      PATH: `${path.dirname(decoy)}${path.delimiter}${path.dirname(magicPathDecoy)}`,
-      npm_execpath: decoy,
-      COREPACK_HOME: path.join(root, "untrusted-corepack"),
-    },
-    nodeExecutable,
-    spawn(executable, args, options) {
-      calls.push({ executable, args, environment: options.env });
-      return { status: 0, stdout: `${current.pnpm.version}\n`, stderr: "" };
-    },
+for (const candidate of [null, "12.0.0-beta.1"])
+  test(`trusted pnpm resolution rejects command shadowing with ${candidate ?? "stable"} pins`, () => {
+    const root = transactionFixture();
+    const configuration = JSON.parse(sourceToolchain);
+    if (candidate) configuration.stable.pnpm.version = candidate;
+    writeFileSync(path.join(root, ".codex/toolchain.json"), JSON.stringify(configuration));
+    const current = configuration.stable;
+    const decoy = path.join(root, "node_modules", ".bin", "pnpm");
+    const toolRoot = mkdtempSync(path.join(os.tmpdir(), "trusted-pnpm-tool-"));
+    transactionRoots.push(toolRoot);
+    const nodeExecutable = path.join(
+      toolRoot,
+      "installs",
+      "node",
+      current.node.version,
+      "bin",
+      "node",
+    );
+    const trusted = path.join(toolRoot, "installs", "pnpm", current.pnpm.version, "pnpm");
+    const magicPathDecoy = path.join(
+      toolRoot,
+      "external",
+      "installs",
+      "pnpm",
+      current.pnpm.version,
+      "pnpm",
+    );
+    mkdirSync(path.dirname(decoy), { recursive: true });
+    mkdirSync(path.dirname(nodeExecutable), { recursive: true });
+    mkdirSync(path.dirname(trusted), { recursive: true });
+    mkdirSync(path.dirname(magicPathDecoy), { recursive: true });
+    writeFileSync(decoy, "decoy\n");
+    writeFileSync(nodeExecutable, "node\n");
+    writeFileSync(trusted, "trusted\n");
+    writeFileSync(magicPathDecoy, "magic path decoy\n");
+    chmodSync(decoy, 0o755);
+    chmodSync(nodeExecutable, 0o755);
+    chmodSync(trusted, 0o755);
+    chmodSync(magicPathDecoy, 0o755);
+    const calls = [];
+    const command = trustedPnpmCommand({
+      repositoryRoot: root,
+      environment: {
+        PATH: `${path.dirname(decoy)}${path.delimiter}${path.dirname(magicPathDecoy)}`,
+        npm_execpath: decoy,
+        COREPACK_HOME: path.join(root, "untrusted-corepack"),
+      },
+      nodeExecutable,
+      spawn(executable, args, options) {
+        calls.push({ executable, args, environment: options.env });
+        return { status: 0, stdout: `${current.pnpm.version}\n`, stderr: "" };
+      },
+    });
+    assert.equal(command.executable, trusted);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].executable, trusted);
+    assert.equal(calls[0].environment.COREPACK_HOME, undefined);
   });
-  assert.equal(command.executable, trusted);
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].executable, trusted);
-  assert.equal(calls[0].environment.COREPACK_HOME, undefined);
-});
 
 function localInputTransactionFixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "dependency-local-input-"));

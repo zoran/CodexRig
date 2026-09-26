@@ -27,6 +27,10 @@ test("launcher maintains before admission, fails closed, and admits only native 
   mkdirSync(setup, { recursive: true });
   const launcher = path.join(setup, "start-codex.sh");
   copyFileSync(path.join(root, "scripts/setup/start-codex.sh"), launcher);
+  copyFileSync(
+    path.join(root, "scripts/setup/start-codex-session.sh"),
+    path.join(setup, "start-codex-session.sh"),
+  );
   const capture = path.join(project, "calls");
   const ambientHome = path.join(project, "caller-home");
   const sanitizedKeys = [
@@ -58,39 +62,37 @@ test("launcher maintains before admission, fails closed, and admits only native 
     '[[ "${npm_config_ignore_pnpmfile:-}" == true && "${pnpm_config_ignore_pnpmfile:-}" == true ]] || exit 87',
     '{ printf "CALL\\0"; printf "%s\\0" "${0##*/}" "${CODEX_HOME:-<unset>}" "$PWD" "$@"; printf "END\\0"; } >> "$CAPTURE_PATH"',
   ];
-  const codex = path.join(bin, "codex");
-  writeFileSync(
-    codex,
-    [
-      ...captureShell,
-      '[[ "$#" == 1 && "$1" == update ]] || exit 88',
-      'exit "${FAKE_UPDATE_STATUS:-0}"',
-      "",
-    ].join("\n"),
-  );
-  chmodSync(codex, 0o755);
+  const codex = path.join(project, "managed", "codex");
   const bootstrapNode = path.join(bin, "node");
   writeFileSync(
     bootstrapNode,
     [
       ...captureShell,
-      '[[ "$*" == "scripts/deps/maintain-toolchain.mjs --startup" ]] || exit 89',
-      'exit "${FAKE_UPDATE_STATUS:-0}"',
+      'if [[ "${FAKE_FAIL_COMMAND:-}" == "node $*" ]]; then exit 74; fi',
+      'case "$1" in',
+      '  scripts/deps/maintain-toolchain.mjs) [[ "$*" == "scripts/deps/maintain-toolchain.mjs --startup" ]] || exit 89; exit "${FAKE_UPDATE_STATUS:-0}" ;;',
+      '  scripts/setup/project-command.mjs) [[ "$2" == -- ]] || exit 89; shift 2; export CODEX_HOME="$PWD"; exec "$@" ;;',
+      '  --input-type=module) printf "%s\\n" "$FAKE_CODEX_EXECUTABLE" ;;',
+      "esac",
       "",
     ].join("\n"),
   );
   chmodSync(bootstrapNode, 0o755);
-  const mise = path.join(bin, "mise");
+  const prereqs = path.join(setup, "check-prereqs.sh");
   writeFileSync(
-    mise,
+    prereqs,
     [
       ...captureShell,
-      'if [[ "${FAKE_FAIL_COMMAND:-}" == "$*" ]]; then exit 74; fi',
-      "exit 0",
+      '[[ "${FAKE_FAIL_COMMAND:-}" != "bash scripts/setup/check-prereqs.sh $*" ]] || exit 74',
       "",
     ].join("\n"),
   );
-  chmodSync(mise, 0o755);
+  const pnpm = path.join(bin, "pnpm");
+  writeFileSync(
+    pnpm,
+    [...captureShell, '[[ "${FAKE_FAIL_COMMAND:-}" != "pnpm $*" ]] || exit 74', ""].join("\n"),
+  );
+  chmodSync(pnpm, 0o755);
 
   function calls() {
     if (!existsSync(capture)) return [];
@@ -115,6 +117,7 @@ test("launcher maintains before admission, fails closed, and admits only native 
       env: {
         PATH: `${bin}:/usr/bin:/bin`,
         CAPTURE_PATH: capture,
+        FAKE_CODEX_EXECUTABLE: codex,
         CODEX_HOME: ambientHome,
         ...Object.fromEntries(sanitizedKeys.map((key) => [key, "synthetic-stale-control"])),
         ...extra,
@@ -138,11 +141,19 @@ test("launcher maintains before admission, fails closed, and admits only native 
       cwd: project,
       args: ["scripts/deps/maintain-toolchain.mjs", "--startup"],
     });
+    assert.deepEqual(observed[1].args, [
+      "scripts/setup/project-command.mjs",
+      "--",
+      "bash",
+      "scripts/setup/start-codex-session.sh",
+      policy,
+    ]);
+    const checked = observed.slice(2).filter((call) => call.args[0] !== "--input-type=module");
     assert.deepEqual(
-      observed.slice(1).map((call) => call.args.slice(3)),
+      checked.map((call) => [call.executable, ...call.args]),
       [
         ["node", "scripts/deps/verify-pnpm-execution-policy.mjs"],
-        ["bash", "scripts/setup/check-prereqs.sh", "--codex"],
+        ["check-prereqs.sh", "--codex"],
         ["node", "scripts/setup/validate-codex-model-policy.mjs"],
         ["pnpm", "tooling:doctor"],
         [
@@ -155,13 +166,9 @@ test("launcher maintains before admission, fails closed, and admits only native 
         ],
       ],
     );
-    for (const call of observed.slice(1)) {
+    for (const call of observed.slice(2)) {
       assert.equal(call.cwd, project);
-      assert.deepEqual(call.args.slice(0, 3), ["exec", "--locked", "--"]);
-      assert.equal(
-        call.home,
-        call.args.includes("scripts/setup/validate-codex-model-policy.mjs") ? project : "<unset>",
-      );
+      assert.equal(call.home, project);
     }
   }
   const updateFailure = invoke([], { FAKE_UPDATE_STATUS: "37" });
@@ -174,7 +181,7 @@ test("launcher maintains before admission, fails closed, and admits only native 
     "node scripts/setup/validate-codex-model-policy.mjs",
     "pnpm tooling:doctor",
   ]) {
-    const failure = invoke([], { FAKE_FAIL_COMMAND: `exec --locked -- ${command}` });
+    const failure = invoke([], { FAKE_FAIL_COMMAND: command });
     assert.equal(failure.status, 74);
     assert.equal(
       calls().some((call) => call.args.includes("scripts/setup/startup-session-controller.mjs")),

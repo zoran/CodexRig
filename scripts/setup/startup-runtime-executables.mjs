@@ -1,8 +1,9 @@
-/** Owns canonical external executable binding for the startup session control plane. */
+/** Owns canonical bootstrap and private managed executable binding for the startup session control plane. */
 import { existsSync, lstatSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { isProjectManagedExecutable } from "../repository/project-tool-executables.mjs";
 
 function pathIsInside(root, candidate) {
   const relative = path.relative(root, candidate);
@@ -12,12 +13,15 @@ function pathIsInside(root, candidate) {
   );
 }
 
-export function canonicalExternalExecutable(root, requestedExecutable, label) {
+export function canonicalRuntimeExecutable(root, requestedExecutable, label) {
   if (!path.isAbsolute(requestedExecutable)) {
     throw new Error(`${label} executable path must be absolute.`);
   }
   const canonicalRoot = realpathSync.native(root);
-  if (pathIsInside(canonicalRoot, path.resolve(requestedExecutable))) {
+  if (
+    pathIsInside(canonicalRoot, path.resolve(requestedExecutable)) &&
+    !isProjectManagedExecutable(canonicalRoot, requestedExecutable)
+  ) {
     throw new Error(`${label} executable path must remain outside the writable project root.`);
   }
   const executable = realpathSync.native(requestedExecutable);
@@ -25,13 +29,16 @@ export function canonicalExternalExecutable(root, requestedExecutable, label) {
   if (stats.isSymbolicLink() || !stats.isFile() || (stats.mode & 0o111) === 0) {
     throw new Error(`${label} executable must resolve to an executable regular file.`);
   }
-  if (pathIsInside(canonicalRoot, executable)) {
+  if (
+    pathIsInside(canonicalRoot, executable) &&
+    !isProjectManagedExecutable(canonicalRoot, executable)
+  ) {
     throw new Error(`${label} executable must remain outside the writable project root.`);
   }
   return executable;
 }
 
-export function externalExecutableSearchPath(root, value = "") {
+export function startupExecutableSearchPath(root, value = "") {
   const canonicalRoot = realpathSync.native(root);
   const entries = [];
   for (const candidate of value.split(path.delimiter)) {
@@ -40,7 +47,17 @@ export function externalExecutableSearchPath(root, value = "") {
     if (!existsSync(resolved)) continue;
     const canonical = realpathSync.native(resolved);
     if (!lstatSync(canonical).isDirectory()) continue;
-    if (pathIsInside(canonicalRoot, canonical)) continue;
+    if (
+      pathIsInside(canonicalRoot, canonical) &&
+      !["mise", "codex", "node", "pnpm"].some((name) => {
+        const executable = path.join(canonical, name);
+        return (
+          existsSync(executable) &&
+          isProjectManagedExecutable(canonicalRoot, realpathSync.native(executable))
+        );
+      })
+    )
+      continue;
     if (!entries.includes(canonical)) entries.push(canonical);
   }
   if (entries.length === 0) {
@@ -54,7 +71,7 @@ function executableFromSearchPath(root, executableName, searchPath) {
     if (!directory) continue;
     const candidate = path.join(directory, executableName);
     if (!existsSync(candidate)) continue;
-    return canonicalExternalExecutable(root, candidate, `Canonical ${executableName}`);
+    return canonicalRuntimeExecutable(root, candidate, `Canonical ${executableName}`);
   }
   throw new Error(`Canonical ${executableName} executable is unavailable on the external PATH.`);
 }
@@ -79,7 +96,7 @@ function shellNameForExecutable(executable) {
 function optionalExternalExecutable(root, candidate, label) {
   if (!candidate || !path.isAbsolute(candidate) || !existsSync(candidate)) return null;
   try {
-    return canonicalExternalExecutable(root, candidate, label);
+    return canonicalRuntimeExecutable(root, candidate, label);
   } catch {
     return null;
   }
@@ -106,7 +123,7 @@ export function resolveStartupHookShell({
   platform = process.platform,
   userShell = platform === "win32" ? "" : os.userInfo().shell,
 } = {}) {
-  const externalSearchPath = externalExecutableSearchPath(root, searchPath);
+  const externalSearchPath = startupExecutableSearchPath(root, searchPath);
   if (platform !== "win32") {
     const userShellName = shellNameForExecutable(userShell ?? "");
     const canonicalUserShell = optionalExternalExecutable(root, userShell, "Canonical user shell");
@@ -158,12 +175,12 @@ export function resolveStartupRuntimeExecutables({
   nodeExecutable = process.execPath,
   searchPath,
 }) {
-  const externalSearchPath = externalExecutableSearchPath(root, searchPath);
+  const externalSearchPath = startupExecutableSearchPath(root, searchPath);
   const hookShell = resolveStartupHookShell({ root, searchPath: externalSearchPath });
   return Object.freeze({
     executables: Object.freeze({
-      codex: canonicalExternalExecutable(root, codexExecutable, "Canonical Codex"),
-      node: canonicalExternalExecutable(root, nodeExecutable, "Canonical Node"),
+      codex: canonicalRuntimeExecutable(root, codexExecutable, "Canonical Codex"),
+      node: canonicalRuntimeExecutable(root, nodeExecutable, "Canonical Node"),
       pnpm: executableFromSearchPath(root, "pnpm", externalSearchPath),
       shell: hookShell.path,
     }),
@@ -172,7 +189,7 @@ export function resolveStartupRuntimeExecutables({
   });
 }
 
-/** Rejects non-canonical, project-local, or partial executable bindings at every consumer. */
+/** Rejects non-canonical, unmanaged project-local, or partial executable bindings at every consumer. */
 export function validateStartupRuntimeExecutables(root, value) {
   if (
     !value ||
@@ -182,10 +199,10 @@ export function validateStartupRuntimeExecutables(root, value) {
   ) {
     throw new Error("Startup runtime executable binding is invalid.");
   }
-  const codex = canonicalExternalExecutable(root, value.codex, "Canonical Codex");
-  const node = canonicalExternalExecutable(root, value.node, "Canonical Node");
-  const pnpm = canonicalExternalExecutable(root, value.pnpm, "Canonical pnpm");
-  const shell = canonicalExternalExecutable(root, value.shell, "Canonical hook shell");
+  const codex = canonicalRuntimeExecutable(root, value.codex, "Canonical Codex");
+  const node = canonicalRuntimeExecutable(root, value.node, "Canonical Node");
+  const pnpm = canonicalRuntimeExecutable(root, value.pnpm, "Canonical pnpm");
+  const shell = canonicalRuntimeExecutable(root, value.shell, "Canonical hook shell");
   if (
     codex !== value.codex ||
     node !== value.node ||

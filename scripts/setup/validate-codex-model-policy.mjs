@@ -1,4 +1,5 @@
 /** Owns validate codex model policy behavior for the setup, launch, and portable project boundary. */
+import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
 import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import path from "node:path";
 import process from "node:process";
@@ -60,7 +61,7 @@ export function validateInstalledCodexModelPolicy(projectRoot = defaultRoot) {
   const result = spawnSync("codex", ["debug", "models", "--bundled"], {
     cwd: projectRoot,
     encoding: "utf8",
-    env: process.env,
+    env: projectToolEnvironment({ root: projectRoot }),
     input: "",
     maxBuffer: 16 * 1024 * 1024,
     stdio: ["pipe", "pipe", "pipe"],

@@ -18,6 +18,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const fixturePackageManager = JSON.parse(
@@ -65,6 +66,7 @@ function copyGoalGateRuntime(repository) {
     "scripts/filesystem/owned-path-safety.mjs",
     "scripts/goals/goal-publication-precondition.mjs",
     "scripts/repository/git-runtime-isolation.mjs",
+    "scripts/repository/project-tool-environment.mjs",
     "scripts/repository/pnpm-workspace-manifests.mjs",
     "scripts/repository/product-roots.mjs",
     "scripts/repository/runtime-lifecycle-mutex.mjs",
@@ -160,9 +162,10 @@ function createFixture() {
   const repository = path.join(parent, "project-secret-name");
   const remote = path.join(parent, "remote-secret-name.git");
   copyGoalGateRuntime(repository);
+  prepareProjectToolDirectories(repository);
   writeFileSync(
     path.join(repository, ".gitignore"),
-    "/auth.json\n/.codex/runtime/\n/cache/\n",
+    "/auth.json\n/.auth/\n/.codex/runtime/\n/cache/\n",
     "utf8",
   );
   writeFileSync(

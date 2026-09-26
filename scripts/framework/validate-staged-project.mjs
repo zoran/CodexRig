@@ -1,4 +1,9 @@
 /** Owns validate staged project behavior for the setup, launch, and portable project boundary. */
+import {
+  prepareProjectToolDirectories,
+  projectToolEnvironment,
+} from "../repository/project-tool-environment.mjs";
+import { toolingRoot } from "../filesystem/repository-files.mjs";
 import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
@@ -58,6 +63,8 @@ function assertStageRootBinding(binding) {
 }
 
 function assertStaticModuleImports(binding) {
+  // The validator owns scratch state; the target remains a portable, read-only artifact.
+  prepareProjectToolDirectories(toolingRoot);
   const validatorPath = path.join(binding.root, "scripts/setup/validate-static-module-imports.mjs");
   const result = spawnSync(
     process.execPath,
@@ -65,7 +72,7 @@ function assertStaticModuleImports(binding) {
     {
       cwd: binding.root,
       encoding: "utf8",
-      env: { ...process.env, NODE_OPTIONS: "" },
+      env: projectToolEnvironment({ root: toolingRoot }),
       input: "",
       stdio: "pipe",
       timeout: 30_000,

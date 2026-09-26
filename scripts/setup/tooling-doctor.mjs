@@ -16,18 +16,40 @@ import {
 } from "../contracts/semver-contract.mjs";
 import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
+import { validateMinimalMiseTools } from "../contracts/mise-toolchain-configuration.mjs";
 import { detectGitProvider, platformCiPath } from "../platform/git-provider.mjs";
-import { ciAdapterContractViolations } from "../deps/toolchain-archives.mjs";
+import { ciAdapterContractViolations } from "../deps/ci-toolchain-contract.mjs";
+import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
+import {
+  projectManagedToolLayout,
+  verifyProjectToolBundle,
+} from "../repository/project-tool-executables.mjs";
+import { canonicalRuntimeExecutable } from "./startup-runtime-executables.mjs";
 
 function pushFinding(collection, code, message) {
   collection.push({ code, message });
 }
 
-function toolVersion(root, executable, args, label, errors) {
+function toolVersion(root, name, args, label, errors, environment) {
+  let executable;
+  try {
+    const layout = projectManagedToolLayout(root);
+    executable =
+      name === "codex"
+        ? verifyProjectToolBundle(root, layout.codex)
+        : canonicalRuntimeExecutable(root, layout[name].executable, label);
+  } catch {
+    pushFinding(
+      errors,
+      `tool.${label}.missing`,
+      `${label} managed project installation is unavailable or invalid.`,
+    );
+    return "";
+  }
   const result = spawnSync(executable, args, {
     cwd: root,
     encoding: "utf8",
-    env: process.env,
+    env: projectToolEnvironment({ root, inherited: environment }),
     input: "",
     maxBuffer: 1024 * 1024,
     stdio: "pipe",
@@ -70,17 +92,21 @@ function validateToolchainOwners({ contract, matrix, root, errors }) {
   }
   let mise;
   try {
-    mise = readRepositoryFile(root, "mise.toml");
+    mise = readRepositoryFile(root, ".codex/mise.toml");
   } catch {
     pushFinding(errors, "owner.mise.missing", "mise.toml is unavailable.");
+    return;
+  }
+  const validation = validateMinimalMiseTools(mise);
+  if (validation.errors.length) {
+    pushFinding(errors, "owner.mise.invalid", "mise.toml must use exact supported tool pins.");
     return;
   }
   for (const [tool, version] of [
     ["node", matrix.stable.node.version],
     ["pnpm", matrix.stable.pnpm.version],
   ]) {
-    const escaped = version.replaceAll(".", "\\.");
-    if (!new RegExp(`^${tool}\\s*=\\s*\"${escaped}\"$`, "mu").test(mise)) {
+    if (validation.versions[tool] !== version) {
       pushFinding(
         errors,
         `owner.mise.${tool}.drift`,
@@ -90,10 +116,10 @@ function validateToolchainOwners({ contract, matrix, root, errors }) {
   }
 }
 
-function validateRuntimeVersions({ matrix, root, errors, versions }) {
+function validateRuntimeVersions({ matrix, root, errors, versions, environment }) {
   versions.node = process.version.replace(/^v/u, "");
-  versions.pnpm = toolVersion(root, "pnpm", ["--version"], "pnpm", errors);
-  versions.codex = toolVersion(root, "codex", ["--version"], "Codex", errors);
+  versions.pnpm = toolVersion(root, "pnpm", ["--version"], "pnpm", errors, environment);
+  versions.codex = toolVersion(root, "codex", ["--version"], "Codex", errors, environment);
   try {
     if (!versionSatisfiesSimpleRange(versions.node, matrix.stable.node.range)) {
       pushFinding(
@@ -191,7 +217,7 @@ export function compatibilityFreshnessWarnings(matrix, latest) {
     pushFinding(
       warnings,
       "online.codex.newer",
-      `Codex stable ${latest.codex} is newer than the reviewed blocking-CI version ${matrix.ci.codexVersion}; run canonical startup maintenance to review the official archives and update host and CI pins together.`,
+      `Codex stable ${latest.codex} is newer than the reviewed blocking-CI version ${matrix.ci.codexVersion}; run canonical startup maintenance to review the official archives and update project installations and CI pins together.`,
     );
   }
   return warnings;
@@ -235,7 +261,7 @@ export async function diagnoseTooling({
     return { errors, mode: "unknown", online: {}, platform: null, versions, warnings };
   }
   validateToolchainOwners({ contract, matrix, root, errors });
-  validateRuntimeVersions({ matrix, root, errors, versions });
+  validateRuntimeVersions({ matrix, root, errors, versions, environment });
   validateCiAdapters({ root, matrix, errors });
   const mode = "project";
   let platform = null;

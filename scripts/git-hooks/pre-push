@@ -34,5 +34,5 @@ if [ -n "$git_exec_path" ]; then
 fi
 
 cd "$root"
-mise exec --locked -- node scripts/deps/verify-pnpm-execution-policy.mjs
-exec mise exec --locked -- sh scripts/verify/pre-push.sh "$@"
+bash scripts/setup/run-project.sh node scripts/deps/verify-pnpm-execution-policy.mjs
+exec bash scripts/setup/run-project.sh sh scripts/verify/pre-push.sh "$@"

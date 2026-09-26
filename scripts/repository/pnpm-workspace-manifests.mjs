@@ -1,6 +1,8 @@
 /** Owns non-executing pnpm workspace discovery and repository-controlled pnpm hook policy. */
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
+import { toolingRoot } from "../filesystem/repository-files.mjs";
+import { projectToolEnvironment } from "./project-tool-environment.mjs";
 import { matchesPnpmWorkspacePattern, pnpmWorkspacePatterns } from "./product-roots.mjs";
 import { listActiveFiles } from "./source-inventory.mjs";
 
@@ -16,49 +18,10 @@ const executableWorkspaceConfigurationKeys = new Set([
   "globalPnpmfile",
   "pnpmfile",
 ]);
-const portableDependencyEnvironmentKeys = new Set([
-  "CI",
-  "COMSPEC",
-  "FORCE_COLOR",
-  "HOME",
-  "HTTPS_PROXY",
-  "HTTP_PROXY",
-  "LANG",
-  "LANGUAGE",
-  "LC_ALL",
-  "NODE_AUTH_TOKEN",
-  "NODE_EXTRA_CA_CERTS",
-  "NO_COLOR",
-  "NO_PROXY",
-  "NPM_AUTH_TOKEN",
-  "NPM_TOKEN",
-  "PATH",
-  "PATHEXT",
-  "SSL_CERT_DIR",
-  "SSL_CERT_FILE",
-  "SYSTEMROOT",
-  "TEMP",
-  "TERM",
-  "TMP",
-  "TMPDIR",
-  "TZ",
-  "USERPROFILE",
-]);
-
-export function pnpmHooksDisabledEnvironment(environment = {}) {
-  const sanitized = {};
-  for (const [key, value] of Object.entries(environment)) {
-    const normalizedKey = key.toUpperCase();
-    if (!portableDependencyEnvironmentKeys.has(normalizedKey) || typeof value !== "string")
-      continue;
-    if (value.includes("\0")) continue;
-    const childKey = process.platform === "win32" ? normalizedKey : key;
-    sanitized[childKey] = value;
-  }
+/** Uses the common account boundary; dependency callers cannot inherit host registry credentials. */
+export function pnpmHooksDisabledEnvironment(environment = {}, root = toolingRoot) {
   return {
-    ...sanitized,
-    NPM_CONFIG_IGNORE_PNPMFILE: "true",
-    PNPM_CONFIG_IGNORE_PNPMFILE: "true",
+    ...projectToolEnvironment({ root, inherited: environment }),
     npm_config_ignore_pnpmfile: "true",
     pnpm_config_ignore_pnpmfile: "true",
   };

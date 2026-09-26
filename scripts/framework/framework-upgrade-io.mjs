@@ -2,6 +2,7 @@
 import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { resolveRepositoryPath, sha256 } from "../filesystem/repository-files.mjs";
+import { nonPortableTransferPathReason } from "../repository/source-inventory-policy.mjs";
 import {
   atomicWriteOwnedFile,
   ensureOwnedDirectoryChain,
@@ -65,5 +66,37 @@ export function isProjectToolPath(file) {
     /^(?:scripts\/|\.agents\/skills\/|\.codex\/|\.codexrig\/|\.github\/workflows\/ci\.yml$|\.gitlab-ci\.yml$|\.gitignore$|\.prettierignore$|\.prettierrc|dependency-policy\.json$|pnpm-(?:lock|workspace)\.yaml$|mise\.(?:lock|toml)$|LICENSE$|NOTICE$)/u.test(
       file,
     )
+  );
+}
+
+export const reviewedProjectDocuments = Object.freeze([
+  "AGENTS.md",
+  "instructions.md",
+  "README.md",
+  ".codex/README.md",
+  "docs/project.md",
+  "docs/project-context.md",
+]);
+/** Reviewed migration may reconcile workflow entry documents, never arbitrary product data. */
+export function isFrameworkUpgradePath(file) {
+  return (
+    !nonPortableTransferPathReason(file) &&
+    (isProjectToolPath(file) ||
+      file === "package.json" ||
+      reviewedProjectDocuments.includes(file) ||
+      isReviewedProjectPath(file))
+  );
+}
+
+/** Additional product owners are admitted only by exact, explicitly reviewed public paths. */
+export function isReviewedProjectPath(file) {
+  if (file === "src/.gitkeep") return true;
+  return (
+    typeof file === "string" &&
+    !nonPortableTransferPathReason(file) &&
+    /^(?:docs\/[A-Za-z0-9_./-]+\.(?:md|html)|config\/[A-Za-z0-9_./-]+\.json|scripts\/[A-Za-z0-9_./-]+\.(?:mjs|sh))$/u.test(
+      file,
+    ) &&
+    !file.split("/").some((part) => part === "." || part === ".." || !part)
   );
 }

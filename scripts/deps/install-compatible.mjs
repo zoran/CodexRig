@@ -1,7 +1,10 @@
 /** Owns install compatible behavior for the dependency and toolchain maintenance boundary. */
 import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { chmodSync, existsSync, lstatSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
-import os from "node:os";
+import {
+  prepareProjectToolDirectories,
+  projectToolPaths,
+} from "../repository/project-tool-environment.mjs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -114,8 +117,16 @@ function dependencyInputs(projectRoot, manifests) {
   return [...records.values()].sort((left, right) => left.path.localeCompare(right.path));
 }
 
-function runPnpm(spawnPnpm, args, cwd, projectRoot, lifecycleCapability) {
-  const environment = pnpmHooksDisabledEnvironment({ ...process.env });
+function runPnpm(
+  spawnPnpm,
+  args,
+  cwd,
+  projectRoot,
+  lifecycleCapability,
+  environmentRoot = projectRoot,
+) {
+  prepareProjectToolDirectories(environmentRoot);
+  const environment = pnpmHooksDisabledEnvironment(process.env, environmentRoot);
   if (spawnPnpm !== spawnSync) {
     return spawnTrustedPnpm({
       args,
@@ -179,7 +190,8 @@ function commandFailure(result, label, projectRoot) {
 }
 
 function installationStoreArgs(options, projectRoot, lifecycleCapability) {
-  if (!options.installationRoot) return [];
+  if (!options.installationRoot)
+    return ["--store-dir", path.join(projectToolPaths(projectRoot).data, "pnpm", "store")];
   // Resolve with the candidate pnpm, but in the final root: the default store is filesystem-local,
   // and a configured relative store is relative to that root, not to either temporary stage.
   const result = runPnpm(
@@ -188,13 +200,44 @@ function installationStoreArgs(options, projectRoot, lifecycleCapability) {
     realpathSync.native(options.installationRoot),
     projectRoot,
     lifecycleCapability,
+    options.installationRoot,
   );
   if (result.error || result.status !== 0)
     throw commandFailure(result, "Installation store path lookup", projectRoot);
   const storeDirectory = String(result.stdout ?? "").trim();
   if (!path.isAbsolute(storeDirectory) || /[\0\r\n]/u.test(storeDirectory))
     throw new DependencyTransactionError("Installation store path must be one absolute path.");
+  const localStore = path.join(projectToolPaths(options.installationRoot).data, "pnpm", "store");
+  if (storeDirectory !== localStore && !storeDirectory.startsWith(`${localStore}${path.sep}`))
+    throw new DependencyTransactionError(
+      "Installation store path must belong to the project tool state.",
+    );
   return ["--store-dir", storeDirectory];
+}
+
+function installationRepairArgs(projectRoot, environmentRoot = projectRoot) {
+  if (!existsSync(path.join(projectRoot, "node_modules"))) return [];
+  const modules = lstatSync(path.join(projectRoot, "node_modules"));
+  if (!modules.isDirectory() || modules.isSymbolicLink())
+    throw new DependencyTransactionError(
+      "Dependency installation requires a real project node_modules directory.",
+    );
+  const metadata = readOptionalFile(projectRoot, "node_modules/.modules.yaml");
+  const localStore = path.join(projectToolPaths(environmentRoot).data, "pnpm", "store");
+  // pnpm owns its installation metadata. Recognize a current local binding; ask pnpm itself to
+  // rebuild everything else instead of maintaining readers for historical installation formats.
+  try {
+    const value = JSON.parse(metadata.content);
+    if (
+      typeof value.storeDir === "string" &&
+      value.storeDir.startsWith(`${localStore}${path.sep}`) &&
+      realpathSync.native(value.storeDir) === value.storeDir
+    )
+      return [];
+  } catch {
+    /* Missing, old or invalid metadata requires native reconstruction. */
+  }
+  return ["--force"];
 }
 
 function copyDependencyStage(projectRoot, stageRoot, inputs) {
@@ -253,6 +296,14 @@ function rollbackLockfile(projectRoot, original, expectedHash, mode) {
 
 function withDependencyInstallation(options, action) {
   const projectRoot = path.resolve(options.projectRoot ?? root);
+  if (options.installationRoot && path.resolve(options.installationRoot) !== projectRoot) {
+    const parent = projectToolPaths(path.resolve(options.installationRoot)).temporary;
+    const relative = path.relative(parent, projectRoot);
+    if (!relative || relative.startsWith("..") || path.isAbsolute(relative))
+      throw new DependencyTransactionError(
+        "Toolchain staging must remain inside its owning project's private temporary directory.",
+      );
+  }
   return withDependencyTransactionLock(
     projectRoot,
     (lock) => {
@@ -274,20 +325,26 @@ function withDependencyInstallation(options, action) {
   );
 }
 
-/** Reproduces the current lockfile offline under the dependency owner without changing inputs. */
+/** Reproduces the current lockfile without resolution changes; registry downloads are explicit. */
 export function reproduceLockedDependencies(options = {}) {
   return withDependencyInstallation(options, ({ inputs, lock, manifests, projectRoot }) => {
     const result = runPnpm(
       options.spawnPnpm ?? spawnSync,
-      [...compatibleInstallArgs, "--offline"],
+      [
+        ...compatibleInstallArgs,
+        ...installationStoreArgs(options, projectRoot, lock.lifecycleCapability),
+        ...installationRepairArgs(projectRoot, options.installationRoot),
+        ...(options.offline === false ? [] : ["--offline"]),
+      ],
       projectRoot,
       projectRoot,
       lock.lifecycleCapability,
+      options.installationRoot,
     );
     verifyInputRecords(projectRoot, inputs);
     if (result.error || result.status !== 0) {
       throw new DependencyTransactionError(
-        `${commandFailure(result, "Offline frozen dependency reproduction", projectRoot).message} Installation is incomplete; no registry resolution was requested.`,
+        `${commandFailure(result, "Frozen dependency reproduction", projectRoot).message} Installation is incomplete; no dependency version resolution was requested.`,
       );
     }
     return { lockfileUpdated: false, manifestCount: manifests.length };
@@ -302,7 +359,11 @@ export function installLatestCompatibleDependencies(options = {}) {
     const lockfilePath = safeRepositoryPath(projectRoot, "pnpm-lock.yaml");
     const lockfileMode = lstatSync(lockfilePath).mode & 0o777;
     const stageRoot = mkdtempSync(
-      path.join(options.temporaryParent ?? os.tmpdir(), "deps-compatible-"),
+      path.join(
+        options.temporaryParent ??
+          prepareProjectToolDirectories(options.installationRoot ?? projectRoot).temporary,
+        "deps-compatible-",
+      ),
     );
     chmodSync(stageRoot, 0o700);
 
@@ -314,6 +375,7 @@ export function installLatestCompatibleDependencies(options = {}) {
         stageRoot,
         projectRoot,
         lock.lifecycleCapability,
+        options.installationRoot,
       );
       if (update.error || update.status !== 0) {
         throw new DependencyTransactionError(
@@ -329,10 +391,15 @@ export function installLatestCompatibleDependencies(options = {}) {
 
       const install = runPnpm(
         spawnPnpm,
-        [...compatibleInstallArgs, ...storeArgs],
+        [
+          ...compatibleInstallArgs,
+          ...storeArgs,
+          ...installationRepairArgs(projectRoot, options.installationRoot),
+        ],
         projectRoot,
         projectRoot,
         lock.lifecycleCapability,
+        options.installationRoot,
       );
       if (install.error || install.status !== 0) {
         let rollbackSummary = "The compatible lockfile was unchanged";
@@ -382,18 +449,17 @@ export function installLatestCompatibleDependencies(options = {}) {
   });
 }
 
-function reproduceMaintenanceInstallation(role) {
-  const projectRoot = realpathSync.native(process.cwd());
+function withMaintenanceDependency(projectRoot, role, action) {
+  projectRoot = realpathSync.native(projectRoot);
   const environment = process.env;
   if (
     environment.CODEXRIG_LIFECYCLE_DELEGATION_ROOT !== projectRoot ||
     environment.CODEXRIG_LIFECYCLE_DELEGATION_OPERATION !== "dependency" ||
     environment.CODEXRIG_LIFECYCLE_DELEGATION_ROLE !== role
-  ) {
+  )
     throw new Error(
-      "Maintenance reproduction requires an exact repository-bound dependency delegation.",
+      "Maintenance installation requires an exact repository-bound dependency delegation.",
     );
-  }
   const capability = adoptRuntimeLifecycleDelegation({
     root: projectRoot,
     token: environment.CODEXRIG_LIFECYCLE_DELEGATION_TOKEN,
@@ -401,11 +467,18 @@ function reproduceMaintenanceInstallation(role) {
     role,
   });
   try {
-    reproduceLockedDependencies({ projectRoot, lifecycleCapability: capability });
-    console.log("Installation reproduced offline from the unchanged lockfile.");
+    return action(capability);
   } finally {
     releaseRuntimeLifecycleLock({ root: projectRoot, owner: capability });
   }
+}
+
+function reproduceMaintenanceInstallation(role) {
+  const projectRoot = realpathSync.native(process.cwd());
+  withMaintenanceDependency(projectRoot, role, (capability) => {
+    reproduceLockedDependencies({ projectRoot, lifecycleCapability: capability });
+    console.log("Installation reproduced offline from the unchanged lockfile.");
+  });
 }
 
 function main() {
@@ -418,11 +491,16 @@ function main() {
     reproduceMaintenanceInstallation("toolchain-dependency");
     return;
   }
-  if (args.length === 2 && args[0] === "--stage-toolchain") {
-    installLatestCompatibleDependencies({
-      projectRoot: process.cwd(),
-      installationRoot: args[1],
-    });
+  if (args.length === 2 && ["--stage-toolchain", "--stage-locked"].includes(args[0])) {
+    withMaintenanceDependency(args[1], "toolchain-dependency", () =>
+      (args[0] === "--stage-locked"
+        ? reproduceLockedDependencies
+        : installLatestCompatibleDependencies)({
+        projectRoot: process.cwd(),
+        installationRoot: args[1],
+        offline: false,
+      }),
+    );
     return;
   }
   if (args.length > 0) throw new Error("Unsupported dependency installation arguments.");

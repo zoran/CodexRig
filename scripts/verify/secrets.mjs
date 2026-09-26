@@ -3,7 +3,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
   activeSourcePathClassification,
-  isPrivateCodexRuntimePath,
+  isPrivateRepositoryStatePath,
   listRepositoryPathInventory,
   repositoryRoot,
 } from "../repository/source-inventory.mjs";
@@ -21,7 +21,7 @@ export async function scanRepositorySecrets({ root = repositoryRoot, files } = {
       throw new Error("Secret scan refused an unsafe repository-relative path.");
     }
     const pathReason = sensitivePathReason(relativePath);
-    if (isPrivateCodexRuntimePath(relativePath)) {
+    if (isPrivateRepositoryStatePath(relativePath)) {
       findings.push(`${relativePath}: ${pathReason ?? activeClassification.reason}`);
       continue;
     }

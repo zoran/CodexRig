@@ -1,5 +1,6 @@
 /** Owns seo behavior for the repository verification boundary. */
 import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
+import { cleanGitEnvironment } from "../repository/git-runtime-isolation.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -321,7 +322,11 @@ function changedHtmlPathsFromGit(sourceRoot, productSourceRoot) {
 }
 
 function gitOutputLines(sourceRoot, args) {
-  const result = spawnSync("git", args, { cwd: sourceRoot, encoding: "utf8" });
+  const result = spawnSync("git", args, {
+    cwd: sourceRoot,
+    env: cleanGitEnvironment(process.env, sourceRoot),
+    encoding: "utf8",
+  });
   if (result.status !== 0) return [];
   return result.stdout
     .split(/\r?\n/)
@@ -330,6 +335,10 @@ function gitOutputLines(sourceRoot, args) {
 }
 
 function readGitFile(sourceRoot, revisionPath) {
-  const result = spawnSync("git", ["show", revisionPath], { cwd: sourceRoot, encoding: "utf8" });
+  const result = spawnSync("git", ["show", revisionPath], {
+    cwd: sourceRoot,
+    env: cleanGitEnvironment(process.env, sourceRoot),
+    encoding: "utf8",
+  });
   return result.status === 0 ? result.stdout : "";
 }

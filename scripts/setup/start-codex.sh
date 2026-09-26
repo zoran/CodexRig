@@ -54,12 +54,6 @@ else
   startup_control_policy="interactive-v2:safe-defaults"
 fi
 
-if ! command -v mise >/dev/null 2>&1; then
-  echo "mise is not available on PATH. Install it before this project can start:" >&2
-  echo "  https://mise.jdx.dev/installing-mise.html" >&2
-  exit 127
-fi
-
 # These values must survive deterministic validation, attestation issuance, the Codex process, and
 # both lifecycle hooks. A narrower subshell would leave later pnpm version probes able to load
 # mutable repository or user pnpm hooks before the attestation can reject them.
@@ -72,21 +66,9 @@ export pnpm_config_ignore_pnpmfile=true
 # must already be available; the maintenance owner installs the reviewed candidate through mise.
 cd "$root"
 if ! command -v node >/dev/null 2>&1; then
-  echo "Bootstrap Node.js is unavailable. Run mise install --locked, then retry inside mise exec --locked." >&2
+  echo "Bootstrap Node.js is unavailable. Install a supported read-only Node.js bootstrap before retrying." >&2
   exit 127
 fi
 node scripts/deps/maintain-toolchain.mjs --startup
-hash -r
-(
-  env -u CODEX_HOME mise exec --locked -- node scripts/deps/verify-pnpm-execution-policy.mjs
-  env -u CODEX_HOME mise exec --locked -- bash scripts/setup/check-prereqs.sh --codex
-  CODEX_HOME="$root" mise exec --locked -- node scripts/setup/validate-codex-model-policy.mjs
-  env -u CODEX_HOME mise exec --locked -- pnpm tooling:doctor
-)
-codex_executable="$(command -v codex)"
-cd "$root"
-exec env -u CODEX_HOME \
-  CODEXRIG_STARTUP_CONTROL_POLICY="$startup_control_policy" \
-  mise exec --locked -- node scripts/setup/startup-session-controller.mjs \
-  --control-policy "$startup_control_policy" \
-  --codex-executable "$codex_executable"
+exec node scripts/setup/project-command.mjs -- \
+  bash scripts/setup/start-codex-session.sh "$startup_control_policy"

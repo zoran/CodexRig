@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -23,14 +24,23 @@ import {
   textFiles,
 } from "./project-initialization-test-helpers.mjs";
 import { assertIndependentProjectOutput } from "../../scripts/framework/project-output-projection.mjs";
+import {
+  prepareProjectToolDirectories,
+  projectToolEnvironment,
+  projectToolPaths,
+} from "../repository/project-tool-environment.mjs";
+import {
+  projectManagedToolLayout,
+  verifyProjectToolBundle,
+} from "../repository/project-tool-executables.mjs";
 
 const write = (root, file, content) => {
   mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
   writeFileSync(path.join(root, file), content);
 };
 function run(root, args, executable = process.execPath) {
-  const env = { ...process.env, NODE_OPTIONS: "", CODEX_HOME: root };
-  delete env.NODE_TEST_CONTEXT;
+  prepareProjectToolDirectories(root);
+  const env = projectToolEnvironment({ root });
   return spawnSync(executable, args, {
     cwd: root,
     encoding: "utf8",
@@ -38,6 +48,28 @@ function run(root, args, executable = process.execPath) {
     stdio: "pipe",
     timeout: 30_000,
     env,
+  });
+}
+function seedPublicPackageCache(target) {
+  const source = projectToolPaths(root);
+  const destination = prepareProjectToolDirectories(target);
+  // Only immutable public package bytes and registry metadata seed offline fixtures. Never copy
+  // account configuration, native state, home directories or a host package cache.
+  for (const kind of ["data", "cache"]) {
+    const from = path.join(source[kind], "pnpm");
+    assert.ok(existsSync(from), "Run the source's canonical dependency installation before tests.");
+    cpSync(from, path.join(destination[kind], "pnpm"), { recursive: true });
+  }
+  // A generated doctor must inspect its own tools, not borrow the test parent's PATH. Seed only
+  // the already verified immutable distributions; no native account or session data is copied.
+  const sourceTools = projectManagedToolLayout(root);
+  const targetTools = projectManagedToolLayout(target);
+  verifyProjectToolBundle(root, sourceTools.codex);
+  mkdirSync(path.dirname(targetTools.codex.directory), { recursive: true, mode: 0o700 });
+  cpSync(sourceTools.codex.directory, targetTools.codex.directory, { recursive: true });
+  mkdirSync(path.dirname(targetTools.pnpm.executable), { recursive: true, mode: 0o700 });
+  cpSync(path.dirname(sourceTools.pnpm.executable), path.dirname(targetTools.pnpm.executable), {
+    recursive: true,
   });
 }
 function generate(source, name, extra = []) {
@@ -156,6 +188,7 @@ test("generated tools and selected checks operate after the source checkout beco
   const source = isolatedTrackedFrameworkSource("unreachable-source-");
   const generated = generate(source, "Standalone Fixture");
   renameSync(source, source + "-unreachable");
+  seedPublicPackageCache(generated);
   for (const args of [
     ["--experimental-vm-modules", "scripts/setup/validate-static-module-imports.mjs"],
     ["scripts/verify/repository-smoke.mjs"],
@@ -201,6 +234,7 @@ test("generated tools and selected checks operate after the source checkout beco
 test("unknown changes and a missing Git basis still execute the actual product test lifecycle", () => {
   const source = isolatedTrackedFrameworkSource("product-check-source-");
   const generated = generate(source, "Product Test Fixture");
+  seedPublicPackageCache(generated);
   const pkg = JSON.parse(readFileSync(path.join(generated, "package.json"), "utf8"));
   pkg.scripts.test = "node --test src/cloud-foundation.test.mjs";
   write(generated, "package.json", JSON.stringify(pkg, null, 2) + "\n");

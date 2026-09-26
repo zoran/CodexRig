@@ -4,12 +4,13 @@ import { fileURLToPath } from "node:url";
 import { readVerificationConfiguration } from "./verification-configuration.mjs";
 import { toolingRoot, readRepositoryFile } from "../filesystem/repository-files.mjs";
 import { spawnSyncWithBoundedIo } from "../repository/runtime-process-io.mjs";
+import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
 export function runSelectedPrePushPolicy(root = toolingRoot) {
   for (const file of readVerificationConfiguration(root).prePushChecks) {
     readRepositoryFile(root, file);
     const result = spawnSyncWithBoundedIo(process.execPath, [file], {
       cwd: root,
-      env: process.env,
+      env: projectToolEnvironment({ root }),
       input: "",
       stdio: ["pipe", "inherit", "inherit"],
       timeout: 120_000,

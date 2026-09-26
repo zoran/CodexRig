@@ -26,7 +26,7 @@ export function postProjectCreationGuidance({ sourceHasChanges }) {
     ...(sourceHasChanges
       ? [
           "Optional source publication after review and after every owning Codex session exits:",
-          'mise exec --locked -- pnpm framework:publish --message "<message>"',
+          'bash scripts/setup/run-project.sh pnpm framework:publish --message "<message>"',
           "This explicit command resets, verifies, commits all non-ignored changes, pushes central main, and checks goal:new.",
         ]
       : []),

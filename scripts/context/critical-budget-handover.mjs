@@ -237,7 +237,7 @@ export function createCriticalBudgetHandover({
   if (!working || working.state.status === "complete") {
     throw new Error("Critical-budget handover requires active or blocked docs/project-context.md.");
   }
-  if (findSecretMatches(working.content).length > 0) {
+  if (findSecretMatches(working.content, { conservative: true }).length > 0) {
     throw new Error("Critical-budget handover refuses recognized secret material in work state.");
   }
   for (const line of requiredDrainLines) {

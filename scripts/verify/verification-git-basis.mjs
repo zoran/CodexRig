@@ -40,7 +40,7 @@ function git(repositoryRoot, args, { allowFailure = false, environment = {} } = 
   const result = spawnSync("git", invocationArguments, {
     cwd: repositoryRoot,
     encoding: "utf8",
-    env: { ...cleanGitEnvironment(), ...environment },
+    env: { ...cleanGitEnvironment(process.env, repositoryRoot), ...environment },
     input: "",
     maxBuffer: 4 * 1024 * 1024,
     stdio: "pipe",

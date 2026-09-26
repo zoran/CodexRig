@@ -9,6 +9,10 @@ import { fileURLToPath } from "node:url";
 import { runStopLifecycle } from "../context/session-stop-lifecycle.mjs";
 import { toolingRoot } from "../filesystem/repository-files.mjs";
 import {
+  prepareProjectToolDirectories,
+  projectToolEnvironment,
+} from "../repository/project-tool-environment.mjs";
+import {
   inspectRuntimeSessionLease,
   invalidRuntimeSessionLeaseErrorCode,
   releaseRuntimeSessionLease,
@@ -29,7 +33,7 @@ import {
   sessionControlHookInputMaximumBytes,
 } from "./session-control-hook-command.mjs";
 import {
-  canonicalExternalExecutable,
+  canonicalRuntimeExecutable,
   resolveStartupRuntimeExecutables,
 } from "./startup-runtime-executables.mjs";
 import { validateRuntimeCodexConfig } from "./validate-codex-config.mjs";
@@ -39,26 +43,6 @@ const modulePath = fileURLToPath(import.meta.url);
 const sessionControlTokenPattern = /^[A-Za-z0-9_-]{40,128}$/u;
 const hookPreflightMaximumBytes = 1_048_576;
 const hookPreflightTimeoutMilliseconds = 20_000;
-const inheritedExecutionControlKeys = new Set([
-  "BASH_ENV",
-  "COMSPEC",
-  "CODEXRIG_LAUNCHER_PID",
-  "CODEXRIG_SESSION_CONTROL_NODE",
-  "CODEXRIG_SESSION_CONTROL_PORT",
-  "CODEXRIG_SESSION_CONTROL_TOKEN",
-  "CODEXRIG_STARTUP_CONTROL_POLICY",
-  "CODEXRIG_STARTUP_NONCE",
-  "CODEXRIG_STARTUP_RESUME_SESSION_ID",
-  "CODEXRIG_STARTUP_SESSION_SOURCE",
-  "ENV",
-  "NODE_OPTIONS",
-  "NODE_PATH",
-  "NPM_CONFIG_NODE_OPTIONS",
-  "NPM_CONFIG_SCRIPT_SHELL",
-  "PNPM_CONFIG_NODE_OPTIONS",
-  "PNPM_CONFIG_SCRIPT_SHELL",
-  "SHELL",
-]);
 
 function controllerUsage() {
   return (
@@ -76,7 +60,7 @@ export function parseSessionControllerArguments(argv, root = toolingRoot) {
   if (!Object.values(startupControlPolicies).includes(controlPolicy)) {
     throw new Error("Canonical launcher control policy is unsupported.");
   }
-  const codexExecutable = canonicalExternalExecutable(root, argv[5], "Canonical Codex");
+  const codexExecutable = canonicalRuntimeExecutable(root, argv[5], "Canonical Codex");
   return Object.freeze({
     codexExecutable,
     controlPolicy,
@@ -105,6 +89,14 @@ function codexControlArguments(controlPolicy) {
   ];
 }
 
+// Session flags are authoritative even before project trust and the hook preflight are resolved.
+const codexAccountArguments = Object.freeze([
+  "-c",
+  'cli_auth_credentials_store="file"',
+  "-c",
+  'mcp_oauth_credentials_store="file"',
+]);
+
 function codexIntelligenceArguments(model, reasoningEffort) {
   if (
     typeof model !== "string" ||
@@ -126,9 +118,12 @@ function codexIntelligenceArguments(model, reasoningEffort) {
 export function codexArgumentsFor({ controlPolicy, hookShellName, model, reasoningEffort, root }) {
   const args = [
     "resume",
+    // Session-only trusted hooks and controls require the native embedded lifecycle.
+    "--no-daemon",
     "--cd",
     root,
     ...codexControlArguments(controlPolicy),
+    ...codexAccountArguments,
     ...codexIntelligenceArguments(model, reasoningEffort),
     ...sessionControlHookConfigArguments(hookShellName),
   ];
@@ -290,18 +285,9 @@ function createLifecycleServer({ controlToken, launch, root }) {
 }
 
 function baseCodexEnvironment(root, hookShell) {
-  const environment = { ...process.env };
-  for (const key of Object.keys(environment)) {
-    if (inheritedExecutionControlKeys.has(key.toUpperCase())) delete environment[key];
-  }
-  Object.assign(environment, {
-    CODEX_HOME: root,
-    CODEXRIG_PROJECT_ROOT: root,
-    NPM_CONFIG_IGNORE_PNPMFILE: "true",
-    PNPM_CONFIG_IGNORE_PNPMFILE: "true",
-    npm_config_ignore_pnpmfile: "true",
-    pnpm_config_ignore_pnpmfile: "true",
-  });
+  prepareProjectToolDirectories(root);
+  const environment = projectToolEnvironment({ root });
+  environment.CODEXRIG_PROJECT_ROOT = root;
   if (hookShell.name === "cmd") environment.COMSPEC = hookShell.path;
   else environment.SHELL = hookShell.path;
   return environment;
@@ -368,7 +354,14 @@ function validateSessionControlHookListing(message, root, hookShellName) {
 async function verifyTrustedSessionControlHooks({ codexExecutable, environment, hookShell, root }) {
   const child = spawn(
     codexExecutable,
-    ["--cd", root, ...sessionControlHookConfigArguments(hookShell.name), "app-server", "--stdio"],
+    [
+      "--cd",
+      root,
+      ...codexAccountArguments,
+      ...sessionControlHookConfigArguments(hookShell.name),
+      "app-server",
+      "--stdio",
+    ],
     { cwd: root, env: environment, stdio: ["pipe", "pipe", "pipe"] },
   );
   await new Promise((resolve, reject) => {
@@ -562,12 +555,9 @@ export function startupControllerFailureMessage(error, root = toolingRoot) {
   return (
     `${failure}\n` +
     "The private writer lease is not on the current runtime contract. Exit every Codex session " +
-    "using this framework, then preview and apply the bounded framework reset:\n" +
-    "  mise exec --locked -- pnpm framework:reset\n" +
-    "  mise exec --locked -- pnpm framework:reset --apply\n" +
-    "  mise exec --locked -- pnpm framework:reset\n" +
-    "Do not delete .codex/runtime manually; the full reset discards incompatible disposable " +
-    "runtime state only after repository-wide runtime quiescence is proven. Then retry " +
+    "using this project, then follow the startup recovery procedure in README.md. " +
+    "Do not delete .codex/runtime manually; its maintenance owner must prove repository-wide " +
+    "quiescence and preserve accounts before replacing incompatible disposable state. Then retry " +
     "bash scripts/setup/start-codex.sh."
   );
 }

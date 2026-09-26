@@ -6,7 +6,10 @@ import {
   requiredPortableContractFiles,
 } from "./portable-project-contract.mjs";
 export const generatedProjectDocuments = new Set(generatedProjectDocumentPaths);
-export const defaultUntrackedPortableContractFiles = new Set(["mise.lock", "mise.toml"]);
+export const defaultUntrackedPortableContractFiles = new Set([
+  ".codex/mise.lock",
+  ".codex/mise.toml",
+]);
 export { requiredPortableContractFiles };
 export function projectTransferExclusionReason(
   relativePath,

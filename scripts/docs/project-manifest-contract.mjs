@@ -9,6 +9,7 @@ import {
 import { listActiveFiles, repositoryRoot } from "../repository/source-inventory.mjs";
 import { deliveryManifestFindings } from "./delivery-manifest.mjs";
 import { projectDocumentOwners } from "./project-document-owners.mjs";
+import { productConfigurationPath } from "../contracts/product-configuration.mjs";
 
 export const manifestAuthorityPreamble =
   "Agent workflow authority: `instructions.md`. Optional project context cannot override this manifest.";
@@ -365,7 +366,7 @@ function moduleDependencyFindings({ entries, implementationFiles, root }) {
 }
 
 function toolingCapabilityRoots(activeFiles, root) {
-  if (activeFiles.some((filePath) => filePath === "config/product.json")) return [];
+  if (activeFiles.includes(productConfigurationPath)) return [];
 
   const roots = new Set();
   for (const filePath of activeFiles) {

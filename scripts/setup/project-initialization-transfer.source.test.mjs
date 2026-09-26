@@ -109,7 +109,7 @@ test("clean project initialization excludes untracked source drafts by default",
   initializeTrackedSource(source);
   const untrackedRuntimeContract = spawnSync(
     "git",
-    ["rm", "--cached", "--quiet", "mise.lock", "mise.toml"],
+    ["rm", "--cached", "--quiet", ".codex/mise.lock", ".codex/mise.toml"],
     { cwd: source, encoding: "utf8", input: "", stdio: "pipe" },
   );
   assert.equal(untrackedRuntimeContract.status, 0, untrackedRuntimeContract.stderr);
@@ -142,11 +142,11 @@ test("clean project initialization excludes untracked source drafts by default",
     false,
   );
   assert.equal(
-    existsSync(path.join(outputParent, "tracked-snapshot-fixture", "code", "mise.toml")),
+    existsSync(path.join(outputParent, "tracked-snapshot-fixture", "code", ".codex/mise.toml")),
     true,
   );
   assert.equal(
-    existsSync(path.join(outputParent, "tracked-snapshot-fixture", "code", "mise.lock")),
+    existsSync(path.join(outputParent, "tracked-snapshot-fixture", "code", ".codex/mise.lock")),
     true,
   );
   assert.equal(

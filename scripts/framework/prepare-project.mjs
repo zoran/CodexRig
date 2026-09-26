@@ -38,17 +38,18 @@ export async function prepareProject({
   writeIdentityDocs(sourceRoot, targetRoot, name, description);
   updateGeneratedPackage(sourceRoot, targetRoot, identity);
   enableGeneratedProjectMemories(targetRoot);
-  writeSelectedProjectTooling(sourceRoot, targetRoot);
+  writeSelectedProjectTooling(sourceRoot, targetRoot, name);
   projectOutputProjection(targetRoot);
   formatGeneratedMarkdown(sourceRoot, targetRoot);
   assertIndependentProjectOutput(targetRoot);
   await validateGeneratedProject(targetRoot);
-  if (!skipVerify) runGeneratedNode(targetRoot, "scripts/verify/repository-smoke.mjs");
+  if (!skipVerify) runGeneratedNode(sourceRoot, targetRoot, "scripts/verify/repository-smoke.mjs");
   assertGeneratedProjectClean(targetRoot, identity, { projectDescription: description });
   assertGeneratedProjectParity({
     sourceRoot,
     targetRoot,
     transferManifest,
     projectDescription: description,
+    projectName: name,
   });
 }

@@ -9,14 +9,20 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
+import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 import { toolingRoot, serializeCanonicalJson } from "../filesystem/repository-files.mjs";
 import { verifyInputRecords } from "../deps/dependency-inputs.mjs";
 import { stageDependencyInstallationInputs } from "../deps/install-compatible.mjs";
+import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
+import {
+  installProjectBootstrapTools,
+  retireReplacedProjectTools,
+} from "./project-tool-installation.mjs";
+import { assertInstalledProjectTools } from "./project-runtime-admission.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
 import {
   acquireRuntimeLifecycleLock,
@@ -33,7 +39,8 @@ import {
   recoverInterruptedHousekeepingWrites,
 } from "../repository/repository-housekeeping-transaction.mjs";
 import { formatContextError } from "../terminal/terminal-output.mjs";
-import { ciAdapterContractViolations } from "./toolchain-archives.mjs";
+import { showStartupIntro, startupStatus } from "../terminal/startup-presentation.mjs";
+import { ciAdapterContractViolations } from "./ci-toolchain-contract.mjs";
 import { resolveToolchainReleases, refreshGithubActions } from "./toolchain-releases.mjs";
 import {
   projectToolchainConfiguration,
@@ -63,7 +70,7 @@ function stageWrite(stage, relativePath, content) {
 
 function commandRunner(root, capability) {
   return (command, args, { cwd = root, delegation, env = {} } = {}) => {
-    const environment = pnpmHooksDisabledEnvironment({ ...process.env, ...env });
+    const environment = { ...pnpmHooksDisabledEnvironment(process.env, root), ...env };
     // Private parent controls must not become apparent authority for unrelated staged commands.
     for (const key of Object.keys(environment))
       if (key.startsWith("CODEXRIG_LIFECYCLE_DELEGATION_")) delete environment[key];
@@ -96,8 +103,13 @@ function commandRunner(root, capability) {
 export async function maintainToolchain({
   root = toolingRoot,
   startup = false,
+  locked = false,
+  candidateResolver = resolveToolchainReleases,
   fetchImpl = globalThis.fetch,
+  spawnGit,
   runCommand,
+  installBootstrapTools = installProjectBootstrapTools,
+  admitProjectTools = assertInstalledProjectTools,
   onInventory = () => {},
   onProgress = () => {},
 } = {}) {
@@ -118,7 +130,8 @@ export async function maintainToolchain({
     recoverInterruptedHousekeepingWrites(root);
     const inputs = toolchainMaintenanceInputs(root);
     const current = readToolchainConfiguration(root);
-    stage = mkdtempSync(path.join(os.tmpdir(), "codexrig-toolchain-"));
+    const locations = prepareProjectToolDirectories(root);
+    stage = mkdtempSync(path.join(locations.temporary, "toolchain-"));
     chmodSync(stage, 0o700);
     const dependencyInputs = stageDependencyInstallationInputs({
       projectRoot: root,
@@ -136,28 +149,30 @@ export async function maintainToolchain({
     };
     const run = runCommand ?? commandRunner(root, capability);
     onProgress(
-      "Checking official stable tool releases, CI action pins and compatible workspace packages.",
+      locked
+        ? "Reproducing reviewed tool pins and the existing dependency lockfile."
+        : "Checking official tool releases, CI action pins and workspace dependencies.",
     );
-    const candidate = await resolveToolchainReleases(current, { fetchImpl });
+    const candidate =
+      locked && candidateResolver === resolveToolchainReleases
+        ? current
+        : await candidateResolver(current, { fetchImpl });
     const projected = projectToolchainConfiguration(inputs.contents, current, candidate);
-    projected[".github/workflows/ci.yml"] = await refreshGithubActions(
-      projected[".github/workflows/ci.yml"],
-      { fetchImpl },
-    );
+    if (!locked)
+      projected[".github/workflows/ci.yml"] = await refreshGithubActions(
+        projected[".github/workflows/ci.yml"],
+        { root, spawnGit },
+      );
     for (const [provider, relativePath] of [
       ["github", ".github/workflows/ci.yml"],
       ["gitlab", ".gitlab-ci.yml"],
     ]) {
-      const violations = ciAdapterContractViolations(provider, projected[relativePath], candidate);
+      const violations = ciAdapterContractViolations(provider, projected[relativePath]);
       if (violations.length)
         throw new Error(`Candidate ${provider} CI contract is invalid: ${violations.join(", ")}.`);
     }
     verifyInputRecords(root, allInputs);
-    // Host updates use their supported native controls. Failure always stops before admission.
-    const miseVersion = run("mise", ["--version"]).match(/\b\d+\.\d+\.\d+\b/u)?.[0];
-    if (miseVersion !== candidate.ci.miseVersion)
-      run("mise", ["self-update", "--yes", "--no-plugins", candidate.ci.miseVersion]);
-    run("codex", ["update"]);
+    const bootstrap = await installBootstrapTools({ root, matrix: candidate, run, fetchImpl });
     for (const relativePath of toolchainConfigurationPaths)
       stageWrite(stage, relativePath, projected[relativePath]);
     const packageJson = JSON.parse(readFileSync(path.join(stage, "package.json"), "utf8"));
@@ -166,27 +181,37 @@ export async function maintainToolchain({
       stageWrite(stage, "package.json", serializeCanonicalJson(packageJson));
     const stageOptions = {
       cwd: stage,
-      env: { MISE_TRUSTED_CONFIG_PATHS: path.join(stage, "mise.toml"), MISE_CEILING_PATHS: stage },
+      env: {
+        MISE_OVERRIDE_CONFIG_FILENAMES: path.join(stage, ".codex/mise.toml"),
+        MISE_TRUSTED_CONFIG_PATHS: path.join(stage, ".codex/mise.toml"),
+        MISE_CEILING_PATHS: path.dirname(stage),
+      },
     };
     if (
       current.stable.node.version !== candidate.stable.node.version ||
       current.stable.pnpm.version !== candidate.stable.pnpm.version
     )
-      run("mise", ["lock", "node", "pnpm"], stageOptions);
+      run(bootstrap.mise, ["lock", "node", "pnpm"], stageOptions);
     onProgress("Installing and validating the isolated candidate toolchain and dependency graph.");
-    run("mise", ["install", "--locked", "node", "pnpm"], stageOptions);
+    run(bootstrap.mise, ["install", "--locked"], stageOptions);
+    admitProjectTools({
+      root,
+      configurationRoot: stage,
+      miseExecutable: bootstrap.mise,
+      environment: { ...pnpmHooksDisabledEnvironment(process.env, root), ...stageOptions.env },
+    });
     run(
-      "mise",
+      bootstrap.mise,
       [
         "exec",
         "--locked",
         "--",
         "node",
         path.join(toolingRoot, "scripts/deps/install-compatible.mjs"),
-        "--stage-toolchain",
+        locked ? "--stage-locked" : "--stage-toolchain",
         root,
       ],
-      stageOptions,
+      { ...stageOptions, delegation: { operation: "dependency", role: "toolchain-dependency" } },
     );
     const desired = Object.fromEntries(
       [...toolchainConfigurationPaths, "package.json", "pnpm-lock.yaml"].map((relativePath) => [
@@ -205,7 +230,7 @@ export async function maintainToolchain({
       writes,
       afterApply: () => {
         run(
-          "mise",
+          bootstrap.mise,
           [
             "exec",
             "--locked",
@@ -222,6 +247,8 @@ export async function maintainToolchain({
         );
       },
     });
+    if (startup)
+      retireReplacedProjectTools({ root, previousMatrix: current, owner: capability, run });
     return { changedPaths: writes.map((entry) => entry.relativePath), matrix: candidate };
   } finally {
     if (stage) rmSync(stage, { recursive: true, force: true });
@@ -231,16 +258,28 @@ export async function maintainToolchain({
 
 async function main() {
   const args = process.argv.slice(2);
-  if (args.some((arg) => arg !== "--startup") || args.length > 1)
-    throw new Error("Usage: node scripts/deps/maintain-toolchain.mjs [--startup]");
+  if (args.some((arg) => !["--startup", "--locked"].includes(arg)) || args.length > 1)
+    throw new Error("Usage: node scripts/deps/maintain-toolchain.mjs [--startup|--locked]");
+  const startup = args.includes("--startup");
+  if (startup)
+    await showStartupIntro({ label: readToolingConfiguration(toolingRoot).startup.displayName });
+  let phase = 1;
   const result = await maintainToolchain({
-    startup: args.includes("--startup"),
-    onInventory: (inventory) => console.log(formatWorktreeRecoveryJson(inventory)),
-    onProgress: console.log,
+    startup,
+    locked: args.includes("--locked"),
+    onInventory: (inventory) => {
+      if (startup)
+        startupStatus("1/5", `Workspace inventory: ${inventory.worktrees.length} worktree(s).`);
+      else console.log(formatWorktreeRecoveryJson(inventory));
+    },
+    onProgress: (message) => {
+      if (startup) startupStatus(`${++phase}/5`, message);
+      else console.log(message);
+    },
   });
-  console.log(
-    `Startup maintenance passed; ${result.changedPaths.length} project input(s) updated.`,
-  );
+  const completed = `Toolchain ready; ${result.changedPaths.length} project input(s) updated.`;
+  if (startup) startupStatus("OK", completed);
+  else console.log(completed);
 }
 if (process.argv[1] === fileURLToPath(import.meta.url))
   main().catch((error) => {

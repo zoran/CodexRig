@@ -47,7 +47,7 @@ function runGit(root, metadata, args) {
   const result = spawnSync("git", invocationArguments, {
     cwd: root,
     encoding: "utf8",
-    env: cleanGitEnvironment(),
+    env: cleanGitEnvironment(process.env, root),
     input: "",
     maxBuffer: 1024 * 1024,
     stdio: "pipe",

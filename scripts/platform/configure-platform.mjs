@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 /** Owns configure platform behavior for the Git provider integration boundary. */
+import { readPlatformCredential } from "./platform-credentials.mjs";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
@@ -93,13 +94,14 @@ export async function configurePlatform({
   const plan = platformConfigurationPlan({ contract: validatedContract, detected });
   if (!apply) return { applied: false, plan, warnings: [] };
   if (typeof fetchImpl !== "function") throw new Error("Platform configuration requires fetch.");
+  const token = readPlatformCredential(root, detected);
   const stateStore = platformConfigurationState(root, plan);
   const adapter = detected.provider === "github" ? applyGithubPlatform : applyGitlabPlatform;
   try {
     const result = await adapter({
       contract: validatedContract,
       detected,
-      environment,
+      token,
       fetchImpl,
       stateStore,
     });

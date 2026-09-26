@@ -23,7 +23,8 @@
       ".agents/skills/task-quality/SKILL.md",
       ".agents/skills/task-quality/agents/openai.yaml",
       ".agents/skills/ui-ux-review/SKILL.md",
-      ".agents/skills/ui-ux-review/agents/openai.yaml"
+      ".agents/skills/ui-ux-review/agents/openai.yaml",
+      ".agents/skills/project-implementation/references/rendered-ui.md"
     ],
     "project-entry": [
       ".codex/README.md",
@@ -46,8 +47,8 @@
       "docs/future-modules.md",
       "docs/project.md",
       "instructions.md",
-      "mise.lock",
-      "mise.toml",
+      ".codex/mise.lock",
+      ".codex/mise.toml",
       "package.json",
       "pnpm-lock.yaml",
       "pnpm-workspace.yaml"
@@ -56,7 +57,9 @@
       "scripts/context/critical-budget-handover.mjs",
       "scripts/context/portable-context-contract.mjs",
       "scripts/context/project-work-state.mjs",
-      "scripts/context/session-stop-lifecycle.mjs"
+      "scripts/context/session-stop-lifecycle.mjs",
+      "scripts/context/context-budget.mjs",
+      "scripts/context/context-cli.mjs"
     ],
     "contracts": [
       "scripts/contracts/delivery-configuration.mjs",
@@ -77,8 +80,10 @@
       "scripts/deps/dependency-transaction.mjs",
       "scripts/deps/install-compatible.mjs",
       "scripts/deps/maintain-toolchain.mjs",
+      "scripts/deps/project-tool-installation.mjs",
+      "scripts/deps/project-runtime-admission.mjs",
       "scripts/deps/report.mjs",
-      "scripts/deps/toolchain-archives.mjs",
+      "scripts/deps/ci-toolchain-contract.mjs",
       "scripts/deps/toolchain-maintenance-inputs.mjs",
       "scripts/deps/toolchain-releases.mjs",
       "scripts/deps/trusted-pnpm-command.mjs",
@@ -93,7 +98,8 @@
       "scripts/docs/project-document-policy.mjs",
       "scripts/docs/project-manifest-contract.mjs",
       "scripts/docs/ensure-project-manifest.mjs",
-      "scripts/docs/initial-project-manifest.mjs"
+      "scripts/docs/initial-project-manifest.mjs",
+      "scripts/docs/document-context.mjs"
     ],
     "filesystem": [
       "scripts/filesystem/owned-file-operations.mjs",
@@ -111,6 +117,7 @@
       "scripts/platform/github-platform.mjs",
       "scripts/platform/gitlab-platform.mjs",
       "scripts/platform/platform-api.mjs",
+      "scripts/platform/platform-credentials.mjs",
       "scripts/platform/platform-configuration-state.mjs"
     ],
     "repository": [
@@ -140,7 +147,9 @@
       "scripts/repository/worktree-prune-transaction.mjs",
       "scripts/repository/worktree-recovery-cli.mjs",
       "scripts/repository/worktree-recovery-output.mjs",
-      "scripts/repository/worktree-recovery.mjs"
+      "scripts/repository/worktree-recovery.mjs",
+      "scripts/repository/project-tool-environment.mjs",
+      "scripts/repository/project-tool-executables.mjs"
     ],
     "security": ["scripts/security/secret-patterns.mjs"],
     "setup": [
@@ -149,6 +158,8 @@
       "scripts/setup/runtime-safety.test.mjs",
       "scripts/setup/session-control-hook-command.mjs",
       "scripts/setup/start-codex.sh",
+      "scripts/setup/start-codex-session.sh",
+      "scripts/terminal/startup-presentation.mjs",
       "scripts/setup/startup-attestation.mjs",
       "scripts/setup/startup-codex-process.mjs",
       "scripts/setup/startup-executable-closure.mjs",
@@ -160,7 +171,9 @@
       "scripts/setup/validate-codex-model-policy.mjs",
       "scripts/setup/validate-static-module-imports.mjs",
       "scripts/setup/install-git-hooks.mjs",
-      "scripts/setup/resolve-git-hooks-path.mjs"
+      "scripts/setup/resolve-git-hooks-path.mjs",
+      "scripts/setup/project-command.mjs",
+      "scripts/setup/run-project.sh"
     ],
     "stack": ["scripts/stack/stack-detector.mjs"],
     "terminal": ["scripts/terminal/terminal-output.mjs"],
@@ -259,7 +272,11 @@
     "verify:pre-push",
     "web:update-sitemap-lastmod",
     "worktree:status",
-    "tooling:doctor"
+    "tooling:doctor",
+    "context:map",
+    "context:read",
+    "context:check",
+    "project:run"
   ],
   "verificationCommands": [
     "syntax-lint",

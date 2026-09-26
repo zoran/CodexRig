@@ -25,6 +25,8 @@ import { renderManagedPrePushHook } from "../../../../scripts/setup/install-git-
 import { resolveGitHooksPath } from "../../../../scripts/setup/resolve-git-hooks-path.mjs";
 import { inspectFrameworkReset } from "./reset-framework.mjs";
 
+import { projectToolEnvironment } from "../../../../scripts/repository/project-tool-environment.mjs";
+
 const modulePath = fileURLToPath(import.meta.url);
 const maximumOutputBytes = 64 * 1024 * 1024;
 
@@ -36,16 +38,10 @@ export function parseFrameworkPublicationArguments(args) {
   return { message: args[1] };
 }
 
-function publicationEnvironment() {
-  // Keep the operator's normal identity, signing, and credential configuration. Bind repository,
-  // index, hooks, and remote destinations explicitly instead of inheriting Git routing overrides.
-  const environment = { ...process.env };
-  for (const key of Object.keys(environment)) {
-    if (key.startsWith("GIT_") || ["BASH_ENV", "ENV", "NODE_OPTIONS", "NODE_PATH"].includes(key)) {
-      delete environment[key];
-    }
-  }
-  return environment;
+function publicationEnvironment(root) {
+  // Publication uses the project's own Git identity and credentials, including its signing state.
+  // The common boundary excludes ambient accounts, agents and executable preload controls.
+  return projectToolEnvironment({ root });
 }
 
 function runPublicationGate({ root, script, args = [] }) {
@@ -57,7 +53,7 @@ function runPublicationGate({ root, script, args = [] }) {
       : [script, ...args],
     {
       cwd: root,
-      env: publicationEnvironment(),
+      env: publicationEnvironment(root),
       stdio: "inherit",
       timeout: 60 * 60_000,
     },
@@ -79,7 +75,10 @@ function publicationGit(root) {
     const options = {
       cwd: root,
       encoding: "utf8",
-      env: { ...(native ? publicationEnvironment() : cleanGitEnvironment()), ...environment },
+      env: {
+        ...(native ? publicationEnvironment(root) : cleanGitEnvironment(process.env, root)),
+        ...environment,
+      },
       input: "",
       maxBuffer: maximumOutputBytes,
       stdio: "pipe",

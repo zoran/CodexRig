@@ -28,7 +28,7 @@ function git(args, environment = {}) {
   const result = spawnSync("git", invocationArguments, {
     cwd: repositoryRoot,
     encoding: "utf8",
-    env: { ...cleanGitEnvironment(), ...environment },
+    env: { ...cleanGitEnvironment(process.env, repositoryRoot), ...environment },
     input: "",
     maxBuffer: 4 * 1024 * 1024,
     stdio: "pipe",
@@ -78,7 +78,7 @@ function publicationWorktreeState() {
 }
 
 function verificationEvidenceIsCurrent() {
-  const environment = cleanGitEnvironment();
+  const environment = cleanGitEnvironment(process.env, repositoryRoot);
   if (Object.hasOwn(process.env, "LC_ALL")) environment.LC_ALL = process.env.LC_ALL;
   else delete environment.LC_ALL;
   const result = spawnSync(

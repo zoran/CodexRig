@@ -45,7 +45,7 @@ function runGit(metadata, args, { buffer = false, acceptedStatuses = [0] } = {})
   const result = spawnSync("git", invocationArguments, {
     cwd: metadata.workTree,
     encoding: buffer ? null : "utf8",
-    env: cleanGitEnvironment(),
+    env: cleanGitEnvironment(process.env, metadata.workTree),
     input: "",
     maxBuffer: maximumGitOutputBytes,
     stdio: "pipe",

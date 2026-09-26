@@ -5,6 +5,18 @@ This file owns this product repository's workflow. README owns setup/use and dis
 existing specification owner. A static UI reference is a separate design artifact. Optional
 `docs/project-context.md` carries only this repository's current bounded authorized task.
 
+## Interpreting Examples And Scope
+
+<!-- current-examples-and-scope-policy -->
+
+## Repository-Local Tool And Account Isolation
+
+<!-- current-tool-account-isolation-policy -->
+
+## Repository Efficiency And Effectiveness
+
+<!-- current-repository-efficiency-policy -->
+
 ## Authorized Work And Native Codex
 
 Work only on the user's current product outcome and accepted steering. Tool maintenance requires an
@@ -57,8 +69,10 @@ is needed.
 
 ### Startup Repository Reconstruction
 
-Before intake or writes, read AGENTS.md, README, this file, the manifest and its linked requirements
-and design owners. In a persistent main conversation, inspect the optional bounded work context. Run
+Before intake or writes, follow the loaded AGENTS.md and run `pnpm context:map`. Read applicable
+sections of this policy, relevant manifest entries and their requirements/design owners through
+`pnpm context:read`; use README for needed commands. Do not recursively load linked documents. In a
+persistent main conversation recovering authorized work, inspect bounded work context. Run
 `pnpm worktree:status -- --json`; inspect every same-clone worktree and safe recovery marker,
 leases, Git status/diff/untracked files, upstream and task branches. Inventory actual modules,
 surfaces, contracts, data, configuration, delivery, dependencies, tests and composition. Continue
@@ -118,8 +132,10 @@ concrete limiting reason.
 
 Review the plan, repair every relevant omission, contradiction or unsafe assumption, and repeat
 until no relevant finding remains. Then audit afresh against the request and actual system,
-including a representative path through affected owners and consumers. An audit finding reopens the
-affected review/repair loop; audit again only from a clean reviewed state before implementation.
+including a representative path through affected owners and consumers and the
+[repository efficiency/effectiveness assessment](#repository-efficiency-and-effectiveness). An audit
+finding reopens the affected review/repair loop; audit again only from a clean reviewed state before
+implementation.
 
 After each nontrivial slice, perform `$system-coherence`, trace an assembled flow, repair relevant
 findings and repeat affected review and focused evidence until none remains. Then perform a fresh
@@ -205,12 +221,25 @@ language-dependent implementation; use canonical translated copy and
 
 ### Tenant Isolation Boundary
 
-`config/tenancy.json` owns trusted tenant-context resolution and deny-by-default isolation. Resolve
-its pending strategy before product code. Enforce tenant scope in authorization, database queries,
-cache keys, files, messages and jobs. Cover cross-tenant denial with real negative integration
-tests. Identity and Access owns authentication, users, authorization, sessions and provider adapters
-behind ports. Material trust changes require `$security-review`, `pnpm auth:check` and
-`pnpm tenancy:check`.
+`config/tenancy.json` (schema 2) owns trusted tenant-context resolution and deny-by-default
+isolation. Resolve its pending strategy before product code. Its `contextBoundaries` name
+non-overlapping runtime roots and distinct contained `resolver`, `policy`, `publicContract` files;
+outside consumers use those public contracts. `modulePolicies` bind actual manifest module roots to
+`scope` (`tenant-owned`, `tenant-independent`, `control-plane`) and `rationale`.
+Tenant-owned/control-plane entries also name module-local `enforcement` files and `evidence` entries
+with an existing selected verification `command` key and concrete `tests` paths. Configured commands
+use their existing `coveredTestPaths` or explicit test arguments; workspace test lifecycle keys use
+package ownership. Update these bindings with module changes; the manifest remains the sole module
+inventory.
+
+Enforce tenant scope in authorization, data, caches, files, messages and jobs. Bound handles need no
+repeated identifier in every helper; pure tenant-independent modules need no artificial tenant test.
+Reuse existing composed negative tests through their actual owner, without duplicate execution.
+`pnpm tenancy:check` checks structure and evidence selection, not semantic isolation: review actual
+script coverage and trace trusted identity through resource access, including cross-tenant denial,
+handle reuse and switching. Identity and Access owns authentication, users, authorization, sessions
+and provider adapters behind ports. Material trust changes require `$security-review`,
+`pnpm auth:check` and `pnpm tenancy:check`.
 
 ## White-Label Product Configuration
 
@@ -241,13 +270,12 @@ not apply a review simply because a keyword appears. Keep findings and evidence 
 
 ## Dependency Installation And Freshness
 
-Prepare the locked runtime with `mise install --locked`, then run
-`mise exec --locked -- node scripts/deps/install-compatible.mjs` and
-`mise exec --locked -- pnpm setup`. The compatible installer owns range/pin/peer/engine policy,
-archive integrity, transaction and rollback. A frozen install proves reproducibility, not registry
-freshness. CI uses reviewed stable pins, frozen inputs, disabled install scripts/pnpmfile and
-verified archives. Report offline or registry uncertainty honestly; do not substitute unverified
-success or automatic source repairs.
+Prepare project-local tools and compatible dependencies with
+`node scripts/deps/maintain-toolchain.mjs`, then run `bash scripts/setup/run-project.sh pnpm setup`.
+The compatible installer owns range/pin/peer/engine policy, archive integrity, transaction and
+rollback. A frozen install proves reproducibility, not registry freshness. CI uses reviewed stable
+pins, frozen inputs, disabled install scripts/pnpmfile and verified archives. Report offline or
+registry uncertainty honestly; do not substitute unverified success or automatic source repairs.
 
 ## Delivery Environments
 
@@ -282,10 +310,10 @@ secrets.
 Finish authorized code, documentation, cleanup and reviews. Settle every no-longer-needed owned
 worktree and coordination claim through its owner. Preserve ambiguous directories and active
 runtime; never manually delete `.codex/runtime/` or a worktree directory. Run
-`mise exec --locked -- pnpm repo:housekeeping -- --apply`, audit current truth and verify the stable
-state. Commit/push only with authority and the actual integration policy; `goal:new` checks clean,
-verified publication on central main. An unrelated tooling finding does not reactivate completed
-product work or impose another cleanup task.
+`bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply`, audit current truth and
+verify the stable state. Commit/push only with authority and the actual integration policy;
+`goal:new` checks clean, verified publication on central main. An unrelated tooling finding does not
+reactivate completed product work or impose another cleanup task.
 
 ## Subagent Orchestration And Integration Authority
 

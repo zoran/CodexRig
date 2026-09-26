@@ -85,6 +85,12 @@ acceptance follow
 [Slice Acceptance](../../../instructions.md#best-available-engineering-not-quick-fixes); the latest
 developer deploy retains priority, but an unreviewed slice is not a stable dependency.
 
+Every audit applies
+[Repository Efficiency And Effectiveness](../../../instructions.md#repository-efficiency-and-effectiveness):
+assess repository-wide outcome preservation, context/runtime/verification/maintenance cost and
+coherence from the bounded map and affected consumers. Fix only evidenced in-scope regressions;
+report limits and preserve requirements. Static byte checks do not establish model effectiveness.
+
 ## Report
 
 Return material findings by severity with a file reference, concrete failure mode, root-cause remedy

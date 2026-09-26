@@ -194,11 +194,17 @@ test("the installed hook cannot be skipped through BASH_ENV", () => {
   for (const relativePath of [
     "scripts/git-hooks/pre-push",
     "scripts/repository/git-runtime-isolation.mjs",
+    "scripts/repository/project-tool-environment.mjs",
+    "scripts/repository/source-inventory-policy.mjs",
+    "scripts/filesystem/repository-files.mjs",
+    "scripts/filesystem/owned-file-operations.mjs",
+    "scripts/filesystem/owned-path-safety.mjs",
     "scripts/repository/runtime-process-io.mjs",
     "scripts/setup/install-git-hooks.mjs",
     "scripts/setup/install-git-hooks.sh",
     "scripts/setup/resolve-git-hooks-path.mjs",
   ]) {
+    mkdirSync(path.dirname(path.join(repository, relativePath)), { recursive: true });
     copyFileSync(path.join(root, relativePath), path.join(repository, relativePath));
   }
   writeFileSync(
@@ -206,15 +212,15 @@ test("the installed hook cannot be skipped through BASH_ENV", () => {
     `#!/bin/sh\nprintf 'ran\\n' >${JSON.stringify(sentinel)}\nexit 17\n`,
     "utf8",
   );
-  const fakeMise = path.join(binDirectory, "mise");
+  const fakeProjectCommand = path.join(repository, "scripts/setup/run-project.sh");
   writeFileSync(
-    fakeMise,
+    fakeProjectCommand,
     `#!/bin/sh
 set -eu
 case "$*" in
-  "exec --locked -- node scripts/deps/verify-pnpm-execution-policy.mjs") exit 0 ;;
-  "exec --locked -- sh scripts/verify/pre-push.sh"*)
-    shift 5
+  "node scripts/deps/verify-pnpm-execution-policy.mjs") exit 0 ;;
+  "sh scripts/verify/pre-push.sh"*)
+    shift 2
     exec sh "$PWD/scripts/verify/pre-push.sh" "$@"
     ;;
   *) exit 91 ;;
@@ -222,7 +228,7 @@ esac
 `,
     "utf8",
   );
-  chmodSync(fakeMise, 0o755);
+  chmodSync(fakeProjectCommand, 0o755);
   writeFileSync(path.join(repository, "tracked.txt"), "initial\n", "utf8");
   assertGit(repository, "init", "-q");
   assertGit(repository, "config", "user.name", "Pre-Push Hook Test");

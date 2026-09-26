@@ -1,4 +1,5 @@
 /** Owns immutable dependency-plan derivation, validation, and reproducibility checks. */
+import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
 import {
   chmodSync,
   existsSync,
@@ -154,9 +155,10 @@ function defaultLockfilePlanner({ projectRoot, manifestPaths, manifestOutputs, l
         repositoryRoot: projectRoot,
         role: "dependency-supervisor",
       });
+    prepareProjectToolDirectories(projectRoot);
     const command = trustedPnpmCommand({
       repositoryRoot: projectRoot,
-      environment: pnpmHooksDisabledEnvironment({ ...process.env, CI: "true" }),
+      environment: pnpmHooksDisabledEnvironment({ ...process.env, CI: "true" }, projectRoot),
       spawn: spawnPnpm,
     });
     const result = spawnTrustedPnpm({
@@ -167,7 +169,7 @@ function defaultLockfilePlanner({ projectRoot, manifestPaths, manifestOutputs, l
       options: {
         cwd: temporaryRoot,
         encoding: "utf8",
-        env: pnpmHooksDisabledEnvironment({ ...process.env, CI: "true" }),
+        env: pnpmHooksDisabledEnvironment({ ...process.env, CI: "true" }, projectRoot),
         input: "",
         stdio: "pipe",
         timeout: 180_000,

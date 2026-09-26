@@ -1,83 +1,41 @@
+# Owns source verification and disposable compatibility experiments with project-local tools.
 name: CI
-
 on:
   pull_request:
   merge_group:
-    types:
-      - checks_requested
+    types: [checks_requested]
   push:
-    branches:
-      - main
+    branches: [main]
   schedule:
     - cron: "17 4 * * 1"
   workflow_dispatch:
-
 permissions:
   contents: read
-
-env:
-  NPM_CONFIG_IGNORE_PNPMFILE: "true"
-  PNPM_CONFIG_IGNORE_PNPMFILE: "true"
-  npm_config_ignore_pnpmfile: "true"
-  pnpm_config_ignore_pnpmfile: "true"
-
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    container: node:24.21.0-bookworm
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - run: node scripts/deps/verify-pnpm-execution-policy.mjs
-      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
-        with:
-          version: 2026.9.13
-          sha256: a72f49916b33ba952ba398046c5cc91a58238f0b718fee1d938206ef2af21c6d
-          install: false
-          cache: false
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-        with:
-          version: 11.27.1
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 24.21.0
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile
-      - name: Install the reviewed stable Codex CLI
-        shell: bash
-        run: |
-          case "$(uname -m)" in
-            x86_64|amd64) codex_architecture='x64'; codex_platform_package='@openai/codex-linux-x64'; codex_platform_integrity='sha512-2ePo0wgOcnONKsuzp8vBjOmNY+IdsKaouaDDIdiKq9HOWNuV/GI22OeXft2A/1GaoL71ictO0/pLAsCEnQ6wew==' ;;
-            aarch64|arm64) codex_architecture='arm64'; codex_platform_package='@openai/codex-linux-arm64'; codex_platform_integrity='sha512-sTEHk31C12dqzJdjZ2u9KLFCXKL04KyCM+QheSjdQI8uzmVJS7aEF2/qAqFxXwk/jwMzC9u7IihfoIlAGR6YsA==' ;;
-            *) echo "Unsupported stable Codex CI architecture: $(uname -m)" >&2; exit 1 ;;
-          esac
-          codex_package='@openai/codex'
-          codex_version='0.156.1'
-          codex_wrapper_integrity='sha512-nI1iVl/n2SO2lSvlwEsJx63zdSI4C4Me2gR7AG0OWMJiGSakz2tY2hx43E39Zq5aEoeB5bZjJXzp5Sqhog6vyA=='
-          codex_install_root="$(umask 077 && mktemp -d)"
-          codex_stage="$codex_install_root/stage"
-          codex_cache="$codex_install_root/cache"
-          mkdir -m 700 "$codex_stage" "$codex_cache"
-          trap 'rm -rf -- "$codex_install_root"' EXIT
-          npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm cache add "${codex_package}@${codex_version}"
-          npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm cache add "${codex_platform_package}@npm:${codex_package}@${codex_version}-linux-${codex_architecture}"
-          npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm pack --ignore-scripts --pack-destination "$codex_stage" "${codex_package}@${codex_version}" "${codex_package}@${codex_version}-linux-${codex_architecture}" >/dev/null
-          node scripts/deps/toolchain-archives.mjs --verify-codex-archives "$codex_stage" "$codex_wrapper_integrity" "$codex_platform_integrity" >/dev/null
-          npm_config_cache="$codex_cache" npm_config_ignore_scripts=true npm install --global "${codex_package}@${codex_version}" --ignore-scripts --offline
-          rm -rf -- "$codex_install_root"
-          trap - EXIT
+      - name: Provision the disposable container's read-only bootstrap utilities
+        run: apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck
+      - name: Reproduce repository-local tools and locked dependencies
+        run: node scripts/deps/maintain-toolchain.mjs --locked
       - name: Check scheduled repository housekeeping and freshness
         if: github.event_name == 'schedule'
-        run: pnpm repo:housekeeping -- --check --online
+        run: bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --check --online
       - name: Validate framework and detected platform contracts
-        run: pnpm framework:doctor
+        run: bash scripts/setup/run-project.sh pnpm framework:doctor
       - name: Run the complete deterministic verification plan
-        run: pnpm verify
-
+        run: bash scripts/setup/run-project.sh pnpm verify
   compatibility-matrix:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    container: node:24.21.0-bookworm
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
@@ -85,18 +43,15 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      - run: node scripts/deps/verify-pnpm-execution-policy.mjs
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 24.21.0
       - id: matrix
-        run: |
-          echo "matrix=$(node scripts/framework/compatibility-matrix.mjs --github-matrix)" >> "$GITHUB_OUTPUT"
-
+        run:
+          echo "matrix=$(node scripts/framework/compatibility-matrix.mjs --github-matrix)" >>
+          "$GITHUB_OUTPUT"
   compatibility-canary:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     needs: compatibility-matrix
     runs-on: ubuntu-latest
+    container: node:24.21.0-bookworm
     timeout-minutes: 30
     continue-on-error: ${{ matrix.experimental }}
     strategy:
@@ -106,21 +61,20 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
-        with:
-          version: 2026.9.13
-          sha256: a72f49916b33ba952ba398046c5cc91a58238f0b718fee1d938206ef2af21c6d
-          install: false
-          cache: false
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-        with:
-          version: ${{ matrix.pnpm }}
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: ${{ matrix.node }}
-          cache: pnpm
-      - run: npm install --global "@openai/codex@${{ matrix.codex }}" --ignore-scripts
-      - run: pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile
-      - run: node scripts/framework/compatibility-matrix.mjs --check-track "${{ matrix.id }}"
-      - run: pnpm verify
+      - name: Provision the disposable container's read-only bootstrap utilities
+        run: apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck
+      - name: Prepare the explicitly selected disposable toolchain experiment
+        env:
+          COMPATIBILITY_TRACK: ${{ matrix.id }}
+        run:
+          node scripts/framework/prepare-compatibility-track.mjs --disposable-checkout
+          "$COMPATIBILITY_TRACK"
+      - name: Verify the actual selected runtime
+        env:
+          COMPATIBILITY_TRACK: ${{ matrix.id }}
+        run:
+          bash scripts/setup/run-project.sh node scripts/framework/compatibility-matrix.mjs
+          --check-track "$COMPATIBILITY_TRACK"
+      - run: bash scripts/setup/run-project.sh pnpm verify

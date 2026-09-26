@@ -35,7 +35,7 @@ for (const command of commands) {
   const result = spawnSync(command.executable, command.args, {
     cwd: root,
     encoding: "utf8",
-    env: pnpmHooksDisabledEnvironment(process.env),
+    env: pnpmHooksDisabledEnvironment(process.env, root),
     stdio: "inherit",
     timeout: 180_000,
   });

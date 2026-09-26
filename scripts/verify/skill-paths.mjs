@@ -5,6 +5,7 @@ import path from "node:path";
 import process from "node:process";
 import { format as formatWithPrettier } from "prettier";
 import { isPrivateCodexRuntimePath, repositoryRoot } from "../repository/source-inventory.mjs";
+import { cleanGitEnvironment } from "../repository/git-runtime-isolation.mjs";
 
 const skillsRoot = path.join(repositoryRoot, ".agents", "skills");
 const failures = [];
@@ -163,6 +164,7 @@ if (!existsSync(skillsRoot) || lstatSync(skillsRoot).isSymbolicLink()) {
 
 const trackedCodex = spawnSync("git", ["ls-files", "-z", "--", ".codex"], {
   cwd: repositoryRoot,
+  env: cleanGitEnvironment(process.env, repositoryRoot),
   encoding: "utf8",
   input: "",
   stdio: ["pipe", "pipe", "ignore"],

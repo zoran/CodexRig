@@ -44,6 +44,8 @@ const portablePolicy = new Map([
   ],
   ["model_verbosity", { type: "string" }],
   ["web_search", { type: "string", value: "cached" }],
+  ["cli_auth_credentials_store", { type: "string", value: "file" }],
+  ["mcp_oauth_credentials_store", { type: "string", value: "file" }],
   ["model", { type: "string", pattern: sharedAgentIntelligencePolicy.modelPattern }],
   ["service_tier", { type: "string", optional: true }],
   ["approvals_reviewer", { type: "string", value: "user" }],

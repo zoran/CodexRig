@@ -154,7 +154,9 @@ export function openOwnedDirectoryBinding(ownedRootPath, directoryPath, label) {
   );
   try {
     const opened = fstatSync(descriptor);
-    if (!sameObjectIdentity(initial, opened)) {
+    // Directory link counts change when an independent owner creates a child directory. Bind
+    // the directory inode, as revalidation below does; file/hardlink checks remain stricter.
+    if (initial.dev !== opened.dev || initial.ino !== opened.ino || !opened.isDirectory()) {
       throw new Error(`Repository path safety detected a directory identity change in ${label}.`);
     }
     validateOwnedParentBinding(parentBinding, label);

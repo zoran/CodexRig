@@ -13,6 +13,7 @@ import {
 } from "../../../../scripts/repository/runtime-session-lease.mjs";
 import { renderManagedPrePushHook } from "../../../../scripts/setup/install-git-hooks.mjs";
 import { parseFrameworkPublicationArguments, publishFramework } from "./publish-framework.mjs";
+import { projectToolEnvironment } from "../../../../scripts/repository/project-tool-environment.mjs";
 
 const resetScript = fileURLToPath(new URL("reset-framework.mjs", import.meta.url));
 
@@ -65,7 +66,7 @@ function fixture(t) {
         cwd: root,
         encoding: "utf8",
         input: "",
-        env: { ...process.env, CODEX_HOME: "" },
+        env: projectToolEnvironment({ root }),
       });
       assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
     } else if (script === "hooks:install") {

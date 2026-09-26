@@ -16,33 +16,27 @@ import { futureModuleBacklogHeading } from "../docs/project-manifest-contract.mj
 import { listActiveFiles, repositoryRoot } from "../repository/source-inventory.mjs";
 import { readmeDocumentationFindings } from "../docs/project-document-policy.mjs";
 
+import { inspectContextBudget } from "../context/context-budget.mjs";
+import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
+
 const root = repositoryRoot;
 const manifestCheck = spawnSync(
   process.execPath,
   ["scripts/docs/ensure-project-manifest.mjs", "--check"],
-  { cwd: root, stdio: "inherit" },
+  { cwd: root, env: projectToolEnvironment({ root }), stdio: "inherit" },
 );
 if (manifestCheck.status !== 0) process.exit(manifestCheck.status ?? 1);
 
-const failures = [];
+const failures = [...inspectContextBudget(root).findings];
 failures.push(
   ...readmeDocumentationFindings({
     readme: readFileSync(path.join(root, "README.md"), "utf8"),
     relativePaths: listActiveFiles({ root }),
   }),
 );
-const agentsBootstrapByteLimit = 24 * 1024;
 const documentationPaths = listDocumentationMarkdownFiles();
 for (const relativePath of documentationPaths) {
   const content = readFileSync(path.join(root, relativePath), "utf8");
-  if (
-    relativePath === "AGENTS.md" &&
-    Buffer.byteLength(content, "utf8") > agentsBootstrapByteLimit
-  ) {
-    failures.push(
-      `${relativePath}: always-loaded bootstrap exceeds ${agentsBootstrapByteLimit} bytes; move full workflow detail to instructions.md and retain a linked safe-entry summary`,
-    );
-  }
   const headingContract = markdownHeadingContract(relativePath, content);
   failures.push(...headingContract.findings);
 }

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Update Project from Framework"
+  short_description: "Reconcile child tools and policy with current generated output"
+  default_prompt:
+    "Use $update-project-from-framework to review or apply the authorized child update, preserving
+    product adaptations and proving current workflow and tooling convergence."

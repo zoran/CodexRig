@@ -30,7 +30,10 @@ import { withRuntimeLifecycleUpdateMutex } from "../repository/runtime-lifecycle
 import { captureProcessIdentity } from "../repository/runtime-process-identity.mjs";
 import {
   acquireRuntimeLifecycleLock,
+  cancelRuntimeLifecycleDelegation,
+  createRuntimeLifecycleDelegation,
   inspectRuntimeLifecycleLock,
+  registerRuntimeLifecycleDescendant,
   releaseRuntimeLifecycleLock,
 } from "../repository/runtime-session-lease.mjs";
 
@@ -556,7 +559,9 @@ releaseRuntimeLifecycleLock({
       { stdio: "ignore" },
     );
     assert.equal(crashed.signal, "SIGKILL");
-    assert.equal(inspectRuntimeLifecycleLock({ root: repositoryRoot }).status, "stale");
+    const released = inspectRuntimeLifecycleLock({ root: repositoryRoot });
+    assert.equal(released.status, "stale");
+    assert.equal(released.owner.guard, null, "recovery must not consult a reusable inode");
 
     const reclaimed = acquireRuntimeLifecycleLock({
       root: repositoryRoot,
@@ -566,6 +571,114 @@ releaseRuntimeLifecycleLock({
     assert.equal(inspectRuntimeLifecycleLock({ root: repositoryRoot }).status, "absent");
   },
 );
+
+test("a partially removed quiescent lifecycle retries without reopening delegation", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "verification-release-retry-"));
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  const owner = acquireRuntimeLifecycleLock({ root, operation: "verification" });
+  let finalized = 0;
+  const finalize = () => {
+    finalized += 1;
+  };
+  assert.throws(
+    () =>
+      releaseRuntimeLifecycleLock({
+        root,
+        owner,
+        finalize,
+        testHooks: {
+          beforeLifecycleLockRemove() {
+            throw new Error("interrupted removal");
+          },
+        },
+      }),
+    /interrupted removal/u,
+  );
+  assert.equal(inspectRuntimeLifecycleLock({ root }).owner.guard, null);
+  assert.throws(
+    () =>
+      createRuntimeLifecycleDelegation({
+        root,
+        owner,
+        operation: "verification",
+        role: "verification-worker",
+      }),
+    /guard is retired/u,
+  );
+  assert.throws(
+    () =>
+      registerRuntimeLifecycleDescendant({
+        root,
+        owner,
+        pid: process.pid,
+        role: "verification-worker",
+      }),
+    /guard is retired/u,
+  );
+  releaseRuntimeLifecycleLock({ root, owner, finalize });
+  assert.equal(finalized, 1);
+  assert.equal(inspectRuntimeLifecycleLock({ root }).status, "absent");
+});
+
+test(
+  "a crash while reclaiming a stale lifecycle also retires its reusable guard identity",
+  {
+    skip: process.platform !== "linux",
+  },
+  (t) => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "verification-recovery-crash-"));
+    t.after(() => rmSync(root, { force: true, recursive: true }));
+    const lifecycleUrl = new URL("../repository/runtime-session-lease.mjs", import.meta.url).href;
+    const prefix = `const { acquireRuntimeLifecycleLock } = await import(${JSON.stringify(lifecycleUrl)});`;
+    for (const recovering of [false, true]) {
+      const command = recovering
+        ? `acquireRuntimeLifecycleLock({ root: ${JSON.stringify(root)}, testHooks: {
+          beforeLifecycleLockRemove() { process.kill(process.pid, "SIGKILL"); }
+        } });`
+        : `acquireRuntimeLifecycleLock({ root: ${JSON.stringify(root)} }); process.kill(process.pid, "SIGKILL");`;
+      const crashed = spawnSync(
+        process.execPath,
+        ["--input-type=module", "--eval", prefix + command],
+        {
+          stdio: "ignore",
+        },
+      );
+      assert.equal(crashed.signal, "SIGKILL");
+      const state = inspectRuntimeLifecycleLock({ root });
+      assert.equal(state.status, "stale");
+      assert.equal(state.owner.guard === null, recovering);
+    }
+    const owner = acquireRuntimeLifecycleLock({ root });
+    releaseRuntimeLifecycleLock({ root, owner });
+    assert.equal(inspectRuntimeLifecycleLock({ root }).status, "absent");
+  },
+);
+
+test("lifecycle release rechecks work issued by its finalizer before retiring the guard", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "verification-finalizer-delegation-"));
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  const owner = acquireRuntimeLifecycleLock({ root, operation: "verification" });
+  let delegation;
+  let finalized = 0;
+  const finalize = () => {
+    finalized += 1;
+    delegation = createRuntimeLifecycleDelegation({
+      root,
+      owner,
+      operation: "verification",
+      role: "verification-worker",
+    });
+  };
+  assert.throws(
+    () => releaseRuntimeLifecycleLock({ root, owner, finalize }),
+    /descendants must finish/u,
+  );
+  assert.notEqual(inspectRuntimeLifecycleLock({ root }).owner.guard, null);
+  cancelRuntimeLifecycleDelegation({ root, owner, token: delegation.token });
+  releaseRuntimeLifecycleLock({ root, owner, finalize });
+  assert.equal(finalized, 1);
+  assert.equal(inspectRuntimeLifecycleLock({ root }).status, "absent");
+});
 
 test("lifecycle acquisition refuses a swapped runtime parent without touching its target", (t) => {
   const repositoryRoot = mkdtempSync(path.join(os.tmpdir(), "verification-runtime-parent-"));

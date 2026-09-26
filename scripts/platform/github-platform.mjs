@@ -107,15 +107,7 @@ function verifyGithubRuleset(actual, expected) {
   }
 }
 
-export async function applyGithubPlatform({
-  contract,
-  detected,
-  environment,
-  fetchImpl,
-  stateStore,
-}) {
-  const token = environment.GH_TOKEN || environment.GITHUB_TOKEN;
-  if (!token) throw new Error("GitHub configuration requires GH_TOKEN or GITHUB_TOKEN.");
+export async function applyGithubPlatform({ contract, detected, token, fetchImpl, stateStore }) {
   const base = `${providerApiBase(contract, "github", detected.hostname)}/repos/${detected.slug}`;
   const existing = await paginatedPlatformApiRequest(fetchImpl, `${base}/rulesets`, {
     provider: "github",

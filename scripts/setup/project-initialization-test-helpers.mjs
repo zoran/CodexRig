@@ -19,6 +19,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { assertGeneratedProjectParity } from "../../scripts/framework/generated-project-finalization.mjs";
 import { capturePortableProjectTransferManifest } from "../../scripts/framework/project-copy.mjs";
 import { copyPortableSetupFixture } from "./setup-regression-test-helpers.mjs";
+import {
+  prepareProjectToolDirectories,
+  projectToolEnvironment,
+} from "../repository/project-tool-environment.mjs";
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const temporaryRoots = [];
@@ -62,6 +66,7 @@ export function textFiles(directory) {
 }
 
 export function initializeTrackedSource(sourceRoot) {
+  prepareProjectToolDirectories(sourceRoot);
   const initialized = spawnSync("git", ["init", "-q"], {
     cwd: sourceRoot,
     encoding: "utf8",
@@ -203,8 +208,8 @@ export function assertGeneratedTransferParityContract(source, generated) {
 }
 
 export function assertGeneratedProjectQuality(targetRoot) {
-  const env = { ...process.env };
-  delete env.NODE_TEST_CONTEXT;
+  prepareProjectToolDirectories(targetRoot);
+  const env = projectToolEnvironment({ root: targetRoot });
   for (const args of [
     ["scripts/verify/docs.mjs"],
     ["scripts/verify/verification-entrypoints.mjs"],

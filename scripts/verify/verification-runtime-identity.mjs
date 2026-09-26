@@ -4,37 +4,11 @@ import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-proce
 import { accessSync, constants, lstatSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { toolingRoot } from "../filesystem/repository-files.mjs";
+import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
 
-const childEnvironmentKeyPattern =
-  /^(?:CI|COMSPEC|HOME|IMAGE_ASSET_[A-Z0-9_]+|LANG|LC_ALL|NODE_ENV|PATH|PATHEXT|SYSTEMROOT|TEMP|TMP|TMPDIR|TZ|VERIFY_MAX_CAPTURE_BYTES|VERIFY_MAX_PARALLEL|WINDIR)$/iu;
-const forbiddenChildEnvironmentKeys = new Set([
-  "NODE_OPTIONS",
-  "NODE_PATH",
-  "NPM_CONFIG_NODE_OPTIONS",
-  "NPM_CONFIG_SCRIPT_SHELL",
-  "PNPM_CONFIG_NODE_OPTIONS",
-  "PNPM_CONFIG_SCRIPT_SHELL",
-]);
-const disabledNpmConfigRoot = process.platform === "win32" ? "NUL" : "/dev/null";
-const forcedChildEnvironment = Object.freeze({
-  // Verification, evidence refresh, and pre-push cross the launcher-to-shell boundary. Run every
-  // command under one portable presentation environment instead of binding evidence to whichever
-  // locale or timezone the calling process happened to inherit.
-  LANG: "C",
-  LC_ALL: "C",
-  NPM_CONFIG_IGNORE_PNPMFILE: "true",
-  // npm derives its global configuration from <prefix>/etc/npmrc. Binding both the
-  // explicit user configuration and that prefix to the OS null device produces two
-  // distinct, non-creatable inputs without a shared predictable temporary path.
-  NPM_CONFIG_PREFIX: disabledNpmConfigRoot,
-  NPM_CONFIG_USERCONFIG: disabledNpmConfigRoot,
-  PNPM_CONFIG_IGNORE_PNPMFILE: "true",
-  PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "error",
-  TZ: "Etc/UTC",
-});
-const forcedChildEnvironmentKeys = new Set(
-  Object.keys(forcedChildEnvironment).map((key) => key.toUpperCase()),
-);
+const verificationControlKeyPattern =
+  /^(?:IMAGE_ASSET_[A-Z0-9_]+|NODE_ENV|VERIFY_MAX_CAPTURE_BYTES|VERIFY_MAX_PARALLEL)$/u;
 const identityKeys = Object.freeze([
   "arch",
   "environment",
@@ -46,32 +20,38 @@ const identityKeys = Object.freeze([
 ]);
 const versionProbeCache = new Map();
 
-export function verificationChildEnvironment(environment = process.env) {
-  if (process.platform !== "win32") {
-    const sink = lstatSync(disabledNpmConfigRoot);
-    if (!sink.isCharacterDevice() || realpathSync.native(disabledNpmConfigRoot) !== "/dev/null") {
-      throw new Error(
-        "Verification could not bind npm configuration to the operating-system null device.",
-      );
-    }
-  }
-  const childEnvironment = {};
-  for (const key of Object.keys(environment)) {
-    const normalizedKey = key.toUpperCase();
+/** Adds only verification controls to the same repository-bound environment used by installation. */
+export function verificationChildEnvironment(environment = process.env, root = toolingRoot) {
+  const child = projectToolEnvironment({ root, inherited: environment });
+  // Deterministic verification never loads mutable user npm options or credentials. Other tools
+  // retain the common repository home. Dependency installation owns its explicit registry profile.
+  const disabledNpmConfigRoot = process.platform === "win32" ? "NUL" : "/dev/null";
+  if (
+    process.platform !== "win32" &&
+    (!lstatSync(disabledNpmConfigRoot).isCharacterDevice() ||
+      realpathSync.native(disabledNpmConfigRoot) !== "/dev/null")
+  )
+    throw new Error(
+      "Verification could not bind npm configuration to the operating-system null device.",
+    );
+  delete child.NPM_CONFIG_GLOBALCONFIG;
+  for (const [key, value] of Object.entries(environment)) {
     if (
-      !childEnvironmentKeyPattern.test(key) ||
-      forcedChildEnvironmentKeys.has(normalizedKey) ||
-      forbiddenChildEnvironmentKeys.has(normalizedKey)
-    ) {
-      continue;
-    }
-    const value = environment[key];
-    if (typeof value === "string" && !value.includes("\0")) {
-      const childKey = process.platform === "win32" ? key.toUpperCase() : key;
-      childEnvironment[childKey] = value;
-    }
+      verificationControlKeyPattern.test(key) &&
+      typeof value === "string" &&
+      !value.includes("\0")
+    )
+      child[key] = value;
   }
-  return { ...childEnvironment, ...forcedChildEnvironment };
+  return {
+    ...child,
+    NPM_CONFIG_USERCONFIG: disabledNpmConfigRoot,
+    NPM_CONFIG_PREFIX: disabledNpmConfigRoot,
+    LANG: "C",
+    LC_ALL: "C",
+    PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "error",
+    TZ: "Etc/UTC",
+  };
 }
 
 function commandVersionDigest(command, args, cwd, executable, environment, environmentIdentity) {
@@ -158,7 +138,7 @@ function executableDetails(command, cwd, environment) {
 
 export function resolveVerificationExecutable(
   command,
-  { cwd = process.cwd(), environment = verificationChildEnvironment() } = {},
+  { cwd = process.cwd(), environment = verificationChildEnvironment(process.env, cwd) } = {},
 ) {
   return executableDetails(command, path.resolve(cwd), environment).resolved;
 }
@@ -176,7 +156,9 @@ function executableSnapshot(cwd, environment) {
 
 export function normalizedVerificationRuntimeIdentity(runtimeIdentity, { cwd } = {}) {
   const runtimeCwd = path.resolve(cwd ?? process.cwd());
-  const childEnvironment = runtimeIdentity ? null : verificationChildEnvironment();
+  const childEnvironment = runtimeIdentity
+    ? null
+    : verificationChildEnvironment(process.env, runtimeCwd);
   const environment = runtimeIdentity ? null : environmentDigest(childEnvironment);
   const executables = runtimeIdentity ? null : executableSnapshot(runtimeCwd, childEnvironment);
   const value =

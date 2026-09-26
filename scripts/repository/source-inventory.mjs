@@ -21,7 +21,7 @@ import {
 } from "./git-runtime-isolation.mjs";
 import {
   isExcludedActivePath,
-  isPrivateCodexRuntimePath,
+  isPrivateRepositoryStatePath,
   isRepositoryCodexHomePath,
   nonPortableTransferPathReason,
   normalizeSourceRelativePath,
@@ -32,6 +32,7 @@ import {
 export {
   activeSourcePathClassification,
   activeSourcePathExclusionReason,
+  isPrivateRepositoryStatePath,
   gitlessPreDescentExcludePatterns,
   isExcludedActivePath,
   isPrivateCodexRuntimePath,
@@ -45,6 +46,7 @@ export {
   repositoryCodexHomeRuntimeDatabasePrefixes,
   repositoryCodexHomeRuntimeDirectoryNames,
   repositoryCodexHomeRuntimeFileNames,
+  repositoryCodexHomeCredentialFileNames,
   repositoryCodexHomeRuntimeProbePaths,
   repositoryCodexRuntimeCacheDirectory,
   repositoryCodexRuntimeDirectory,
@@ -73,7 +75,7 @@ function splitNullBuffer(buffer) {
 export function repositoryCodexHomeGitignoreBehaviorFindings({ root = repositoryRoot } = {}) {
   const temporaryDirectory = mkdtempSync(path.join(os.tmpdir(), "codex-ignore-contract-"));
   const gitDirectory = path.join(temporaryDirectory, "git");
-  const gitEnvironment = cleanGitEnvironment();
+  const gitEnvironment = cleanGitEnvironment(process.env, root);
   try {
     const initializationArguments = ["init", "--bare", "--quiet", gitDirectory];
     const initialized = spawnSync("git", initializationArguments, {
@@ -144,7 +146,7 @@ function gitPathOutput(root, gitDirectory, args, label) {
   const result = spawnSync("git", invocationArguments, {
     cwd: root,
     encoding: null,
-    env: cleanGitEnvironment(),
+    env: cleanGitEnvironment(process.env, root),
     input: Buffer.alloc(0),
     maxBuffer: 64 * 1024 * 1024,
     stdio: ["pipe", "pipe", "ignore"],
@@ -185,7 +187,7 @@ function sourcePathsFromEphemeralGit(root) {
     const initialized = spawnSync("git", initializationArguments, {
       cwd: root,
       encoding: "utf8",
-      env: cleanGitEnvironment(),
+      env: cleanGitEnvironment(process.env, root),
       input: "",
       maxBuffer: 1024 * 1024,
       stdio: "pipe",
@@ -248,7 +250,7 @@ function sourcePathInventory(root, { includeUntracked = true } = {}) {
   const probe = spawnSync("git", probeArguments, {
     cwd: root,
     encoding: "utf8",
-    env: cleanGitEnvironment(),
+    env: cleanGitEnvironment(process.env, root),
     input: "",
     maxBuffer: 1024 * 1024,
     stdio: "pipe",
@@ -390,12 +392,12 @@ function regularRepositoryFileInventory({
   let candidates = inventory.candidates;
   if (activeOnly) candidates = candidates.filter((candidate) => !isExcludedActivePath(candidate));
   if (portableOnly) assertPortableFiles(candidates);
-  const protectedRuntimePaths =
+  const protectedPrivatePaths =
     activeOnly || portableOnly
       ? []
-      : candidates.filter((candidate) => isPrivateCodexRuntimePath(candidate));
-  if (protectedRuntimePaths.length > 0) {
-    candidates = candidates.filter((candidate) => !isPrivateCodexRuntimePath(candidate));
+      : candidates.filter((candidate) => isPrivateRepositoryStatePath(candidate));
+  if (protectedPrivatePaths.length > 0) {
+    candidates = candidates.filter((candidate) => !isPrivateRepositoryStatePath(candidate));
   }
   return {
     files: [
@@ -406,7 +408,7 @@ function regularRepositoryFileInventory({
         rejectNonRegular,
         root,
       }),
-      ...protectedRuntimePaths,
+      ...protectedPrivatePaths,
     ].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)),
     mode: inventory.mode,
   };

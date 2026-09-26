@@ -4,6 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { listActiveFiles, repositoryRoot } from "../repository/source-inventory.mjs";
+import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
 
 const batchSize = 200;
 
@@ -22,7 +23,7 @@ export function runProjectPrettier(mode, { root = repositoryRoot } = {}) {
     const result = spawnSync(
       process.execPath,
       [prettierPath, mode, "--ignore-unknown", "--", ...batch],
-      { cwd: root, stdio: "inherit" },
+      { cwd: root, env: projectToolEnvironment({ root }), stdio: "inherit" },
     );
     if (result.error) throw new Error(`Project formatter failed to start: ${result.error.message}`);
     if (result.status !== 0) return result.status ?? 1;

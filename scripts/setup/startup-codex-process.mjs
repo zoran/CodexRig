@@ -10,7 +10,7 @@ import {
   completeStartupSessionWriterHandoff,
 } from "./startup-attestation.mjs";
 import {
-  canonicalExternalExecutable,
+  canonicalRuntimeExecutable,
   validateStartupRuntimeExecutables,
 } from "./startup-runtime-executables.mjs";
 import { validateRuntimeCodexConfig } from "./validate-codex-config.mjs";
@@ -138,7 +138,7 @@ function processFailure(error, safeToRelease) {
 export async function runStartupCodexProcess({ args, codexExecutable, environment, launch, root }) {
   validateRuntimeCodexConfig(root);
   const runtimeExecutables = validateStartupRuntimeExecutables(root, launch.runtimeExecutables);
-  const controllerNode = canonicalExternalExecutable(root, process.execPath, "Controller Node");
+  const controllerNode = canonicalRuntimeExecutable(root, process.execPath, "Controller Node");
   if (runtimeExecutables.node !== controllerNode || runtimeExecutables.codex !== codexExecutable) {
     throw new Error("Codex process launch differs from its issue-time executable binding.");
   }

@@ -81,6 +81,7 @@ network_access = false
     },
   );
   assert.throws(() => parsePortableToml('name = "one"\nname = "two"\n'), /duplicate key name/);
+  assert.throws(() => parsePortableToml('name = "one"\n"name" = "two"\n'), /duplicate key name/);
   assert.throws(() => parsePortableToml("unsupported = 1.5\n"), /unsupported portable TOML/);
   assert.throws(
     () => parsePortableToml("name = 'not''a-valid-literal'\n"),
@@ -139,6 +140,8 @@ test("Codex config parser accepts only the complete typed portable policy", () =
     model_reasoning_effort: "ultra",
     model_verbosity: "medium",
     web_search: "cached",
+    cli_auth_credentials_store: "file",
+    mcp_oauth_credentials_store: "file",
     model: "gpt-6-astra",
     approvals_reviewer: "user",
     approval_policy: "on-request",
@@ -342,6 +345,7 @@ test("runtime Codex config permits only non-executable repository-local metadata
     'theme = "codex"',
     "screen_reader_detection_done = true",
     "[tui.model_availability_nux]",
+    '\"gpt-5.6-sol\" = 1',
     "gpt-6-astra = 2",
     "",
   ].join("\n");
@@ -359,6 +363,7 @@ test("runtime Codex config permits only non-executable repository-local metadata
 
   for (const unsafe of [
     'notify = ["sh", "-c", "run-project-code"]\n',
+    '"notify" = ["sh", "-c", "run-project-code"]\n',
     '[mcp_servers.project]\ncommand = "run-project-code"\n',
     "[plugins.project]\nenabled = true\n",
     'openai_base_url = "https://attacker.invalid"\n',
@@ -797,6 +802,16 @@ test("hook installation is managed and never overwrites an unrelated hook", () =
   copyFileSync(path.join(root, "scripts/setup/resolve-git-hooks-path.mjs"), pathResolver);
   copyFileSync(path.join(root, "scripts/repository/git-runtime-isolation.mjs"), gitIsolation);
   copyFileSync(path.join(root, "scripts/repository/runtime-process-io.mjs"), processIo);
+  for (const relative of [
+    "scripts/repository/project-tool-environment.mjs",
+    "scripts/repository/source-inventory-policy.mjs",
+    "scripts/filesystem/repository-files.mjs",
+    "scripts/filesystem/owned-file-operations.mjs",
+    "scripts/filesystem/owned-path-safety.mjs",
+  ]) {
+    mkdirSync(path.dirname(path.join(fixture, relative)), { recursive: true });
+    copyFileSync(path.join(root, relative), path.join(fixture, relative));
+  }
   copyFileSync(path.join(root, "scripts/git-hooks/pre-push"), sourceHook);
   chmodSync(installer, 0o755);
   chmodSync(sourceHook, 0o755);

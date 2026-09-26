@@ -48,9 +48,9 @@ upgradeable product repositories while deliberately defining no child product or
   inside their owning capability roots rather than a mixed application tree. Framework source,
   identifiers, tests, and technical headers are English; no child-facing locale set exists here.
 - Infrastructure state: portable CI lives in `.github/workflows/ci.yml` and `.gitlab-ci.yml`,
-  toolchain declarations live in `mise.toml`, `mise.lock`, and workspace manifests, and provider or
-  delivery orchestration lives under `scripts/platform` and `scripts/setup`, while goal housekeeping
-  lives under `scripts/goals`; none is mixed into a product runtime root.
+  toolchain declarations live in `.codex/mise.toml`, `.codex/mise.lock`, and workspace manifests,
+  and provider or delivery orchestration lives under `scripts/platform` and `scripts/setup`, while
+  goal housekeeping lives under `scripts/goals`; none is mixed into a product runtime root.
 
 <!-- project:delivery-inventory:start -->
 
@@ -117,10 +117,12 @@ upgradeable product repositories while deliberately defining no child product or
   acknowledgement. The existing continuation response reminds the primary to reconcile outcome,
   whole-project effects, proportionality, cleanup and current documentation before further work.
 - Runtime and technology: Node.js ESM and built-ins on the framework's mise-pinned toolchain.
-- Public contract: `handover:create`, `handover:receive`, `handover:acknowledge`, exported portable
-  context validators, and the preloaded Stop lifecycle. Receipt requires an active canonical session
-  distinct from the sealing session and the exact accepted repository-bound artifact;
-  acknowledgement removes only unchanged received bytes, not native conversation history.
+- Public contract: `context:map`, bounded Markdown/HTML `context:read`, byte-based `context:check`
+  (also part of documentation verification), `handover:create`, `handover:receive`,
+  `handover:acknowledge`, exported portable context validators, and the preloaded Stop lifecycle.
+  Receipt requires an active canonical session distinct from the sealing session and the exact
+  accepted repository-bound artifact; acknowledgement removes only unchanged received bytes, not
+  native conversation history.
 - Private internals: Work-marker validation, bounded continuation loop state, private prompt binding
   and digest checks, and required portable-policy declarations.
 - Owned data and migrations: Bounded `.codex/runtime/stop-continuation/` state and private transient
@@ -136,7 +138,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Root: `scripts/contracts`
 - Responsibility: Parses and validates versioned framework, compatibility, startup, platform,
   managed-surface, generated white-label product-configuration, delivery-inventory, localization,
-  and tenant-isolation contracts.
+  and tenant-isolation contracts. Tenancy schema 2 binds manifest module policies and runtime
+  context boundaries to existing enforcement and verification owners.
 - Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
 - Public contract: Exported contract readers, product/delivery/localization/tenancy-configuration
   renderers, normalizers, path guards, and canonical serializers.
@@ -146,7 +149,7 @@ upgradeable product repositories while deliberately defining no child product or
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/filesystem`.
 - Focused verifier:
-  `node --test scripts/setup/startup-state.test.mjs scripts/verify/api-security.test.mjs scripts/verify/localization.test.mjs scripts/verify/white-label.test.mjs`
+  `node --test scripts/setup/startup-state.test.mjs scripts/verify/tenant-isolation.test.mjs scripts/verify/localization.test.mjs scripts/verify/white-label.test.mjs`
 - Steward: Framework lifecycle maintainer.
 
 #### Owned Filesystem Safety
@@ -175,10 +178,16 @@ upgradeable product repositories while deliberately defining no child product or
   allowed by tracked ranges, pins, engines, peers, and supply-chain policy. Also reproduces an
   existing lockfile offline for source housekeeping and toolchain maintenance, and stages complete
   workspace inputs without changing their policy. Staged installation resolves and fills the final
-  project's pnpm store, including when temporary staging is on another filesystem or the project
-  configures a relative store. Failures retain bounded, sanitized pnpm diagnostics. Canonical
-  startup invokes the same owner's compatible local toolchain, host CLI and reviewed stable CI
-  maintenance.
+  project's private pnpm store. Existing installations bound to a former host store are rebuilt
+  through pnpm while preserving the lockfile. Failures retain bounded, sanitized pnpm diagnostics.
+  Canonical startup invokes the same owner's compatible project-local toolchain and reviewed stable
+  CI maintenance. Mise versions/checksums come from its official public distribution; action pins
+  come from isolated native Git tags with commit verification for newer releases, avoiding GitHub
+  REST quotas and credentials. Official Mise binaries, complete Codex platform bundles and their
+  integrity records remain under ignored `.auth/project-tools`; host executables are never updated.
+  Successful, quiescent canonical startup retires verified replaced bundles and lets Mise prune
+  unused runtimes. Stable CI uses the same maintenance owner with `--locked`, skipping release
+  refresh and reproducing frozen dependencies before entering the common command wrapper.
 - Runtime and technology: Node.js ESM orchestrating the pnpm and mise toolchain.
 - Public contract: `deps:install`, `deps:report`, and `deps:update*` commands; the
   lifecycle-delegated `install-compatible.mjs --reproduce-locked` and `--reproduce-toolchain`
@@ -223,10 +232,17 @@ upgradeable product repositories while deliberately defining no child product or
 - Runtime and technology: Node.js ESM on the declared toolchain.
 - Public contract: `framework:doctor`, `framework:version`, `framework:upgrade`,
   `compatibility:matrix` and the source housekeeping adapter. Migration requires an explicit target
-  and pristine generated reference; target-owned documents, product code and identity are preserved.
+  and current generated output, with explicit hash-bound policy/tool reconciliation or an optional
+  pristine reference; product code and identity are preserved.
 - Private internals: Conservative SemVer classification, three-way file/package comparison, exact
-  target runtime exclusion, conflict planning, transactional journal and rollback. Non-current
-  reference metadata is compared as opaque bytes, never interpreted as an older private schema.
+  target runtime exclusion, conflict planning, transactional journal and rollback. Explicit
+  old-child regeneration requires confirmed quiescence and binds recovery to the exact projected
+  source runtime without importing a partially installed target. Non-current reference metadata is
+  compared as opaque bytes, never interpreted as an older private schema. Explicit disposable CI
+  experiments use `prepare-compatibility-track.mjs` to resolve declared selectors through the same
+  private tool installer and advance only fixture release mirrors before full verification.
+  Read-only version checks allow detached CI against its unique actual integration upstream;
+  ordinary source housekeeping remains restricted to the integration branch.
 - Owned data and migrations: Source `.codexrig/framework.json` release identity and
   `.codexrig/compatibility.json` nonblocking experiments; temporary target
   `.project-state/framework-upgrade/` journals disappear after settlement. Source selection is
@@ -301,7 +317,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Responsibility: Detects GitHub or GitLab and previews or reconciles equivalent protected-branch,
   review, CI, and merge-serialization policy with provider read-back.
 - Runtime and technology: Node.js ESM using credential-free contract parsing and HTTPS adapters.
-- Public contract: `platform:detect` and `platform:configure`.
+- Public contract: `platform:detect` and `platform:configure`; authenticated apply reads the private
+  `.auth/git-platform.json` profile bound to the selected provider, host and repository.
 - Private internals: Provider API clients, pagination, host allowlists, and reconciliation state.
 - Owned data and migrations: Disposable local reconciliation state; remote changes occur only on an
   explicit primary-owned apply.
@@ -319,10 +336,13 @@ upgradeable product repositories while deliberately defining no child product or
   exact latest-session recovery markers, Git-less root classification, safe classification and
   preservation of broken worktree links, the shared crash-recoverable prune transaction, path
   reservations and preservation locks, stable snapshots, delivery-environment evidence discovery,
-  and transfer-source validation. Owns the shared crash-recoverable file batch used by housekeeping
-  and startup maintenance, including synchronous install finalization and rollback. Per-root
-  inconsistencies remain visible without discarding other safe inventory; orphan recovery corruption
-  is advisory unless writer ownership is also unsafe.
+  and transfer-source validation. Owns the clean repository tool environment with private
+  home/configuration/data/cache directories and no inherited account variables. Account state is
+  excluded before source discovery and kept separate from ephemeral native-runtime reset. Owns the
+  shared crash-recoverable file batch used by housekeeping and startup maintenance, including
+  synchronous install finalization and rollback. Per-root inconsistencies remain visible without
+  discarding other safe inventory; orphan recovery corruption is advisory unless writer ownership is
+  also unsafe.
 - Runtime and technology: Node.js ESM over filesystem and isolated Git process boundaries.
 - Public contract: `worktree:status` with current/unfinished/settled human markers plus exported
   inventory, path-policy, Product Root, worktree-recovery, runtime-lease/session-recovery,
@@ -350,8 +370,10 @@ upgradeable product repositories while deliberately defining no child product or
 #### Secret Classification
 
 - Root: `scripts/security`
-- Responsibility: Owns reusable secret-pattern classification shared by terminal output and
-  repository verification.
+- Responsibility: Owns reusable secret-pattern detection with conservative terminal/private-context
+  handling and actionable repository classification. Local and streamed pushed-content checks share
+  the same decision; ambiguous domain sessions, signatures and non-credential keys do not alone
+  establish a repository secret.
 - Runtime and technology: Node.js ESM deterministic pattern contracts.
 - Public contract: Exported secret patterns and match helpers.
 - Private internals: Pattern ordering and false-positive guards.
@@ -388,7 +410,15 @@ upgradeable product repositories while deliberately defining no child product or
   tenant-capable projects, installs hooks, initializes repositories, and exports explicitly selected
   independent projects. Source-only generation/export uses one recipe and source-owned staged
   validator. Local `.codex/tooling.json`, toolchain and verification configuration provide the
-  retained tools' contracts without source metadata.
+  retained tools' contracts without source metadata. `project:run` inventories repository ownership
+  before preparing private tool state and executing the requested command through
+  `mise exec --locked` in the common repository environment; it grants no authentication,
+  publication or deployment authority. Mise pins and locks are explicitly loaded from `.codex/`,
+  outside host-shell ancestor discovery. Interactive Codex resume explicitly selects embedded mode
+  with `--no-daemon`, preserving its session-only hooks and controls. `startup.displayName` in
+  `.codex/tooling.json` owns the launcher's ASCII identity; generation sets the supplied project
+  name. A bounded terminal-only reveal precedes five progress phases, with static output for logs,
+  CI, dumb terminals and `NO_COLOR`.
 - Runtime and technology: Node.js ESM and Bash on the mise-pinned framework toolchain.
 - Public contract: `codex:start`, `codex:validate`, `setup`, `hooks:install`, and `project:export`.
 - Private internals: Atomic native-picker reservation and authenticated selected-session binding,
@@ -441,8 +471,9 @@ upgradeable product repositories while deliberately defining no child product or
 - Responsibility: Routes changed-path and full checks, binds successful evidence to source, runtime,
   Git basis, delivery environment, verified artifact/configuration bytes and a target-specific plan,
   rejects duplicated public product identity and tooling imports, checks delivery-inventory drift,
-  enforces Identity and Access/provider/public-contract and tenant-isolation boundaries, enforces
-  physical surface and cross-surface import separation, checks responsive multi-device hazards,
+  checks Identity and Access/provider/public-contract structure plus tenancy ownership and selected
+  evidence bindings (semantic security remains an executed-flow review), enforces physical surface
+  and cross-surface import separation, checks responsive multi-device hazards,
   localization/source-language truth, product-stack drift, and source/declaration-header currency,
   and performs repository quality gates.
 - Runtime and technology: Node.js ESM orchestration plus bounded Bash verifier adapters.
@@ -477,7 +508,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `5.6.0`.
+- Framework version: `6.0.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->
@@ -492,10 +523,11 @@ upgradeable product repositories while deliberately defining no child product or
   neutral source.
 - Tracked `.codex/`, `.agents/`, `.codexrig/`, and `scripts/` surfaces are user-inspectable. Only
   sensitive or disposable runtime state is ignored; normative framework policy is never hidden.
-- Explicit project-tool migrations run from the source framework against a supplied pristine
-  generated reference. Three-way file comparison detects conflicts, and the target's own runtime
-  lock protects the complete transaction through cleanup. Project documents and product identity are
-  preserved; generated projects contain no self-updater or installation receipt.
+- Explicit project-tool migrations run from the source framework against current generated output
+  with reviewed hash-bound decisions, or an optional pristine reference. File comparison detects
+  conflicts, and the target's own runtime lock protects the complete transaction through cleanup.
+  Project documents and product identity are preserved; generated projects contain no self-updater
+  or installation receipt.
 
 ## Maintenance
 

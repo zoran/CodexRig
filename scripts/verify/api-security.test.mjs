@@ -4,15 +4,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import {
-  initialTenancyConfiguration,
-  serializeTenancyConfiguration,
-  tenancyConfigurationPath,
-} from "../contracts/tenancy-configuration.mjs";
 import { importSpecifiersForFile } from "../repository/local-import-resolution.mjs";
 import { apiSecurityFindings, isApiSource, readApiFiles } from "./api-security.mjs";
 import { identityAccessProjectFindings } from "./identity-access.mjs";
-import { tenantIsolationProjectFindings } from "./tenant-isolation.mjs";
 
 function fixture(content, relativePath = "src/routes/account.ts") {
   return { content, relativePath };
@@ -342,6 +336,39 @@ test("hand-rolled Identity implementations and sensitive logs cannot hide outsid
   );
 });
 
+test("Identity checks distinguish domain sessions, role taxonomy and port delegation from enforcement", (t) => {
+  const fixture = identityProject(t, {
+    "src/training/sessions.ts":
+      'export function createSession(trainingDay) { return { trainingDay }; }\nexport function validateSession(value) { return value.status === "open"; }\n',
+    "src/anatomy/taxonomy.ts":
+      "export function strongest(roles) { if (roles.length === 0) throw new Error(); return roles.reduce((left, right) => left.priority > right.priority ? left : right); }\n",
+    "src/ui/notifications.kt":
+      "fun canNotify(context: Context) = context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED\n",
+    "src/pairing/composition.ts":
+      "export const client = { async authorize(action) { return await identityClient.authorize(action); } };\n",
+    "src/training/unsafe-provider.ts":
+      'import { getAuth } from "firebase-admin/auth";\nexport const provider = getAuth();\n',
+    "src/accounts/validation.ts":
+      'export function needsInput(password) { if (password == null || password === "") return true; if (password?.email == null || password.email.trim() === "") return true; return false; }\n',
+    "src/training/explanation.ts": 'export const example = "return password === saved";\n',
+    "src/orders/access.ts": 'export function canRead(user) { return user.role === "admin"; }\n',
+    "src/accounts/unsafe-credential.ts":
+      "export function matches(password, saved) { return password === saved; }\n",
+    "src/accounts/unsafe-literal.ts":
+      'export function matches(password) { return password === "local-password"; }\n',
+  });
+  const findings = identityAccessProjectFindings(fixture);
+  assert.equal(findings.length, 4, findings.join("\n"));
+  assert.ok(
+    findings.some(
+      (finding) => finding.includes("unsafe-provider.ts") && finding.includes("provider-adapter"),
+    ),
+  );
+  assert.ok(findings.some((finding) => finding.includes("orders/access.ts")));
+  assert.ok(findings.some((finding) => finding.includes("unsafe-credential.ts")));
+  assert.ok(findings.some((finding) => finding.includes("unsafe-literal.ts")));
+});
+
 test("package imports distinguish external, blocked, and conditional local mappings", (t) => {
   const fixture = identityProject(t, {
     "package.json": JSON.stringify({
@@ -540,355 +567,4 @@ test("umbrella auth modules require concern directories and reject sensitive log
   assert.ok(findings.some((finding) => finding.includes("Product Root-level mixed file")));
   assert.ok(findings.some((finding) => finding.includes("explicit authentication")));
   assert.ok(findings.some((finding) => finding.includes("must not log credential")));
-});
-
-const tenantEvidencePath = "src/tenancy/isolation/tenant-isolation.test.ts";
-
-function tenancyManifest() {
-  return `# Project Manifest
-
-### Active Module Inventory
-
-#### Product Runtime
-
-- Root: \`src\`
-- Responsibility: Owns the product runtime in this tenant-isolation fixture.
-- Runtime and technology: TypeScript on Node.js ESM.
-- Public contract: \`src/tenancy/public/index.ts\`
-- Private internals: Everything else below the module root.
-- Owned data and migrations: Tenant-scoped runtime data; no fixture migrations.
-- Tenant isolation: Tenant-scoped by verified tenant context; cross-tenant access is denied.
-- Allowed dependencies: None.
-- Focused verifier: \`node --test ${tenantEvidencePath}\`
-- Steward: Product maintainer.
-`;
-}
-
-function tenantEvidenceSource() {
-  return `import assert from "node:assert/strict";
-const allowsTenant = (actor, resource) => actor.tenantId === resource.tenantId;
-assert.equal(allowsTenant({ tenantId: "tenant-a" }, { tenantId: "tenant-b" }), false);
-`;
-}
-
-function tenancyProject(t, entries, configuration = initialTenancyConfiguration()) {
-  const productImplementation = Object.keys(entries).some(
-    (relativePath) =>
-      relativePath.startsWith("src/") &&
-      relativePath !== "src/.gitkeep" &&
-      !/(?:^|\/)(?:[^/]+\.)?(?:source\.)?(?:spec|test)\.[^/]+$/iu.test(relativePath),
-  );
-  const suppliedPackage = entries["package.json"]
-    ? JSON.parse(entries["package.json"])
-    : { name: "tenant-fixture", private: true };
-  if (suppliedPackage.scripts === undefined) {
-    suppliedPackage.scripts = {
-      "test:tenant-isolation": `node --test ${tenantEvidencePath}`,
-    };
-  }
-  const fixture = identityProject(t, {
-    "package.json": JSON.stringify(suppliedPackage),
-    "pnpm-workspace.yaml": "packages: []\n",
-    "src/.gitkeep": "",
-    [tenancyConfigurationPath]: configuration,
-    ...(productImplementation
-      ? {
-          "docs/project.md": tenancyManifest(),
-          [tenantEvidencePath]: tenantEvidenceSource(),
-        }
-      : {}),
-    ...entries,
-  });
-  return fixture;
-}
-
-function activeTenancyConfiguration(...trustedSources) {
-  return serializeTenancyConfiguration({
-    tenantContext: {
-      key: "tenantId",
-      resolutionStrategy:
-        trustedSources.length === 1 ? "single-trusted-source" : "composed-trusted-sources",
-      trustedSources,
-    },
-  });
-}
-
-test("an empty generated project starts with a truthful pending tenant contract", (t) => {
-  const fixture = tenancyProject(t, {});
-  assert.deepEqual(tenantIsolationProjectFindings(fixture), []);
-});
-
-test("product implementation requires trusted tenant resolution and separated concerns", (t) => {
-  const pending = tenancyProject(t, {
-    "src/orders/public/index.ts": "export const listOrders = () => [];\n",
-  });
-  const pendingFindings = tenantIsolationProjectFindings(pending);
-  assert.ok(pendingFindings.some((finding) => finding.includes("must be configured")));
-  assert.ok(pendingFindings.some((finding) => finding.includes("dedicated tenancy boundary")));
-
-  const active = tenancyProject(
-    t,
-    {
-      "src/orders/persistence/repository.ts":
-        "export const ordersFor = (tenantId) => ({ tenantId });\n",
-      "src/tenancy/context/resolve.ts":
-        "export const resolveTenantContext = (membership) => ({ tenantId: membership.tenantId });\n",
-      "src/tenancy/policy/isolate.ts":
-        "export const allowsTenant = (tenantContext, resource) => tenantContext.tenantId === resource.tenantId;\n",
-      "src/tenancy/public/index.ts":
-        "export const requireTenant = (tenantContext) => tenantContext.tenantId;\n",
-    },
-    activeTenancyConfiguration("authenticated-membership"),
-  );
-  assert.deepEqual(tenantIsolationProjectFindings(active), []);
-});
-
-test("active product modules require executable negative cross-tenant lifecycle evidence", (t) => {
-  const missingScenario = tenancyProject(
-    t,
-    {
-      "src/orders/persistence/repository.ts":
-        "export const ordersFor = (tenantId) => ({ tenantId });\n",
-      "src/tenancy/context/resolve.ts":
-        "export const resolveTenantContext = (membership) => ({ tenantId: membership.tenantId });\n",
-      "src/tenancy/policy/isolate.ts":
-        "export const allowsTenant = (tenantContext, resource) => tenantContext.tenantId === resource.tenantId;\n",
-      "src/tenancy/public/index.ts":
-        "export const requireTenant = (tenantContext) => tenantContext.tenantId;\n",
-      [tenantEvidencePath]:
-        '// assert.equal(check("tenant-a", "tenant-b"), false) is not executable evidence.\n',
-    },
-    activeTenancyConfiguration("authenticated-membership"),
-  );
-  assert.ok(
-    tenantIsolationProjectFindings(missingScenario).some((finding) =>
-      finding.includes("negative cross-tenant test/spec"),
-    ),
-  );
-
-  const unselectedLifecycle = tenancyProject(
-    t,
-    {
-      "package.json": JSON.stringify({ name: "tenant-fixture", private: true, scripts: {} }),
-      "src/orders/persistence/repository.ts":
-        "export const ordersFor = (tenantId) => ({ tenantId });\n",
-      "src/tenancy/context/resolve.ts":
-        "export const resolveTenantContext = (membership) => ({ tenantId: membership.tenantId });\n",
-      "src/tenancy/policy/isolate.ts":
-        "export const allowsTenant = (tenantContext, resource) => tenantContext.tenantId === resource.tenantId;\n",
-      "src/tenancy/public/index.ts":
-        "export const requireTenant = (tenantContext) => tenantContext.tenantId;\n",
-    },
-    activeTenancyConfiguration("authenticated-membership"),
-  );
-  assert.ok(
-    tenantIsolationProjectFindings(unselectedLifecycle).some((finding) =>
-      finding.includes("no owning test:tenant-isolation lifecycle selected by full verification"),
-    ),
-  );
-
-  const noOpLifecycle = tenancyProject(
-    t,
-    {
-      "package.json": JSON.stringify({
-        name: "tenant-fixture",
-        private: true,
-        scripts: { "test:tenant-isolation": `echo ${tenantEvidencePath}` },
-      }),
-      "src/orders/persistence/repository.ts":
-        "export const ordersFor = (tenantId) => ({ tenantId });\n",
-      "src/tenancy/context/resolve.ts":
-        "export const resolveTenantContext = (membership) => ({ tenantId: membership.tenantId });\n",
-      "src/tenancy/policy/isolate.ts":
-        "export const allowsTenant = (tenantContext, resource) => tenantContext.tenantId === resource.tenantId;\n",
-      "src/tenancy/public/index.ts":
-        "export const requireTenant = (tenantContext) => tenantContext.tenantId;\n",
-    },
-    activeTenancyConfiguration("authenticated-membership"),
-  );
-  assert.ok(
-    tenantIsolationProjectFindings(noOpLifecycle).some((finding) =>
-      finding.includes("directly named by its test:tenant-isolation runner"),
-    ),
-  );
-
-  const unrelatedAssertion = tenancyProject(
-    t,
-    {
-      "src/orders/persistence/repository.ts":
-        "export const ordersFor = (tenantId) => ({ tenantId });\n",
-      "src/tenancy/context/resolve.ts":
-        "export const resolveTenantContext = (membership) => ({ tenantId: membership.tenantId });\n",
-      "src/tenancy/policy/isolate.ts":
-        "export const allowsTenant = (tenantContext, resource) => tenantContext.tenantId === resource.tenantId;\n",
-      "src/tenancy/public/index.ts":
-        "export const requireTenant = (tenantContext) => tenantContext.tenantId;\n",
-      [tenantEvidencePath]:
-        'const tenantA = { tenantId: "tenant-a" };\nconst tenantB = { tenantId: "tenant-b" };\nassert.equal(false, false);\n',
-    },
-    activeTenancyConfiguration("authenticated-membership"),
-  );
-  assert.ok(
-    tenantIsolationProjectFindings(unrelatedAssertion).some((finding) =>
-      finding.includes("tenant-coupled denial assertion"),
-    ),
-  );
-});
-
-test("tenant isolation rejects caller context, defaults, ambient state, deep imports, and unscoped data", (t) => {
-  const fixture = tenancyProject(
-    t,
-    {
-      "src/orders/handler.ts":
-        'import { resolveTenantContext } from "../tenancy/context/resolve";\nconst tenantId = request.headers.tenantId || "default";\nexport const handle = resolveTenantContext;\n',
-      "src/orders/jobs/rebuild.ts": "export const rebuild = () => true;\n",
-      "src/tenancy/context/ambient.ts": "let currentTenant = null;\nexport { currentTenant };\n",
-      "src/tenancy/context/resolve.ts":
-        "export const resolveTenantContext = (membership) => ({ tenantId: membership.tenantId });\n",
-      "src/tenancy/policy/isolate.ts":
-        "export const allowsTenant = (tenantContext, resource) => tenantContext.tenantId === resource.tenantId;\n",
-      "src/tenancy/public/index.ts":
-        "export const requireTenant = (tenantContext) => tenantContext.tenantId;\n",
-    },
-    activeTenancyConfiguration("authenticated-membership"),
-  );
-  const findings = tenantIsolationProjectFindings(fixture);
-  assert.ok(findings.some((finding) => finding.includes("caller-controlled")));
-  assert.ok(findings.some((finding) => finding.includes("default/global fallback")));
-  assert.ok(findings.some((finding) => finding.includes("mutable ambient global state")));
-  assert.ok(findings.some((finding) => finding.includes("public contract or port")));
-  assert.ok(findings.some((finding) => finding.includes("must carry explicit tenant scope")));
-});
-
-test("tenant contracts cannot be bypassed through aliases or workspace packages", (t) => {
-  const fixture = tenancyProject(
-    t,
-    {
-      "tsconfig.base.json": JSON.stringify({
-        compilerOptions: { baseUrl: ".", paths: { "@/*": ["src/*"] } },
-      }),
-      "tsconfig.json": JSON.stringify({ extends: "./tsconfig.base.json" }),
-      "pnpm-workspace.yaml": "packages:\n  - 'packages/*'\n",
-      "packages/platform/package.json": JSON.stringify({
-        name: "@product/platform",
-        exports: { "./context": { default: "./src/tenancy/context/resolve.ts" } },
-      }),
-      "packages/platform/src/tenancy/context/resolve.ts":
-        "export const resolveTenantContext = (membership) => ({ tenantId: membership.tenantId });\n",
-      "packages/platform/src/tenancy/policy/isolate.ts":
-        "export const allowsTenant = (tenantContext, resource) => tenantContext.tenantId === resource.tenantId;\n",
-      "packages/platform/src/tenancy/public/index.ts":
-        "export const requireTenant = (tenantContext) => tenantContext.tenantId;\n",
-      "src/orders/alias-handler.ts":
-        'import { resolveTenantContext } from "@/tenancy/context/resolve";\nexport const handle = resolveTenantContext;\n',
-      "src/orders/package-handler.ts":
-        'import { resolveTenantContext } from "@product/platform/context";\nexport const handle = resolveTenantContext;\n',
-      "src/tenancy/context/resolve.ts":
-        "export const resolveTenantContext = (membership) => ({ tenantId: membership.tenantId });\n",
-      "src/tenancy/policy/isolate.ts":
-        "export const allowsTenant = (tenantContext, resource) => tenantContext.tenantId === resource.tenantId;\n",
-      "src/tenancy/public/index.ts":
-        "export const requireTenant = (tenantContext) => tenantContext.tenantId;\n",
-    },
-    activeTenancyConfiguration("authenticated-membership"),
-  );
-
-  const findings = tenantIsolationProjectFindings(fixture);
-  assert.ok(
-    findings.some(
-      (finding) =>
-        finding.includes("src/orders/alias-handler.ts") &&
-        finding.includes("public contract or port"),
-    ),
-  );
-  assert.ok(
-    findings.some(
-      (finding) =>
-        finding.includes("src/orders/package-handler.ts") &&
-        finding.includes("public contract or port"),
-    ),
-  );
-});
-
-test("baseUrl-only and non-JavaScript imports cannot bypass tenant contracts", (t) => {
-  const fixture = tenancyProject(
-    t,
-    {
-      "tsconfig.json": JSON.stringify({ compilerOptions: { baseUrl: "src" } }),
-      "src/orders/base-url-handler.ts":
-        'import { resolveTenantContext } from "tenancy/context/resolve";\nexport const handle = resolveTenantContext;\n',
-      "src/orders/python_handler.py":
-        "from tenancy.context import resolve\nhandle = resolve.resolve_tenant_context\n",
-      "src/orders/runtime_handler.py":
-        'import importlib\nhandle = importlib.import_module("tenancy.context.resolve")\n',
-      "src/Orders/Handler.cs": "using TenantContext = Product.Tenancy.Context;\n",
-      "src/Tenancy/Context/Resolve.cs": "namespace Product.Tenancy.Context;\n",
-      "src/tenancy/context/resolve.py":
-        "def resolve_tenant_context(membership):\n    return {'tenantId': membership.tenantId}\n",
-      "src/tenancy/context/resolve.ts":
-        "export const resolveTenantContext = (membership) => ({ tenantId: membership.tenantId });\n",
-      "src/tenancy/policy/isolate.ts":
-        "export const allowsTenant = (tenantContext, resource) => tenantContext.tenantId === resource.tenantId;\n",
-      "src/tenancy/public/index.ts":
-        "export const requireTenant = (tenantContext) => tenantContext.tenantId;\n",
-    },
-    activeTenancyConfiguration("authenticated-membership"),
-  );
-
-  const findings = tenantIsolationProjectFindings(fixture);
-  for (const relativePath of [
-    "src/orders/base-url-handler.ts",
-    "src/orders/python_handler.py",
-    "src/orders/runtime_handler.py",
-    "src/Orders/Handler.cs",
-  ]) {
-    assert.ok(
-      findings.some(
-        (finding) => finding.includes(relativePath) && finding.includes("public contract or port"),
-      ),
-      relativePath,
-    );
-  }
-});
-
-test("C++ and Swift imports cannot bypass tenant contracts", (t) => {
-  const fixture = tenancyProject(
-    t,
-    {
-      "src/orders/Handler.cpp": "#include <tenancy/context/resolve.hpp>\n",
-      "src/Orders/Handler.swift": "import Tenancy\n",
-      "src/orders/Dashboard.astro":
-        "---\nawait import(`../tenancy/context/resolve`, {});\n---\n<main />\n",
-      "src/orders/Included.rs": 'include!("../tenancy/context/resolve.rs");\n',
-      "src/orders/Commented.rs": "use /* reviewed boundary */ crate::tenancy::context::resolve;\n",
-      "src/orders/Loaded.rb": 'require( # reviewed boundary\n"tenancy/context/resolve"\n)\n',
-      "src/tenancy/context/resolve.hpp": "// tenantId\n",
-      "src/Tenancy/Context/Resolve.swift": "public struct TenantContext {}\n",
-      "src/tenancy/context/resolve.ts":
-        "export const resolveTenantContext = (membership) => ({ tenantId: membership.tenantId });\n",
-      "src/tenancy/context/resolve.rs": "pub struct TenantContext;\n",
-      "src/tenancy/policy/isolate.ts":
-        "export const allowsTenant = (tenantContext, resource) => tenantContext.tenantId === resource.tenantId;\n",
-      "src/tenancy/public/index.ts":
-        "export const requireTenant = (tenantContext) => tenantContext.tenantId;\n",
-    },
-    activeTenancyConfiguration("authenticated-membership"),
-  );
-
-  const findings = tenantIsolationProjectFindings(fixture);
-  for (const relativePath of [
-    "src/orders/Dashboard.astro",
-    "src/orders/Included.rs",
-    "src/orders/Commented.rs",
-    "src/orders/Loaded.rb",
-    "src/orders/Handler.cpp",
-    "src/Orders/Handler.swift",
-  ]) {
-    assert.ok(
-      findings.some(
-        (finding) => finding.includes(relativePath) && finding.includes("public contract or port"),
-      ),
-      relativePath,
-    );
-  }
 });

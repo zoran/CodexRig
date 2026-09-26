@@ -38,7 +38,7 @@ export function reconcileHousekeepingVersion({ root, apply, lifecycleCapability 
         options: {
           cwd: root,
           encoding: "utf8",
-          env: verificationChildEnvironment(),
+          env: verificationChildEnvironment(process.env, root),
           input: "",
           stdio: "pipe",
           timeout: 240_000,
@@ -51,7 +51,7 @@ export function reconcileHousekeepingVersion({ root, apply, lifecycleCapability 
       }
     } catch (error) {
       throw new Error(
-        `${error.message} Source housekeeping is incomplete. Retry with mise exec --locked -- node scripts/framework/source-housekeeping.mjs --apply; this also works when pnpm's pre-script guard rejects stale installation metadata.`,
+        `${error.message} Source housekeeping is incomplete. Retry with bash scripts/setup/run-project.sh node scripts/framework/source-housekeeping.mjs --apply; this also works when pnpm's pre-script guard rejects stale installation metadata.`,
         { cause: error },
       );
     }

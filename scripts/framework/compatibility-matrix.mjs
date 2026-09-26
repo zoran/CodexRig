@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 /** Owns compatibility matrix behavior for the framework lifecycle and child upgrade boundary. */
-import { gitlabMiseInstallBeforeScript } from "../deps/toolchain-archives.mjs";
 import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import path from "node:path";
 import process from "node:process";
@@ -11,12 +10,14 @@ import {
   validateCompatibilityMatrix,
 } from "../contracts/framework-contract.mjs";
 import { toolingRoot } from "../filesystem/repository-files.mjs";
+import { versionMatchesReleaseSelector } from "../contracts/semver-contract.mjs";
+import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
 
 function commandVersion(executable, args, label) {
   const result = spawnSync(executable, args, {
     cwd: toolingRoot,
     encoding: "utf8",
-    env: process.env,
+    env: projectToolEnvironment({ root: toolingRoot }),
     input: "",
     maxBuffer: 1024 * 1024,
     stdio: "pipe",
@@ -31,24 +32,6 @@ function extractedVersion(output, label) {
   if (!match) throw new Error(`${label} did not report a semantic version.`);
   parseSemver(match[1], label);
   return match[1];
-}
-
-function nodeMatchesSpec(version, specification) {
-  const parsed = parseSemver(version);
-  if (/^\d+$/u.test(specification)) return parsed.major === Number(specification);
-  return version === specification;
-}
-
-function packageMatchesSpec(version, specification, label) {
-  const parsed = parseSemver(version, label);
-  if (/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(specification)) {
-    return version === specification;
-  }
-  const nextMajor = specification.match(/^next-(\d+)$/u);
-  if (nextMajor) return parsed.major === Number(nextMajor[1]);
-  if (specification === "latest") return parsed.prerelease === "";
-  if (specification === "alpha") return /(?:^|[.-])alpha(?:[.-]|$)/u.test(parsed.prerelease);
-  throw new Error(`Unsupported ${label} compatibility specification: ${specification}.`);
 }
 
 export function ciCompatibilityTracks(matrix = readCompatibilityMatrix()) {
@@ -72,23 +55,18 @@ export function gitlabChildPipeline(matrix = readCompatibilityMatrix()) {
     lines.push(
       `compatibility:${track.id}:`,
       "  stage: compatibility",
-      `  image: ${yamlSingleQuoted(`node:${track.node}-bookworm`)}`,
+      `  image: ${yamlSingleQuoted(`node:${matrix.stable.node.version}-bookworm`)}`,
       `  allow_failure: ${track.experimental ? "true" : "false"}`,
       "  variables:",
       `    CODEXRIG_COMPATIBILITY_TRACK: ${yamlSingleQuoted(track.id)}`,
-      "    NPM_CONFIG_IGNORE_PNPMFILE: 'true'",
-      "    PNPM_CONFIG_IGNORE_PNPMFILE: 'true'",
-      "    npm_config_ignore_pnpmfile: 'true'",
-      "    pnpm_config_ignore_pnpmfile: 'true'",
+      "    GIT_DEPTH: '0'",
       "  before_script:",
-      "    - apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck && rm -rf /var/lib/apt/lists/*",
-      ...gitlabMiseInstallBeforeScript(matrix),
-      `    - npm install --global ${yamlSingleQuoted(`pnpm@${track.pnpm}`)} ${yamlSingleQuoted(`@openai/codex@${track.codex}`)} --ignore-scripts`,
-      "    - node scripts/deps/verify-pnpm-execution-policy.mjs",
-      "    - pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile",
+      '    - test -n "${CI_JOB_IMAGE:-}"',
+      "    - apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck",
+      '    - node scripts/framework/prepare-compatibility-track.mjs --disposable-checkout "$CODEXRIG_COMPATIBILITY_TRACK"',
       "  script:",
-      '    - node scripts/framework/compatibility-matrix.mjs --check-track "$CODEXRIG_COMPATIBILITY_TRACK"',
-      "    - pnpm verify",
+      '    - bash scripts/setup/run-project.sh node scripts/framework/compatibility-matrix.mjs --check-track "$CODEXRIG_COMPATIBILITY_TRACK"',
+      "    - bash scripts/setup/run-project.sh pnpm verify",
       "",
     );
   }
@@ -104,17 +82,17 @@ export function checkCompatibilityTrack(trackId, matrix = readCompatibilityMatri
     pnpm: extractedVersion(commandVersion("pnpm", ["--version"], "pnpm"), "pnpm"),
   };
   parseSemver(versions.node, "Node.js");
-  if (!nodeMatchesSpec(versions.node, track.node)) {
+  if (!versionMatchesReleaseSelector(versions.node, track.node)) {
     throw new Error(
       `Compatibility track ${track.id} expected Node.js ${track.node}, received ${versions.node}.`,
     );
   }
-  if (!packageMatchesSpec(versions.pnpm, track.pnpm, "pnpm")) {
+  if (!versionMatchesReleaseSelector(versions.pnpm, track.pnpm)) {
     throw new Error(
       `Compatibility track ${track.id} expected pnpm ${track.pnpm}, received ${versions.pnpm}.`,
     );
   }
-  if (!packageMatchesSpec(versions.codex, track.codex, "Codex")) {
+  if (!versionMatchesReleaseSelector(versions.codex, track.codex)) {
     throw new Error(
       `Compatibility track ${track.id} expected Codex ${track.codex}, received ${versions.codex}.`,
     );

@@ -3,6 +3,7 @@ import path from "node:path";
 
 export const repositoryCodexRuntimeDirectory = ".codex/runtime";
 export const repositoryCodexRuntimeCacheDirectory = `${repositoryCodexRuntimeDirectory}/cache`;
+export const projectAccountStateDirectory = ".auth";
 
 const excludedActiveDirectoryNames = new Set([
   ".codex",
@@ -44,6 +45,7 @@ export const repositoryCodexHomeRuntimeDirectoryNames = Object.freeze([
   "log",
   "logs",
   "memories",
+  "mcp-oauth-locks",
   "plugins",
   "rules",
   "sessions",
@@ -52,9 +54,14 @@ export const repositoryCodexHomeRuntimeDirectoryNames = Object.freeze([
   "thread-writer-locks",
   "tmp",
 ]);
-export const repositoryCodexHomeRuntimeFileNames = Object.freeze([
-  ".sandbox_migration",
+// Current native account stores are private but survive ephemeral runtime reset.
+export const repositoryCodexHomeCredentialFileNames = Object.freeze([
+  ".credentials.json",
   "auth.json",
+]);
+export const repositoryCodexHomeRuntimeFileNames = Object.freeze([
+  ...repositoryCodexHomeCredentialFileNames,
+  ".sandbox_migration",
   "config.toml",
   "history.jsonl",
   "hooks.json",
@@ -83,6 +90,8 @@ export const portableCodexGitignorePatterns = Object.freeze([
   "!.codex/hooks.json",
   "!.codex/tooling.json",
   "!.codex/toolchain.json",
+  "!.codex/mise.toml",
+  "!.codex/mise.lock",
   "!.codex/verification.json",
   "!.codex/README.md",
   "!.codex/agents/",
@@ -90,6 +99,7 @@ export const portableCodexGitignorePatterns = Object.freeze([
   "!.codex/agents/*.toml",
 ]);
 export const sourceInventoryPreDescentExcludePatterns = Object.freeze([
+  `/${projectAccountStateDirectory}`,
   ...repositoryCodexHomeGitignorePatterns,
   ...portableCodexGitignorePatterns,
   "/.project-state",
@@ -116,6 +126,8 @@ export const repositoryCodexHomeProtectedGitignoreProbePaths = Object.freeze([
   ".codex/agents/nested/extra.toml",
 ]);
 export const portableCodexGitignoreProbePaths = Object.freeze([
+  ".codex/mise.toml",
+  ".codex/mise.lock",
   ".codex/README.md",
   ".codex/config.toml",
   ".codex/hooks.json",
@@ -181,6 +193,8 @@ export function isPortableCodexPath(relativePath) {
       ".codex/hooks.json",
       ".codex/tooling.json",
       ".codex/toolchain.json",
+      ".codex/mise.toml",
+      ".codex/mise.lock",
       ".codex/verification.json",
       ".codex/agents",
     ].includes(relativePath) || /^\.codex\/agents\/[a-z][a-z0-9_-]*\.toml$/u.test(relativePath)
@@ -190,6 +204,12 @@ export function isPortableCodexPath(relativePath) {
 export function activeSourcePathClassification(value) {
   const relativePath = normalizeSourceRelativePath(value);
   if (!relativePath) return { code: "unsafe-path", reason: "unsafe repository-relative path" };
+  if (
+    relativePath === projectAccountStateDirectory ||
+    relativePath.startsWith(`${projectAccountStateDirectory}/`)
+  ) {
+    return { code: "project-account-state", reason: "private repository account and tool state" };
+  }
   if (isRepositoryCodexHomePath(relativePath)) {
     return {
       code: "repository-codex-runtime",
@@ -232,6 +252,12 @@ export function isPrivateCodexRuntimePath(value) {
   return privateCodexRuntimeCodes.has(activeSourcePathClassification(value)?.code);
 }
 
+/** Account privacy is independent from the native ephemeral-runtime reset lifecycle. */
+export function isPrivateRepositoryStatePath(value) {
+  const code = activeSourcePathClassification(value)?.code;
+  return code === "project-account-state" || privateCodexRuntimeCodes.has(code);
+}
+
 export function isExcludedActivePath(value) {
   return activeSourcePathClassification(value) !== null;
 }
@@ -239,6 +265,11 @@ export function isExcludedActivePath(value) {
 export function nonPortableTransferPathReason(value) {
   const relativePath = normalizeSourceRelativePath(value);
   if (!relativePath) return "unsafe repository-relative path";
+  if (
+    relativePath === projectAccountStateDirectory ||
+    relativePath.startsWith(`${projectAccountStateDirectory}/`)
+  )
+    return "private repository account and tool state";
   if (isRepositoryCodexHomePath(relativePath)) {
     return "repository-root Codex runtime or cache state";
   }

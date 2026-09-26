@@ -5,9 +5,15 @@ import { syncBuiltinESMExports } from "node:module";
 import path from "node:path";
 import { after, test } from "node:test";
 import { pathToFileURL } from "node:url";
+import { stageRegenerationRuntime } from "./framework-upgrade-runtime.mjs";
+import {
+  beginFrameworkUpgrade,
+  persistFrameworkUpgradeJournal,
+} from "./framework-upgrade-journal.mjs";
 import {
   applyFrameworkUpgrade,
   buildFrameworkUpgradePlan,
+  desiredProjectToolFile,
   recoverInterruptedFrameworkUpgrade,
 } from "./framework-upgrade.mjs";
 import {
@@ -67,6 +73,16 @@ function fixture() {
 test("explicit migration removes obsolete source tools under ownership and preserves product documents and identity", async (t) => {
   const fixtureData = fixture(),
     plan = buildFrameworkUpgradePlan(fixtureData);
+  for (const file of [
+    "scripts/setup/start-codex.sh",
+    "scripts/repository/runtime-session-lease.mjs",
+  ]) {
+    fs.chmodSync(path.join(fixtureData.sourceRoot, file), 0o660);
+    assert.equal(
+      desiredProjectToolFile(fixtureData.sourceRoot, file).mode,
+      fs.lstatSync(path.join(fixtureData.baselineRoot, file)).mode & 0o777,
+    );
+  }
   assert.deepEqual(plan.conflicts, []);
   assert.ok(
     plan.operations.some(
@@ -212,5 +228,305 @@ test("migration recovery preserves unrelated edits and resumes only after reconc
   } else write(data.targetRoot, interrupted.path, interrupted.content);
   assert.equal(await recoverInterruptedFrameworkUpgrade(data.targetRoot), true);
   assert.deepEqual(buildFrameworkUpgradePlan(data).operations, plan.operations);
+  assert.equal(existsSync(path.join(data.targetRoot, ".project-state/framework-upgrade")), false);
+});
+
+test("current-output review requires policy decisions, preserves custom tools and rejects stale approvals", async () => {
+  const data = fixture();
+  write(data.targetRoot, "scripts/verify/product-check.mjs", "// Product verifier.\n");
+  const options = { sourceRoot: data.sourceRoot, targetRoot: data.targetRoot };
+  const preview = buildFrameworkUpgradePlan(options);
+  assert.ok(preview.conflicts.includes("AGENTS.md"));
+  assert.ok(preview.conflicts.includes("scripts/verify/product-check.mjs"));
+  await assert.rejects(applyFrameworkUpgrade(preview), /explicit local reconciliation/);
+  const resolutions = preview.differences.map(({ kind, ...entry }) => ({
+    ...entry,
+    action: entry.path === "scripts/verify/product-check.mjs" ? "keep" : "source",
+    reason:
+      entry.path === "scripts/verify/product-check.mjs"
+        ? "Existing product test owner."
+        : "Reviewed current generated behavior.",
+  }));
+  const reviewed = buildFrameworkUpgradePlan({ ...options, resolutions });
+  assert.deepEqual(reviewed.conflicts, []);
+  assert.deepEqual(
+    reviewed.deviations.map((x) => x.path),
+    ["scripts/verify/product-check.mjs"],
+  );
+  write(data.targetRoot, "AGENTS.md", "Changed after review.\n");
+  assert.throws(
+    () => buildFrameworkUpgradePlan({ ...options, resolutions }),
+    /Stale reconciliation/,
+  );
+});
+
+test("reviewed policy and tools share rollback, custom replacements and convergence evidence", async () => {
+  const data = fixture(),
+    options = { sourceRoot: data.sourceRoot, targetRoot: data.targetRoot };
+  const preview = buildFrameworkUpgradePlan(options);
+  const original = readFileSync(path.join(data.targetRoot, "AGENTS.md"), "utf8");
+  const originalReadme = readFileSync(path.join(data.targetRoot, "README.md"), "utf8");
+  const resolutions = preview.differences.map(({ kind, ...entry }) => ({
+    ...entry,
+    action: "source",
+    reason: "Reviewed migration.",
+  }));
+  resolutions.push({
+    ...preview.documentBindings.find((x) => x.path === "README.md"),
+    action: "replace",
+    reason: "Reviewed operational commands.",
+    content: "# Product\n\nCurrent operational commands.\n",
+    mode: 0o644,
+  });
+  const policy = resolutions.find((x) => x.path === "AGENTS.md");
+  Object.assign(policy, {
+    action: "replace",
+    content: "# Project\n\nPreserve the product approval gate.\n",
+    mode: 0o644,
+  });
+  const reviewed = buildFrameworkUpgradePlan({ ...options, resolutions });
+  await assert.rejects(
+    applyFrameworkUpgrade(reviewed, {
+      afterWrite(op) {
+        if (op.path === "instructions.md") throw new Error("Injected policy failure");
+      },
+    }),
+    /Injected policy failure/,
+  );
+  assert.equal(readFileSync(path.join(data.targetRoot, "AGENTS.md"), "utf8"), original);
+  assert.equal(readFileSync(path.join(data.targetRoot, "README.md"), "utf8"), originalReadme);
+  await applyFrameworkUpgrade(buildFrameworkUpgradePlan({ ...options, resolutions }));
+  assert.equal(readFileSync(path.join(data.targetRoot, "AGENTS.md"), "utf8"), policy.content);
+  const after = buildFrameworkUpgradePlan(options);
+  assert.deepEqual(after.conflicts, ["AGENTS.md"]);
+  assert.equal(after.operations.length, 0);
+  const [{ kind, ...difference }] = after.differences;
+  const settled = buildFrameworkUpgradePlan({
+    ...options,
+    resolutions: [{ ...difference, action: "keep", reason: "Current product gate retained." }],
+  });
+  assert.deepEqual(await applyFrameworkUpgrade(settled), { changed: false });
+  assert.equal(existsSync(path.join(data.targetRoot, ".project-state/framework-upgrade")), false);
+});
+
+test("a runtime namespace cutover excludes installed and destination writers throughout writes", async () => {
+  const data = fixture();
+  for (const file of [
+    "scripts/repository/runtime-session-lease.mjs",
+    "scripts/repository/runtime-lifecycle-mutex.mjs",
+  ]) {
+    const text = readFileSync(path.join(data.targetRoot, file), "utf8").replaceAll(
+      "project-lifecycle",
+      "prior-lifecycle",
+    );
+    write(data.targetRoot, file, text);
+  }
+  const options = { sourceRoot: data.sourceRoot, targetRoot: data.targetRoot };
+  const preview = buildFrameworkUpgradePlan(options);
+  const resolutions = preview.differences.map(({ kind, ...entry }) => ({
+    ...entry,
+    action: "source",
+    reason: "Atomic current runtime cutover.",
+  }));
+  const destination = await import(
+    pathToFileURL(path.join(data.baselineRoot, "scripts/repository/runtime-session-lease.mjs")).href
+  );
+  let checked = false;
+  await applyFrameworkUpgrade(buildFrameworkUpgradePlan({ ...options, resolutions }), {
+    afterWrite() {
+      assert.throws(
+        () =>
+          destination.acquireRuntimeLifecycleLock({
+            root: data.targetRoot,
+            operation: "competing-writer",
+          }),
+        /lock|owner|active|held|busy/i,
+      );
+      checked = true;
+    },
+  });
+  assert.ok(checked);
+  const owner = destination.acquireRuntimeLifecycleLock({
+    root: data.targetRoot,
+    operation: "post-upgrade-check",
+  });
+  destination.releaseRuntimeLifecycleLock({ root: data.targetRoot, owner });
+});
+
+test("explicit regeneration preserves private state, requires quiescence and rolls back public owners", async () => {
+  const data = fixture();
+  fs.rmSync(path.join(data.targetRoot, "scripts/repository/runtime-session-lease.mjs"));
+  write(data.targetRoot, ".sandbox_migration", "private marker\n");
+  write(data.targetRoot, ".codex/runtime/private.json", "opaque private bytes\n");
+  write(data.targetRoot, "docs/obsolete-context.md", "# Obsolete Context\n");
+  const options = {
+    sourceRoot: data.sourceRoot,
+    targetRoot: data.targetRoot,
+    regenerate: true,
+    projectPaths: [
+      "docs/obsolete-context.md",
+      "config/localization.json",
+      "scripts/verify/product-runtime.mjs",
+    ],
+  };
+  assert.throws(
+    () => buildFrameworkUpgradePlan({ ...options, projectPaths: ["docs/../auth.json"] }),
+    /public/,
+  );
+  const preview = buildFrameworkUpgradePlan(options);
+  assert.ok(!preview.differences.some((x) => /private|sandbox_migration/.test(x.path)));
+  const resolutions = preview.differences.map(({ kind, ...entry }) => ({
+    ...entry,
+    action: "source",
+    reason: "Reviewed regenerated tools.",
+  }));
+  resolutions.push({
+    ...preview.documentBindings.find((x) => x.path === "docs/obsolete-context.md"),
+    action: "remove",
+    reason: "The only obsolete public context contract is retired.",
+  });
+  resolutions.push({
+    ...preview.documentBindings.find((x) => x.path === "scripts/verify/product-runtime.mjs"),
+    action: "replace",
+    content: "export const product = true;\n",
+    mode: 0o644,
+    reason: "Preserve product verification at its explicit new owner.",
+  });
+  const plan = buildFrameworkUpgradePlan({ ...options, resolutions });
+  await assert.rejects(applyFrameworkUpgrade(plan), /confirmed quiescence/);
+  await assert.rejects(
+    applyFrameworkUpgrade(
+      buildFrameworkUpgradePlan({ ...options, regenerate: false, resolutions }),
+    ),
+    /runtime-session-lease/,
+  );
+  const staged = await stageRegenerationRuntime(data.sourceRoot, plan.regenerationRuntimeHash);
+  const writer = staged.lifecycle.acquireRuntimeLifecycleLock({
+    root: data.targetRoot,
+    operation: "competing-writer",
+  });
+  await assert.rejects(
+    applyFrameworkUpgrade(plan, { confirmQuiescent: true }),
+    /active|lock|held|busy/i,
+  );
+  staged.lifecycle.releaseRuntimeLifecycleLock({ root: data.targetRoot, owner: writer });
+  staged.cleanup();
+  await assert.rejects(
+    applyFrameworkUpgrade(plan, {
+      confirmQuiescent: true,
+      afterWrite(op) {
+        if (op.path === "scripts/repository/runtime-session-lease.mjs")
+          throw new Error("injected late regeneration failure");
+      },
+    }),
+    /injected late/,
+  );
+  assert.equal(
+    existsSync(path.join(data.targetRoot, "scripts/repository/runtime-session-lease.mjs")),
+    false,
+  );
+  assert.equal(
+    readFileSync(path.join(data.targetRoot, "docs/obsolete-context.md"), "utf8"),
+    "# Obsolete Context\n",
+  );
+  await applyFrameworkUpgrade(plan, { confirmQuiescent: true });
+  assert.equal(
+    readFileSync(path.join(data.targetRoot, ".sandbox_migration"), "utf8"),
+    "private marker\n",
+  );
+  assert.equal(
+    readFileSync(path.join(data.targetRoot, ".codex/runtime/private.json"), "utf8"),
+    "opaque private bytes\n",
+  );
+  assert.equal(existsSync(path.join(data.targetRoot, "docs/obsolete-context.md")), false);
+  assert.equal(
+    readFileSync(path.join(data.targetRoot, "scripts/verify/product-runtime.mjs"), "utf8"),
+    "export const product = true;\n",
+  );
+});
+
+test("regeneration rejects a changed lifecycle dependency before creating its journal", async () => {
+  const data = fixture();
+  fs.rmSync(path.join(data.targetRoot, "scripts/repository/runtime-session-lease.mjs"));
+  const options = { sourceRoot: data.sourceRoot, targetRoot: data.targetRoot, regenerate: true };
+  const dependency = "scripts/repository/runtime-lifecycle-mutex.mjs";
+  const current = readFileSync(path.join(data.targetRoot, dependency), "utf8");
+  write(data.targetRoot, dependency, current + "\n// divergent lifecycle contract\n");
+  const preview = buildFrameworkUpgradePlan(options);
+  const resolutions = preview.differences.map(({ kind, ...entry }) => ({
+    ...entry,
+    action: entry.path === dependency ? "keep" : "source",
+    reason: "Exercise explicit lifecycle divergence admission.",
+  }));
+  await assert.rejects(
+    applyFrameworkUpgrade(buildFrameworkUpgradePlan({ ...options, resolutions }), {
+      confirmQuiescent: true,
+    }),
+    /current lifecycle contract/,
+  );
+  assert.equal(existsSync(path.join(data.targetRoot, ".project-state/framework-upgrade")), false);
+  assert.equal(
+    existsSync(path.join(data.targetRoot, "scripts/repository/runtime-session-lease.mjs")),
+    false,
+  );
+});
+
+test("regeneration recovery uses the bound source closure even when the installed owner is invalid", async () => {
+  const data = fixture();
+  const ownerPath = "scripts/repository/runtime-session-lease.mjs";
+  fs.rmSync(path.join(data.targetRoot, ownerPath));
+  const options = { sourceRoot: data.sourceRoot, targetRoot: data.targetRoot, regenerate: true };
+  const preview = buildFrameworkUpgradePlan(options);
+  const resolutions = preview.differences.map(({ kind, ...entry }) => ({
+    ...entry,
+    action: "source",
+    reason: "Current regeneration.",
+  }));
+  const plan = buildFrameworkUpgradePlan({ ...options, resolutions });
+  const stage = await stageRegenerationRuntime(data.sourceRoot, plan.regenerationRuntimeHash);
+  const { journal, lifecycleCapability } = beginFrameworkUpgrade(plan, stage.lifecycle);
+  const item = journal.originals.find((x) => x.path === ownerPath);
+  // Model an admitted interrupted file state without relying on target module evaluation.
+  const broken = "export const incomplete = ;\n";
+  const { sha256 } = await import("../filesystem/repository-files.mjs");
+  item.allowedSha256 = sha256(broken);
+  item.allowedMode = 0o644;
+  persistFrameworkUpgradeJournal(data.targetRoot, journal);
+  write(data.targetRoot, ownerPath, broken);
+  fs.chmodSync(path.join(data.targetRoot, ownerPath), item.allowedMode);
+  stage.lifecycle.releaseRuntimeLifecycleLock({
+    root: data.targetRoot,
+    owner: lifecycleCapability,
+  });
+  stage.cleanup();
+  await assert.rejects(
+    recoverInterruptedFrameworkUpgrade(data.targetRoot),
+    /explicit regeneration recovery/,
+  );
+  const recovery = { regenerate: true, confirmQuiescent: true, sourceRoot: data.sourceRoot };
+  const sourceOwner = path.join(data.sourceRoot, ownerPath);
+  const original = readFileSync(sourceOwner, "utf8");
+  writeFileSync(sourceOwner, original + "\n// changed runtime\n");
+  await assert.rejects(
+    recoverInterruptedFrameworkUpgrade(data.targetRoot, recovery),
+    /exact admitted/,
+  );
+  writeFileSync(sourceOwner, original);
+  const contenderStage = await stageRegenerationRuntime(
+    data.sourceRoot,
+    plan.regenerationRuntimeHash,
+  );
+  const writer = contenderStage.lifecycle.acquireRuntimeLifecycleLock({
+    root: data.targetRoot,
+    operation: "competing-writer",
+  });
+  await assert.rejects(
+    recoverInterruptedFrameworkUpgrade(data.targetRoot, recovery),
+    /active|held|busy|lock/i,
+  );
+  contenderStage.lifecycle.releaseRuntimeLifecycleLock({ root: data.targetRoot, owner: writer });
+  contenderStage.cleanup();
+  assert.equal(await recoverInterruptedFrameworkUpgrade(data.targetRoot, recovery), true);
+  assert.equal(existsSync(path.join(data.targetRoot, ownerPath)), false);
   assert.equal(existsSync(path.join(data.targetRoot, ".project-state/framework-upgrade")), false);
 });

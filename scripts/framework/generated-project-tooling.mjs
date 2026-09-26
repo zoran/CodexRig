@@ -13,7 +13,7 @@ export function projectCiProjection(relativePath, source) {
     return (
       `# Owns stable project verification in CI.\nname: Project verification\non:\n  push:\n    branches: [main]\n  pull_request:\n  merge_group:\n  workflow_dispatch:\npermissions:\n  contents: read\njobs:\n${job
         .replace(
-          /      - name: Check scheduled repository housekeeping and freshness\n        if:[^\n]*\n        run:[^\n]*\n/u,
+          /^      - name: Check scheduled repository housekeeping and freshness\n(?:        [^\n]*\n)*/mu,
           "",
         )
         .replaceAll("pnpm framework:doctor", "pnpm tooling:doctor")
@@ -29,17 +29,20 @@ export function projectCiProjection(relativePath, source) {
     const image = source.match(/^  image:[^\n]+/mu)?.[0]?.trim();
     if (!image) throw new Error("Source CI needs its reviewed stable image.");
     return (
-      `# Owns stable project verification in CI.\n${image}\nstages: [verify]\nvariables:\n  NPM_CONFIG_IGNORE_PNPMFILE: "true"\n  PNPM_CONFIG_IGNORE_PNPMFILE: "true"\n  npm_config_ignore_pnpmfile: "true"\n  pnpm_config_ignore_pnpmfile: "true"\nworkflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'\n    - if: "$CI_COMMIT_BRANCH"\n${job.replace(/^    - if \[ "\$CI_PIPELINE_SOURCE" = "schedule"[^\n]*\n/mu, "").replaceAll("pnpm framework:doctor", "pnpm tooling:doctor")}`.trimEnd() +
+      `# Owns stable project verification in CI.\n${image}\nstages: [verify]\nworkflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'\n    - if: "$CI_COMMIT_BRANCH"\n${job.replace(/^    - if \[ "\$CI_PIPELINE_SOURCE" = "schedule"[^\n]*\n(?:      [^\n]*\n)*/mu, "").replaceAll("pnpm framework:doctor", "pnpm tooling:doctor")}`.trimEnd() +
       "\n"
     );
   }
   throw new Error("Unknown project CI adapter.");
 }
 
-export function writeSelectedProjectTooling(sourceRoot, targetRoot) {
+export function writeSelectedProjectTooling(sourceRoot, targetRoot, projectName) {
   writeFileSync(
     path.join(targetRoot, ".codex/tooling.json"),
-    projectToolingConfiguration(readFileSync(path.join(sourceRoot, ".codex/tooling.json"), "utf8")),
+    projectToolingConfiguration(
+      readFileSync(path.join(sourceRoot, ".codex/tooling.json"), "utf8"),
+      projectName,
+    ),
   );
   const selection = readProjectToolSelection(sourceRoot);
   const verification = JSON.parse(
@@ -57,8 +60,20 @@ export function writeSelectedProjectTooling(sourceRoot, targetRoot) {
 }
 
 /** New products always require their four typed configuration owners. */
-export function projectToolingConfiguration(content) {
+export function projectToolingConfiguration(content, displayName) {
+  const configuration = JSON.parse(content);
   return (
-    JSON.stringify({ ...JSON.parse(content), productConfigurationRequired: true }, null, 2) + "\n"
+    JSON.stringify(
+      {
+        ...configuration,
+        startup: {
+          ...configuration.startup,
+          displayName: displayName ?? configuration.startup.displayName,
+        },
+        productConfigurationRequired: true,
+      },
+      null,
+      2,
+    ) + "\n"
   );
 }

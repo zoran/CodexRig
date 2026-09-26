@@ -147,9 +147,9 @@ function tableAt(root, tablePath, definedTables) {
 }
 
 function assignment(line) {
-  const match = /^([A-Za-z0-9_-]+)\s*=\s*(.*)$/u.exec(line);
+  const match = /^([A-Za-z0-9_-]+|"(?:[^"\\]|\\.)*"|'[^']*')\s*=\s*(.*)$/u.exec(line);
   if (!match) throw new Error("unsupported portable TOML statement");
-  return { key: match[1], value: match[2] };
+  return { key: dottedKeySegments(match[1])[0], value: match[2] };
 }
 
 /** Parses the exact TOML subset accepted by tracked and generated Codex configuration. */

@@ -365,15 +365,7 @@ function verifyApprovalRule(rules, required) {
   }
 }
 
-export async function applyGitlabPlatform({
-  contract,
-  detected,
-  environment,
-  fetchImpl,
-  stateStore,
-}) {
-  const token = environment.GITLAB_TOKEN || environment.GLAB_TOKEN;
-  if (!token) throw new Error("GitLab configuration requires GITLAB_TOKEN or GLAB_TOKEN.");
+export async function applyGitlabPlatform({ contract, detected, token, fetchImpl, stateStore }) {
   const base = `${providerApiBase(contract, "gitlab", detected.hostname)}/projects/${encodeURIComponent(detected.slug)}`;
   const branch = contract.platform.integrationBranch;
   const desiredSettings = desiredApprovalSettings(contract.platform.protection);

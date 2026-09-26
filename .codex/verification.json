@@ -203,7 +203,8 @@
         "--test-reporter=dot",
         "--test-concurrency=1",
         "scripts/deps/dependency-policy.test.mjs",
-        "scripts/deps/dependency-owner-normalization.test.mjs"
+        "scripts/deps/dependency-owner-normalization.test.mjs",
+        "scripts/deps/project-tool-installation.test.mjs"
       ],
       "artifactOwners": [],
       "coveredTestPaths": [],
@@ -254,7 +255,8 @@
         "--test",
         "--test-reporter=dot",
         "scripts/context/context-lifecycle.test.mjs",
-        "scripts/context/portable-context-contract.test.mjs"
+        "scripts/context/portable-context-contract.test.mjs",
+        "scripts/context/document-context.test.mjs"
       ],
       "artifactOwners": [],
       "coveredTestPaths": [],
@@ -298,7 +300,8 @@
         "scripts/setup/project-initialization-transfer.source.test.mjs",
         "scripts/setup/project-creator-contract.source.test.mjs",
         "scripts/setup/project-generator-state.test.mjs",
-        "scripts/setup/staged-project-validator.test.mjs"
+        "scripts/setup/staged-project-validator.test.mjs",
+        "scripts/terminal/startup-presentation.test.mjs"
       ],
       "artifactOwners": [],
       "coveredTestPaths": [],
@@ -324,6 +327,7 @@
         "scripts/stack/stack-detector.test.mjs",
         "scripts/verify/adaptive-surfaces.test.mjs",
         "scripts/verify/api-security.test.mjs",
+        "scripts/verify/tenant-isolation.test.mjs",
         "scripts/verify/path-hygiene.test.mjs",
         "scripts/verify/patterns.test.mjs",
         "scripts/verify/secrets.test.mjs",
@@ -334,7 +338,8 @@
         "scripts/verify/surface-quality.test.mjs",
         "scripts/verify/white-label.test.mjs",
         "scripts/web/update-sitemap-lastmod.test.mjs",
-        "scripts/web/web-quality-scan.test.mjs"
+        "scripts/web/web-quality-scan.test.mjs",
+        "scripts/repository/project-tool-environment.test.mjs"
       ],
       "artifactOwners": [],
       "coveredTestPaths": [],
@@ -491,7 +496,7 @@
       "scripts/verify/localization.test.mjs"
     ],
     "scripts/contracts/tenancy-configuration.mjs": [
-      "scripts/verify/api-security.test.mjs"
+      "scripts/verify/tenant-isolation.test.mjs"
     ],
     "scripts/filesystem/owned-file-operations.mjs": [
       ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
@@ -502,6 +507,7 @@
     "scripts/filesystem/owned-path-safety.mjs": [
       ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
       "scripts/deps/dependency-policy.test.mjs",
+      "scripts/repository/project-tool-environment.test.mjs",
       "scripts/setup/startup-state.test.mjs",
       "scripts/verify/verification-session-lock.test.mjs"
     ],
@@ -641,7 +647,8 @@
       "scripts/setup/startup-state.test.mjs"
     ],
     "scripts/docs/project-manifest-contract.mjs": [
-      "scripts/docs/project-manifest-contract.test.mjs"
+      "scripts/docs/project-manifest-contract.test.mjs",
+      "scripts/verify/tenant-isolation.test.mjs"
     ],
     "scripts/git-hooks/pre-push": [
       "scripts/verify/pre-push.test.mjs"
@@ -725,7 +732,7 @@
       "scripts/verify/localization.test.mjs"
     ],
     "scripts/verify/tenant-isolation.mjs": [
-      "scripts/verify/api-security.test.mjs"
+      "scripts/verify/tenant-isolation.test.mjs"
     ],
     "scripts/verify/package-manifest.mjs": [
       "scripts/verify/package-manifest.test.mjs"
@@ -806,7 +813,8 @@
     ],
     "scripts/verify/workspace-verification.mjs": [
       "scripts/verify/adaptive-runner-routing.test.mjs",
-      "scripts/verify/adaptive-runner.test.mjs"
+      "scripts/verify/adaptive-runner.test.mjs",
+      "scripts/verify/tenant-isolation.test.mjs"
     ],
     "scripts/repository/git-runtime-isolation.mjs": [
       "scripts/framework/framework-version.test.mjs",
@@ -818,16 +826,19 @@
     ],
     "scripts/repository/local-import-resolution.mjs": [
       "scripts/verify/api-security.test.mjs",
-      "scripts/verify/path-hygiene.test.mjs"
+      "scripts/verify/path-hygiene.test.mjs",
+      "scripts/verify/tenant-isolation.test.mjs"
     ],
     "scripts/repository/source-import-specifiers.mjs": [
       "scripts/verify/api-security.test.mjs",
-      "scripts/verify/path-hygiene.test.mjs"
+      "scripts/verify/path-hygiene.test.mjs",
+      "scripts/verify/tenant-isolation.test.mjs"
     ],
     "scripts/repository/product-roots.mjs": [
       "scripts/repository/product-roots.test.mjs",
       "scripts/verify/api-security.test.mjs",
-      "scripts/verify/path-hygiene.test.mjs"
+      "scripts/verify/path-hygiene.test.mjs",
+      "scripts/verify/tenant-isolation.test.mjs"
     ],
     "scripts/repository/runtime-session-lease.mjs": [
       ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
@@ -865,6 +876,72 @@
     ],
     "scripts/platform/platform-lifecycle-harness.mjs": [
       "scripts/platform/platform-lifecycle.test.mjs"
+    ],
+    "scripts/context/context-budget.mjs": [
+      "scripts/context/document-context.test.mjs"
+    ],
+    "scripts/context/context-cli.mjs": [
+      "scripts/context/document-context.test.mjs"
+    ],
+    "scripts/docs/document-context.mjs": [
+      "scripts/context/document-context.test.mjs"
+    ],
+    "scripts/framework/framework-upgrade-review.mjs": [
+      "scripts/framework/framework-upgrade.test.mjs"
+    ],
+    "scripts/framework/framework-upgrade-runtime.mjs": [
+      "scripts/framework/framework-upgrade.test.mjs"
+    ],
+    "scripts/repository/project-tool-environment.mjs": [
+      "scripts/repository/project-tool-environment.test.mjs",
+      "scripts/setup/startup-session-controller.test.mjs"
+    ],
+    "scripts/repository/project-tool-executables.mjs": [
+      "scripts/deps/project-tool-installation.test.mjs",
+      "scripts/setup/startup-state.test.mjs"
+    ],
+    "scripts/deps/project-tool-installation.mjs": [
+      "scripts/deps/project-tool-installation.test.mjs"
+    ],
+    "scripts/deps/project-runtime-admission.mjs": [
+      "scripts/repository/project-tool-environment.test.mjs",
+      "scripts/framework/toolchain-maintenance.test.mjs"
+    ],
+    "scripts/setup/project-command.mjs": [
+      "scripts/repository/project-tool-environment.test.mjs"
+    ],
+    "scripts/setup/run-project.sh": [
+      "scripts/repository/project-tool-environment.test.mjs"
+    ],
+    "scripts/setup/start-codex-session.sh": [
+      "scripts/setup/codex-launcher.test.mjs"
+    ],
+    "scripts/contracts/toolchain-configuration.mjs": [
+      "scripts/framework/compatibility-integrity.test.mjs",
+      "scripts/framework/toolchain-maintenance.test.mjs",
+      "scripts/deps/project-tool-installation.test.mjs"
+    ],
+    "scripts/platform/platform-credentials.mjs": [
+      "scripts/platform/platform-lifecycle.test.mjs"
+    ],
+    "scripts/verify/verification-configuration.mjs": [
+      "scripts/verify/tenant-isolation.test.mjs"
+    ],
+    "scripts/deps/ci-toolchain-contract.mjs": [
+      "scripts/framework/compatibility-integrity.test.mjs",
+      "scripts/framework/toolchain-maintenance.test.mjs"
+    ],
+    "scripts/deps/maintain-toolchain.mjs": [
+      "scripts/framework/toolchain-maintenance.test.mjs"
+    ],
+    "scripts/deps/toolchain-releases.mjs": [
+      "scripts/framework/toolchain-maintenance.test.mjs"
+    ],
+    "scripts/framework/prepare-compatibility-track.mjs": [
+      "scripts/framework/toolchain-maintenance.test.mjs"
+    ],
+    "scripts/terminal/startup-presentation.mjs": [
+      "scripts/terminal/startup-presentation.test.mjs"
     ]
   },
   "exactConsumers": {
@@ -1053,6 +1130,24 @@
     ],
     "scripts/verify/web-stack.mjs": [
       "surface-quality"
+    ],
+    "scripts/context/context-budget.mjs": [
+      "context-regressions",
+      "docs"
+    ],
+    "scripts/context/context-cli.mjs": [
+      "context-regressions",
+      "docs"
+    ],
+    "scripts/docs/document-context.mjs": [
+      "context-regressions",
+      "docs"
+    ],
+    "scripts/framework/framework-upgrade-review.mjs": [
+      "framework-regressions"
+    ],
+    "scripts/framework/framework-upgrade-runtime.mjs": [
+      "framework-regressions"
     ]
   },
   "ownedCategories": {

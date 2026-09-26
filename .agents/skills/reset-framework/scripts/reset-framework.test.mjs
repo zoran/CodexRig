@@ -39,7 +39,7 @@ import {
   releaseDependencyTransactionLock,
 } from "../../../../scripts/deps/dependency-transaction-state.mjs";
 import { openFrameworkRuntimeStatus, removeResetCandidate } from "./reset-framework.mjs";
-import { startupControllerFailureMessage } from "../../../../scripts/setup/startup-session-controller.mjs";
+import { projectToolEnvironment } from "../../../../scripts/repository/project-tool-environment.mjs";
 
 const script = path.join(path.dirname(fileURLToPath(import.meta.url)), "reset-framework.mjs");
 const toolingRoot = path.resolve(path.dirname(script), "..", "..", "..", "..");
@@ -114,19 +114,14 @@ function currentVerificationEvidence(root) {
 function run(root, args = [], env = {}) {
   return spawnSync(process.execPath, [script, "--root", root, ...args], {
     encoding: "utf8",
-    env: { ...process.env, CODEX_HOME: "", ...env },
+    env: { ...projectToolEnvironment({ root }), ...env },
     input: "",
     stdio: "pipe",
   });
 }
 
-test("operator reset guidance executes preview, apply, and clean preview through mise and pnpm", async (t) => {
-  const error = new Error("Fixture private lease is not current.");
-  error.code = invalidRuntimeSessionLeaseErrorCode;
-  const guidance = [
-    ["startup recovery", startupControllerFailureMessage(error, toolingRoot)],
-    ["README recovery", readFileSync(path.join(toolingRoot, "README.md"), "utf8")],
-  ];
+test("operator recovery invokes the reset owner for preview, apply, and clean preview", async (t) => {
+  const guidance = [["README recovery", readFileSync(path.join(toolingRoot, "README.md"), "utf8")]];
   for (const [label, content] of guidance) {
     await t.test(label, () => {
       const root = fixture("reset operator guidance ");
@@ -136,7 +131,9 @@ test("operator reset guidance executes preview, apply, and clean preview through
         const commands = content
           .split("\n")
           .map((line) => {
-            const start = line.indexOf("mise exec --locked -- pnpm framework:reset");
+            const start = line.indexOf(
+              "node .agents/skills/reset-framework/scripts/reset-framework.mjs",
+            );
             return start === -1 ? null : line.slice(start).trim().split(/\s+/u);
           })
           .filter(Boolean);
@@ -144,7 +141,7 @@ test("operator reset guidance executes preview, apply, and clean preview through
           const result = spawnSync(executable, [...args, "--root", root], {
             cwd: toolingRoot,
             encoding: "utf8",
-            env: { ...process.env, CODEX_HOME: "" },
+            env: projectToolEnvironment({ root }),
             input: "",
             stdio: "pipe",
             timeout: 30_000,
@@ -230,6 +227,8 @@ test("reset preserves current identity and removes all disposable framework runt
   write(root, ".codex/auth.json", "obsolete auth\n", 0o600);
   write(root, ".codex/history.jsonl", "obsolete history\n");
   write(root, "auth.json", "current auth\n", 0o600);
+  write(root, ".credentials.json", "current MCP account fixture\n", 0o600);
+  write(root, "mcp-oauth-locks/file-store.lock", "", 0o600);
   write(root, "config.toml", 'model = "fixture"\n', 0o600);
   write(root, "installation_id", "fixture-installation\n", 0o600);
   write(root, ".codex/runtime/cache/codexrig/startup-attestation.json", "{}\n");
@@ -285,6 +284,7 @@ test("reset preserves current identity and removes all disposable framework runt
     ".codex/runtime/config.toml",
     ".codex/runtime/installation_id",
     "history.jsonl",
+    "mcp-oauth-locks",
     "rules",
     "sessions",
     "state_1.sqlite",
@@ -292,6 +292,10 @@ test("reset preserves current identity and removes all disposable framework runt
     assert.equal(existsSync(path.join(root, ...removed.split("/"))), false, removed);
   }
   assert.equal(readFileSync(path.join(root, "auth.json"), "utf8"), "current auth\n");
+  assert.equal(
+    readFileSync(path.join(root, ".credentials.json"), "utf8"),
+    "current MCP account fixture\n",
+  );
   assert.equal(readFileSync(path.join(root, "config.toml"), "utf8"), 'model = "fixture"\n');
   assert.equal(statSync(path.join(root, "auth.json")).mode & 0o777, 0o600);
   assert.equal(readFileSync(path.join(root, "installation_id"), "utf8"), "fixture-installation\n");
@@ -322,6 +326,32 @@ test("reset discards non-current verification evidence", (t) => {
     existsSync(path.join(root, ".codex/runtime/cache/project-verification/evidence.json")),
     false,
   );
+});
+
+test("reset accepts the project command environment after session exit", async (t) => {
+  for (const previousSession of [false, true]) {
+    await t.test(previousSession ? "stale session lease" : "no session lease", (t) => {
+      const root = fixture("reset-framework-project-command-");
+      t.after(() => rmSync(root, { force: true, recursive: true }));
+      write(root, "history.jsonl", "disposable session history\n");
+      if (previousSession) writeStaleRuntimeSessionLease(root);
+
+      const preview = run(root);
+      assert.equal(preview.status, 1, preview.stderr);
+      assert.equal(preview.stderr, "");
+      assert.match(preview.stdout, /Framework reset would remove:/u);
+      assert.equal(
+        readFileSync(path.join(root, "history.jsonl"), "utf8"),
+        "disposable session history\n",
+      );
+      const applied = run(root, ["--apply"]);
+      assert.equal(applied.status, 0, applied.stderr);
+      assert.equal(existsSync(path.join(root, "history.jsonl")), false);
+      const clean = run(root);
+      assert.equal(clean.status, 0, clean.stderr);
+      assert.match(clean.stdout, /Framework baseline is clean\./u);
+    });
+  }
 });
 
 test("reset refuses an active Codex runtime lease without deleting state", (t) => {
@@ -476,6 +506,57 @@ test("clean preview tolerates only the currently active verification lock", (t) 
   const preview = run(root, ["--verification-source-baseline"]);
   assert.equal(preview.status, 0, preview.stderr);
   assert.match(preview.stdout, /Framework verification source baseline is clean/);
+});
+
+test("in-session verification preserves only valid unfinished context; post-exit reset removes it", (t) => {
+  const root = fixture("reset-framework-working-context-");
+  let lock;
+  t.after(() => {
+    lock?.release();
+    releaseRuntimeSessionLease({ root, pid: process.pid });
+    rmSync(root, { force: true, recursive: true });
+  });
+  issueRuntimeSessionLease({ root, pid: process.pid });
+  lock = acquireVerificationSessionLock({ repositoryRoot: root });
+  const state = {
+    version: 1,
+    revision: 1,
+    status: "active",
+    outcome: "Finish the authorized repair.",
+    currentGoal: "Verify integration.",
+    currentSlice: "Run source checks.",
+    nextAction: "Review the evidence.",
+    blocker: null,
+  };
+  const content = `<!-- codexrig-work-state\n${JSON.stringify(state)}\n-->\n\n# Project Context\n\nCurrent work only.\n`;
+  write(root, "docs/project-context.md", content);
+  const preview = run(root, ["--verification-source-baseline"]);
+  assert.equal(preview.status, 0, preview.stderr + preview.stdout);
+  assert.equal(readFileSync(path.join(root, "docs/project-context.md"), "utf8"), content);
+  write(root, "docs/project-context.md", "# Project Context\n\nMissing current marker.\n");
+  assert.equal(run(root, ["--verification-source-baseline"]).status, 1);
+  write(
+    root,
+    "docs/project-context.md",
+    content
+      .replace('"status":"active"', '"status":"complete"')
+      .replace('"nextAction":"Review the evidence."', '"nextAction":null'),
+  );
+  assert.equal(run(root, ["--verification-source-baseline"]).status, 1);
+  write(root, "docs/project-context.md", content);
+  write(root, "docs/reviews/obsolete.md", "# Obsolete Review\n");
+  assert.equal(run(root, ["--verification-source-baseline"]).status, 1);
+  removeResetCandidate(root, path.join(root, "docs/reviews"));
+  lock.release();
+  lock = null;
+  releaseRuntimeSessionLease({ root, pid: process.pid });
+  lock = acquireVerificationSessionLock({ repositoryRoot: root });
+  const unowned = run(root, ["--verification-source-baseline"]);
+  assert.equal(unowned.status, 1, unowned.stderr + unowned.stdout);
+  lock.release();
+  lock = null;
+  assert.equal(run(root, ["--apply"]).status, 0);
+  assert.equal(existsSync(path.join(root, "docs/project-context.md")), false);
 });
 
 test("reset unlinks top-level and nested runtime symlinks without touching their targets", (t) => {

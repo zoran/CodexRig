@@ -70,3 +70,15 @@ export function versionSatisfiesSimpleRange(version, range) {
     return comparison === 0;
   });
 }
+
+/** Checks a resolved release against an explicit exact, major, or named channel selector. */
+export function versionMatchesReleaseSelector(version, specification) {
+  const parsed = parseSemver(version);
+  if (/^\d+$/u.test(specification)) return parsed.major === Number(specification);
+  if (/^\d+\./u.test(specification)) return version === parseSemver(specification).raw;
+  const nextMajor = specification.match(/^next-(\d+)$/u);
+  if (nextMajor) return parsed.major === Number(nextMajor[1]);
+  if (specification === "latest") return !parsed.prerelease && !parsed.build;
+  if (specification === "alpha") return /(?:^|[.-])alpha(?:[.-]|$)/u.test(parsed.prerelease);
+  throw new Error(`Unsupported release selector: ${specification}.`);
+}

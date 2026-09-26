@@ -5,7 +5,7 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 root="$(cd "$script_dir/../.." && pwd -P)"
 if ! command -v node >/dev/null 2>&1; then
-  echo "Bootstrap Node.js is unavailable. Run mise install --locked and use mise exec --locked." >&2
+  echo "Bootstrap Node.js is unavailable. Provide a supported read-only Node.js bootstrap and use start-codex.sh." >&2
   exit 1
 fi
 required_node_version="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).stable.node.version' "$root/.codex/toolchain.json")"
@@ -39,7 +39,7 @@ require_system_command() {
   fi
 }
 
-for command_name in bash git rg shellcheck; do
+for command_name in bash git rg shellcheck tar; do
   require_system_command "$command_name"
 done
 
@@ -65,7 +65,7 @@ else
 fi
 
 if ((check_codex)) && ! command -v codex >/dev/null 2>&1; then
-  optional_missing+=("codex (system-wide host CLI)")
+  optional_missing+=("codex (private project installation)")
 fi
 
 if ((
@@ -81,17 +81,13 @@ if (("${#runtime_issues[@]}" > 0)); then
   cat >&2 <<'EOF'
 Project runtimes are missing, mismatched, or inactive. This check is read-only.
 
-Install or activate mise, then install the repository-locked runtimes:
-  mise install --locked
+Prepare the project-local tools and dependencies through their maintenance owner:
+  node scripts/deps/maintain-toolchain.mjs
 
-Run project commands inside that exact runtime environment:
-  mise exec --locked -- bash scripts/setup/check-prereqs.sh
+Run commands inside the repository environment:
+  bash scripts/setup/run-project.sh bash scripts/setup/check-prereqs.sh
 
-Install or update the host CLI through the official Codex installation path. Prepare the locked
-project runtime and compatible dependencies explicitly, then start the isolated session:
-  https://developers.openai.com/codex/cli/
-  mise install --locked
-  mise exec --locked -- node scripts/deps/install-compatible.mjs
+Canonical interactive startup performs maintenance before session selection:
   bash scripts/setup/start-codex.sh
 
 Locked runtime platforms: Linux x64/arm64 (glibc and musl), macOS arm64, and Windows x64.
@@ -105,11 +101,9 @@ if (("${#missing_system[@]}" > 0)); then
   cat >&2 <<'EOF'
 Missing required system tools.
 
-Host tools:
-  Codex CLI: https://developers.openai.com/codex/cli/
-  mise:      https://mise.jdx.dev/installing-mise.html
+The launcher owns project-local Mise and Codex installations. Shared system binaries are
+read-only bootstrap; these package commands are suggestions for the human host owner:
 
-System package commands:
   Debian/Ubuntu: sudo apt-get install -y git ripgrep shellcheck
   Fedora:        sudo dnf install -y git ripgrep ShellCheck
   Homebrew (macOS arm64): brew install git ripgrep shellcheck

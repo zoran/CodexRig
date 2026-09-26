@@ -3,7 +3,21 @@ import { parseJsonFile, toolingRoot } from "../filesystem/repository-files.mjs";
 import { Buffer } from "node:buffer";
 import { compareSemver, parseSemver, versionSatisfiesSimpleRange } from "./semver-contract.mjs";
 
-export const supportedToolchainSchema = 1;
+export const supportedToolchainSchema = 2;
+export const codexDistributionPlatforms = Object.freeze([
+  "linux-x64",
+  "linux-arm64",
+  "darwin-arm64",
+  "win32-x64",
+]);
+export const miseBinaryPlatforms = Object.freeze([
+  "linux-x64",
+  "linux-arm64",
+  "linux-x64-musl",
+  "linux-arm64-musl",
+  "macos-arm64",
+  "windows-x64",
+]);
 
 function plainObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -41,74 +55,35 @@ function validateCodexCiContract(ci) {
       "compatibility.ci.codexNpmPackage must use the official @openai/codex package.",
     );
   }
-  const packages = requiredObject(
-    ci.codexNpmPlatformPackages,
-    "compatibility.ci.codexNpmPlatformPackages",
-  );
   const integrities = requiredObject(
     ci.codexNpmPlatformIntegrities,
     "compatibility.ci.codexNpmPlatformIntegrities",
   );
-  if (Object.keys(packages).sort().join("\n") !== "arm64\nx64") {
-    throw new Error("compatibility.ci.codexNpmPlatformPackages must own exactly arm64 and x64.");
-  }
-  if (Object.keys(integrities).sort().join("\n") !== "arm64\nx64") {
-    throw new Error("compatibility.ci.codexNpmPlatformIntegrities must own exactly arm64 and x64.");
-  }
-  canonicalIntegrity(ci.codexNpmPackageIntegrity, "compatibility.ci.codexNpmPackageIntegrity");
-  for (const architecture of ["arm64", "x64"]) {
-    if (
-      requiredString(
-        packages[architecture],
-        `compatibility.ci.codexNpmPlatformPackages.${architecture}`,
-      ) !== `@openai/codex-linux-${architecture}`
-    ) {
-      throw new Error(
-        `compatibility.ci.codexNpmPlatformPackages.${architecture} must use the matching official Codex Linux package alias.`,
-      );
-    }
+  exactPlatforms(
+    integrities,
+    codexDistributionPlatforms,
+    "compatibility.ci.codexNpmPlatformIntegrities",
+  );
+  for (const platform of codexDistributionPlatforms) {
     canonicalIntegrity(
-      integrities[architecture],
-      `compatibility.ci.codexNpmPlatformIntegrities.${architecture}`,
+      integrities[platform],
+      `compatibility.ci.codexNpmPlatformIntegrities.${platform}`,
     );
   }
   return codexVersion;
 }
 
+function exactPlatforms(value, platforms, label) {
+  if (Object.keys(value).sort().join("\n") !== [...platforms].sort().join("\n"))
+    throw new Error(`${label} must own exactly the supported distribution platforms.`);
+}
+
 function validateMiseCiContract(ci) {
-  const miseLinuxX64Sha256 = requiredString(
-    ci.miseLinuxX64Sha256,
-    "compatibility.ci.miseLinuxX64Sha256",
-  );
-  if (!/^[a-f0-9]{64}$/u.test(miseLinuxX64Sha256)) {
-    throw new Error("compatibility.ci.miseLinuxX64Sha256 must be a lowercase SHA-256 digest.");
-  }
-  const packages = requiredObject(ci.miseNpmPackages, "compatibility.ci.miseNpmPackages");
-  const integrities = requiredObject(
-    ci.miseNpmPackageIntegrities,
-    "compatibility.ci.miseNpmPackageIntegrities",
-  );
-  if (Object.keys(packages).sort().join("\n") !== "arm64\nx64") {
-    throw new Error("compatibility.ci.miseNpmPackages must own exactly arm64 and x64.");
-  }
-  if (Object.keys(integrities).sort().join("\n") !== "arm64\nx64") {
-    throw new Error("compatibility.ci.miseNpmPackageIntegrities must own exactly arm64 and x64.");
-  }
-  for (const architecture of ["arm64", "x64"]) {
-    const packageName = requiredString(
-      packages[architecture],
-      `compatibility.ci.miseNpmPackages.${architecture}`,
-    );
-    if (packageName !== `@jdxcode/mise-linux-${architecture}`) {
-      throw new Error(
-        `compatibility.ci.miseNpmPackages.${architecture} must use the matching official Linux mise package.`,
-      );
-    }
-    canonicalIntegrity(
-      integrities[architecture],
-      `compatibility.ci.miseNpmPackageIntegrities.${architecture}`,
-    );
-  }
+  const binaries = requiredObject(ci.miseBinarySha256, "compatibility.ci.miseBinarySha256");
+  exactPlatforms(binaries, miseBinaryPlatforms, "compatibility.ci.miseBinarySha256");
+  for (const digest of Object.values(binaries))
+    if (!/^[a-f0-9]{64}$/u.test(digest))
+      throw new Error("Mise binary integrity must be a lowercase SHA-256 digest.");
   parseSemver(ci.miseVersion, "compatibility.ci.miseVersion");
 }
 
@@ -124,6 +99,19 @@ export function validateToolchainConfiguration(value) {
     throw new Error("Compatibility matrix reviewedOn must be an ISO date.");
   }
   const ci = requiredObject(matrix.ci, "compatibility.ci");
+  if (
+    Object.keys(ci).sort().join("\n") !==
+    [
+      "codexNpmPackage",
+      "codexNpmPlatformIntegrities",
+      "codexVersion",
+      "miseBinarySha256",
+      "miseVersion",
+    ]
+      .sort()
+      .join("\n")
+  )
+    throw new Error("Toolchain distributions must use only the current contract.");
   const codexVersion = validateCodexCiContract(ci);
   validateMiseCiContract(ci);
 

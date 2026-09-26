@@ -93,6 +93,7 @@ export function validateToolingConfiguration(value) {
     throw new Error("Unsupported native session protocol.");
   parseSemver(contract.protocol.version, "native session protocol version");
   const startup = requiredObject(contract.startup, "startup");
+  requiredString(startup.displayName, "startup.displayName");
   const maxAge = requiredInteger(
     startup.attestationMaxAgeSeconds,
     "startup.attestationMaxAgeSeconds",

@@ -14,7 +14,7 @@ This skill owns architecture decisions and coherent cutovers.
 
 ## Reconstruct And Place The Change
 
-1. Read the manifest and its established requirements/design owners under
+1. Use `pnpm context:map`, then read relevant manifest and requirements/design sections under
    [Documentation Ownership](../../../instructions.md#documentation-ownership), then affected
    source: real roots, composition, public entrypoints, state and migrations, adapters, delivery,
    focused verifiers and actual dependency direction. Trace a representative assembled flow. A

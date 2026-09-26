@@ -22,6 +22,7 @@ import {
   repositoryCodexRuntimeCacheDirectory,
   repositoryCodexRuntimeDirectory,
 } from "../repository/source-inventory.mjs";
+import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
 import { runHeldVerificationCommand } from "./verification-executor.mjs";
 
 const capabilities = new Map();
@@ -140,6 +141,7 @@ export function acquireVerificationSessionLock({ repositoryRoot = toolingRoot, t
   let directory;
   let created;
   try {
+    prepareProjectToolDirectories(root);
     directory = ensureVerificationState(root, { testHooks });
     let current;
     try {

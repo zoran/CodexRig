@@ -194,7 +194,7 @@ function runPnpmJson(
     options: {
       cwd,
       encoding: "utf8",
-      env: pnpmHooksDisabledEnvironment(process.env),
+      env: pnpmHooksDisabledEnvironment(process.env, commandRoot),
       input: "",
       maxBuffer: 16 * 1024 * 1024,
       stdio: "pipe",

@@ -16,6 +16,102 @@ const resolutionStrategies = new Set([
   "single-trusted-source",
 ]);
 const tenantKeyPattern = /^[A-Za-z][A-Za-z0-9_]{1,63}$/u;
+const moduleScopes = new Set(["tenant-owned", "tenant-independent", "control-plane"]);
+
+function publicPath(value) {
+  return (
+    typeof value === "string" &&
+    /^[A-Za-z0-9][A-Za-z0-9._/-]*$/u.test(value) &&
+    value.split("/").every((part) => part && part !== "." && part !== "..")
+  );
+}
+
+function pathList(value, minimum = 0) {
+  return (
+    Array.isArray(value) &&
+    value.length >= minimum &&
+    value.length <= 64 &&
+    value.every(publicPath) &&
+    new Set(value).size === value.length
+  );
+}
+
+function ownershipFindings(value) {
+  const findings = [];
+  const boundaryRoots = [];
+  if (!Array.isArray(value.contextBoundaries) || value.contextBoundaries.length > 64) {
+    findings.push("tenancy contextBoundaries must be a bounded list of trusted runtime boundaries");
+  } else {
+    for (const boundary of value.contextBoundaries) {
+      if (
+        !exactKeys(boundary, ["root", "resolver", "policy", "publicContract"]) ||
+        !Object.values(boundary).every(publicPath) ||
+        [boundary.resolver, boundary.policy, boundary.publicContract].some(
+          (file) => !file.startsWith(`${boundary.root}/`),
+        ) ||
+        new Set([boundary.resolver, boundary.policy, boundary.publicContract]).size !== 3 ||
+        boundaryRoots.some(
+          (root) =>
+            root === boundary.root ||
+            root.startsWith(`${boundary.root}/`) ||
+            boundary.root.startsWith(`${root}/`),
+        )
+      ) {
+        findings.push(
+          "tenancy contextBoundaries require non-overlapping roots and distinct contained resolver, policy and publicContract files",
+        );
+      } else boundaryRoots.push(boundary.root);
+    }
+  }
+  if (!Array.isArray(value.modulePolicies) || value.modulePolicies.length > 256) {
+    return [
+      ...findings,
+      "tenancy modulePolicies must be a bounded list of manifest-owned policies",
+    ];
+  }
+  const modules = new Set();
+  for (const entry of value.modulePolicies) {
+    if (
+      !exactKeys(entry, ["module", "scope", "rationale", "enforcement", "evidence"]) ||
+      !publicPath(entry.module) ||
+      modules.has(entry.module) ||
+      !moduleScopes.has(entry.scope) ||
+      typeof entry.rationale !== "string" ||
+      !entry.rationale.trim() ||
+      entry.rationale.length > 1000 ||
+      !pathList(entry.enforcement, entry.scope === "tenant-independent" ? 0 : 1) ||
+      entry.enforcement.some((file) => !file.startsWith(`${entry.module}/`)) ||
+      !Array.isArray(entry.evidence) ||
+      entry.evidence.length > 16 ||
+      (entry.scope !== "tenant-independent" && entry.evidence.length === 0) ||
+      (entry.scope === "tenant-independent" &&
+        (entry.enforcement.length > 0 || entry.evidence.length > 0))
+    ) {
+      findings.push(
+        "tenancy module policy requires a unique module, explicit scope/rationale and scope-appropriate enforcement/evidence",
+      );
+      continue;
+    }
+    modules.add(entry.module);
+    const commands = new Set();
+    for (const evidence of entry.evidence) {
+      if (
+        !exactKeys(evidence, ["command", "tests"]) ||
+        typeof evidence.command !== "string" ||
+        !/^[a-z][a-z0-9:-]*$/u.test(evidence.command) ||
+        commands.has(evidence.command) ||
+        !pathList(evidence.tests, 1)
+      ) {
+        findings.push(
+          `tenancy module ${entry.module} requires unique selected command references and concrete test paths`,
+        );
+        continue;
+      }
+      commands.add(evidence.command);
+    }
+  }
+  return findings;
+}
 
 function plainObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -40,12 +136,22 @@ export function tenancyConfigurationFindings(content) {
     return [`${tenancyConfigurationPath} must contain valid JSON`];
   }
 
-  if (!exactKeys(value, ["crossTenantOperations", "isolation", "schemaVersion", "tenantContext"])) {
+  if (
+    !exactKeys(value, [
+      "contextBoundaries",
+      "crossTenantOperations",
+      "isolation",
+      "modulePolicies",
+      "schemaVersion",
+      "tenantContext",
+    ])
+  ) {
     return [`${tenancyConfigurationPath} must contain the complete tenant-isolation shape`];
   }
 
   const findings = [];
-  if (value.schemaVersion !== 1) findings.push("tenancy configuration schemaVersion must equal 1");
+  if (value.schemaVersion !== 2) findings.push("tenancy configuration schemaVersion must equal 2");
+  findings.push(...ownershipFindings(value));
   if (
     !exactKeys(value.tenantContext, ["key", "required", "resolutionStrategy", "trustedSources"])
   ) {
@@ -133,7 +239,7 @@ export function parseTenancyConfiguration(content) {
 
 export function serializeTenancyConfiguration(configuration) {
   const value = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     tenantContext: {
       key: configuration.tenantContext?.key ?? "tenantId",
       required: true,
@@ -153,6 +259,8 @@ export function serializeTenancyConfiguration(configuration) {
       requireExplicitCapability: true,
       audited: true,
     },
+    contextBoundaries: configuration.contextBoundaries ?? [],
+    modulePolicies: configuration.modulePolicies ?? [],
   };
   const content = `${JSON.stringify(value, null, 2)}\n`;
   parseTenancyConfiguration(content);

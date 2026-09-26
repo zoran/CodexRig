@@ -7,7 +7,7 @@ import path from "node:path";
 import { after, test } from "node:test";
 import { scanRepositorySecrets } from "./secrets.mjs";
 import { activeSourcePathClassification } from "../repository/source-inventory.mjs";
-import { findSecretMatches } from "../security/secret-patterns.mjs";
+import { findSecretMatches, redactSecretMatches } from "../security/secret-patterns.mjs";
 import { createSecretContentScanner } from "./secret-content-scan.mjs";
 
 const roots = [];
@@ -129,6 +129,48 @@ test("secret classification catches literal credentials across providers and chu
   uriScanner.write(Buffer.from(connection.slice(0, 31)));
   uriScanner.write(Buffer.from(connection.slice(31)));
   assert.ok(uriScanner.findings().includes("credential-bearing connection URI"));
+});
+
+test("repository findings distinguish domain values from credentials without weakening redaction", () => {
+  const value = "0".repeat(64);
+  const domainValues = [
+    JSON.stringify({ signature: value }),
+    JSON.stringify({ session: "training-session-in-progress" }),
+    'autoComplete={creating ? "new-password" : "current-password"}',
+    JSON.stringify({ current_key: value }),
+    JSON.stringify({ UNLISTED_SYNC_TRIGGER_INPUT_KEY: "product.sync.trigger.v1" }),
+  ];
+  for (const source of domainValues) {
+    assert.deepEqual(findSecretMatches(source), []);
+    assert.ok(findSecretMatches(source, { conservative: true }).length > 0);
+    assert.notEqual(redactSecretMatches(source), source);
+    for (let split = 0; split <= source.length; split += 1) {
+      const scanner = createSecretContentScanner();
+      scanner.write(Buffer.from(source.slice(0, split)));
+      scanner.write(Buffer.from(source.slice(split)));
+      assert.deepEqual(scanner.findings(), []);
+    }
+  }
+  const credentials = [
+    JSON.stringify({ NEW_PROVIDER_ACCESS_TOKEN: value }),
+    JSON.stringify({ UNLISTED_SERVICE_SIGNING_KEY: value }),
+    JSON.stringify({ sessionToken: value }),
+    JSON.stringify({ accessToken: value }),
+    JSON.stringify({ signature: value, password: value }),
+    `https://storage.example.invalid/object?X-Amz-Signature=${value}`,
+    `https://storage.example.invalid/object?sig=${value}&expires=42`,
+  ];
+  for (const source of credentials) {
+    const expected = [...new Set(findSecretMatches(source).map(({ label }) => label))].sort();
+    assert.ok(expected.length > 0);
+    assert.ok(!redactSecretMatches(source).includes(value));
+    for (let split = 0; split <= source.length; split += 1) {
+      const scanner = createSecretContentScanner();
+      scanner.write(Buffer.from(source.slice(0, split)));
+      scanner.write(Buffer.from(source.slice(split)));
+      assert.deepEqual(scanner.findings(), expected);
+    }
+  }
 });
 
 test("secret scan flags credential paths without rejecting ordinary security source modules", async () => {

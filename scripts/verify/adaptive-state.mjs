@@ -1,5 +1,6 @@
 /** Owns adaptive state behavior for the repository verification boundary. */
 import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
+import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -103,7 +104,7 @@ export function run(command, args, options = {}) {
     maxBuffer: options.maxBuffer ?? 64 * 1024 * 1024,
     stdio: options.stdio ?? "pipe",
     timeout: options.timeout ?? 120_000,
-    env: { ...process.env, ...options.env },
+    env: { ...projectToolEnvironment({ root }), ...options.env },
   });
   if (result.error) {
     if (options.allowFailure) return null;
@@ -151,7 +152,7 @@ function git(args, options = {}) {
     maxBuffer: options.maxBuffer ?? 64 * 1024 * 1024,
     stdio: options.stdio ?? "pipe",
     timeout: options.timeout ?? 120_000,
-    env: { ...cleanGitEnvironment(), ...options.env },
+    env: { ...cleanGitEnvironment(process.env, repositoryRoot), ...options.env },
   });
   if (!isolatedGitResultCompleted(result, { args: invocationArguments, encoding: "utf8" })) {
     if (options.allowFailure) return null;
@@ -370,8 +371,8 @@ function isFrameworkScript(filePath) {
 
 function isDependencyFile(filePath) {
   return (
-    filePath === "mise.lock" ||
-    filePath === "mise.toml" ||
+    filePath === ".codex/mise.lock" ||
+    filePath === ".codex/mise.toml" ||
     filePath === "package.json" ||
     filePath.endsWith("/package.json") ||
     filePath === "package.exports.json" ||

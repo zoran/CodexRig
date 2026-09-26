@@ -17,6 +17,9 @@ backups/
 *.bak
 *.bak.*
 
+# Repository-owned accounts and mutable tool state never belong to source or exports.
+/.auth/
+
 # Native mutable Codex state belongs to ignored repository-root CODEX_HOME entries.
 # Only framework coordination lives in .codex/runtime/; /tmp holds private handovers and process
 # temporaries, while /.tmp holds native cache work. Full runtime reset requires all sessions to exit.
@@ -25,6 +28,7 @@ backups/
 /log
 /logs
 /memories
+/mcp-oauth-locks
 /plugins
 /rules
 /sessions
@@ -34,6 +38,7 @@ backups/
 /tmp
 /.sandbox_migration
 /auth.json
+/.credentials.json
 /config.toml
 /history.jsonl
 /hooks.json
@@ -55,6 +60,8 @@ backups/
 !.codex/hooks.json
 !.codex/tooling.json
 !.codex/toolchain.json
+!.codex/mise.toml
+!.codex/mise.lock
 !.codex/verification.json
 !.codex/README.md
 !.codex/agents/

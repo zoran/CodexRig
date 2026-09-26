@@ -4,7 +4,11 @@ import path from "node:path";
 import process from "node:process";
 import { toolingRoot as root, readRepositoryFile } from "../filesystem/repository-files.mjs";
 import { portableContextContractFindings } from "../context/portable-context-contract.mjs";
-import { validateMinimalMiseTools } from "../contracts/mise-toolchain-configuration.mjs";
+import {
+  validateMinimalMiseTools,
+  miseLockBlocks,
+  miseLockFindings,
+} from "../contracts/mise-toolchain-configuration.mjs";
 import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
 import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 import { startupExecutableClosurePaths } from "../setup/startup-executable-closure.mjs";
@@ -96,7 +100,7 @@ for (const command of Object.values(packageJson?.scripts ?? {})) {
     }
   }
 }
-const miseToml = readRelative("mise.toml");
+const miseToml = readRelative(".codex/mise.toml");
 const miseValidation = validateMinimalMiseTools(miseToml);
 for (const error of miseValidation.errors) failures.push(`mise.toml ${error}`);
 const miseVersions = miseValidation.versions;
@@ -108,24 +112,14 @@ if (
   failures.push("mise.toml pnpm version must match package.json packageManager");
 }
 
-const miseLock = readRelative("mise.lock");
-const lockedTools = [...miseLock.matchAll(/^\[\[tools\.([a-z0-9_-]+)\]\]$/gm)].map(
-  ([, tool]) => tool,
-);
-const configuredTools = Object.keys(miseVersions);
-if (
-  new Set(lockedTools).size !== lockedTools.length ||
-  [...lockedTools].sort().join(",") !== [...configuredTools].sort().join(",")
-) {
-  failures.push("mise.lock tool entries must match every configured mise.toml tool exactly once");
-}
-
+const miseLock = readRelative(".codex/mise.lock");
+failures.push(...miseLockFindings(miseLock, miseValidation.versionLists));
+const lockedBlocks = miseLockBlocks(miseLock);
 function lockedToolBlock(tool) {
-  const marker = `[[tools.${tool}]]`;
-  const start = miseLock.indexOf(marker);
-  if (start < 0) return "";
-  const next = miseLock.indexOf("\n[[tools.", start + marker.length);
-  return miseLock.slice(start, next < 0 ? undefined : next);
+  return (
+    lockedBlocks.find((entry) => entry.tool === tool && entry.version === miseVersions[tool])
+      ?.block ?? ""
+  );
 }
 
 function lockedPlatformBlock(tool, platform) {
@@ -145,29 +139,6 @@ function lockedPlatformsForTool(tool) {
   return [
     ...lockedToolBlock(tool).matchAll(/^\[tools\.[a-z0-9_-]+\."platforms\.([^"]+)"\]$/gm),
   ].map(([, platform]) => platform);
-}
-
-for (const tool of configuredTools) {
-  const block = lockedToolBlock(tool);
-  if (!block.includes(`version = "${miseVersions[tool]}"`)) {
-    failures.push(`mise.lock ${tool} entry must match mise.toml version ${miseVersions[tool]}`);
-  }
-  if (!/^backend = "[^"\r\n]+"$/m.test(block)) {
-    failures.push(`mise.lock ${tool} entry must declare its resolved backend`);
-  }
-  const platforms = lockedPlatformsForTool(tool);
-  if (platforms.length === 0) {
-    failures.push(`mise.lock ${tool} entry must contain at least one locked platform artifact`);
-  }
-  for (const platform of platforms) {
-    const platformBlock = lockedPlatformBlock(tool, platform);
-    if (!/^checksum = "sha256:[a-f0-9]{64}"$/m.test(platformBlock)) {
-      failures.push(`mise.lock ${tool} ${platform} entry must include a SHA-256 checksum`);
-    }
-    if (!/^url = "https:\/\/[^"\r\n]+"$/m.test(platformBlock)) {
-      failures.push(`mise.lock ${tool} ${platform} entry must include an HTTPS URL`);
-    }
-  }
 }
 
 const lockedPlatforms = {

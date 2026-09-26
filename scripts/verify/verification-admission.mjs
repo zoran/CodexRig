@@ -117,9 +117,6 @@ function entryRouting({
       if (available.has(key)) ownerKeys.add(key);
     }
   }
-  if (categories.includes("infrastructure/runtime config") && available.has("surface-quality")) {
-    ownerKeys.add("surface-quality");
-  }
   if (categories.includes("repository source-policy surface")) {
     for (const key of ["codex-config", "path-hygiene", "repository-smoke"]) {
       if (available.has(key)) ownerKeys.add(key);

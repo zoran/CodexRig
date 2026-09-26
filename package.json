@@ -1,10 +1,10 @@
 {
   "name": "codexrig",
-  "version": "5.6.0",
+  "version": "6.0.0",
   "private": true,
   "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
-  "packageManager": "pnpm@11.27.1",
+  "packageManager": "pnpm@11.28.0",
   "scripts": {
     "auth:check": "node scripts/verify/identity-access.mjs",
     "localization:check": "node scripts/verify/localization.mjs",
@@ -44,7 +44,11 @@
     "verify:pre-push": "bash scripts/verify/pre-push.sh",
     "web:update-sitemap-lastmod": "node scripts/web/update-sitemap-lastmod.mjs",
     "worktree:status": "node scripts/repository/worktree-recovery-cli.mjs",
-    "tooling:doctor": "node scripts/framework/framework-doctor.mjs"
+    "tooling:doctor": "node scripts/framework/framework-doctor.mjs",
+    "context:map": "node scripts/context/context-cli.mjs map",
+    "context:read": "node scripts/context/context-cli.mjs read",
+    "context:check": "node scripts/context/context-cli.mjs check",
+    "project:run": "bash scripts/setup/run-project.sh"
   },
   "devDependencies": {
     "prettier": "^3.9.6"

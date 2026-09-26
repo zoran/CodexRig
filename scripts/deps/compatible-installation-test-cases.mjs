@@ -1,6 +1,6 @@
 /** Owns compatible installation test cases behavior for the dependency and toolchain maintenance boundary. */
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
@@ -14,7 +14,24 @@ import {
   reproduceLockedDependencies,
   stageDependencyInstallationInputs,
 } from "./install-compatible.mjs";
+import {
+  prepareProjectToolDirectories,
+  projectToolEnvironment,
+} from "../repository/project-tool-environment.mjs";
 import { trustedPnpmCommand } from "./trusted-pnpm-command.mjs";
+
+function privateCandidate(target) {
+  const root = mkdtempSync(
+    path.join(prepareProjectToolDirectories(target).temporary, "candidate-"),
+  );
+  stageDependencyInstallationInputs({ projectRoot: target, stageRoot: root });
+  mkdirSync(path.join(root, ".codex"));
+  writeFileSync(
+    path.join(root, ".codex/toolchain.json"),
+    readFileSync(path.join(target, ".codex/toolchain.json")),
+  );
+  return root;
+}
 
 function compatibleInstallFixture(transactionFixture) {
   const root = transactionFixture();
@@ -194,12 +211,14 @@ export function registerCompatibleInstallationTests(transactionFixture) {
       ].join("\n"),
     );
     rmSync(path.join(target, "pnpm-lock.yaml"));
+    prepareProjectToolDirectories(target);
     const pnpm = trustedPnpmCommand({ repositoryRoot: target });
     const initial = spawnSync(
       pnpm.executable,
       ["install", "--lockfile-only", "--ignore-scripts", "--ignore-pnpmfile"],
       {
         cwd: target,
+        env: projectToolEnvironment({ root: target }),
         encoding: "utf8",
         timeout: 30_000,
       },
@@ -220,7 +239,7 @@ export function registerCompatibleInstallationTests(transactionFixture) {
       /ERR_PNPM_NO_OFFLINE_TARBALL/u,
     );
 
-    const bound = transactionFixture();
+    const bound = privateCandidate(target);
     stageDependencyInstallationInputs({ projectRoot: target, stageRoot: bound });
     installLatestCompatibleDependencies({ projectRoot: bound, installationRoot: target });
     writeFileSync(
@@ -233,6 +252,17 @@ export function registerCompatibleInstallationTests(transactionFixture) {
       lockfileUpdated: false,
       manifestCount: 1,
     });
+    const metadataPath = path.join(target, "node_modules/.modules.yaml");
+    const installed = JSON.parse(readFileSync(metadataPath, "utf8"));
+    const localStore = installed.storeDir;
+    const foreign = path.join(target, "foreign-store");
+    mkdirSync(foreign);
+    writeFileSync(path.join(foreign, "sentinel"), "unchanged");
+    installed.storeDir = foreign;
+    writeFileSync(metadataPath, JSON.stringify(installed));
+    reproduceLockedDependencies({ projectRoot: target });
+    assert.equal(JSON.parse(readFileSync(metadataPath, "utf8")).storeDir, localStore);
+    assert.equal(readFileSync(path.join(foreign, "sentinel"), "utf8"), "unchanged");
     assert.equal(readFileSync(path.join(target, "pnpm-lock.yaml"), "utf8"), lockfile);
     assert.equal(
       JSON.parse(readFileSync(path.join(target, "node_modules/store-fixture/package.json"), "utf8"))
@@ -246,10 +276,10 @@ export function registerCompatibleInstallationTests(transactionFixture) {
     );
   });
 
-  test("toolchain staging fills the target installation store across filesystem boundaries", () => {
-    const fixture = compatibleInstallFixture(transactionFixture);
+  test("private toolchain staging fills only the owning project installation store", () => {
     const target = compatibleInstallFixture(transactionFixture);
-    const storeDirectory = path.join(target.root, "target store", "v11");
+    const fixture = compatibleInstallFixture(() => privateCandidate(target.root));
+    const storeDirectory = path.join(target.root, ".auth/project-tools/data/pnpm/store/v11");
     const pnpm = compatiblePnpmFixture(fixture, { storeDirectory });
     installLatestCompatibleDependencies({
       projectRoot: fixture.root,
@@ -310,7 +340,12 @@ export function registerCompatibleInstallationTests(transactionFixture) {
       { lockfileUpdated: false, manifestCount: 1 },
     );
     assert.equal(pnpm.calls.length, 1);
-    assert.deepEqual(pnpm.calls[0].args, [...compatibleInstallArgs, "--offline"]);
+    assert.deepEqual(pnpm.calls[0].args, [
+      ...compatibleInstallArgs,
+      "--store-dir",
+      path.join(fixture.root, ".auth/project-tools/data/pnpm/store"),
+      "--offline",
+    ]);
     assert.equal(pnpm.calls[0].ignorePnpmfile, "true");
     assert.equal(pnpm.calls[0].cwd, fixture.root);
     assert.equal(readFileSync(fixture.manifestPath, "utf8"), originalManifest);
@@ -366,13 +401,21 @@ export function registerCompatibleInstallationTests(transactionFixture) {
       [
         {
           executable: "pnpm",
-          args: compatibleUpdateArgs,
+          args: [
+            ...compatibleUpdateArgs,
+            "--store-dir",
+            path.join(fixture.root, ".auth/project-tools/data/pnpm/store"),
+          ],
           ignorePnpmfile: "true",
           scope: "stage",
         },
         {
           executable: "pnpm",
-          args: compatibleInstallArgs,
+          args: [
+            ...compatibleInstallArgs,
+            "--store-dir",
+            path.join(fixture.root, ".auth/project-tools/data/pnpm/store"),
+          ],
           ignorePnpmfile: "true",
           scope: "project",
         },

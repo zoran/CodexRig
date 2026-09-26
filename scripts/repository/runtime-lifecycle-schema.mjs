@@ -53,6 +53,11 @@ export function validRuntimeLifecycleOwner(owner, identity) {
   ) {
     return false;
   }
+  // A guard has not been published, or its quiescent release is already durable. Neither
+  // state may carry capabilities that could acquire or inherit its physical descriptor.
+  if (owner.guard === null && (owner.descendants.length > 0 || owner.delegations.length > 0)) {
+    return false;
+  }
   const descendantKeys = new Set();
   for (const descendant of owner.descendants) {
     if (

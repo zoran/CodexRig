@@ -1,5 +1,8 @@
 /** Owns the source compatibility contract for nonblocking toolchain experiments. */
-import { validateToolchainConfiguration } from "./toolchain-configuration.mjs";
+import {
+  supportedToolchainSchema,
+  validateToolchainConfiguration,
+} from "./toolchain-configuration.mjs";
 export const supportedCompatibilitySchema = 3;
 function requiredObject(value, label) {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -15,7 +18,7 @@ export function validateCompatibilityMatrix(matrix) {
   if (matrix.schemaVersion !== supportedCompatibilitySchema)
     throw new Error("Unsupported source compatibility schema.");
   validateToolchainConfiguration({
-    schemaVersion: 1,
+    schemaVersion: supportedToolchainSchema,
     reviewedOn: matrix.reviewedOn,
     ci: matrix.ci,
     stable: matrix.stable,

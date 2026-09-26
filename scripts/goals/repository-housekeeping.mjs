@@ -50,7 +50,7 @@ function runNode(relativeScript, args = []) {
   const result = spawnSync(process.execPath, [path.join(repositoryRoot, relativeScript), ...args], {
     cwd: repositoryRoot,
     encoding: "utf8",
-    env: verificationChildEnvironment(),
+    env: verificationChildEnvironment(process.env, repositoryRoot),
     input: "",
     stdio: "pipe",
     timeout: 180_000,

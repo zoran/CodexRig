@@ -105,7 +105,7 @@ function runGit({ args, gitMetadata, label, root, optional = false, timeoutMilli
   const result = spawnSync("git", invocationArguments, {
     cwd: root,
     encoding: null,
-    env: cleanGitEnvironment(),
+    env: cleanGitEnvironment(process.env, root),
     input: Buffer.alloc(0),
     maxBuffer: 64 * 1024 * 1024,
     stdio: ["pipe", "pipe", "pipe"],
@@ -222,25 +222,36 @@ function remoteBranchCommit(root, gitMetadata, remoteName, integrationBranch) {
   return match[1];
 }
 
-function publishedBaseline(root, gitMetadata, integrationBranch) {
-  const localBranch = gitText({
+function publishedBaseline(root, gitMetadata, integrationBranch, review) {
+  const localBranch = runGit({
     args: ["symbolic-ref", "--quiet", "HEAD"],
     gitMetadata,
     label: "Framework integration branch",
+    optional: review,
     root,
-  });
+  })
+    ?.toString("utf8")
+    .trim();
   const expectedLocalBranch = `refs/heads/${integrationBranch}`;
-  if (localBranch !== expectedLocalBranch) {
+  if (!review && localBranch !== expectedLocalBranch) {
     throw new Error(
       `Automatic framework versioning must run on the configured integration branch ${integrationBranch}.`,
     );
   }
-  const remoteName = exactLocalConfigValue(
+  const configuredRemotes = localConfigValues(
     root,
     gitMetadata,
     `branch.${integrationBranch}.remote`,
-    `Configured integration branch ${integrationBranch} remote`,
   );
+  const remoteName =
+    review && configuredRemotes.length === 0
+      ? gitText({ args: ["remote"], gitMetadata, label: "Review integration remote", root })
+      : exactLocalConfigValue(
+          root,
+          gitMetadata,
+          `branch.${integrationBranch}.remote`,
+          `Configured integration branch ${integrationBranch} remote`,
+        );
   if (
     !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/u.test(remoteName) ||
     remoteName === "." ||
@@ -250,12 +261,20 @@ function publishedBaseline(root, gitMetadata, integrationBranch) {
   ) {
     throw new Error(`Configured integration branch ${integrationBranch} remote is invalid.`);
   }
-  const mergeReference = exactLocalConfigValue(
+  const configuredMerges = localConfigValues(
     root,
     gitMetadata,
     `branch.${integrationBranch}.merge`,
-    `Configured integration branch ${integrationBranch} merge reference`,
   );
+  const mergeReference =
+    review && configuredMerges.length === 0
+      ? `refs/heads/${integrationBranch}`
+      : exactLocalConfigValue(
+          root,
+          gitMetadata,
+          `branch.${integrationBranch}.merge`,
+          `Configured integration branch ${integrationBranch} merge reference`,
+        );
   if (mergeReference !== `refs/heads/${integrationBranch}`) {
     throw new Error(
       `Configured integration branch ${integrationBranch} must merge its central remote branch.`,
@@ -267,12 +286,14 @@ function publishedBaseline(root, gitMetadata, integrationBranch) {
     `remote.${remoteName}.url`,
     `Configured central remote ${remoteName} URL`,
   );
-  const upstreamReference = gitText({
-    args: ["rev-parse", "--symbolic-full-name", "@{upstream}"],
-    gitMetadata,
-    label: "Published framework upstream",
-    root,
-  });
+  const upstreamReference = review
+    ? `refs/remotes/${remoteName}/${integrationBranch}`
+    : gitText({
+        args: ["rev-parse", "--symbolic-full-name", "@{upstream}"],
+        gitMetadata,
+        label: "Published framework upstream",
+        root,
+      });
   const expectedUpstreamReference = `refs/remotes/${remoteName}/${integrationBranch}`;
   if (upstreamReference !== expectedUpstreamReference) {
     throw new Error(
@@ -376,6 +397,7 @@ function packageBump(baseline, current) {
 }
 
 function requiredChangeBump({
+  baselineCommit,
   baselineContract,
   baselineManifest,
   baselinePackage,
@@ -383,6 +405,7 @@ function requiredChangeBump({
   currentContract,
   currentManifest,
   currentPackage,
+  gitMetadata,
   root,
 }) {
   let bump = "none";
@@ -408,7 +431,22 @@ function requiredChangeBump({
     } else if (deleted && capabilityDeletionPattern.test(relativePath)) {
       bump = highestBump(bump, "major");
     } else {
-      bump = highestBump(bump, "minor");
+      // Published portable schemas are opaque release metadata, never compatibility readers.
+      // Compare only the marker of active JSON owners; private native files never enter this list.
+      let schemaChanged = false;
+      if (!deleted && relativePath.endsWith(".json")) {
+        const before = baselineContent(root, gitMetadata, baselineCommit, relativePath, {
+          optional: true,
+        });
+        if (before !== null) {
+          const prior = parseJson(before, `Published ${relativePath}`);
+          const current = parseJson(readRepositoryFile(root, relativePath), relativePath);
+          schemaChanged =
+            Number.isSafeInteger(prior?.schemaVersion) &&
+            prior.schemaVersion !== current?.schemaVersion;
+        }
+      }
+      bump = highestBump(bump, schemaChanged ? "major" : "minor");
     }
   }
   return bump;
@@ -428,7 +466,7 @@ function jsonStringFieldWithValue(content, field, value, label) {
   return content.replace(pattern, `$1${JSON.stringify(value)}$2`);
 }
 
-export function frameworkVersionReconciliationPlan({ root = repositoryRoot } = {}) {
+export function frameworkVersionReconciliationPlan({ root = repositoryRoot, review = false } = {}) {
   if (!isReusableFrameworkSource(root)) {
     return Object.freeze({
       applicable: false,
@@ -462,7 +500,7 @@ export function frameworkVersionReconciliationPlan({ root = repositoryRoot } = {
     label: "Published framework baseline",
     root,
   });
-  const baseline = publishedBaseline(root, gitMetadata, integrationBranch);
+  const baseline = publishedBaseline(root, gitMetadata, integrationBranch, review);
 
   const baselineContractContent = baselineContent(
     root,
@@ -504,6 +542,7 @@ export function frameworkVersionReconciliationPlan({ root = repositoryRoot } = {
   ).raw;
   const changedPaths = changedSourcePaths(root, gitMetadata, baseline.commit);
   const requiredBump = requiredChangeBump({
+    baselineCommit: baseline.commit,
     baselineContract,
     baselineManifest,
     baselinePackage,
@@ -511,6 +550,7 @@ export function frameworkVersionReconciliationPlan({ root = repositoryRoot } = {
     currentContract,
     currentManifest,
     currentPackage,
+    gitMetadata,
     root,
   });
   const minimumVersion = nextFrameworkVersion(baselineVersion, requiredBump);
@@ -587,7 +627,10 @@ async function main() {
   }
   const unknown = argumentsWithoutDelimiter.find((argument) => argument !== "--check");
   if (unknown) throw new Error(`Unknown framework version option: ${unknown}`);
-  const plan = frameworkVersionReconciliationPlan({ root: toolingRoot });
+  const plan = frameworkVersionReconciliationPlan({
+    root: toolingRoot,
+    review: argumentsWithoutDelimiter.includes("--check"),
+  });
   if (!plan.applicable) {
     console.log("Source release versioning is not applicable in this repository.");
     return;

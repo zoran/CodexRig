@@ -186,7 +186,7 @@ private runtime from Git, staging, export, and generated projects.
 Portable defaults may vary by project but contain no secrets, telemetry targets, notification
 commands, persisted trust entries, personal paths, or local domains. After changing
 model/reasoning/features/TUI/hooks, keep every role on the exact primary GPT Astra model with `ultra`
-reasoning and run `mise exec --locked -- pnpm codex:validate`.
+reasoning and run `bash scripts/setup/run-project.sh pnpm codex:validate`.
 
 The canonical lifecycle does not require a manual `/hooks` approval: the issue-time controller
 computes trust for only its two exact session-owned definitions, and the Codex preflight proves the

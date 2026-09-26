@@ -1,5 +1,6 @@
 /** Verifies dependency owner normalization behavior for the dependency and toolchain maintenance boundary. */
 import assert from "node:assert/strict";
+import { toolingRoot } from "../filesystem/repository-files.mjs";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -158,9 +159,9 @@ test("dependency subprocesses receive an allowlisted environment without ambient
   assert.equal(environment.NODE_OPTIONS, undefined);
   assert.equal(environment.NPM_CONFIG_FILTER, undefined);
   assert.equal(environment.PNPM_CONFIG_FILTER, undefined);
-  assert.equal(environment.PNPM_HOME, undefined);
-  assert.equal(environment.HOME, "/safe/home");
-  assert.equal(environment.NODE_AUTH_TOKEN, "registry-token");
+  assert.ok(environment.PNPM_HOME.startsWith(`${toolingRoot}/.auth/`));
+  assert.ok(environment.HOME.startsWith(`${toolingRoot}/.auth/`));
+  assert.equal(environment.NODE_AUTH_TOKEN, undefined);
   assert.equal(environment.PATH, "/safe/bin");
   assert.equal(environment.PNPM_CONFIG_IGNORE_PNPMFILE, "true");
 });

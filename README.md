@@ -7,9 +7,9 @@ imposing a product stack.
 
 ## Start
 
-Install a current [Codex CLI](https://developers.openai.com/codex/cli/),
-[mise](https://mise.jdx.dev/installing-mise.html), Git, Bash, ripgrep, and ShellCheck. Then run from
-the repository root:
+Provide a current Node.js bootstrap, Git, Bash, ripgrep, ShellCheck and the system archive tool. The
+launcher installs reviewed Mise, Codex and locked project runtimes inside the repository; it does
+not update host installations. Run from the repository root:
 
 ```bash
 bash scripts/setup/start-codex.sh
@@ -36,25 +36,29 @@ maintenance behavior and failure handling, and
 Use `/side` inside a running session for a separate temporary conversation. After a framework
 update, exit and restart through the canonical launcher so the updated lifecycle code takes effect.
 
-Bootstrap Node.js and mise must be available before the launcher can inventory the repository. For a
-first installation, prepare the locked runtime with the following commands. Canonical starts
-thereafter perform freshness maintenance automatically; `install-compatible.mjs` remains the
-explicit dependency-only entry point:
+For noninteractive initial preparation, the same maintenance owner can install the toolchain and
+compatible dependencies without opening Codex. Every subsequent project command uses the common
+repository-local entry:
 
 ```bash
-mise install --locked
-mise exec --locked -- node scripts/deps/install-compatible.mjs
-mise exec --locked -- pnpm setup
-mise exec --locked -- pnpm framework:doctor -- --online
+node scripts/deps/maintain-toolchain.mjs
+bash scripts/setup/run-project.sh pnpm setup
+bash scripts/setup/run-project.sh pnpm framework:doctor -- --online
 ```
 
+CI and reproducible setup use `node scripts/deps/maintain-toolchain.mjs --locked` to install only
+the reviewed tool pins and frozen dependency graph. CI runs in disposable containers; source-only
+compatibility experiments explicitly prepare a declared candidate in their disposable checkout. They
+retain the full verification and release checks.
+
 If startup reports an invalid or unsupported private session lease, exit every Codex session using
-this framework. Then preview and apply the bounded reset; never delete `.codex/runtime` manually:
+this framework. Run the reset owner directly with the read-only Node bootstrap, because the normal
+command entry correctly refuses an unsafe lease. Never delete `.codex/runtime` manually:
 
 ```bash
-mise exec --locked -- pnpm framework:reset
-mise exec --locked -- pnpm framework:reset --apply
-mise exec --locked -- pnpm framework:reset
+node .agents/skills/reset-framework/scripts/reset-framework.mjs
+node .agents/skills/reset-framework/scripts/reset-framework.mjs --apply
+node .agents/skills/reset-framework/scripts/reset-framework.mjs
 bash scripts/setup/start-codex.sh
 ```
 
@@ -92,6 +96,14 @@ boundaries and handling of an optional creation brief.
 
 ## Essential Commands
 
+Run these commands inside the canonical session. From a host shell, prefix them with
+`bash scripts/setup/run-project.sh`. Project pins and locks live under `.codex/` and are loaded
+explicitly, so the host shell does not activate them after Codex exits. The launcher explicitly uses
+Codex's embedded mode (`--no-daemon`) for its trusted session-only hooks and settings. An ASCII name
+reveal introduces five startup phases. The launcher name is owned by `startup.displayName` in
+`.codex/tooling.json`; generated projects receive their supplied project name. Logs, CI, `TERM=dumb`
+and `NO_COLOR` use static text without motion or terminal escapes.
+
 ```bash
 pnpm framework:doctor -- --online
 pnpm framework:version
@@ -100,6 +112,7 @@ pnpm platform:configure                 # preview
 pnpm platform:configure -- --apply      # mutate the detected remote
 pnpm compatibility:matrix
 pnpm worktree:status -- --json
+bash scripts/setup/run-project.sh <command> [arguments] # project environment, then mise exec --locked
 pnpm verify:changed -- --print-plan
 pnpm verify
 pnpm handover:create -- --critical       # terminal critical-capacity seal
@@ -120,8 +133,13 @@ verification, commit and push sequence. After reviewing all source changes, exit
 for this framework and run this one command from its root:
 
 ```bash
-mise exec --locked -- pnpm framework:publish --message "<commit message>"
+bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"
 ```
+
+The wrapper establishes the project environment and executes the existing
+`bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"` pipeline.
+Git identity, signing and authentication must be configured in the project; no host accounts are
+imported.
 
 Running this command explicitly authorizes publication of all non-ignored source changes on `main`.
 It performs reset, housekeeping, verification, commit and push; do not run its individual steps
@@ -129,30 +147,68 @@ separately beforehand. See [Verification And Publication](instructions.md#verifi
 exact gates, evidence and recovery behavior. Generated projects do not include this source
 publisher.
 
+## Project Accounts
+
+[Repository-local isolation](instructions.md#repository-local-tool-and-account-isolation) owns the
+account boundary and future tool admission. Private tool home, configuration, installations, caches
+and temporary state live under `.auth/project-tools/`; native Codex state remains in the root
+`CODEX_HOME`. These paths are excluded from Git, context, generation and transfer. Login commands
+must run through `bash scripts/setup/run-project.sh`; existing project credentials remain private.
+
+The platform-policy API uses `.auth/git-platform.json`, with private owner-only permissions and
+exact fields `schemaVersion` (1), `provider`, `hostname`, `repository` (the selected remote's slug),
+and `token`. It reads this file only for explicit `platform:configure -- --apply`; inherited host
+tokens are ignored. Configure this private file locally without putting its contents into prompts,
+command history or source control. Git's SSH transport uses the project home's `.ssh/id_ed25519` and
+`.ssh/known_hosts`, with host SSH configuration and agents disabled. Other authentication adapters
+must meet the same boundary before use.
+
 ## Repository Housekeeping
 
-Run `mise exec --locked -- pnpm repo:housekeeping -- --apply` for repository maintenance. See
+Run `bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply` for repository
+maintenance. See
 [closure and housekeeping](instructions.md#completed-goal-closure-and-repository-housekeeping) for
 its required order, preservation boundaries and source-version reconciliation.
 
 ## Documentation Context Economy
+
+Use `pnpm context:map` for navigation, `pnpm context:read -- instructions.md --outline` for section
+discovery, and `pnpm context:check` to detect automatic instruction growth. Large reference
+documents stay intact; select relevant sections instead of loading them all. The byte budgets are
+repository guardrails, not native model limits or proof of quality. They complement outcome-based
+review. The design follows
+[OpenAI context guidance](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)
+and [progressive skill disclosure](https://learn.chatgpt.com/docs/build-skills). The
+[repository-context study, revision 2](https://arxiv.org/html/2602.11988v2) found no general success
+improvement from added context files and higher costs in its tested settings; that is motivation to
+measure actual tasks, not an Astra-specific performance guarantee.
 
 See [Documentation Ownership](instructions.md#documentation-ownership) for where content belongs and
 how README links are maintained when documents are added, moved or retired.
 
 ## Update Generated Projects
 
-From this source, preview an explicitly requested migration with:
+Use [Update Project from Framework](.agents/skills/update-project-from-framework/SKILL.md). From
+this source, preview the current generated tools and policy against an explicit target:
 
 ```bash
-pnpm framework:upgrade -- --target <project-root> --baseline <pristine-generated-reference>
+pnpm framework:upgrade -- --target <project-root>
+pnpm framework:upgrade -- --target <project-root> --reconcile <reviewed-decisions.json>
 ```
 
-The reference is an unchanged generated tree from before product customization, supplied explicitly
-for a three-way file comparison. Review conflicts and the exact write/delete plan before adding
-`--apply`. All target sessions must be stopped; the target's own runtime owner enforces exclusion.
-The source tool preserves project documents and product identity, retires unchanged obsolete tools,
-and emits no installation receipt. There is no self-updater in generated projects. See
+Every divergent existing file needs a reasoned decision bound to its current and desired hashes and
+modes. Review the write/delete plan and intentional product deviations before adding `--apply`. All
+target sessions must be stopped; its own runtime owner enforces exclusion. For an old target without
+that owner, prepare a small fresh generated candidate and reconcile it before using explicit
+`--regenerate --confirm-quiescent --apply`. Confirm stopped writers independently: a new lock cannot
+fence an old launcher. Interrupted regeneration uses `--regenerate --confirm-quiescent --recover`
+and requires the exact admitted source runtime; ordinary recovery uses `--recover`. The single
+current journal covers public policy, tools and explicitly named `--project-path <path>` document or
+configuration owners; private runtime is never a migration input. A real pristine ancestor may
+additionally support `--baseline <pristine-generated-reference>` for a three-way comparison. Never
+substitute a customized checkout for that reference. Maintained product documents, identity and
+custom verification require local reconciliation, not blind replacement. Generated projects contain
+no self-updater or installation receipt. See
 [Framework Lifecycle](instructions.md#framework-lifecycle-compatibility-and-git-platforms) and
 [Repository Update Scope](instructions.md#repository-update-scope).
 

@@ -238,22 +238,19 @@ test("long same-tip multi-ref pushes use a bounded Git process pipeline", async 
   const logPath = path.join(root, "git-processes.log");
   const binDirectory = path.join(root, "instrumented-bin");
   const wrapper = path.join(binDirectory, "git");
-  const realGit = execFileSync("bash", ["-lc", "command -v git"], {
+  const realGit = execFileSync("bash", ["--noprofile", "--norc", "-c", "command -v git"], {
     encoding: "utf8",
   }).trim();
   mkdirSync(binDirectory);
+  const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
   writeFileSync(
     wrapper,
-    '#!/usr/bin/env bash\nprintf "git\\n" >>"$PUSHED_OBJECT_GIT_LOG"\nexec "$PUSHED_OBJECT_REAL_GIT" "$@"\n',
+    `#!/usr/bin/env bash\nprintf 'git\\n' >>${quote(logPath)}\nexec ${quote(realGit)} "$@"\n`,
     "utf8",
   );
   chmodSync(wrapper, 0o755);
   const previousPath = process.env.PATH;
-  const previousLog = process.env.PUSHED_OBJECT_GIT_LOG;
-  const previousGit = process.env.PUSHED_OBJECT_REAL_GIT;
   process.env.PATH = `${binDirectory}${path.delimiter}${previousPath}`;
-  process.env.PUSHED_OBJECT_GIT_LOG = logPath;
-  process.env.PUSHED_OBJECT_REAL_GIT = realGit;
   let result;
   try {
     result = await inspectPushedObjects(
@@ -267,10 +264,6 @@ test("long same-tip multi-ref pushes use a bounded Git process pipeline", async 
   } finally {
     if (previousPath === undefined) delete process.env.PATH;
     else process.env.PATH = previousPath;
-    if (previousLog === undefined) delete process.env.PUSHED_OBJECT_GIT_LOG;
-    else process.env.PUSHED_OBJECT_GIT_LOG = previousLog;
-    if (previousGit === undefined) delete process.env.PUSHED_OBJECT_REAL_GIT;
-    else process.env.PUSHED_OBJECT_REAL_GIT = previousGit;
   }
 
   assert.equal(result.commitCount, 100);

@@ -5,6 +5,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { assertProjectSourceReady } from "./source-readiness.mjs";
 import { neutralProductSourceFindings } from "../verify/path-hygiene.mjs";
+import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 assertProjectSourceReady(root);
@@ -26,6 +27,7 @@ const resetScript = path.join(
 const resetTest = path.join(path.dirname(resetScript), "reset-framework.test.mjs");
 const testResult = spawnSync(process.execPath, ["--test", "--test-reporter=dot", resetTest], {
   cwd: root,
+  env: projectToolEnvironment({ root }),
   encoding: "utf8",
   stdio: "inherit",
 });
@@ -40,6 +42,7 @@ console.log(
 );
 const result = spawnSync(process.execPath, [resetScript, "--verification-source-baseline"], {
   cwd: root,
+  env: projectToolEnvironment({ root }),
   encoding: "utf8",
   stdio: "inherit",
 });

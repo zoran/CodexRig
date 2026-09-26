@@ -12,13 +12,15 @@ import {
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { toolingRoot } from "../filesystem/repository-files.mjs";
+import { projectToolEnvironment } from "./project-tool-environment.mjs";
 import {
   isTerminalSynchronousProcessResult,
   spawnSyncWithBoundedIo as spawnSync,
 } from "./runtime-process-io.mjs";
 
-export function cleanGitEnvironment(baseEnvironment = process.env) {
-  const environment = { ...baseEnvironment };
+export function cleanGitEnvironment(baseEnvironment = process.env, root = toolingRoot) {
+  const environment = projectToolEnvironment({ root, inherited: baseEnvironment });
   for (const name of Object.keys(environment)) {
     if (name.startsWith("GIT_")) delete environment[name];
   }
@@ -183,7 +185,7 @@ export function localGitExcludeIsInactive({ gitDirectory, workTree } = {}) {
   const resolved = spawnSync("git", args, {
     cwd: workTree,
     encoding: "utf8",
-    env: cleanGitEnvironment(),
+    env: cleanGitEnvironment(process.env, workTree),
     input: "",
     maxBuffer: 1024 * 1024,
     stdio: "pipe",

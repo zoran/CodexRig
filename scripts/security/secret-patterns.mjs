@@ -40,12 +40,17 @@ export const secretPatterns = Object.freeze([
   {
     label: "literal named credential",
     regex:
-      /(?:^|[\s{[(,?&])["']?\b(?:access[-_]?token|api[-_]?key|client[-_]?(?:key|password|secret|token)|credential(?:s|[-_]?(?:key|password|secret|token))?|database[-_]?(?:key|password|secret|token)|gh[-_]?token|github[-_]?token|gitlab[-_]?token|glab[-_]?token|id[-_]?token|jwt|password(?:[-_]?hash)?|private[-_]?(?:key|token)|refresh[-_]?token|secret(?:[-_]?access[-_]?key)?|service[-_]?(?:key|password|secret|token)|session(?:[-_]?(?:cookie|key|password|secret|token))?|signature|token|[A-Z][A-Z0-9]*[-_](?:KEY|PASSWORD|SECRET|TOKEN))\b["']?\s*(?:=|:)\s*(?:(?<credentialQuote>["'])(?<secretValueQuoted>(?!(?:\$|<|\{|0{8}-|CODEXRIG_|dead|dummy|env(?:ironment)?\.|example|fake|fixture|mock|opaque|os\.environ|placeholder|process\.env|redacted|replacement|sample|secretref|stale|symbolic|synthetic|test|vault|(?:[a-z0-9]+[-_])*runtime[-_]?(?:key|password|secret|token)|(?:config|runtime|state)\.))[0-9A-Za-z][0-9A-Za-z._~+/=!@%^*-]{15,})\k<credentialQuote>|(?<secretValueBare>(?!(?:\$|<|\{|0{8}-|CODEXRIG_|dead|dummy|env(?:ironment)?\.|example|fake|fixture|mock|opaque|os\.environ|placeholder|process\.env|redacted|replacement|sample|secretref|stale|synthetic|test|vault))(?=[0-9A-Za-z._~+/=!@%^*-]{16,}(?=["'\s,;)}\]&]|$))(?=[0-9A-Za-z._~+/=!@%^*-]*[-=+/!@%^*])[0-9A-Za-z][0-9A-Za-z._~+/=!@%^*-]{15,}))(?=["'\s,;)}\]&]|$)/iu,
+      /(?:^|[\s{[(,?&])["']?\b(?:access[-_]?token|api[-_]?key|client[-_]?(?:key|password|secret|token)|credential(?:s|[-_]?(?:key|password|secret|token))?|database[-_]?(?:key|password|secret|token)|gh[-_]?token|github[-_]?token|gitlab[-_]?token|glab[-_]?token|id[-_]?token|jwt|password(?:[-_]?hash)?|private[-_]?(?:key|token)|refresh[-_]?token|secret(?:[-_]?access[-_]?key)?|service[-_]?(?:key|password|secret|token)|session[-_]?(?:cookie|key|password|secret|token)|token|(?<ambiguousCredentialName>session|signature)|(?<environmentCredentialName>[A-Z][A-Z0-9_-]*[-_](?:KEY|PASSWORD|SECRET|TOKEN)))\b["']?\s*(?:=|:)\s*(?:(?<credentialQuote>["'])(?<secretValueQuoted>(?!(?:\$|<|\{|0{8}-|CODEXRIG_|dead|dummy|env(?:ironment)?\.|example|fake|fixture|mock|opaque|os\.environ|placeholder|process\.env|redacted|replacement|sample|secretref|stale|symbolic|synthetic|test|vault|(?:[a-z0-9]+[-_])*runtime[-_]?(?:key|password|secret|token)|(?:config|runtime|state)\.))[0-9A-Za-z][0-9A-Za-z._~+/=!@%^*-]{15,})\k<credentialQuote>|(?<secretValueBare>(?!(?:\$|<|\{|0{8}-|CODEXRIG_|dead|dummy|env(?:ironment)?\.|example|fake|fixture|mock|opaque|os\.environ|placeholder|process\.env|redacted|replacement|sample|secretref|stale|synthetic|test|vault))(?=[0-9A-Za-z._~+/=!@%^*-]{16,}(?=["'\s,;)}\]&]|$))(?=[0-9A-Za-z._~+/=!@%^*-]*[-=+/!@%^*])[0-9A-Za-z][0-9A-Za-z._~+/=!@%^*-]{15,}))(?=["'\s,;)}\]&]|$)/iu,
   },
   {
     label: "literal credential CLI value",
     regex:
       /--(?:access[-_]?token|api[-_]?key|authorization|client[-_]?(?:key|password|secret|token)|credential(?:s|[-_]?(?:key|password|secret|token))?|gh[-_]?token|github[-_]?token|gitlab[-_]?token|glab[-_]?token|password|private[-_]?token|refresh[-_]?token|secret|session[-_]?(?:secret|token)|token)(?:=|\s+)["']?(?<secretValue>(?!(?:\$|<|\{|dummy|env(?:ironment)?\.|example|opaque|os\.environ|placeholder|process\.env|redacted|secretref|test|vault))[0-9A-Za-z][0-9A-Za-z._~+/=!@%^&*-]{15,})/iu,
+  },
+  {
+    label: "signed URL credential",
+    regex:
+      /[?&](?:[A-Za-z0-9_.-]*[-_.])?(?:signature|sig)=(?<secretValue>(?!(?:dummy|example|fake|fixture|mock|opaque|placeholder|redacted|sample|secretref|synthetic|test|vault))[0-9A-Za-z%+/_=-]{16,})(?=[&#"'\s)<>]|$)/iu,
   },
   {
     label: "HTTP authorization credential",
@@ -150,17 +155,37 @@ export function redactSecretMatches(
   return redacted + source.slice(offset);
 }
 
-export function findSecretMatches(content) {
+/** Broad possible-credential matches remain useful for redaction, but cannot all block source. */
+export function isActionableSecretMatch(match) {
+  if (match.groups?.ambiguousCredentialName) return false;
+  const environmentName = match.groups?.environmentCredentialName;
+  if (!environmentName) return true;
+  if (environmentName !== environmentName.toUpperCase()) return false;
+  // Dictionary, input and storage keys are not credentials merely because a constant is uppercase.
+  return (
+    !environmentName.endsWith("KEY") ||
+    /(?:^|[-_])(?:ACCESS|API|AUTH|CLIENT|CREDENTIALS?|DECRYPTION|ENCRYPTION|PRIVATE|SECRET|SERVICE|SIGNING)(?:[-_][A-Z0-9]+)*[-_]KEY$/u.test(
+      environmentName,
+    )
+  );
+}
+
+/** Repository findings use credential semantics; private-context transfer may request redaction sensitivity. */
+export function findSecretMatches(content, { conservative = false } = {}) {
   const matches = [];
   const lines = content.split(/\r?\n/);
 
   for (const [lineIndex, line] of lines.entries()) {
     for (const pattern of secretPatterns) {
-      if (pattern.regex.test(line)) {
-        matches.push({
-          line: lineIndex + 1,
-          label: pattern.label,
-        });
+      const matcher = new RegExp(
+        pattern.regex.source,
+        `${pattern.regex.flags.replace(/[gy]/gu, "")}g`,
+      );
+      for (const match of line.matchAll(matcher)) {
+        if (conservative || isActionableSecretMatch(match)) {
+          matches.push({ line: lineIndex + 1, label: pattern.label });
+          break;
+        }
       }
     }
   }

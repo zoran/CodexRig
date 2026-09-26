@@ -1,11 +1,26 @@
 /** Resolves compatible stable tool and CI releases from their official distribution owners. */
 import { createHash } from "node:crypto";
+import { chmodSync, lstatSync, mkdtempSync } from "node:fs";
+import path from "node:path";
+import { toolingRoot } from "../filesystem/repository-files.mjs";
+import { removeOwnedArtifact } from "../filesystem/owned-file-operations.mjs";
+import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
+import {
+  cleanGitEnvironment,
+  isolatedGitResultCompleted,
+} from "../repository/git-runtime-isolation.mjs";
+import { spawnSyncWithBoundedIo } from "../repository/runtime-process-io.mjs";
 import {
   compareSemver,
   parseSemver,
   versionSatisfiesSimpleRange,
+  versionMatchesReleaseSelector,
 } from "../contracts/semver-contract.mjs";
-import { validateToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
+import {
+  codexDistributionPlatforms,
+  miseBinaryPlatforms,
+  validateToolchainConfiguration,
+} from "../contracts/toolchain-configuration.mjs";
 
 /** Reads bounded public metadata or release bytes without credentials or cached fallback. */
 export async function releaseBytes(url, maximumBytes, fetchImpl = globalThis.fetch) {
@@ -63,7 +78,7 @@ async function npmRelease(name, version, fetchImpl) {
   const data = await releaseJson(npmUrl(name, version), fetchImpl);
   if (
     data.name !== name ||
-    (version !== "latest" && data.version !== version) ||
+    (/^\d/u.test(version) && data.version !== version) ||
     !data.dist?.tarball ||
     !/^sha512-[A-Za-z0-9+/]{86}==$/u.test(data.dist.integrity ?? "")
   )
@@ -75,7 +90,7 @@ async function npmRelease(name, version, fetchImpl) {
 }
 
 async function verifyArchive(release, fetchImpl) {
-  const bytes = await releaseBytes(release.dist.tarball, 160 * 1024 * 1024, fetchImpl);
+  const bytes = await releaseBytes(release.dist.tarball, 256 * 1024 * 1024, fetchImpl);
   const integrity = `sha512-${createHash("sha512").update(bytes).digest("base64")}`;
   if (integrity !== release.dist.integrity)
     throw new Error(`Release archive integrity failed for ${release.name}.`);
@@ -86,128 +101,234 @@ function noDowngrade(next, current, label) {
     throw new Error(`${label} release is unstable or older than the current pin.`);
 }
 
-/** Reviews tool versions and archive digests before any project or host update. */
+/** Resolves the exact Codex platform contract; the unused npm JavaScript wrapper is not installed. */
+export async function resolveCodexDistribution(
+  matrix,
+  specification,
+  { fetchImpl = globalThis.fetch } = {},
+) {
+  const release = await npmRelease("@openai/codex", specification, fetchImpl);
+  parseSemver(release.version, "Codex release");
+  const candidate = structuredClone(matrix);
+  candidate.ci.codexVersion = release.version;
+  candidate.stable.codex.minimumVersion = release.version;
+  for (const target of codexDistributionPlatforms) {
+    const platform = await npmRelease("@openai/codex", `${release.version}-${target}`, fetchImpl);
+    candidate.ci.codexNpmPlatformIntegrities[target] = platform.dist.integrity;
+    if (release.version !== matrix.ci.codexVersion) await verifyArchive(platform, fetchImpl);
+  }
+  if (
+    release.version === matrix.ci.codexVersion &&
+    JSON.stringify(candidate.ci.codexNpmPlatformIntegrities) !==
+      JSON.stringify(matrix.ci.codexNpmPlatformIntegrities)
+  )
+    throw new Error("An unchanged Codex version has different archive digests.");
+  return candidate;
+}
+
+/** Resolves existing explicit compatibility selectors without changing the published stable policy. */
+export async function resolveCompatibilityToolchain(
+  current,
+  track,
+  { fetchImpl = globalThis.fetch } = {},
+) {
+  validateToolchainConfiguration(current);
+  const matrix = await resolveCodexDistribution(current, track.codex, { fetchImpl });
+  const nodes = await releaseJson("https://nodejs.org/dist/index.json", fetchImpl);
+  const requested = /^\d+$/u.test(track.node)
+    ? `>=${track.node}.0.0 <${Number(track.node) + 1}.0.0`
+    : `>=${track.node} <=${track.node}`;
+  matrix.stable.node.version = latestCompatibleVersion(
+    nodes.map((entry) => entry.version.replace(/^v/u, "")),
+    requested,
+    /^\d+$/u.test(track.node) ? `${track.node}.0.0` : track.node,
+  );
+  const pnpm = await npmRelease("pnpm", track.pnpm, fetchImpl);
+  parseSemver(pnpm.version, "Compatibility pnpm");
+  if (
+    !versionMatchesReleaseSelector(pnpm.version, track.pnpm) ||
+    !versionMatchesReleaseSelector(matrix.ci.codexVersion, track.codex)
+  )
+    throw new Error("Resolved compatibility release does not match its declared selector.");
+  matrix.stable.pnpm.version = pnpm.version;
+  for (const tool of ["node", "pnpm"])
+    matrix.stable[tool].range = `>=${matrix.stable[tool].version} <=${matrix.stable[tool].version}`;
+  matrix.reviewedOn = new Date().toISOString().slice(0, 10);
+  return validateToolchainConfiguration(matrix);
+}
+
+/** Reviews official stable releases before the shared project-local installer consumes them. */
 export async function resolveToolchainReleases(current, { fetchImpl = globalThis.fetch } = {}) {
-  const matrix = structuredClone(validateToolchainConfiguration(current));
+  validateToolchainConfiguration(current);
   const results = await Promise.allSettled([
     releaseJson("https://nodejs.org/dist/index.json", fetchImpl),
     releaseJson(npmUrl("pnpm"), fetchImpl),
-    npmRelease("@openai/codex", "latest", fetchImpl),
-    npmRelease("@jdxcode/mise-linux-x64", "latest", fetchImpl),
+    resolveCodexDistribution(current, "latest", { fetchImpl }),
+    releaseBytes("https://mise.jdx.dev/VERSION", 128, fetchImpl),
   ]);
   for (const result of results) if (result.status === "rejected") throw result.reason;
-  const [nodes, pnpm, codex, mise] = results.map((result) => result.value);
+  const [nodes, pnpm, matrix, mise] = results.map((result) => result.value);
   matrix.stable.node.version = latestCompatibleVersion(
     nodes.filter((entry) => entry.lts).map((entry) => entry.version.replace(/^v/u, "")),
-    matrix.stable.node.range,
-    matrix.stable.node.version,
+    current.stable.node.range,
+    current.stable.node.version,
   );
   matrix.stable.pnpm.version = latestCompatibleVersion(
     Object.keys(pnpm.versions ?? {}),
-    matrix.stable.pnpm.range,
-    matrix.stable.pnpm.version,
+    current.stable.pnpm.range,
+    current.stable.pnpm.version,
   );
-  noDowngrade(codex.version, current.ci.codexVersion, "Codex");
-  noDowngrade(mise.version, current.ci.miseVersion, "mise");
-  const codexChanged = codex.version !== current.ci.codexVersion;
-  const miseChanged = mise.version !== current.ci.miseVersion;
-  matrix.ci.codexVersion = codex.version;
-  matrix.ci.codexNpmPackageIntegrity = codex.dist.integrity;
-  matrix.stable.codex.minimumVersion = codex.version;
-  matrix.ci.miseVersion = mise.version;
-  const archives = [codex];
-  for (const architecture of ["x64", "arm64"]) {
-    const platform = await npmRelease(
-      "@openai/codex",
-      `${codex.version}-linux-${architecture}`,
-      fetchImpl,
-    );
-    const misePlatform =
-      architecture === "x64"
-        ? mise
-        : await npmRelease(`@jdxcode/mise-linux-${architecture}`, mise.version, fetchImpl);
-    matrix.ci.codexNpmPlatformIntegrities[architecture] = platform.dist.integrity;
-    matrix.ci.miseNpmPackageIntegrities[architecture] = misePlatform.dist.integrity;
-    if (codexChanged) archives.push(platform);
-    if (miseChanged) await verifyArchive(misePlatform, fetchImpl);
+  noDowngrade(matrix.ci.codexVersion, current.ci.codexVersion, "Codex");
+  const miseVersion = mise.toString("utf8").trim();
+  noDowngrade(miseVersion, current.ci.miseVersion, "Mise");
+  const base = `https://github.com/jdx/mise/releases/download/v${miseVersion}`;
+  const checksums = (await releaseBytes(`${base}/SHASUMS256.txt`, 128 * 1024, fetchImpl)).toString(
+    "utf8",
+  );
+  const digests = new Map();
+  for (const line of checksums.trim().split(/\r?\n/u)) {
+    const match = /^([a-f0-9]{64})  \.\/([^\s/]+)$/u.exec(line);
+    if (!match || digests.has(match[2]))
+      throw new Error("Official Mise checksum manifest is invalid or ambiguous.");
+    digests.set(match[2], match[1]);
   }
-  if (
-    !codexChanged &&
-    (matrix.ci.codexNpmPackageIntegrity !== current.ci.codexNpmPackageIntegrity ||
-      JSON.stringify(matrix.ci.codexNpmPlatformIntegrities) !==
-        JSON.stringify(current.ci.codexNpmPlatformIntegrities))
-  )
-    throw new Error("An unchanged Codex version has different archive digests.");
-  if (
-    !miseChanged &&
-    JSON.stringify(matrix.ci.miseNpmPackageIntegrities) !==
-      JSON.stringify(current.ci.miseNpmPackageIntegrities)
-  )
-    throw new Error("An unchanged mise version has different archive digests.");
-  if (codexChanged) for (const archive of archives) await verifyArchive(archive, fetchImpl);
-  if (miseChanged) {
-    const release = await releaseJson(
-      `https://api.github.com/repos/jdx/mise/releases/tags/v${mise.version}`,
-      fetchImpl,
-    );
-    const asset = release.assets?.find((entry) => entry.name === `mise-v${mise.version}-linux-x64`);
-    matrix.ci.miseLinuxX64Sha256 = await verifiedMiseBinaryDigest(asset, fetchImpl);
+  matrix.ci.miseVersion = miseVersion;
+  for (const platform of miseBinaryPlatforms) {
+    const name = `mise-v${miseVersion}-${platform}${platform.startsWith("windows-") ? ".exe" : ""}`;
+    const digest = digests.get(name);
+    if (!digest)
+      throw new Error(`Official Mise release is missing a binary digest for ${platform}.`);
+    if (miseVersion === current.ci.miseVersion && digest !== current.ci.miseBinarySha256[platform])
+      throw new Error("An unchanged Mise version has different archive digests.");
+    matrix.ci.miseBinarySha256[platform] =
+      miseVersion !== current.ci.miseVersion && platform === "linux-x64"
+        ? await verifiedMiseBinaryDigest(
+            { digest: `sha256:${digest}`, browser_download_url: `${base}/${name}` },
+            fetchImpl,
+          )
+        : digest;
   }
   if (JSON.stringify(matrix) !== JSON.stringify(current))
     matrix.reviewedOn = new Date().toISOString().slice(0, 10);
   return validateToolchainConfiguration(matrix);
 }
 
-/** Verifies a raw mise executable against its official asset size and digest, independently of compressed npm archives. */
+/** Verifies a bounded raw mise executable against its official checksum, independently of npm archives. */
 export async function verifiedMiseBinaryDigest(asset, fetchImpl = globalThis.fetch) {
-  if (
-    !asset ||
-    !/^sha256:[a-f0-9]{64}$/u.test(asset.digest ?? "") ||
-    !Number.isSafeInteger(asset.size) ||
-    asset.size <= 0 ||
-    asset.size > 256 * 1024 * 1024
-  ) {
-    throw new Error("Official mise release has no bounded raw executable size and digest.");
+  if (!asset || !/^sha256:[a-f0-9]{64}$/u.test(asset.digest ?? "")) {
+    throw new Error("Official mise release has no raw executable digest.");
   }
-  const bytes = await releaseBytes(asset.browser_download_url, asset.size, fetchImpl);
+  const bytes = await releaseBytes(asset.browser_download_url, 256 * 1024 * 1024, fetchImpl);
   const digest = createHash("sha256").update(bytes).digest("hex");
-  if (bytes.length !== asset.size || `sha256:${digest}` !== asset.digest)
-    throw new Error("Official mise binary size or integrity failed.");
+  if (bytes.length === 0 || `sha256:${digest}` !== asset.digest)
+    throw new Error("Official mise binary integrity failed.");
   return digest;
 }
 
-/** Updates SHA-pinned GitHub actions within each annotated stable major line. */
-export async function refreshGithubActions(content, { fetchImpl = globalThis.fetch } = {}) {
+/** Runs public Git discovery without host/project Git configuration, credentials, hooks or checkout. */
+function withPublicGithubGit(root, spawnGit, action) {
+  const locations = prepareProjectToolDirectories(root);
+  const directory = mkdtempSync(path.join(locations.temporary, "release-refs-"));
+  chmodSync(directory, 0o700);
+  const identity = lstatSync(directory);
+  const environment = {
+    ...cleanGitEnvironment(process.env, root),
+    HOME: directory,
+    USERPROFILE: directory,
+    XDG_CONFIG_HOME: directory,
+    GIT_CEILING_DIRECTORIES: locations.temporary,
+    GIT_CONFIG_COUNT: "0",
+    GIT_ALLOW_PROTOCOL: "https",
+  };
+  const git = (...args) => {
+    const result = spawnGit("git", args, {
+      cwd: directory,
+      env: environment,
+      encoding: "utf8",
+      input: "",
+      timeout: 60_000,
+      maxBuffer: 4 * 1024 * 1024,
+      stdio: "pipe",
+    });
+    if (!isolatedGitResultCompleted(result, { args, maximumOutputBytes: 4 * 1024 * 1024 }))
+      throw new Error(
+        `Public GitHub release lookup failed during git ${args[0]}; freshness is indeterminate.`,
+      );
+    return result.stdout.trim();
+  };
+  try {
+    return action(git);
+  } finally {
+    const currentIdentity = lstatSync(directory);
+    if (
+      currentIdentity.dev !== identity.dev ||
+      currentIdentity.ino !== identity.ino ||
+      !currentIdentity.isDirectory()
+    )
+      throw new Error("Public release lookup directory identity changed.");
+    removeOwnedArtifact(root, directory, "directory", "public release lookup", {
+      expectedIdentity: currentIdentity,
+    });
+  }
+}
+
+/** Updates immutable GitHub action pins from public Git tags, without the account/IP REST quota. */
+export async function refreshGithubActions(
+  content,
+  { root = toolingRoot, spawnGit = spawnSyncWithBoundedIo } = {},
+) {
   const pattern =
     /\buses: ([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([a-f0-9]{40}) # v(\d+\.\d+\.\d+)\b/gu;
   const updates = new Map();
+  const repositories = new Map();
   for (const match of content.matchAll(pattern)) {
     if (updates.has(match[0])) continue;
     const [, repository, oldSha, current] = match;
     const major = parseSemver(current).major;
-    const refs = await releaseJson(
-      `https://api.github.com/repos/${repository}/git/matching-refs/tags/v${major}.`,
-      fetchImpl,
-    );
-    if (!Array.isArray(refs)) throw new Error("GitHub action tags could not be inspected.");
+    const url = `https://github.com/${repository}.git`;
+    if (!repositories.has(repository))
+      repositories.set(
+        repository,
+        withPublicGithubGit(root, spawnGit, (git) => {
+          const refs = new Map();
+          for (const line of git("ls-remote", "--tags", "--exit-code", url).split("\n")) {
+            const record = /^([a-f0-9]{40})\t(refs\/tags\/[^\s]+)$/u.exec(line);
+            if (!record || refs.has(record[2]))
+              throw new Error("GitHub action tags are invalid or ambiguous.");
+            refs.set(record[2], record[1]);
+          }
+          return refs;
+        }),
+      );
+    const refs = repositories.get(repository);
     const version = latestCompatibleVersion(
-      refs.map((ref) => ref.ref?.replace(/^refs\/tags\/v/u, "")),
+      [...refs.keys()].map((ref) => ref.replace(/^refs\/tags\/v/u, "")),
       `>=${current} <${major + 1}.0.0`,
       current,
     );
-    let object = refs.find((ref) => ref.ref === `refs/tags/v${version}`)?.object;
-    for (let depth = 0; object?.type === "tag" && depth < 4; depth += 1)
-      object = (
-        await releaseJson(
-          `https://api.github.com/repos/${repository}/git/tags/${object.sha}`,
-          fetchImpl,
-        )
-      ).object;
-    if (object?.type !== "commit" || !/^[a-f0-9]{40}$/u.test(object.sha))
-      throw new Error("GitHub action tag has no bounded commit identity.");
-    if (version === current && oldSha !== object.sha)
+    const identity = (tag) => refs.get(`${tag}^{}`) ?? refs.get(tag);
+    if (identity(`refs/tags/v${current}`) !== oldSha)
       throw new Error(`GitHub action ${repository} moved its existing release tag.`);
-    updates.set(match[0], `uses: ${repository}@${object.sha} # v${version}`);
+    const tag = `refs/tags/v${version}`;
+    const sha = identity(tag);
+    if (version !== current)
+      withPublicGithubGit(root, spawnGit, (git) => {
+        git("init", "--bare", "--template=", "--quiet");
+        git(
+          "fetch",
+          "--quiet",
+          "--depth=1",
+          "--filter=tree:0",
+          "--no-tags",
+          "--no-recurse-submodules",
+          "--no-auto-maintenance",
+          url,
+          tag,
+        );
+        if (git("rev-parse", "--verify", "FETCH_HEAD^{commit}") !== sha)
+          throw new Error("GitHub action tag changed during lookup or has no commit identity.");
+      });
+    updates.set(match[0], `uses: ${repository}@${sha} # v${version}`);
   }
   return content.replace(pattern, (match) => updates.get(match));
 }

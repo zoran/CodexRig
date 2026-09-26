@@ -12,7 +12,7 @@ For a complete source-framework closure, lead with the existing publication orch
 owning Codex session exits:
 
 ```bash
-mise exec --locked -- pnpm framework:publish --message "<commit message>"
+bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"
 ```
 
 This reset-owned orchestrator uses the existing worktree, housekeeping, verification, hook, and
@@ -34,9 +34,9 @@ For an explicitly reset-only/local outcome or a diagnosed recovery need, use the
 boundary and explain why publication is outside that action:
 
 ```bash
-mise exec --locked -- pnpm framework:reset
-mise exec --locked -- pnpm framework:reset --apply
-mise exec --locked -- pnpm framework:reset
+node .agents/skills/reset-framework/scripts/reset-framework.mjs
+node .agents/skills/reset-framework/scripts/reset-framework.mjs --apply
+node .agents/skills/reset-framework/scripts/reset-framework.mjs
 ```
 
 The first command is a read-only preview and exits non-zero while reset candidates exist. Review its
@@ -59,18 +59,23 @@ runtime state, so generation never invokes reset or requires the source work cac
    reset holds the lifecycle lock and proves repository-wide runtime quiescence. It validates only
    the current lease schema; an incompatible private lease is discarded with disposable runtime
    rather than interpreted.
-4. Preserve `.git`, source code, dependencies, and portable `.codex` policy. Preserve only the
-   current runtime identity required for the next session in root CODEX_HOME (`auth.json`, root
-   `config.toml`, and `installation_id`) plus exact current-schema, digest-valid successful
-   publication evidence. Non-current or corrupt evidence and non-current identity copies are
-   disposable state and are never interpreted or migrated. It removes sessions, history, memories,
-   logs, databases and WAL files, caches, downloaded plugins/skills, snapshots, temporary files,
-   startup attestations, and stale locks. Never rewrite Git history implicitly.
+4. Preserve `.git`, source code, dependencies, portable `.codex` policy and repository-local account
+   state under `.auth`. The
+   [source inventory owner](../../../scripts/repository/source-inventory-policy.mjs) defines the
+   native credential files retained in root CODEX_HOME; use that current classification rather than
+   maintaining another credential list here. Preserve root `config.toml`, `installation_id` and
+   exact current-schema, digest-valid successful publication evidence. Non-current or corrupt
+   evidence and non-current identity copies are disposable state and are never interpreted or
+   migrated; credential stores are not disposable runtime. Reset removes sessions, history,
+   memories, logs, databases and WAL files, caches, downloaded plugins/skills, snapshots, temporary
+   files, startup attestations, and stale locks. Never rewrite Git history implicitly.
 5. Ensure `docs/project.md` remains the concise, product-neutral central truth. Remove
    product-specific source manually only when the user explicitly placed it in scope; the reset
    script never guesses. Framework verification uses the internal read-only
    `--verification-source-baseline` only while its verification lock is active. It ignores contained
-   runtime state but rejects process/planning residue and never substitutes for publication cleanup.
+   runtime state and the valid bounded unfinished work cache of an observably active repository
+   session, but rejects other process/planning residue. It never substitutes for publication
+   cleanup; full reset still removes the work cache after sessions exit.
 6. Run the reset preview again. After applicable reviews, the publication workflow invokes adaptive
    `pnpm verify` admission once. Run the applied reset and clean preview once more after
    verification so any temporary state created by checks is gone while exact verification evidence

@@ -47,6 +47,12 @@ relevant evidence-backed findings in finish mode, batch by root cause, and repea
 review/evidence until none remains. In review-only mode, report rather than repair; do not call a
 known-defective state clean.
 
+Every audit applies
+[Repository Efficiency And Effectiveness](../../../instructions.md#repository-efficiency-and-effectiveness):
+assess repository-wide outcome preservation, context/runtime/verification/maintenance cost and
+coherence from the bounded map and affected consumers. Fix only evidenced in-scope regressions;
+report limits and preserve requirements. Static byte checks do not establish model effectiveness.
+
 ## Audit And Settle
 
 1. Reconcile changed-contract docs, source/declaration headers, dead paths and bounded work context

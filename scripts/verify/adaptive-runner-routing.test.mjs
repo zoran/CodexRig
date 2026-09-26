@@ -673,3 +673,10 @@ test("an executable index file retains upstream dependency coverage", (t) => {
   assert.ok(args.includes("./packages/beta"));
   assert.ok(args.includes("./packages/core"));
 });
+
+test("a static surface scan cannot claim missing product infrastructure test ownership", () => {
+  const changed = "infra/gcp/foundation-policy.mjs";
+  const plan = route([changed], { workspaceManifests: [] });
+  assert.equal(plan.verificationScope, "full");
+  assert.ok(plan.admission.uncoveredFullRelevantPaths.includes(changed));
+});

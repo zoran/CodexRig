@@ -18,10 +18,19 @@ description:
   selection; major updates require explicit selection, migration review, and targeted regression.
 - Registry or advisory lookup failure is indeterminate, not proof that no update or vulnerability
   exists. Report it and leave manifests unchanged.
-- Use `mise exec --locked -- node scripts/deps/install-compatible.mjs` for initial installation and
-  dependency-graph refreshes. It resolves the newest stable versions allowed by workspace ranges and
-  explicit pins under strict peer and Node.js engine compatibility, then installs the reviewed
-  lockfile. A frozen install is a reproducibility command, not a freshness check.
+- A versioned `patchedDependencies` selector declares patch applicability; it does not pin package
+  resolution. Before compatible refresh, reconcile the actual native version constraints for every
+  patched direct/transitive dependency and any owning SDK whose newer release requires a different
+  patched version. Preserve the reviewed patch until its owner migrates or retires it. Use
+  compatible native pins with an adjacent reason/review condition; do not force versions outside
+  consumer ranges, widen patch applicability without evidence, or allow unused patches to unblock
+  startup. Inspect the resulting graph for both lost patches and duplicate unpatched native
+  packages.
+- Use `bash scripts/setup/run-project.sh node scripts/deps/install-compatible.mjs` for initial
+  installation and dependency-graph refreshes. It resolves the newest stable versions allowed by
+  workspace ranges and explicit pins under strict peer and Node.js engine compatibility, then
+  installs the reviewed lockfile. A frozen install is a reproducibility command, not a freshness
+  check.
 - Canonical startup invokes `scripts/deps/maintain-toolchain.mjs --startup` before session
   admission. It checks official releases and updates Node.js/pnpm within matrix ranges, stable mise
   and Codex, CI tool pins and action pins within annotated majors, plus compatible project packages.

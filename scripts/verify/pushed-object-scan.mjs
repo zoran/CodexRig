@@ -29,7 +29,7 @@ function gitInvocation(repositoryRoot, args) {
       gitDirectory: metadata.gitDirectory,
       workTree: metadata.workTree,
     }),
-    environment: cleanGitEnvironment(),
+    environment: cleanGitEnvironment(process.env, repositoryRoot),
   };
 }
 

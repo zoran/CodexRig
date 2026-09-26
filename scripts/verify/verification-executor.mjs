@@ -171,7 +171,7 @@ function boundedOutputCollector() {
 }
 
 export async function runHeldVerificationCommand({ command, commandArgs, repositoryRoot }) {
-  const environment = verificationChildEnvironment();
+  const environment = verificationChildEnvironment(process.env, repositoryRoot);
   const resolvedCommand = resolveVerificationExecutable(command, {
     cwd: repositoryRoot,
     environment,
@@ -251,7 +251,7 @@ function runUnsupervisedCommand(command, repositoryRoot) {
       lifecycleCapability: verificationLifecycleCapability(repositoryRoot),
       options: {
         cwd: repositoryRoot,
-        env: verificationChildEnvironment(),
+        env: verificationChildEnvironment(process.env, repositoryRoot),
         stdio: ["ignore", "pipe", "pipe"],
       },
       repositoryRoot,

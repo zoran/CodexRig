@@ -1,7 +1,6 @@
 /** Exercises retained project runtime trust boundaries in owned isolated fixtures. */
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { createHash } from "node:crypto";
 import {
   cpSync,
   mkdirSync,
@@ -16,8 +15,15 @@ import path from "node:path";
 import { toolingRoot } from "../filesystem/repository-files.mjs";
 import { validateCodexConfig, validateRuntimeCodexConfig } from "./validate-codex-config.mjs";
 import { startupExecutableClosurePaths } from "./startup-executable-closure.mjs";
-import { verifyMiseArchive, verifyCodexArchives } from "../deps/toolchain-archives.mjs";
+import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
+import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
+import {
+  projectManagedToolLayout,
+  sealProjectToolBundle,
+  verifyProjectToolBundle,
+} from "../repository/project-tool-executables.mjs";
 import { evaluateAutonomousContinuation } from "../context/session-stop-lifecycle.mjs";
+import { diagnoseTooling } from "./tooling-doctor.mjs";
 const roots = [];
 function fixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "project-runtime-safety-"));
@@ -67,20 +73,58 @@ test("startup closure requires contained regular modules and every actual import
   assert.throws(() => startupExecutableClosurePaths(root));
 });
 
-test("reviewed installer archives reject corrupt bytes, symlinks and incomplete pairs", () => {
+test("installed native bundles reject changed bytes and linked executable replacements", () => {
   const root = fixture();
-  const archive = path.join(root, "reviewed.tgz");
-  const bytes = Buffer.from("reviewed isolated archive bytes");
-  const integrity = `sha512-${createHash("sha512").update(bytes).digest("base64")}`;
-  writeFileSync(archive, bytes);
-  assert.equal(verifyMiseArchive(root, integrity), archive);
-  writeFileSync(archive, "corrupt");
-  assert.throws(() => verifyMiseArchive(root, integrity), /integrity/iu);
-  assert.throws(() => verifyCodexArchives(root, integrity, integrity), /exactly two/iu);
-  rmSync(archive);
-  symlinkSync(path.join(toolingRoot, "NOTICE"), archive);
-  assert.throws(() => verifyMiseArchive(root, integrity), /regular/iu);
+  prepareProjectToolDirectories(root);
+  const tool = projectManagedToolLayout(root, readToolchainConfiguration()).mise;
+  mkdirSync(path.dirname(tool.executable), { recursive: true, mode: 0o700 });
+  writeFileSync(tool.executable, "reviewed executable fixture", { mode: 0o755 });
+  sealProjectToolBundle(root, tool.directory, tool);
+  assert.equal(verifyProjectToolBundle(root, tool), tool.executable);
+  writeFileSync(tool.executable, "substituted executable fixture");
+  assert.throws(() => verifyProjectToolBundle(root, tool));
+  rmSync(tool.executable);
+  symlinkSync(path.join(toolingRoot, "NOTICE"), tool.executable);
+  assert.throws(() => verifyProjectToolBundle(root, tool));
 });
+
+test(
+  "tooling diagnosis ignores product PATH shadows and requires its own native installation",
+  { skip: process.platform === "win32" },
+  async () => {
+    const root = fixture();
+    prepareProjectToolDirectories(root);
+    for (const file of [
+      ".codex/tooling.json",
+      ".codex/toolchain.json",
+      "package.json",
+      ".codex/mise.toml",
+    ])
+      cpSync(path.join(toolingRoot, file), path.join(root, file));
+    const layout = projectManagedToolLayout(root);
+    const matrix = readToolchainConfiguration(root);
+    for (const [executable, version] of [
+      [layout.codex.executable, matrix.ci.codexVersion],
+      [layout.pnpm.executable, matrix.stable.pnpm.version],
+    ]) {
+      mkdirSync(path.dirname(executable), { recursive: true });
+      writeFileSync(executable, `#!/bin/sh\nprintf '%s\\n' '${version}'\n`, { mode: 0o755 });
+    }
+    sealProjectToolBundle(root, layout.codex.directory, layout.codex);
+    const shadow = path.join(root, "node_modules/.bin");
+    mkdirSync(shadow, { recursive: true });
+    for (const name of ["codex", "pnpm"])
+      writeFileSync(path.join(shadow, name), "#!/bin/sh\nprintf '0.1.0\\n'\n", { mode: 0o755 });
+    const environment = { ...process.env, PATH: `${shadow}${path.delimiter}${process.env.PATH}` };
+    const result = await diagnoseTooling({ root, environment });
+    assert.equal(result.versions.codex, matrix.ci.codexVersion);
+    assert.equal(result.versions.pnpm, matrix.stable.pnpm.version);
+    rmSync(layout.codex.executable);
+    const missing = await diagnoseTooling({ root, environment });
+    assert.equal(missing.versions.codex, "");
+    assert.ok(missing.errors.some(({ code }) => code === "tool.Codex.missing"));
+  },
+);
 
 test("invalid work state is a diagnostic and cannot manufacture a continuation task", () => {
   const root = fixture();

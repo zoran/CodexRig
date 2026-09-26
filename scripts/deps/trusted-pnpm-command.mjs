@@ -4,7 +4,9 @@ import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { readOptionalOwnedFile } from "../filesystem/owned-file-operations.mjs";
+import { isProjectManagedExecutable } from "../repository/project-tool-executables.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
+import { parseSemver } from "../contracts/semver-contract.mjs";
 
 const commandCache = new Map();
 
@@ -30,12 +32,10 @@ function expectedToolchain(repositoryRoot) {
   }
   const node = compatibility?.stable?.node?.version;
   const pnpm = compatibility?.stable?.pnpm?.version;
-  if (
-    typeof node !== "string" ||
-    !/^\d+\.\d+\.\d+$/u.test(node) ||
-    typeof pnpm !== "string" ||
-    !/^\d+\.\d+\.\d+$/u.test(pnpm)
-  ) {
+  try {
+    parseSemver(node);
+    parseSemver(pnpm);
+  } catch {
     throw new Error("Trusted Node.js/pnpm compatibility versions are invalid.");
   }
   return Object.freeze({ node, pnpm });
@@ -87,7 +87,7 @@ export function trustedPnpmCommand({
       if (
         !stats.isFile() ||
         !strictDescendant(resolvedPnpmRoot, executable) ||
-        strictDescendant(root, executable) ||
+        (strictDescendant(root, executable) && !isProjectManagedExecutable(root, executable)) ||
         executable === root
       ) {
         continue;
@@ -98,7 +98,7 @@ export function trustedPnpmCommand({
     const result = spawn(executable, ["--version"], {
       cwd: root,
       encoding: "utf8",
-      env: pnpmHooksDisabledEnvironment(environment),
+      env: pnpmHooksDisabledEnvironment(environment, root),
       input: "",
       stdio: "pipe",
       timeout: 30_000,
@@ -115,7 +115,7 @@ export function trustedPnpmCommand({
     return command;
   }
   throw new Error(
-    `Trusted pnpm ${expected.pnpm} was not resolved beside compatibility-owned Node.js ${expected.node}; run through mise exec --locked.`,
+    `Trusted pnpm ${expected.pnpm} was not resolved beside compatibility-owned Node.js ${expected.node}; use bash scripts/setup/run-project.sh.`,
   );
 }
 

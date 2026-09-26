@@ -9,7 +9,7 @@ import {
   sha256,
 } from "../filesystem/repository-files.mjs";
 import {
-  isProjectToolPath,
+  isFrameworkUpgradePath,
   atomicWriteUpgradeFile,
   ensureUpgradeDirectoryChain,
   targetUpgradeFileState,
@@ -67,8 +67,9 @@ function journalForPlan(plan) {
   const paths = new Set(plan.operations.map((operation) => operation.path));
   const operationByPath = new Map(plan.operations.map((operation) => [operation.path, operation]));
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     digest: plan.digest,
+    regenerationRuntimeHash: plan.regenerationRuntimeHash ?? null,
     originals: [...paths].sort().map((relativePath) => {
       const original = originalRecord(plan.targetRoot, relativePath);
       const operation = operationByPath.get(relativePath);
@@ -93,10 +94,12 @@ function journalForPlan(plan) {
 
 function validateJournal(journal, expectedDigest) {
   if (
-    journal?.schemaVersion !== 2 ||
+    journal?.schemaVersion !== 3 ||
     !validHash(journal.digest) ||
     journal.digest === null ||
-    Object.keys(journal).sort().join(",") !== "digest,originals,schemaVersion" ||
+    Object.keys(journal).sort().join(",") !==
+      "digest,originals,regenerationRuntimeHash,schemaVersion" ||
+    !validHash(journal.regenerationRuntimeHash) ||
     (expectedDigest !== undefined && journal.digest !== expectedDigest) ||
     !Array.isArray(journal.originals) ||
     journal.originals.length > 4096
@@ -108,7 +111,7 @@ function validateJournal(journal, expectedDigest) {
     const relativePath = normalizeRepositoryPath(original?.path, "framework upgrade journal path");
     if (
       seen.has(relativePath) ||
-      (relativePath !== "package.json" && !isProjectToolPath(relativePath)) ||
+      !isFrameworkUpgradePath(relativePath) ||
       Object.keys(original).sort().join(",") !==
         "allowedMode,allowedSha256,content,existed,mode,path,sha256" ||
       (original.allowedSha256 === null) !== (original.allowedMode === null) ||
@@ -223,7 +226,7 @@ export function beginFrameworkUpgrade(plan, lifecycle) {
       serializeCanonicalJson({
         lifecycleNonce: lifecycleCapability.nonce,
         operation: "framework-upgrade",
-        schemaVersion: 2,
+        schemaVersion: 3,
       }),
       0o600,
     );

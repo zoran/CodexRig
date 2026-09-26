@@ -52,7 +52,7 @@ function gitOutput(metadata, args) {
   const result = spawnSync("git", invocationArguments, {
     cwd: metadata.workTree,
     encoding: "utf8",
-    env: cleanGitEnvironment(),
+    env: cleanGitEnvironment(process.env, metadata.workTree),
     input: "",
     maxBuffer: 1024 * 1024,
     stdio: "pipe",

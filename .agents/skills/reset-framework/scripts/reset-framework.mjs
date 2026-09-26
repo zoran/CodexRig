@@ -5,12 +5,18 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { isRepositoryProcessArtifactPath } from "../../../../scripts/docs/document-scope.mjs";
+import {
+  projectContextRelativePath,
+  readProjectWorkContext,
+} from "../../../../scripts/context/project-work-state.mjs";
 import { claimAndRemove } from "../../../../scripts/filesystem/owned-path-safety.mjs";
 import {
   isPrivateCodexRuntimePath,
+  isPrivateRepositoryStatePath,
   isRepositoryCodexHomePath,
   repositoryCodexRuntimeCacheDirectory,
   repositoryCodexRuntimeDirectory,
+  repositoryCodexHomeCredentialFileNames,
 } from "../../../../scripts/repository/source-inventory.mjs";
 import { isPortableCodexPath } from "../../../../scripts/repository/source-inventory-policy.mjs";
 import { inspectLinuxOpenRepositoryPaths } from "../../../../scripts/repository/runtime-process-identity.mjs";
@@ -53,7 +59,11 @@ const optionalEmptyDirectories = [
   "services",
 ];
 const scanExcludedDirectories = new Set([".codex", ".git", ".project-state", "node_modules"]);
-const preservedCodexHomeFiles = new Set(["auth.json", "config.toml", "installation_id"]);
+const preservedCodexHomeFiles = new Set([
+  ...repositoryCodexHomeCredentialFileNames,
+  "config.toml",
+  "installation_id",
+]);
 const preservedRuntimeFiles = new Set([runtimeLifecycleGuardName, runtimeLifecycleLockName]);
 
 function fail(message) {
@@ -167,13 +177,8 @@ export function openFrameworkRuntimeStatus(root, { procRoot = "/proc", testHooks
 
 function assertRuntimeInactive(root) {
   const runtimePath = absolutePath(root, repositoryCodexRuntimeDirectory);
-  const configuredHome = process.env.CODEX_HOME?.trim();
-  if (configuredHome) {
-    const resolvedHome = path.resolve(configuredHome);
-    if (resolvedHome === root || resolvedHome === runtimePath) {
-      fail("Reset refused while this Codex session owns the framework runtime; exit Codex first.");
-    }
-  }
+  // Every isolated project command sets CODEX_HOME, including post-exit publication. Only
+  // observable runtime ownership and the current session lease establish an active session.
   const openRuntimeStatus = openFrameworkRuntimeStatus(root);
   if (openRuntimeStatus === "active") {
     fail("Reset refused while another process still has framework runtime files open.");
@@ -232,7 +237,7 @@ function scanProcessDocuments(root) {
       const target = path.join(directory, entry.name);
       const relative = relativePath(root, target);
       if (entry.isSymbolicLink()) continue;
-      if (isRepositoryCodexHomePath(relative)) continue;
+      if (isPrivateRepositoryStatePath(relative)) continue;
       if (entry.isDirectory()) {
         if (!scanExcludedDirectories.has(entry.name) && relative !== "dist/exports") {
           pending.push(target);
@@ -424,6 +429,20 @@ function printPreview(candidates, applyArguments = "--apply") {
   console.log(`Re-run with ${applyArguments} after reviewing this list.`);
 }
 
+function verificationSourceCandidates(root) {
+  const candidates = collectCandidates(root, { includeLocalRuntime: false });
+  if (
+    candidates.includes(projectContextRelativePath) &&
+    inspectRuntimeSessionLease({ root }).status === "active"
+  ) {
+    const context = readProjectWorkContext(root);
+    if (context && context.state.status !== "complete") {
+      return candidates.filter((candidate) => candidate !== projectContextRelativePath);
+    }
+  }
+  return candidates;
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const root = requireFrameworkRoot(options.root);
@@ -441,9 +460,7 @@ async function main() {
       fail("Reset refused while a repository verification session is active.");
     }
     const includeLocalRuntime = fullReset;
-    const candidates = fullReset
-      ? inspectFrameworkReset(root)
-      : collectCandidates(root, { includeLocalRuntime });
+    const candidates = fullReset ? inspectFrameworkReset(root) : verificationSourceCandidates(root);
 
     if (!options.apply) {
       if (candidates.length === 0) {
