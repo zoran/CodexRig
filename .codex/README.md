@@ -48,7 +48,8 @@ or delegation authority. Every other mismatch closes the child and keeps the wor
 
 Memories are disabled in the reusable framework root. Generation transfers no source/sibling
 runtime or memory state and enables memories only inside the child's own isolated runtime home.
-Framework reset removes obsolete and disposable runtime after all owning Codex sessions exit.
+Framework publication preserves the verified calling session and its private runtime. Full framework
+reset removes obsolete and disposable runtime only after all owning Codex sessions exit.
 
 ## Current Contracts Only
 

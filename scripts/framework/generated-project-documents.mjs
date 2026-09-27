@@ -105,7 +105,8 @@ omit real product tests. Tool failures are bounded findings, not a new maintenan
 
 Portable startup requests on-request approval and network-disabled workspace-write. Explicit Dev
 \`--yolo\` changes runtime permissions only within existing authority. No unapproved staging/prod,
-commit or push. Default to parallel development with four concurrent subagents in addition to the
+commit or push. Explicitly authorized publication and deployment may run in the owning session;
+use the README command and retain environment gates. Default to parallel development with four concurrent subagents in addition to the
 primary when substantial disjoint work, permissions, confirmed capacity and integration permit.
 Keep at most four live; use fewer or work serially when necessary, briefly state why, and never
 invent work to fill slots. Name runnable assignments in the plan, start admitted work concurrently,
@@ -193,7 +194,8 @@ require their own explicit publication and deployment authority.
 
 ## Publish Source Changes
 
-Review all non-ignored changes and exit this project's Codex sessions with \`/quit\`. Then run:
+Review all non-ignored changes and authorize publication. Run from the owning Codex session or
+from the terminal:
 
 \`\`\`bash
 bash scripts/setup/run-project.sh pnpm project:publish --message "<commit message>"
@@ -205,7 +207,12 @@ task and elapsed time; add \`--verbose\` for sanitized check output. Failed chec
 a rejected push preserves the local commit for retry without an empty commit. No branch switch,
 automatic merge, force push, native-session reset or direct deployment is performed. Existing Git
 hooks, branch protections and any CI/deployment approvals still apply. A missing upstream must be
-configured explicitly before publication.
+configured explicitly before publication. The calling canonical session is admitted through exact
+Linux process ancestry; other or unverified active writers block publication. Drain owned agents
+and background writers first. Session exit is unnecessary when this proof is available. Authorized
+deployments can follow directly using project commands and existing project credentials; retain
+the project's environment approvals. If process ancestry cannot be proven, publish from the terminal
+after sessions exit.
 
 Verification reuses successful evidence for unchanged source and the same effective toolchain.
 Use \`pnpm verify:changed -- --print-plan\` to inspect the selected checks and admission reason.

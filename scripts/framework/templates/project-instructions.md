@@ -314,6 +314,16 @@ run. A tooling defect blocks only the affected unsafe operation; name the blocke
 the product task. Pre-push checks current successful evidence, the actual pushed objects and
 secrets.
 
+Explicitly authorized publication and deployment may run directly from the owning Codex session. Use
+the README's `project:publish` command to verify, commit and push the current branch to its
+configured upstream. Drain owned agents and background writers first. The publisher proves the
+calling canonical session through its exact live lease and observable Linux process ancestry;
+competing or unverified active writers remain blockers. Where this proof is unavailable, publish
+from the terminal after sessions exit. Preserve native history, project credentials, branch
+protections, CI approvals and deployment environment gates. Do not require another login or `/quit`
+when existing credentials and calling-session admission suffice. Publication does not itself deploy;
+continue an already-authorized deployment through the project's actual delivery commands.
+
 ## Completed-Goal Closure And Repository Housekeeping
 
 Finish authorized code, documentation, cleanup and reviews. Settle every no-longer-needed owned

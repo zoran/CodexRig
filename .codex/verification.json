@@ -277,7 +277,8 @@
         "scripts/setup/startup-state.test.mjs",
         "scripts/platform/platform-lifecycle.test.mjs",
         ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
-        ".agents/skills/reset-framework/scripts/publish-framework.test.mjs"
+        ".agents/skills/reset-framework/scripts/publish-framework.test.mjs",
+        ".agents/skills/reset-framework/scripts/publication-integration.test.mjs"
       ],
       "artifactOwners": [],
       "coveredTestPaths": [],
@@ -473,7 +474,8 @@
         "scripts/repository/global-git-credential.test.mjs",
         "scripts/goals/publication-command.test.mjs",
         "scripts/goals/project-publication-integration.test.mjs",
-        "scripts/repository/git-publication-identity.test.mjs"
+        "scripts/repository/git-publication-identity.test.mjs",
+        "scripts/repository/publication-session.test.mjs"
       ],
       "artifactOwners": [],
       "coveredTestPaths": [],
@@ -558,7 +560,8 @@
       "scripts/deps/dependency-policy.test.mjs",
       "scripts/setup/startup-state.test.mjs",
       "scripts/repository/worktree-recovery.test.mjs",
-      "scripts/verify/verification-session-lock.test.mjs"
+      "scripts/verify/verification-session-lock.test.mjs",
+      "scripts/repository/publication-session.test.mjs"
     ],
     "scripts/repository/runtime-process-io.mjs": [
       "scripts/repository/source-inventory-git-environment.test.mjs"
@@ -988,6 +991,16 @@
     "scripts/repository/git-publication-identity.mjs": [
       "scripts/repository/git-publication-identity.test.mjs",
       "scripts/goals/project-publication-integration.test.mjs"
+    ],
+    "scripts/repository/publication-session.mjs": [
+      "scripts/repository/publication-session.test.mjs",
+      "scripts/goals/project-publication-integration.test.mjs",
+      ".agents/skills/reset-framework/scripts/publish-framework.test.mjs",
+      ".agents/skills/reset-framework/scripts/publication-integration.test.mjs"
+    ],
+    "scripts/goals/project-publication.fixture.mjs": [
+      "scripts/goals/project-publication-integration.test.mjs",
+      ".agents/skills/reset-framework/scripts/publication-integration.test.mjs"
     ]
   },
   "exactConsumers": {
@@ -1242,7 +1255,7 @@
     ]
   },
   "prePushChecks": [
-    ".agents/skills/reset-framework/scripts/reset-framework.mjs"
+    ".agents/skills/reset-framework/scripts/publication-baseline.mjs"
   ],
   "risks": [
     {

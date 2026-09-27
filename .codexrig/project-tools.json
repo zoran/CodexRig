@@ -114,7 +114,8 @@
       "scripts/goals/project-publication.test.mjs",
       "scripts/goals/project-publication-integration.test.mjs",
       "scripts/goals/publication-command.mjs",
-      "scripts/goals/publication-command.test.mjs"
+      "scripts/goals/publication-command.test.mjs",
+      "scripts/goals/project-publication.fixture.mjs"
     ],
     "platform": [
       "scripts/platform/configure-platform.mjs",
@@ -127,6 +128,7 @@
       "scripts/platform/platform-configuration-state.mjs"
     ],
     "repository": [
+      "scripts/repository/publication-session.mjs",
       "scripts/repository/delivery-environment-discovery.mjs",
       "scripts/repository/git-runtime-isolation.mjs",
       "scripts/repository/local-import-resolution.mjs",
@@ -159,7 +161,8 @@
       "scripts/repository/global-git-credential.mjs",
       "scripts/repository/global-git-credential.test.mjs",
       "scripts/repository/git-publication-identity.mjs",
-      "scripts/repository/git-publication-identity.test.mjs"
+      "scripts/repository/git-publication-identity.test.mjs",
+      "scripts/repository/publication-session.test.mjs"
     ],
     "security": ["scripts/security/secret-patterns.mjs"],
     "setup": [

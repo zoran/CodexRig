@@ -17,7 +17,7 @@ import {
   releaseRuntimeLifecycleLock,
 } from "../repository/runtime-session-lease.mjs";
 import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycle-process.mjs";
-import { reconcileRepositoryWorktreeState } from "../repository/worktree-recovery.mjs";
+import { inspectPublicationSession } from "../repository/publication-session.mjs";
 import { renderManagedPrePushHook } from "../setup/install-git-hooks.mjs";
 import { resolveGitHooksPath } from "../setup/resolve-git-hooks-path.mjs";
 import { createPublicationOutput } from "../terminal/publication-output.mjs";
@@ -157,17 +157,7 @@ function publicationGit(root, output, runGit = spawnSync) {
 }
 
 function inspectPublicationBinding(root, git, requiredBranch) {
-  const state = reconcileRepositoryWorktreeState({ root });
-  if (!state.inventory.complete || state.blockingFindings.length > 0) {
-    throw new Error(`Worktree settlement blocks publication: ${state.blockingFindings.join("; ")}`);
-  }
-  if (
-    state.inventory.worktrees.some((worktree) =>
-      ["active", "unknown", "invalid"].includes(worktree.session.status),
-    )
-  ) {
-    throw new Error("Exit all active Codex sessions for this repository before publication.");
-  }
+  const session = inspectPublicationSession(root);
   const branchRef = git(["symbolic-ref", "--quiet", "HEAD"]);
   if (!branchRef.startsWith("refs/heads/")) throw new Error("Publication requires a named branch.");
   const branch = branchRef.slice("refs/heads/".length);
@@ -243,7 +233,16 @@ function inspectPublicationBinding(root, git, requiredBranch) {
     commonDirectory: git(["rev-parse", "--path-format=absolute", "--git-common-dir"]),
     hooksDirectory: git(["rev-parse", "--path-format=absolute", "--git-path", "hooks"]),
   });
-  return Object.freeze({ branch, targetBranch, remoteRef, remote, tracking, url, hooksDirectory });
+  return Object.freeze({
+    branch,
+    targetBranch,
+    remoteRef,
+    remote,
+    tracking,
+    url,
+    hooksDirectory,
+    session,
+  });
 }
 
 function requireManagedHook(root, binding) {

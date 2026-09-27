@@ -62,8 +62,8 @@ generator/export/updater/reset tooling, internal suites and compatibility experi
 Creation preserves source content, including its current task context. It snapshots source state,
 prepares a new owned stage, validates it and rechecks source state before publication. A changed
 source or pre-existing target blocks publication. Generation performs no source reset, Git
-initialization, commit or push. The optional post-exit source publisher is guidance only when source
-changes exist; publication remains separately authorized.
+initialization, commit or push. The optional source publisher is guidance only when source changes
+exist; publication remains separately authorized.
 
 The generator creates product-owned AGENTS, instructions, README and technical manifest, a real
 empty `src/`, four typed configuration owners and optional requirements draft. Selected tools

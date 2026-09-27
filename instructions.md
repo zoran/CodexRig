@@ -352,9 +352,9 @@ pause/resume/clear controls when the user requests them. Native Goal completion,
 check, and a finished slice are not proof that the broader authorized outcome is complete.
 `pnpm goal:new` is a repository publication check, not a native Goal creator or task store. Keep
 related unfinished slices in one coherent repository goal rather than manufacturing early
-publication boundaries. A required post-exit reset, missing publication authority, or rejected
-publication leaves closure open; report that exact boundary without claiming completion, bypassing
-it, or discarding recovery context.
+publication boundaries. Missing publication authority or rejected publication leaves closure open;
+report that exact boundary without claiming completion, bypassing it, or discarding recovery
+context.
 
 Official [Codex Goals](https://learn.chatgpt.com/use-cases/follow-goals) provide continuation across
 turns;
@@ -583,7 +583,8 @@ blocker with its next resolution condition. A clean or integrated temporary work
 unsettled when it is no longer needed. At a goal boundary, every goal-owned temporary worktree,
 branch, writer/session claim, handover, prune transaction, reservation, preservation lock, and
 generated/process residue that is no longer needed must be retired or the goal remains open. The
-current owning session may remain only until the mandatory post-exit framework reset.
+current owning session may remain active through explicitly authorized publication; its private
+runtime is preserved until a separate full reset after exit.
 
 1. Finish all goal-owned implementation, integration preparation, dead-path removal, configuration
    cleanup, bounded context maintenance, and other repository-mutating work. First perform the deep
@@ -654,11 +655,12 @@ current owning session may remain only until the mandatory post-exit framework r
    actual integrated result and rerun read-only housekeeping plus every affected review,
    documentation, course-check, audit, and verification gate. Any new drift reopens the owning
    change; never manufacture an empty marker commit.
-5. On the stable actual target-`main` state, invoke adaptive final verification once. Complete the
-   required post-exit reset, exact commit and push only in the authorized publication path. After a
-   clean, verified, published central `main`, immediately run `pnpm goal:new`; it proves the clean
-   publication and exact-current successful evidence before another goal opens. Continue the next
-   already-approved goal without returning merely because a checkpoint completed.
+5. On the stable actual target-`main` state, invoke adaptive final verification once. Complete
+   source cleanup, exact commit and push only in the authorized publication path; preserve the
+   verified calling session and its private runtime. After a clean, verified, published central
+   `main`, immediately run `pnpm goal:new`; it proves the clean publication and exact-current
+   successful evidence before another goal opens. Continue the next already-approved goal without
+   returning merely because a checkpoint completed.
 
 The checked-in GitHub and GitLab schedules run `repo:housekeeping --check --online` read-only so
 environment inventory, tool compatibility and other bounded repository health do not depend only on
@@ -1569,8 +1571,8 @@ against those declared transformations, imports, contracts, trust boundaries and
 identity. It also proves private-state isolation with controlled markers; an identity search alone
 is not acceptance. Active source work context is excluded and preserved, never continued in the
 product. Source-state changes during creation discard staging. Creation never initializes Git,
-mutates or resets the source, commits or pushes. Source publication remains the explicit post-exit
-orchestrator.
+mutates or resets the source, commits or pushes. Source publication remains the explicit publication
+orchestrator, which also supports the verified calling session.
 
 Provider detection prefers CI identity, then the selected branch upstream, `origin`, or the sole
 remote. Standard GitHub/GitLab hosts work without configuration; self-hosted domains must have one
@@ -2394,51 +2396,57 @@ the fresh audit required above. Invoke `pnpm verify` once on the actual target-`
 after the final goal audit and cleanup are clean. Both entries use the same admission owner; a
 previous failure cannot bypass it.
 
-After any optimization of the framework itself, run `pnpm framework:reset --apply` after the owning
-Codex session exits. The admitted full plan uses the read-only, verification-lock-bound portable
-source baseline and refuses remaining goals, slices, process history, generated exports or
-dependency transaction state while deferring contained runtime sanitation to the mandatory post-exit
-reset. Only while a current repository session is observably active may that read-only baseline
-retain the single valid bounded `docs/project-context.md` for unfinished work. Completed, invalid or
-unowned context still blocks the baseline. Full reset and publication always remove the work cache;
-this verification allowance grants no publication exception. Every framework reset removes
-disposable native state while preserving the approved identity and exact publication evidence.
-Verification and pre-push remain read-only. The reset never rewrites Git history. It sanitizes
-obsolete and disposable Codex runtime only when no active session owns that state, while retaining
-only authentication, runtime configuration, installation identity, and exact publication evidence
-needed for the next start and push. On Linux, missing or unobservable procfs and permission-obscured
-descriptor state for a process observably bound to the exact repository root are indeterminate and
-block reset; `EACCES` or `EPERM` is never converted into proof of inactivity. Full reset holds the
-shared lifecycle lock and proves repository-wide runtime quiescence before removal. It validates a
-current lease through the sole current reader; an incompatible private lease is disposable reset
-input and is removed with the rest of the runtime without interpreting another schema.
-Source-framework pre-push first rejects a dirty index or working tree—`git add` alone does not
-create the commit Git can push—before reporting any refreshed or reusable verification basis. It
-then repeats the clean reset preview and fails closed if resettable state reappears. For an
-explicitly authorized source publication, exit all owning Codex sessions and run
-`pnpm framework:publish --message "<message>"`. This source-only reset-skill entry inventories
-worktrees, binds one central `main` upstream, refreshes its tracking ref, previews and applies
-reset, requires a clean preview, runs housekeeping and hook installation, then invokes
-`pnpm verify`. It performs another reset and clean preview to remove verification residue while
-retaining successful evidence. Under the existing lifecycle lock it compares the source and HEAD
-with the verified snapshot, stages all non-ignored source, and commits only a changed tree. It then
-pushes the exact commit through the managed pre-push hook, verifies live remote `main`, runs
-`goal:new`, and performs Worktree Settlement. No force push, automatic merge, hook bypass, or empty
-commit is permitted. A failed gate stops subsequent mutations; a rejected push preserves its local
-commit so the same command can retry. Project creation itself stops after its active-session-safe
-cleanup and user instructions; it never performs the optional publication steps.
+Framework publication and private runtime sanitation are separate boundaries. After framework
+changes, clear completed source process artifacts through the reset owner's publication mode. The
+admitted verification plan uses the read-only, verification-lock-bound portable source baseline and
+refuses goals, slices, process history, generated exports and dependency transaction state. Only
+while a repository session is observably active may verification retain the single valid bounded
+`docs/project-context.md` for unfinished work. Publication removes that work cache and other source
+residue; this does not require deleting the calling session's private runtime.
 
-For a source-framework completion handoff or a question about remaining operator actions, inspect
-the current README, `package.json`, and the reset skill's publication entry before giving commands.
-Lead with the existing `framework:publish` orchestrator and its exact README invocation; explain
-that it includes reset, verification, commit and push after every owning session exits. The
-`bash scripts/setup/run-project.sh` prefix selects the declared runtime for that same command; it is
-not a separate maintenance procedure. Do not replace the orchestrator with its individual steps or
-add a second wrapper. If publication is not yet authorized, present the command as the operator's
-explicit choice to publish and state that the agent has not executed it. Recommend the standalone
-reset sequence only for an explicitly local/reset-only outcome or a diagnosed recovery requirement,
-and name that reason. Generated projects do not contain the source publisher; use their actual
-commands.
+Explicitly authorized commit, push and deployment may run directly from the owning Codex session.
+Drain owned subagents and background writers before publication. The common publisher inventories
+all worktrees, rejects competing or indeterminate writers, and admits an active caller only when its
+exact live controller, supervisor and Codex process are bound to the current canonical lease and
+observable Linux process ancestry proves the command descends from that Codex process. An
+environment session ID alone is not proof. If this evidence is unavailable, use publication after
+sessions exit rather than bypassing the admission gate. The bound session, destination, source tree
+and HEAD are rechecked across publication. This is ownership evidence, not user authorization. Keep
+approved project credentials; neither session exit nor another login is intrinsically required for
+an already-authorized publication or deployment. Preserve staging/production, branch protection, CI
+and project deployment gates. Publication commands do not themselves deploy.
+
+For source publication, run the README's `pnpm framework:publish --message "<message>"` invocation.
+It binds central `main`, refreshes upstream, previews/applies source cleanup, runs housekeeping and
+hook installation, then verifies. Its reset owner uses `--publication`: for a proven calling session
+it removes only source process residue and preserves private runtime; outside active sessions it
+performs full reset. After verification it rechecks the same baseline and snapshot, commits exactly
+the verified non-ignored tree under the lifecycle lock, pushes that commit through the managed
+pre-push hook, verifies live remote `main`, runs `goal:new`, and performs Worktree Settlement.
+Pre-push remains read-only and requires a clean committed tree, the publication baseline and
+exact-current successful evidence. No force push, automatic merge, hook bypass or empty commit is
+permitted. A failed gate stops later mutations; a rejected push preserves the local commit for
+retry. Generated projects use `project:publish` on their configured branch upstream, preserve
+history and accounts, and do not perform source-framework reset. Creation never initializes Git or
+publishes.
+
+Full `pnpm framework:reset --apply` is the explicit runtime sanitation path after all sessions exit.
+It holds the lifecycle lock and proves repository-wide runtime quiescence before removing disposable
+native state. Preserve authentication, runtime configuration, installation identity and exact
+publication evidence. Missing or unobservable Linux procfs or permission-obscured descriptors for an
+exact-root-bound process are indeterminate and block full reset; never infer inactivity from
+`EACCES` or `EPERM`. The sole current lease reader validates current state; incompatible private
+leases are discarded with quiescent disposable runtime without interpreting an older schema. Never
+remove open databases, WAL files or active session state. Full reset never rewrites Git history and
+is not a prerequisite for an otherwise valid in-session publication.
+
+For completion guidance, inspect the current README, package script and reset skill publication
+entry. Lead with the existing combined command; explain its cleanup, verification, commit and push
+effects and whether authority is present. The `bash scripts/setup/run-project.sh` prefix selects the
+project environment and runtime for that command. Do not substitute individual steps, invent a
+wrapper or require `/quit` when calling-session admission succeeds. Without publication authority,
+state that the command remains unexecuted. Recommend full reset only for explicit local sanitation,
+export hygiene or diagnosed recovery, with its actual session-exit requirement.
 
 When admission identifies a real uncovered risk, the full plan covers syntax/format, tests,
 build/typecheck when present, repository contracts, secrets, dependencies, and relevant product

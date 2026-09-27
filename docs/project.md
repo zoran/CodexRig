@@ -304,9 +304,11 @@ upgradeable product repositories while deliberately defining no child product or
 - Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
 - Public contract: `repo:housekeeping`, `goal:new` and `project:publish`. Explicit publication
   verifies, commits and pushes all reviewed non-ignored changes on the current branch to its
-  configured upstream, after owning sessions exit. Shared snapshot, destination and managed-hook
-  gates serve both source and product publication; only the source composition resets runtime and
-  enforces central `main`. Product publication preserves native history and accounts.
+  configured upstream, including from the proven calling canonical session once its other writers
+  drain. Shared snapshot, session, destination and managed-hook gates serve source and product
+  publication. The source composition enforces central `main` and clears source residue; it
+  preserves live private runtime and performs full reset only outside sessions. Product publication
+  preserves native history and accounts.
 - Private internals: Atomic local reconciliation, health-check orchestration, Git publication,
   source identity, and evidence admission checks. Failed command excerpts retain stderr summaries
   independently of subsequent successful stdout, constrained by the sanitized chronological capture.
@@ -365,7 +367,9 @@ upgradeable product repositories while deliberately defining no child product or
 - Runtime and technology: Node.js ESM over filesystem and isolated Git process boundaries.
 - Public contract: `worktree:status` with current/unfinished/settled human markers plus exported
   inventory, path-policy, Product Root, worktree-recovery, runtime-lease/session-recovery,
-  delivery-discovery, snapshot and credential-recovery APIs.
+  delivery-discovery, snapshot, publication-session and credential-recovery APIs. Publication
+  admission proves the caller descends from the exact live Codex process using Linux ancestry;
+  missing proof and competing worktree writers fail closed.
 - Private internals: Repository inventory, process-identity, session-lifecycle, isolated Git,
   launcher/writer liveness aggregation, per-root recovery classification, and Git/Git-less traversal
   detail. The session lease accepts only current schema 6 with namespace-bound coordinator,
@@ -532,7 +536,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.1.0`.
+- Framework version: `6.2.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

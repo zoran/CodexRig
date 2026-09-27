@@ -14,12 +14,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const projectCreatorSkill = ".agents/skills/create-project-from-framework/SKILL.md";
 const content = readFileSync(path.join(root, projectCreatorSkill), "utf8");
 
-test("the project creator gives post-exit cleanup guidance and only conditional Git guidance", () => {
+test("the project creator gives authorized in-session publication guidance only for source changes", () => {
   const cleanGuidance = postProjectCreationGuidance({ sourceHasChanges: false }).join("\n");
   assert.match(cleanGuidance, /did not modify source files, initialize Git, commit or push/i);
   assert.doesNotMatch(cleanGuidance, /framework:publish/i);
   const dirtyGuidance = postProjectCreationGuidance({ sourceHasChanges: true }).join("\n");
-  assert.match(dirtyGuidance, /every owning Codex session exits/);
+  assert.match(dirtyGuidance, /including from the owning Codex session/);
   assert.match(dirtyGuidance, /pnpm framework:publish --message "<message>"/);
   assert.match(dirtyGuidance, /commits all non-ignored changes/);
 });

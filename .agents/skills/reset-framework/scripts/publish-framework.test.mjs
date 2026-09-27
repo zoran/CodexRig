@@ -10,10 +10,16 @@ import { fileURLToPath } from "node:url";
 import {
   issueRuntimeSessionLease,
   releaseRuntimeSessionLease,
+  activateRuntimeSessionLease,
+  inspectRuntimeSessionLease,
+  transitionRuntimeSessionWriterProcess,
 } from "../../../../scripts/repository/runtime-session-lease.mjs";
 import { renderManagedPrePushHook } from "../../../../scripts/setup/install-git-hooks.mjs";
 import { parseFrameworkPublicationArguments, publishFramework } from "./publish-framework.mjs";
-import { projectToolEnvironment } from "../../../../scripts/repository/project-tool-environment.mjs";
+import {
+  prepareProjectToolDirectories,
+  projectToolEnvironment,
+} from "../../../../scripts/repository/project-tool-environment.mjs";
 import { createPublicationOutput } from "../../../../scripts/terminal/publication-output.mjs";
 import { runPublicationCommand } from "../../../../scripts/goals/publication-command.mjs";
 
@@ -31,6 +37,7 @@ function fixture(t) {
   const root = path.join(directory, "source");
   const remote = path.join(directory, "central.git");
   mkdirSync(root);
+  prepareProjectToolDirectories(root);
   const git = (...args) => {
     const result = spawnSync("git", args, { cwd: root, encoding: "utf8", input: "" });
     assert.equal(result.status, 0, result.stderr);
@@ -47,7 +54,7 @@ function fixture(t) {
   write(root, ".agents/skills/create-project-from-framework/SKILL.md", "# Generation Fixture\n");
   write(root, ".codexrig/project-tools.json", "{}\n");
   write(root, ".codex/README.md", "# Portable Policy\n");
-  write(root, ".gitignore", ".codex/runtime/\nhistory.jsonl\n");
+  write(root, ".gitignore", ".codex/runtime/\nhistory.jsonl\n.auth/\n");
   write(root, "source.txt", "baseline\n");
   write(
     root,
@@ -321,4 +328,39 @@ test("a commit hook cannot publish content that verification did not cover", asy
   await assert.rejects(() => f.publish(), /Source changed after verification|Commit hooks changed/);
   assert.equal(f.git("ls-remote", "origin", "refs/heads/main"), `${f.baseline}\trefs/heads/main`);
   assert.equal(existsSync(path.join(f.root, ".git/publication-hook-runs")), false);
+});
+
+test("framework publication clears source residue and preserves its calling session", async (t) => {
+  const f = fixture(t);
+  const lease = issueRuntimeSessionLease({ root: f.root, pid: process.pid });
+  const binding = { root: f.root, pid: process.pid, runtimeSessionId: lease.sessionId };
+  for (const transition of ["supervisor", "handoff", "codex"])
+    transitionRuntimeSessionWriterProcess({ ...binding, transition, writerPid: process.pid });
+  activateRuntimeSessionLease({ ...binding, codexSessionId: "framework-publication-fixture" });
+  const active = inspectRuntimeSessionLease({ root: f.root }).lease;
+  const history = "active native history\n";
+  write(f.root, "history.jsonl", history);
+  write(f.root, "docs/reviews/obsolete.md", "# Completed review\n");
+  write(f.root, "source.txt", "source from active session\n");
+  try {
+    const result = await f.publish();
+    assert.notEqual(result.commit, f.baseline);
+    assert.deepEqual(inspectRuntimeSessionLease({ root: f.root }).lease, active);
+    assert.equal(readFileSync(path.join(f.root, "history.jsonl"), "utf8"), history);
+    assert.equal(existsSync(path.join(f.root, "docs/reviews")), false);
+    assert.equal(f.git("status", "--porcelain"), "");
+    const fullReset = spawnSync(process.execPath, [resetScript, "--root", f.root, "--apply"], {
+      env: projectToolEnvironment({ root: f.root }),
+      encoding: "utf8",
+    });
+    assert.notEqual(
+      fullReset.status,
+      0,
+      "full runtime deletion remains blocked during the session",
+    );
+    assert.equal(readFileSync(path.join(f.root, "history.jsonl"), "utf8"), history);
+  } finally {
+    transitionRuntimeSessionWriterProcess({ ...binding, transition: "complete" });
+    releaseRuntimeSessionLease({ root: f.root, pid: process.pid });
+  }
 });

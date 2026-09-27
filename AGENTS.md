@@ -71,11 +71,13 @@ final action, then stop completely. Follow the exact restart/acceptance protocol
 
 After each completed slice run `pnpm worktree:status -- --json`; preservation is not completion.
 Follow goal housekeeping and verification, using focused checks during work and `pnpm verify` on the
-stable integration state. Source closure requires all owning sessions to exit before the README's
-`bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"`. That
-command resets, verifies, commits and pushes; never infer publication authority. Keep source
-LICENSE, NOTICE, Zoran Kikic and CodexRig Framework credit; generated-output permission is defined
-only by NOTICE.
+stable integration state. The README's
+`bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"` supports
+explicitly authorized publication from the verified owning session after its other writers drain. It
+cleans source, verifies, commits and pushes while preserving active runtime; full runtime reset
+still requires session exit. Never infer publication or deployment authority. Keep source LICENSE,
+NOTICE, Zoran Kikic and CodexRig Framework credit; generated-output permission is defined only by
+NOTICE.
 
 Portable startup is on-request, network-disabled workspace-write. Only explicitly authorized Dev
 `--yolo` changes runtime permissions; staging/production retain their stronger gates. Keep native

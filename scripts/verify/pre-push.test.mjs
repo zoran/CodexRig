@@ -152,7 +152,7 @@ test("selected pre-push policy requires source reset and propagates prerequisite
     readFileSync(path.join(root, ".codex/verification.json"), "utf8"),
   );
   assert.deepEqual(configuration.prePushChecks, [
-    ".agents/skills/reset-framework/scripts/reset-framework.mjs",
+    ".agents/skills/reset-framework/scripts/publication-baseline.mjs",
   ]);
   assert.throws(
     () => runSelectedPrePushPolicy(value.fixtureRoot),

@@ -20,6 +20,7 @@ import {
 } from "../../../../scripts/repository/source-inventory.mjs";
 import { isPortableCodexPath } from "../../../../scripts/repository/source-inventory-policy.mjs";
 import { inspectLinuxOpenRepositoryPaths } from "../../../../scripts/repository/runtime-process-identity.mjs";
+import { inspectPublicationSession } from "../../../../scripts/repository/publication-session.mjs";
 import {
   acquireRuntimeLifecycleLock,
   inspectRuntimeSessionLease,
@@ -75,10 +76,12 @@ function parseArgs(argv) {
     apply: false,
     root: defaultRoot,
     verificationSourceBaseline: false,
+    publication: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--apply") options.apply = true;
+    else if (argument === "--publication") options.publication = true;
     else if (argument === "--verification-source-baseline") {
       options.verificationSourceBaseline = true;
     } else if (argument === "--root") {
@@ -92,6 +95,8 @@ function parseArgs(argv) {
   if (options.apply && options.verificationSourceBaseline) {
     fail("Verification source baseline is read-only and cannot use --apply.");
   }
+  if (options.publication && options.verificationSourceBaseline)
+    fail("Publication and verification source baselines are distinct operations.");
   return options;
 }
 
@@ -211,6 +216,14 @@ export function inspectFrameworkReset(root = defaultRoot) {
   const canonical = requireFrameworkRoot(root);
   assertRuntimeInactive(canonical);
   return Object.freeze(collectCandidates(canonical));
+}
+
+/** Publication clears portable process residue while the caller keeps its private runtime alive. */
+export function inspectFrameworkPublicationReset(root = defaultRoot) {
+  const canonical = requireFrameworkRoot(root);
+  return inspectPublicationSession(canonical)
+    ? Object.freeze(collectCandidates(canonical, { includeLocalRuntime: false }))
+    : inspectFrameworkReset(canonical);
 }
 
 function requirePreservedFile(target, label) {
@@ -449,7 +462,8 @@ async function main() {
   if (options.verificationSourceBaseline && !isActiveVerificationLock(root)) {
     fail("Verification source baseline requires the active repository verification lock.");
   }
-  const fullReset = !options.verificationSourceBaseline;
+  const publicationSession = options.publication ? inspectPublicationSession(root) : null;
+  const fullReset = !options.verificationSourceBaseline && !publicationSession;
   // Preview is strictly read-only; every mutating reset mode holds the shared capability through
   // planning, apply, and the residual recheck.
   const lifecycleOwner = options.apply
@@ -460,14 +474,20 @@ async function main() {
       fail("Reset refused while a repository verification session is active.");
     }
     const includeLocalRuntime = fullReset;
-    const candidates = fullReset ? inspectFrameworkReset(root) : verificationSourceCandidates(root);
+    const candidates = options.publication
+      ? inspectFrameworkPublicationReset(root)
+      : fullReset
+        ? inspectFrameworkReset(root)
+        : verificationSourceCandidates(root);
 
     if (!options.apply) {
       if (candidates.length === 0) {
         console.log(
           fullReset
             ? "Framework baseline is clean."
-            : "Framework verification source baseline is clean.",
+            : options.publication
+              ? "Framework publication source baseline is clean."
+              : "Framework verification source baseline is clean.",
         );
         return;
       }
@@ -476,6 +496,11 @@ async function main() {
       return;
     }
 
+    if (
+      options.publication &&
+      JSON.stringify(inspectPublicationSession(root)) !== JSON.stringify(publicationSession)
+    )
+      fail("Publication session changed before source cleanup.");
     await applyReset(root, candidates);
     const residual = collectCandidates(root, { includeLocalRuntime });
     if (residual.length > 0) fail(`Reset left removable state: ${residual.join(", ")}`);

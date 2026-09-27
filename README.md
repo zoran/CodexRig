@@ -119,7 +119,7 @@ pnpm handover:create -- --critical       # terminal critical-capacity seal
 pnpm project:export -- --name "<Project Name>"
 pnpm framework:reset
 pnpm framework:reset --apply
-pnpm framework:publish --message "<commit message>"  # after exiting Codex
+pnpm framework:publish --message "<commit message>"  # authorized publication, including inside Codex
 ```
 
 Verification reuses successful evidence for unchanged source and the same effective toolchain.
@@ -136,8 +136,8 @@ the handover when the new session announces it. `/new` and `/resume` inside the 
 its existing launcher; they cannot replace this restart. Keep the handover and runtime files intact.
 
 To finish framework work, the existing `framework:publish` script runs the complete cleanup,
-verification, commit and push sequence. After reviewing all source changes, exit every Codex session
-for this framework and run this one command from its root:
+verification, commit and push sequence. After reviewing all source changes and authorizing
+publication, run this command from the owning Codex session or from the terminal:
 
 ```bash
 bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"
@@ -157,8 +157,11 @@ sign-in prompts remain interactive. After the first successful HTTPS authenticat
 publishes reuse the project credential described below until it expires or is revoked.
 
 Running this command explicitly authorizes publication of all non-ignored source changes on `main`.
-It performs reset, housekeeping, verification, commit and push; do not run its individual steps
-separately beforehand. See [Verification And Publication](instructions.md#verification) for the
+It performs source cleanup, housekeeping, verification, commit and push; do not run its individual
+steps separately beforehand. Inside the verified owning session it preserves private runtime and
+history. Outside Codex it also performs the full runtime reset. Other or unverified active writers
+block publication. Drain owned agents and background writers before publishing; publication does not
+authorize concurrent edits. See [Verification And Publication](instructions.md#verification) for the
 exact gates, evidence and recovery behavior. Generated projects do not include this source
 publisher.
 
@@ -166,9 +169,13 @@ Generated projects receive their own `project:publish --message "<commit message
 the same `bash scripts/setup/run-project.sh` entry. It verifies, commits and pushes the current
 branch to its configured upstream with the same progress display and project-local HTTPS sign-in. It
 preserves native session history and accounts and performs no framework reset or direct deployment.
-Review all non-ignored changes and exit the project's Codex sessions before running it; existing
-hooks, branch protections and CI/deployment approvals remain effective. In this source repository
-`project:publish` is an alias for the framework publisher above.
+Review all non-ignored changes and authorize publication before running it in the owning session;
+existing hooks, branch protections and CI/deployment approvals remain effective. Authorized
+deployments may follow directly in that session using the project's deployment commands and existing
+project credentials. A session exit or another login is not a publication prerequisite.
+Calling-session admission currently requires observable Linux process ancestry; when that proof is
+unavailable, publication fails closed and remains available from a terminal after sessions exit. In
+this source repository `project:publish` is an alias for the framework publisher above.
 
 ## Project Accounts
 

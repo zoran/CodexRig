@@ -10,7 +10,7 @@ import {
   publishProject,
 } from "../../../../scripts/goals/project-publication.mjs";
 import { createPublicationOutput } from "../../../../scripts/terminal/publication-output.mjs";
-import { inspectFrameworkReset } from "./reset-framework.mjs";
+import { inspectFrameworkPublicationReset } from "./reset-framework.mjs";
 
 export function parseFrameworkPublicationArguments(args) {
   return parsePublicationArguments(args, "framework:publish");
@@ -21,13 +21,13 @@ export async function publishFramework({ root = toolingRoot, ...options } = {}) 
   if (!isReusableFrameworkSource(root) || realpathSync(root) !== root)
     throw new Error("Publication is available only in the reusable source framework.");
   const reset = async ({ gate, output }) => {
-    const candidates = inspectFrameworkReset(root);
+    const candidates = inspectFrameworkPublicationReset(root);
     output.detail(
       `Framework reset preview: ${candidates.length} candidate(s).\n${candidates.join("\n")}`,
     );
     if (candidates.length > 0)
-      await gate("framework:reset", ["--apply"], "Clear disposable session state");
-    await gate("framework:reset", [], "Confirm clean framework baseline");
+      await gate("framework:reset", ["--publication", "--apply"], "Clear publication residue");
+    await gate("framework:reset", ["--publication"], "Confirm clean publication baseline");
   };
   return publishProject({
     ...options,
@@ -35,7 +35,7 @@ export async function publishFramework({ root = toolingRoot, ...options } = {}) 
     requiredBranch: "main",
     displayName: "CodexRig",
     lifecycle: {
-      inspect: () => inspectFrameworkReset(root),
+      inspect: () => inspectFrameworkPublicationReset(root),
       async prepare(context) {
         await reset(context);
         await context.gate(
@@ -46,10 +46,11 @@ export async function publishFramework({ root = toolingRoot, ...options } = {}) 
       },
       afterVerify: reset,
       beforeCommit() {
-        if (inspectFrameworkReset(root).length > 0)
+        if (inspectFrameworkPublicationReset(root).length > 0)
           throw new Error("Reset state reappeared before commit.");
       },
-      beforePush: ({ gate }) => gate("framework:reset", [], "Confirm publication baseline"),
+      beforePush: ({ gate }) =>
+        gate("framework:reset", ["--publication"], "Confirm publication baseline"),
       finish: ({ gate }) => gate("goal:new", [], "Check completed publication evidence"),
     },
   });

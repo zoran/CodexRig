@@ -121,6 +121,33 @@ export function inspectProcessIdentity(identity) {
   return current.startIdentity === identity.startIdentity ? "active" : "stale";
 }
 
+/** Proves the caller descends from an exact live process; unavailable ancestry fails closed. */
+export function isCurrentProcessDescendantOf(identity) {
+  if (process.platform !== "linux" || !identity?.startIdentity) return false;
+  try {
+    if (inspectProcessIdentity(identity) !== "active") return false;
+    let pid = process.pid;
+    const visited = new Set();
+    while (pid > 0 && !visited.has(pid) && visited.size < 256) {
+      if (pid === identity.pid) return inspectProcessIdentity(identity) === "active";
+      visited.add(pid);
+      const before = captureProcessIdentity(pid);
+      const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+      const fields = stat
+        .slice(stat.lastIndexOf(")") + 1)
+        .trim()
+        .split(/\s+/u);
+      if (!before?.startIdentity || inspectProcessIdentity(before) !== "active") return false;
+      const parent = Number(fields[1]);
+      if (!Number.isSafeInteger(parent) || parent < 0) return false;
+      pid = parent;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 function sameFileIdentity(stats, identity) {
   return String(stats.dev) === identity.device && String(stats.ino) === identity.inode;
 }
