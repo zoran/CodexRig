@@ -14,6 +14,8 @@ import {
 import { renderManagedPrePushHook } from "../../../../scripts/setup/install-git-hooks.mjs";
 import { parseFrameworkPublicationArguments, publishFramework } from "./publish-framework.mjs";
 import { projectToolEnvironment } from "../../../../scripts/repository/project-tool-environment.mjs";
+import { createPublicationOutput } from "../../../../scripts/terminal/publication-output.mjs";
+import { runPublicationCommand } from "../../../../scripts/goals/publication-command.mjs";
 
 const resetScript = fileURLToPath(new URL("reset-framework.mjs", import.meta.url));
 
@@ -102,6 +104,10 @@ test("publication parses only an explicit literal commit message", () => {
   assert.deepEqual(parseFrameworkPublicationArguments(["--message", "GPT 6 Upgrade"]), {
     message: "GPT 6 Upgrade",
   });
+  assert.deepEqual(parseFrameworkPublicationArguments(["--message", "Upgrade", "--verbose"]), {
+    message: "Upgrade",
+    verbose: true,
+  });
   for (const args of [
     [],
     ["--", "--message", "upgrade"],
@@ -112,13 +118,16 @@ test("publication parses only an explicit literal commit message", () => {
   }
 });
 
-test("publication resets, verifies, commits all source and pushes through its installed hook", (t) => {
+test("publication resets, verifies, commits all source and pushes through its installed hook", async (t) => {
   const f = fixture(t);
   write(f.root, "history.jsonl", "disposable session\n");
   write(f.root, "source.txt", "verified source\n");
   write(f.root, "new source.txt", "new verified file\n");
   const message = "GPT 6 Upgrade $(touch injected) `touch injected`";
-  const result = f.publish({ message });
+  const messages = [];
+  const result = await f.publish({ message, log: (line) => messages.push(line) });
+  assert.equal(messages.filter((line) => line.includes("[OK]")).length, 8);
+  assert.ok(messages.at(-1).includes("All 8 phases completed"));
   assert.notEqual(result.commit, f.baseline);
   assert.equal(f.git("log", "-1", "--format=%B"), message);
   assert.equal(
@@ -147,10 +156,89 @@ test("publication resets, verifies, commits all source and pushes through its in
   );
 });
 
-test("failed verification preserves source and the original index without commit or push", (t) => {
+test("publication diagnostics stay quiet on success and identify a failed gate without leaking secrets", async (t) => {
+  const f = fixture(t);
+  const messages = [];
+  const output = createPublicationOutput({ root: f.root, log: (line) => messages.push(line) });
+  await runPublicationCommand({
+    command: process.execPath,
+    args: ["-e", 'console.log("routine check output")'],
+    root: f.root,
+    env: projectToolEnvironment({ root: f.root }),
+    output,
+  });
+  assert.deepEqual(messages, []);
+  await assert.rejects(
+    f.publish({
+      output,
+      async runGate(request) {
+        f.runGate(request);
+        if (request.script === "verify")
+          await runPublicationCommand({
+            command: process.execPath,
+            args: [
+              "-e",
+              'process.stderr.write("to"); process.stderr.write("ken=private-fixture-value\\ncheck failed\\n"); process.exitCode=1;',
+            ],
+            root: f.root,
+            env: projectToolEnvironment({ root: f.root }),
+            output,
+          });
+      },
+    }),
+    (error) => {
+      assert.match(error.message, /check failed/);
+      assert.doesNotMatch(error.message, /private-fixture-value/);
+      return true;
+    },
+  );
+  assert.ok(
+    messages.some(
+      (line) => line.includes("[FAIL] 4/8") && line.includes("Run repository verification"),
+    ),
+  );
+  assert.ok(!messages.some((line) => line.includes("[OK] 5/8") || line.includes("Published")));
+  assert.equal(f.git("rev-parse", "HEAD"), f.baseline);
+  const verbose = createPublicationOutput({
+    root: f.root,
+    verbose: true,
+    log: (line) => messages.push(line),
+  });
+  await runPublicationCommand({
+    command: process.execPath,
+    args: ["-e", 'console.log("verbose details")'],
+    root: f.root,
+    env: projectToolEnvironment({ root: f.root }),
+    output: verbose,
+  });
+  assert.ok(messages.includes("verbose details"));
+  messages.length = 0;
+  output.fail(
+    new Error(
+      `Git push failed\n${"earlier hook output\n".repeat(300)}token=private-fixture-value\nfinal hook diagnostic`,
+    ),
+  );
+  assert.match(messages.join("\n"), /Git push failed/);
+  assert.match(messages.join("\n"), /final hook diagnostic/);
+  assert.doesNotMatch(messages.join("\n"), /private-fixture-value/);
+  assert.ok(messages.join("\n").split("\n").length < 70);
+  await assert.rejects(
+    runPublicationCommand({
+      command: process.execPath,
+      args: ["-e", "setInterval(() => {}, 1000)"],
+      root: f.root,
+      env: projectToolEnvironment({ root: f.root }),
+      output,
+      timeout: 50,
+    }),
+    /timed out/,
+  );
+});
+
+test("failed verification preserves source and the original index without commit or push", async (t) => {
   const f = fixture(t);
   write(f.root, "source.txt", "pending verified change\n");
-  assert.throws(
+  await assert.rejects(
     () =>
       f.publish({
         runGate(request) {
@@ -167,10 +255,10 @@ test("failed verification preserves source and the original index without commit
   assert.equal(existsSync(path.join(f.root, ".git/publication-hook-runs")), false);
 });
 
-test("source changed during verification never reaches a commit", (t) => {
+test("source changed during verification never reaches a commit", async (t) => {
   const f = fixture(t);
   write(f.root, "source.txt", "candidate\n");
-  assert.throws(
+  await assert.rejects(
     () =>
       f.publish({
         runGate(request) {
@@ -184,26 +272,26 @@ test("source changed during verification never reaches a commit", (t) => {
   assert.equal(f.git("diff", "--cached", "--name-only"), "");
 });
 
-test("rejected push retains the verified local commit and retry creates no empty commit", (t) => {
+test("rejected push retains the verified local commit and retry creates no empty commit", async (t) => {
   const f = fixture(t);
   write(f.root, "source.txt", "candidate\n");
   write(f.root, ".git/reject-publication", "fixture rejection\n");
-  assert.throws(() => f.publish(), /Git -c failed/);
+  await assert.rejects(() => f.publish(), /Git push failed/);
   const committed = f.git("rev-parse", "HEAD");
   assert.notEqual(committed, f.baseline);
   assert.equal(f.git("ls-remote", "origin", "refs/heads/main"), `${f.baseline}\trefs/heads/main`);
   rmSync(path.join(f.root, ".git/reject-publication"));
-  assert.equal(f.publish().commit, committed);
+  assert.equal((await f.publish()).commit, committed);
   assert.equal(f.git("rev-list", "--count", "HEAD"), "2");
   assert.equal(readFileSync(path.join(f.root, ".git/publication-hook-runs"), "utf8"), "ran\nran\n");
 });
 
-test("active Codex ownership blocks reset and every publication command", (t) => {
+test("active Codex ownership blocks reset and every publication command", async (t) => {
   const f = fixture(t);
   write(f.root, "history.jsonl", "live session\n");
   issueRuntimeSessionLease({ root: f.root, pid: process.pid });
   try {
-    assert.throws(() => f.publish(), /Reset refused/);
+    await assert.rejects(() => f.publish(), /active Codex sessions|Reset refused/);
     assert.equal(readFileSync(path.join(f.root, "history.jsonl"), "utf8"), "live session\n");
     assert.deepEqual(f.calls, []);
     assert.equal(f.git("rev-parse", "HEAD"), f.baseline);
@@ -212,16 +300,16 @@ test("active Codex ownership blocks reset and every publication command", (t) =>
   }
 });
 
-test("ambiguous push destinations stop before reset", (t) => {
+test("ambiguous push destinations stop before reset", async (t) => {
   const f = fixture(t);
   write(f.root, "history.jsonl", "preserve\n");
   f.git("config", "remote.origin.pushurl", path.join(f.root, "elsewhere.git"));
-  assert.throws(() => f.publish(), /same unique fetch and push destination/);
+  await assert.rejects(() => f.publish(), /same unique fetch and push destination/);
   assert.deepEqual(f.calls, []);
   assert.equal(existsSync(path.join(f.root, "history.jsonl")), true);
 });
 
-test("a commit hook cannot publish content that verification did not cover", (t) => {
+test("a commit hook cannot publish content that verification did not cover", async (t) => {
   const f = fixture(t);
   write(f.root, "source.txt", "candidate\n");
   write(
@@ -230,7 +318,7 @@ test("a commit hook cannot publish content that verification did not cover", (t)
     '#!/bin/sh\nprintf "unverified\\n" > source.txt\ngit add source.txt\n',
     0o700,
   );
-  assert.throws(() => f.publish(), /Source changed after verification|Commit hooks changed/);
+  await assert.rejects(() => f.publish(), /Source changed after verification|Commit hooks changed/);
   assert.equal(f.git("ls-remote", "origin", "refs/heads/main"), `${f.baseline}\trefs/heads/main`);
   assert.equal(existsSync(path.join(f.root, ".git/publication-hook-runs")), false);
 });

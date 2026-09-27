@@ -38,7 +38,7 @@ const write = (root, file, content) => {
   mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
   writeFileSync(path.join(root, file), content);
 };
-function run(root, args, executable = process.execPath) {
+function run(root, args, executable = process.execPath, timeout = 30_000) {
   prepareProjectToolDirectories(root);
   const env = projectToolEnvironment({ root });
   return spawnSync(executable, args, {
@@ -46,7 +46,7 @@ function run(root, args, executable = process.execPath) {
     encoding: "utf8",
     input: "",
     stdio: "pipe",
-    timeout: 30_000,
+    timeout,
     env,
   });
 }
@@ -147,6 +147,7 @@ test("empty generation excludes source capabilities, private markers and new uns
   const pkg = JSON.parse(readFileSync(path.join(generated, "package.json"), "utf8"));
   assert.equal(pkg.license, "UNLICENSED");
   assert.equal(pkg.name, "product");
+  assert.equal(pkg.scripts["project:publish"], "node scripts/goals/publish-project.mjs");
   assert.equal(
     Object.keys(pkg.scripts).some((key) =>
       /framework|compatibility|context:test|project:export/.test(key),
@@ -159,7 +160,14 @@ test("empty generation excludes source capabilities, private markers and new uns
   assert.deepEqual(selected.prePushChecks, []);
   assert.deepEqual(
     selected.commands.flatMap((command) => command.args).filter((arg) => arg.endsWith(".test.mjs")),
-    ["scripts/setup/runtime-safety.test.mjs"],
+    [
+      "scripts/setup/runtime-safety.test.mjs",
+      "scripts/goals/project-publication.test.mjs",
+      "scripts/repository/global-git-credential.test.mjs",
+      "scripts/goals/publication-command.test.mjs",
+      "scripts/goals/project-publication-integration.test.mjs",
+      "scripts/repository/git-publication-identity.test.mjs",
+    ],
   );
   for (const file of [".github/workflows/ci.yml", ".gitlab-ci.yml"])
     assert.doesNotMatch(
@@ -206,8 +214,14 @@ test("generated tools and selected checks operate after the source checkout beco
     "pnpm",
   );
   assert.equal(installed.status, 0, installed.stdout + installed.stderr);
-  const verified = run(generated, ["verify"], "pnpm");
-  assert.equal(verified.status, 0, verified.stdout + verified.stderr);
+  // This exercises the complete generated suite, including portable publication regressions.
+  // Keep a bounded suite allowance distinct from an individual command's 30-second limit.
+  const verified = run(generated, ["verify"], "pnpm", 120_000);
+  assert.equal(
+    verified.status,
+    0,
+    [verified.error?.message, verified.stdout, verified.stderr].filter(Boolean).join("\n"),
+  );
   const plans = run(generated, [
     "--input-type=module",
     "--eval",

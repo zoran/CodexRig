@@ -20,6 +20,9 @@ backups/
 # Repository-owned accounts and mutable tool state never belong to source or exports.
 /.auth/
 
+# Private current-work cache is read explicitly by recovery, never published as source.
+/docs/project-context.md
+
 # Native mutable Codex state belongs to ignored repository-root CODEX_HOME entries.
 # Only framework coordination lives in .codex/runtime/; /tmp holds private handovers and process
 # temporaries, while /.tmp holds native cache work. Full runtime reset requires all sessions to exit.
@@ -36,6 +39,7 @@ backups/
 /skills
 /thread-writer-locks
 /tmp
+/tui-luna-reserve
 /.sandbox_migration
 /auth.json
 /.credentials.json

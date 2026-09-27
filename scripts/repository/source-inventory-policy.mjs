@@ -53,6 +53,7 @@ export const repositoryCodexHomeRuntimeDirectoryNames = Object.freeze([
   "skills",
   "thread-writer-locks",
   "tmp",
+  "tui-luna-reserve",
 ]);
 // Current native account stores are private but survive ephemeral runtime reset.
 export const repositoryCodexHomeCredentialFileNames = Object.freeze([

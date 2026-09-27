@@ -42,6 +42,28 @@ after(() => {
   for (const root of roots) rmSync(root, { force: true, recursive: true });
 });
 
+test("source public-file literals resolve only inside their owning unit without changing browser URLs", () => {
+  const root = fixture();
+  write(root, "pnpm-workspace.yaml", "packages:\n  - 'apps/*'\n");
+  write(root, "apps/site/package.json", '{"name":"@fixture/site"}');
+  write(root, "apps/site/src/server/assets.ts", 'const asset = "public/brand-mark.png";');
+  write(root, "apps/site/public/brand-mark.png", onePixelPng);
+  assert.deepEqual(analyzeImageAssets({ root }), []);
+  write(root, "apps/site/src/page.html", '<img src="public/brand-mark.png" alt="Brand">');
+  assert.match(analyzeImageAssets({ root }).join("\n"), /local image reference is missing/u);
+  write(root, "apps/site/src/page.html", '<img src="/brand-mark.png" alt="Brand">');
+  assert.deepEqual(analyzeImageAssets({ root }), []);
+  write(root, "apps/other/package.json", '{"name":"@fixture/other"}');
+  write(root, "apps/other/src/index.ts", "export {};");
+  write(root, "apps/other/public/brand-mark.png", onePixelPng);
+  write(
+    root,
+    "apps/site/src/server/assets.ts",
+    'const asset = "public/../../other/public/brand-mark.png";',
+  );
+  assert.match(analyzeImageAssets({ root }).join("\n"), /must stay inside the repository/u);
+});
+
 test("image analysis sees tracked bad references but not ignored generated sources", () => {
   const root = fixture();
   write(root, ".gitignore", "dist/\n");

@@ -71,11 +71,13 @@ upgradeable product repositories while deliberately defining no child product or
 - Runtime and technology: Markdown/YAML skill contracts with Node.js ESM for referenced automation.
 - Public contract: Each skill's `SKILL.md`, `agents/openai.yaml`, and referenced scripts,
   references, or assets.
-- Private internals: Skill-specific implementation detail not named by its `SKILL.md`.
+- Private internals: Skill-specific implementation detail not named by its `SKILL.md`. Source
+  publication composes source-only reset and completed-goal gates around the portable publication
+  owner; generated projects exclude the source composition.
 - Owned data and migrations: Tracked skill definitions only; no mutable data or migrations.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/docs`,
-  `scripts/filesystem`, `scripts/framework`, `scripts/repository`, `scripts/setup`,
+  `scripts/filesystem`, `scripts/framework`, `scripts/goals`, `scripts/repository`, `scripts/setup`,
   `scripts/terminal`, `scripts/verify`.
 - Focused verifier: `node scripts/verify/repository-smoke.mjs`
 - Steward: Primary framework maintainer.
@@ -124,7 +126,9 @@ upgradeable product repositories while deliberately defining no child product or
   accepted repository-bound artifact; acknowledgement removes only unchanged received bytes, not
   native conversation history.
 - Private internals: Work-marker validation, bounded continuation loop state, private prompt binding
-  and digest checks, and required portable-policy declarations.
+  and digest checks, and required portable-policy declarations. The context contract verifies that
+  portable Git ignore rules keep `docs/project-context.md` private while explicit recovery reads
+  retain access to it.
 - Owned data and migrations: Bounded `.codex/runtime/stop-continuation/` state and private transient
   prompts under ignored `tmp/codexrig-handovers/`; no search database or model cache.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
@@ -298,17 +302,22 @@ upgradeable product repositories while deliberately defining no child product or
   installation metadata even when all version mirrors already agree; generated-project apply and
   read-only checks do not install dependencies.
 - Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
-- Public contract: `repo:housekeeping` and `goal:new`.
+- Public contract: `repo:housekeeping`, `goal:new` and `project:publish`. Explicit publication
+  verifies, commits and pushes all reviewed non-ignored changes on the current branch to its
+  configured upstream, after owning sessions exit. Shared snapshot, destination and managed-hook
+  gates serve both source and product publication; only the source composition resets runtime and
+  enforces central `main`. Product publication preserves native history and accounts.
 - Private internals: Atomic local reconciliation, health-check orchestration, Git publication,
-  source identity, and evidence admission checks.
+  source identity, and evidence admission checks. Failed command excerpts retain stderr summaries
+  independently of subsequent successful stdout, constrained by the sanitized chronological capture.
 - Owned data and migrations: Project-owned `config/delivery.json` detected evidence and its bounded
   `docs/project.md` projection; in reusable source only, synchronized framework/package/manifest
   release metadata; no external environment or product data.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/deps`, `scripts/docs`, `scripts/filesystem`,
-  `scripts/repository`, `scripts/terminal`, `scripts/verify`.
+  `scripts/repository`, `scripts/setup`, `scripts/terminal`, `scripts/verify`.
 - Focused verifier:
-  `node --test scripts/goals/repository-housekeeping.test.mjs scripts/goals/goal-publication-precondition.test.mjs`
+  `node --test scripts/goals/repository-housekeeping.test.mjs scripts/goals/goal-publication-precondition.test.mjs scripts/goals/project-publication.test.mjs scripts/goals/project-publication-integration.test.mjs scripts/goals/publication-command.test.mjs`
 - Steward: Goal lifecycle maintainer.
 
 #### Git Platform Adapters
@@ -339,14 +348,24 @@ upgradeable product repositories while deliberately defining no child product or
   and transfer-source validation. Owns the clean repository tool environment with private
   home/configuration/data/cache directories and no inherited account variables. Account state is
   excluded before source discovery and kept separate from ephemeral native-runtime reset. Owns the
-  shared crash-recoverable file batch used by housekeeping and startup maintenance, including
-  synchronous install finalization and rollback. Per-root inconsistencies remain visible without
-  discarding other safe inventory; orphan recovery corruption is advisory unless writer ownership is
-  also unsafe.
+  Git HTTPS credential-store binding to the private project home, with repository-path matching and
+  owner-only storage checks. Its shared GitHub/GitLab adapter tries existing global Git helpers and
+  the matching CLI login for configured provider hosts when a project credential is missing; global
+  store/erase and automatic login are excluded. The same adapter owns a private, operation-bound
+  rejection context so publication can skip rejected candidates and make bounded noninteractive
+  retries. Its publication identity resolver fills only missing public Git name/email metadata from
+  native global configuration without includes, validates both identities, and returns only
+  commit-scoped author/committer pins. Other tool accounts remain project-local. The common
+  environment preserves the declared verification controls through launcher, publication and
+  pre-push; private Mise configuration provides persistent public tool defaults. Owns the shared
+  crash-recoverable file batch used by housekeeping and startup maintenance, including synchronous
+  install finalization and rollback. Per-root inconsistencies remain visible without discarding
+  other safe inventory; orphan recovery corruption is advisory unless writer ownership is also
+  unsafe.
 - Runtime and technology: Node.js ESM over filesystem and isolated Git process boundaries.
 - Public contract: `worktree:status` with current/unfinished/settled human markers plus exported
   inventory, path-policy, Product Root, worktree-recovery, runtime-lease/session-recovery,
-  delivery-discovery, and snapshot APIs.
+  delivery-discovery, snapshot and credential-recovery APIs.
 - Private internals: Repository inventory, process-identity, session-lifecycle, isolated Git,
   launcher/writer liveness aggregation, per-root recovery classification, and Git/Git-less traversal
   detail. The session lease accepts only current schema 6 with namespace-bound coordinator,
@@ -360,11 +379,13 @@ upgradeable product repositories while deliberately defining no child product or
   repository-wide runtime quiescence, and removes incompatible private runtime without interpreting
   another lease schema. The single current `.project-state/repository-housekeeping/` journal owns
   repository maintenance batches; a complete interrupted batch is recovered atomically as current
-  state, while failed synchronous finalization rolls back. No product data.
+  state, while failed synchronous finalization rolls back. Credential-recovery contexts contain
+  keyed fingerprints in private project temporary storage and are removed when the bound Git
+  operation exits. No product data.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/filesystem`.
 - Focused verifier:
-  `node --test scripts/repository/source-inventory.test.mjs scripts/repository/worktree-recovery.test.mjs scripts/setup/startup-state.test.mjs scripts/context/context-lifecycle.test.mjs`
+  `node --test scripts/repository/source-inventory.test.mjs scripts/repository/worktree-recovery.test.mjs scripts/setup/startup-state.test.mjs scripts/context/context-lifecycle.test.mjs scripts/repository/global-git-credential.test.mjs scripts/repository/git-publication-identity.test.mjs`
 - Steward: Repository boundary maintainer.
 
 #### Secret Classification
@@ -390,9 +411,9 @@ upgradeable product repositories while deliberately defining no child product or
   admission, then opens the native resume picker with repository-root CODEX_HOME and explicit
   working directory. It reserves the checkout before selection and binds the selected session only
   at authenticated SessionStart, preloads every lifecycle module, accepts bounded non-executable
-  Codex model/reasoning preferences beneath tracked project policy, rejects executable or unknown
-  ignored runtime configuration, projects the tracked Astra/`ultra` policy into every fresh or
-  resumed CLI launch, and injects exactly two session-owned hook definitions. Codex's stable
+  Codex model/reasoning and voice preferences beneath tracked project policy, rejects executable or
+  unknown ignored runtime configuration, projects the tracked Astra/`ultra` policy into every fresh
+  or resumed CLI launch, and injects exactly two session-owned hook definitions. Codex's stable
   `hooks/list` inventory must contain only those exact trusted/enabled definitions; only afterward
   may the controller bind the gated supervisor, durable handoff, and exact Codex PID. Lease release
   requires the exact controller to authenticate the supervisor's terminal child-exit proof against
@@ -455,9 +476,11 @@ upgradeable product repositories while deliberately defining no child product or
 #### Safe Terminal Output
 
 - Root: `scripts/terminal`
-- Responsibility: Sanitizes paths, secrets, and multiline errors before diagnostics reach terminals.
+- Responsibility: Sanitizes paths, secrets, and multiline errors before diagnostics reach terminals;
+  renders startup and publication progress with bounded interactive and redirected output.
 - Runtime and technology: Node.js ESM deterministic output sanitization.
-- Public contract: Exported terminal sanitization and context-error formatting helpers.
+- Public contract: Exported terminal sanitization, context-error formatting and publication progress
+  helpers. The publication owner supplies tasks and outcomes; the renderer never decides gates.
 - Private internals: Replacement ordering and output bounds.
 - Owned data and migrations: No mutable data or migrations.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
@@ -480,7 +503,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Public contract: `verify`, `verify:changed`, `verify:pre-push`, `verify:external`, `docs:check`,
   `auth:check`, `localization:check`, `tenancy:check`, and `format*` commands.
 - Private internals: Risk profiles, command admission, schema-three evidence records, immutable
-  delivery manifests, session locks, scanners, and stack-specific check selection.
+  delivery manifests, session locks, scanners, and stack-specific check selection. Captured checks
+  normalize terminal presentation while retaining semantic controls in their runtime identity.
 - Owned data and migrations: One replace-in-place evidence record and verification lock under
   ignored `.codex/runtime/`; no product data or migrations.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
@@ -508,7 +532,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.0.0`.
+- Framework version: `6.1.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

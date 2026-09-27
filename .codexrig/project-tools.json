@@ -108,7 +108,13 @@
     "git-hooks": ["scripts/git-hooks/pre-push"],
     "goals": [
       "scripts/goals/goal-publication-precondition.mjs",
-      "scripts/goals/repository-housekeeping.mjs"
+      "scripts/goals/repository-housekeeping.mjs",
+      "scripts/goals/publish-project.mjs",
+      "scripts/goals/project-publication.mjs",
+      "scripts/goals/project-publication.test.mjs",
+      "scripts/goals/project-publication-integration.test.mjs",
+      "scripts/goals/publication-command.mjs",
+      "scripts/goals/publication-command.test.mjs"
     ],
     "platform": [
       "scripts/platform/configure-platform.mjs",
@@ -149,7 +155,11 @@
       "scripts/repository/worktree-recovery-output.mjs",
       "scripts/repository/worktree-recovery.mjs",
       "scripts/repository/project-tool-environment.mjs",
-      "scripts/repository/project-tool-executables.mjs"
+      "scripts/repository/project-tool-executables.mjs",
+      "scripts/repository/global-git-credential.mjs",
+      "scripts/repository/global-git-credential.test.mjs",
+      "scripts/repository/git-publication-identity.mjs",
+      "scripts/repository/git-publication-identity.test.mjs"
     ],
     "security": ["scripts/security/secret-patterns.mjs"],
     "setup": [
@@ -176,7 +186,7 @@
       "scripts/setup/run-project.sh"
     ],
     "stack": ["scripts/stack/stack-detector.mjs"],
-    "terminal": ["scripts/terminal/terminal-output.mjs"],
+    "terminal": ["scripts/terminal/terminal-output.mjs", "scripts/terminal/publication-output.mjs"],
     "verify": [
       "scripts/verify/a11y.mjs",
       "scripts/verify/adaptive-options.mjs",
@@ -276,7 +286,8 @@
     "context:map",
     "context:read",
     "context:check",
-    "project:run"
+    "project:run",
+    "project:publish"
   ],
   "verificationCommands": [
     "syntax-lint",
@@ -301,12 +312,14 @@
     "api-security",
     "format",
     "runtime-safety",
-    "module-imports"
+    "module-imports",
+    "project-publication"
   ],
   "scriptOverrides": {
     "repo:housekeeping": "node scripts/goals/repository-housekeeping.mjs",
     "tooling:doctor": "node scripts/setup/tooling-doctor.mjs",
-    "setup": "bash scripts/setup/check-prereqs.sh --codex && node scripts/setup/validate-codex-model-policy.mjs && node scripts/verify/docs.mjs && node scripts/verify/identity-access.mjs && node scripts/verify/tenant-isolation.mjs && node scripts/verify/localization.mjs && node scripts/verify/secrets.mjs && bash scripts/setup/install-git-hooks.sh"
+    "setup": "bash scripts/setup/check-prereqs.sh --codex && node scripts/setup/validate-codex-model-policy.mjs && node scripts/verify/docs.mjs && node scripts/verify/identity-access.mjs && node scripts/verify/tenant-isolation.mjs && node scripts/verify/localization.mjs && node scripts/verify/secrets.mjs && bash scripts/setup/install-git-hooks.sh",
+    "project:publish": "node scripts/goals/publish-project.mjs"
   },
   "devDependencies": ["prettier"]
 }

@@ -7,8 +7,6 @@ import process from "node:process";
 import { toolingRoot } from "../filesystem/repository-files.mjs";
 import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
 
-const verificationControlKeyPattern =
-  /^(?:IMAGE_ASSET_[A-Z0-9_]+|NODE_ENV|VERIFY_MAX_CAPTURE_BYTES|VERIFY_MAX_PARALLEL)$/u;
 const identityKeys = Object.freeze([
   "arch",
   "environment",
@@ -20,9 +18,12 @@ const identityKeys = Object.freeze([
 ]);
 const versionProbeCache = new Map();
 
-/** Adds only verification controls to the same repository-bound environment used by installation. */
+/** Normalizes verification within the common repository-bound tool environment. */
 export function verificationChildEnvironment(environment = process.env, root = toolingRoot) {
   const child = projectToolEnvironment({ root, inherited: environment });
+  // Captured checks use one presentation, so changing terminals cannot discard valid evidence.
+  // Normalize executed inputs as well as their identity; semantic controls remain below.
+  for (const key of ["COLORTERM", "FORCE_COLOR", "TERM_PROGRAM"]) delete child[key];
   // Deterministic verification never loads mutable user npm options or credentials. Other tools
   // retain the common repository home. Dependency installation owns its explicit registry profile.
   const disabledNpmConfigRoot = process.platform === "win32" ? "NUL" : "/dev/null";
@@ -35,21 +36,15 @@ export function verificationChildEnvironment(environment = process.env, root = t
       "Verification could not bind npm configuration to the operating-system null device.",
     );
   delete child.NPM_CONFIG_GLOBALCONFIG;
-  for (const [key, value] of Object.entries(environment)) {
-    if (
-      verificationControlKeyPattern.test(key) &&
-      typeof value === "string" &&
-      !value.includes("\0")
-    )
-      child[key] = value;
-  }
   return {
     ...child,
     NPM_CONFIG_USERCONFIG: disabledNpmConfigRoot,
     NPM_CONFIG_PREFIX: disabledNpmConfigRoot,
     LANG: "C",
     LC_ALL: "C",
+    NO_COLOR: "1",
     PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "error",
+    TERM: "dumb",
     TZ: "Etc/UTC",
   };
 }

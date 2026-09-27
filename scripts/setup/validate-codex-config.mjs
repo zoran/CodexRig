@@ -281,6 +281,7 @@ function validateRuntimeConfigDocument(value, root) {
       "model_reasoning_effort",
       "notice",
       "projects",
+      "realtime",
       "service_tier",
       "tui",
     ],
@@ -337,6 +338,17 @@ function validateRuntimeConfigDocument(value, root) {
       Object.values(notice).some((entry) => typeof entry !== "boolean")
     ) {
       throw new CodexConfigError("Repository-local Codex runtime notice state is invalid.");
+    }
+  }
+  // Codex persists voice selection as a preference; transport and execution settings stay denied.
+  if (value.realtime !== undefined) {
+    requireRuntimeKeys(value.realtime, ["voice"], "voice preferences");
+    if (
+      value.realtime.voice !== undefined &&
+      (typeof value.realtime.voice !== "string" ||
+        !/^[a-z][a-z0-9_-]{0,63}$/u.test(value.realtime.voice))
+    ) {
+      throw new CodexConfigError("Repository-local Codex runtime voice preference is invalid.");
     }
   }
   if (value.tui !== undefined) {

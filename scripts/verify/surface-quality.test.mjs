@@ -97,6 +97,39 @@ test("stack detection reads a stable bounded prefix instead of the complete acti
   assert.equal(snapshot.cache.get("src/large.js").full, undefined);
 });
 
+test("responsive constraints and decorative descendants are distinct from undersized controls", () => {
+  const check = (content) =>
+    responsiveFailures({
+      hasWebSurface: true,
+      files: [{ content, extension: ".css", relativePath: "apps/site/src/app.css" }],
+    });
+  assert.deepEqual(
+    check(
+      [
+        ".content { width: 100%; max-width: 1640px }",
+        ".page-intro > div { max-width: 740px }",
+        ".button { height: 44px }",
+        ".button svg, .control svg { height: 16px }",
+        ".button::before { height: 13px }",
+      ].join("\n"),
+    ),
+    [],
+  );
+  const failures = check(
+    [
+      ".content { min-width: 960px }",
+      ".toolbar button { height: 24px }",
+      ".buttons .icon-button { min-height: 20px }",
+      "a { height: 32px }",
+      'input[type="submit"] { min-height: 28px }',
+      ".button { max-height: 32px }",
+    ].join("\n"),
+  );
+  assert.equal(failures.length, 6);
+  assert.match(failures[0], /fixed 960px width/u);
+  for (const failure of failures.slice(1)) assert.match(failure, /touch-usable target/u);
+});
+
 test("responsive verification covers mobile, tablet, desktop, input, zoom, and viewport hazards", () => {
   const unsafe = responsiveFailures({
     hasWebSurface: true,

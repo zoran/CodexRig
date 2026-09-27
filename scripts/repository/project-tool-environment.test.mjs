@@ -41,6 +41,72 @@ function fixture(t) {
   return roots;
 }
 
+test("semantic verifier controls survive repeated project boundaries without importing secrets", (t) => {
+  const [, root] = fixture(t);
+  const controls = {
+    NODE_ENV: "production",
+    VERIFY_MAX_CAPTURE_BYTES: "1048576",
+    VERIFY_MAX_PARALLEL: "2",
+    IMAGE_ASSET_MAX_BYTES: "12345",
+  };
+  let environment = {
+    ...controls,
+    GITHUB_TOKEN: "fixture-token",
+    AWS_SECRET_ACCESS_KEY: "fixture-secret",
+    NODE_OPTIONS: "--require=fixture-preload.cjs",
+    VERIFY_UNKNOWN_OVERRIDE: "1",
+    IMAGE_ASSET_INVALID: "bad\0value",
+  };
+  for (let boundary = 0; boundary < 4; boundary += 1)
+    environment = projectToolEnvironment({ root, inherited: environment });
+  for (const [key, value] of Object.entries(controls)) assert.equal(environment[key], value, key);
+  for (const key of [
+    "GITHUB_TOKEN",
+    "AWS_SECRET_ACCESS_KEY",
+    "NODE_OPTIONS",
+    "VERIFY_UNKNOWN_OVERRIDE",
+    "IMAGE_ASSET_INVALID",
+  ])
+    assert.equal(environment[key], undefined, key);
+});
+
+// Regression: successful HTTPS authentication must survive a new process, without borrowing
+// a host/sibling account or matching another repository on the same Git server.
+test("Git remembers project HTTPS credentials across commands and rejects invalidated accounts", (t) => {
+  const [host, first, second] = fixture(t);
+  const root = path.join(first, "project's quoted path");
+  mkdirSync(root);
+  const locations = prepareProjectToolDirectories(root);
+  prepareProjectToolDirectories(second);
+  const credential = "protocol=https\nhost=example.invalid\npath=team/source.git\n";
+  const account = "username=fixture-user\npassword=fixture-account-value\n";
+  const hostStore = path.join(host, ".git-credentials");
+  writeFileSync(hostStore, "host-account-sentinel\n");
+  const run = (repository, operation, input) =>
+    spawnSync("git", ["credential", operation], {
+      cwd: repository,
+      env: {
+        ...projectToolEnvironment({ root: repository, inherited: { ...process.env, HOME: host } }),
+        GIT_TERMINAL_PROMPT: "0",
+      },
+      encoding: "utf8",
+      input: `${input}\n`,
+      timeout: 10_000,
+    });
+  assert.equal(run(root, "approve", credential + account).status, 0);
+  const loaded = run(root, "fill", credential);
+  assert.equal(loaded.status, 0, "a fresh Git process must reuse the approved project account");
+  assert.ok(loaded.stdout.includes(account));
+  assert.notEqual(run(second, "fill", credential).status, 0);
+  assert.notEqual(run(root, "fill", credential.replace("source.git", "other.git")).status, 0);
+  const store = path.join(locations.home, ".git-credentials");
+  assert.equal(fs.statSync(store).mode & 0o077, 0);
+  assert.ok(!listActiveFiles({ root }).some((file) => file.includes("credentials")));
+  assert.equal(run(root, "reject", credential + account).status, 0);
+  assert.notEqual(run(root, "fill", credential).status, 0);
+  assert.equal(readFileSync(hostStore, "utf8"), "host-account-sentinel\n");
+});
+
 test("outer-shell Mise discovery ignores project pins before and after a project command", async (t) => {
   const [host, root] = fixture(t);
   const config = '[tools]\n[env]\nEXPECTED_PROJECT_CONFIG = "local"\n';
@@ -136,7 +202,7 @@ test("an unnamed tool and its child receive only their own home and no ambient a
     assert.equal(observed.home, locations.home);
     assert.equal(observed.child, locations.home);
     assert.equal(observed.config, "local", "Mise must actually load the repository configuration");
-    assert.deepEqual(observed.gitConfig, ["1", "user.useConfigOnly", "true"]);
+    assert.deepEqual(observed.gitConfig, ["5", "user.useConfigOnly", "true"]);
     for (const name of [
       "PROVIDER_NOT_IN_ANY_CATALOG_AUTH",
       "AWS_ACCESS_KEY_ID",
@@ -159,6 +225,23 @@ test("private state cannot follow a host symlink or reuse publicly accessible st
   chmodSync(path.join(second, ".auth", "project-tools"), 0o755);
   assert.throws(() => prepareProjectToolDirectories(second), /private/iu);
   assert.equal(existsSync(path.join(host, "project-tools")), false);
+});
+
+test("Git credential storage refuses exposed files and links before invoking a helper", (t) => {
+  const [host, root] = fixture(t);
+  const locations = prepareProjectToolDirectories(root);
+  const store = path.join(locations.home, ".git-credentials");
+  const foreign = path.join(host, "credentials");
+  writeFileSync(foreign, "host-sentinel\n", { mode: 0o600 });
+  symlinkSync(foreign, store);
+  assert.throws(() => prepareProjectToolDirectories(root), /private project-owned/);
+  rmSync(store);
+  writeFileSync(store, "project-sentinel\n", { mode: 0o644 });
+  assert.throws(() => prepareProjectToolDirectories(root), /private project-owned/);
+  chmodSync(store, 0o600);
+  fs.linkSync(store, path.join(locations.home, "linked-credentials"));
+  assert.throws(() => prepareProjectToolDirectories(root), /private project-owned/);
+  assert.equal(readFileSync(foreign, "utf8"), "host-sentinel\n");
 });
 
 test("Git SSH resolves only local identity and known-host paths without the host agent or config", (t) => {

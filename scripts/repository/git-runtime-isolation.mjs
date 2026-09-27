@@ -2,7 +2,6 @@
 import {
   closeSync,
   constants,
-  existsSync,
   fstatSync,
   lstatSync,
   openSync,
@@ -14,6 +13,7 @@ import path from "node:path";
 import process from "node:process";
 import { toolingRoot } from "../filesystem/repository-files.mjs";
 import { projectToolEnvironment } from "./project-tool-environment.mjs";
+import { repositoryCodexHomeGitignorePatterns } from "./source-inventory-policy.mjs";
 import {
   isTerminalSynchronousProcessResult,
   spawnSyncWithBoundedIo as spawnSync,
@@ -175,10 +175,41 @@ export function isolatedGitResultCompleted(
   });
 }
 
+function runtimeExcludesLeaveSourceVisible({ gitDirectory, workTree, excludePath }) {
+  const maximumOutputBytes = 64 * 1024 * 1024;
+  const inventories = [];
+  for (const extraArguments of [[], [`--exclude-from=${excludePath}`]]) {
+    const args = isolatedGitArguments({
+      args: ["ls-files", "--others", "--exclude-per-directory=.gitignore", ...extraArguments, "-z"],
+      gitDirectory,
+      workTree,
+    });
+    const result = spawnSync("git", args, {
+      cwd: workTree,
+      encoding: "utf8",
+      env: cleanGitEnvironment(process.env, workTree),
+      input: "",
+      maxBuffer: maximumOutputBytes,
+      stdio: "pipe",
+      timeout: 20_000,
+    });
+    if (!isolatedGitResultCompleted(result, { args, encoding: "utf8", maximumOutputBytes })) {
+      return false;
+    }
+    inventories.push(result.stdout);
+  }
+  // Unanchored native names can also match product files in nested directories. Git's full,
+  // NUL-delimited inventories must agree; canonical runtime names alone are not sufficient.
+  return inventories[0] === inventories[1];
+}
+
+/** Accepts empty excludes or canonical native rules that have no effect beyond portable ignores. */
 export function localGitExcludeIsInactive({ gitDirectory, workTree } = {}) {
   if (!gitDirectory || !workTree) return false;
   const args = isolatedGitArguments({
-    args: ["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"],
+    // --path-format=absolute dereferences the final symlink before our lstat/O_NOFOLLOW check.
+    // The bound absolute Git directory already produces an absolute, lexical metadata path.
+    args: ["rev-parse", "--git-path", "info/exclude"],
     gitDirectory,
     workTree,
   });
@@ -202,13 +233,11 @@ export function localGitExcludeIsInactive({ gitDirectory, workTree } = {}) {
   }
   const candidate = resolved.stdout.trim();
   if (!candidate || !path.isAbsolute(candidate) || candidate.includes("\0")) return false;
-  if (!existsSync(candidate)) return true;
-
   let initial;
   try {
     initial = lstatSync(candidate, { bigint: true });
-  } catch {
-    return false;
+  } catch (error) {
+    return error?.code === "ENOENT";
   }
   if (
     initial.isSymbolicLink() ||
@@ -228,6 +257,21 @@ export function localGitExcludeIsInactive({ gitDirectory, workTree } = {}) {
       return false;
     }
     const content = readFileSync(descriptor, "utf8");
+    const activeRules = content
+      .split("\n")
+      .map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line))
+      .filter((line) => line !== "" && !line.startsWith("#"));
+    if (activeRules.length > 0) {
+      const nativePatterns = new Set(
+        repositoryCodexHomeGitignorePatterns.flatMap((pattern) => [pattern, pattern.slice(1)]),
+      );
+      if (
+        activeRules.some((rule) => !nativePatterns.has(rule)) ||
+        !runtimeExcludesLeaveSourceVisible({ gitDirectory, workTree, excludePath: candidate })
+      ) {
+        return false;
+      }
+    }
     const after = fstatSync(descriptor, { bigint: true });
     if (
       stableFileIdentity(after) !== stableFileIdentity(initial) ||
@@ -235,10 +279,7 @@ export function localGitExcludeIsInactive({ gitDirectory, workTree } = {}) {
     ) {
       return false;
     }
-    return content.split("\n").every((line) => {
-      const normalized = line.endsWith("\r") ? line.slice(0, -1) : line;
-      return normalized === "" || normalized.startsWith("#");
-    });
+    return true;
   } catch {
     return false;
   } finally {

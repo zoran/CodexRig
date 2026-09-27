@@ -168,7 +168,7 @@ function hasImageExtension(reference) {
 }
 
 function referenceCandidates(reference, sourcePath, productLayout) {
-  const cleaned = cleanReference(reference);
+  const cleaned = cleanReference(reference.value);
   if (!cleaned || isExternalReference(cleaned) || !hasImageExtension(cleaned)) return [];
   const owner = productUnitForPath(sourcePath, productLayout, { surface: true });
   if (!owner) return [];
@@ -180,7 +180,13 @@ function referenceCandidates(reference, sourcePath, productLayout) {
       normalizePath(path.posix.join(publicRoot, withoutSlash)),
     ];
   }
-  return [normalizePath(path.join(path.dirname(sourcePath), cleaned))];
+  const candidates = [normalizePath(path.join(path.dirname(sourcePath), cleaned))];
+  // Server/build source can name its unit's public asset tree; browser-relative URLs cannot.
+  if (reference.type === "source-literal" && cleaned.startsWith("public/")) {
+    const unitRoot = owner.root === "." ? owner.surfaceRoot : owner.root;
+    candidates.push(normalizePath(path.posix.join(unitRoot, cleaned)));
+  }
+  return candidates;
 }
 
 function resolveReference(root, realRoot, activeFiles, reference, sourcePath, productLayout) {
@@ -291,7 +297,7 @@ function collectReferences(filePath, content) {
     /["']([^"']+\.(?:png|jpe?g|gif|webp|avif|svg)(?:[?#][^"']*)?)["']/gi,
   )) {
     references.push({
-      type: "image",
+      type: /\.(?:[cm]?[jt]s|[jt]sx)$/iu.test(filePath) ? "source-literal" : "image",
       value: match[1],
       line: lineAt(match.index ?? 0),
     });
@@ -439,7 +445,7 @@ function analyze(root, realRoot, activeFiles, files, readText, productLayout) {
         root,
         realRoot,
         activeFiles,
-        reference.value,
+        reference,
         filePath,
         productLayout,
       );

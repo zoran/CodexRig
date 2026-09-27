@@ -462,6 +462,23 @@
       "coveredTestPaths": [],
       "phase": "preflight",
       "reason": "actual installed tool imports must resolve inside this project"
+    },
+    {
+      "key": "project-publication",
+      "label": "portable project publication",
+      "executable": "$node",
+      "args": [
+        "--test",
+        "scripts/goals/project-publication.test.mjs",
+        "scripts/repository/global-git-credential.test.mjs",
+        "scripts/goals/publication-command.test.mjs",
+        "scripts/goals/project-publication-integration.test.mjs",
+        "scripts/repository/git-publication-identity.test.mjs"
+      ],
+      "artifactOwners": [],
+      "coveredTestPaths": [],
+      "reason": "portable publication and GitHub/GitLab fallback preserve destinations, verified snapshots, ownership, retry safety and the explicit global-account boundary",
+      "phase": "preflight"
     }
   ],
   "testConsumers": {
@@ -803,7 +820,8 @@
     ],
     "scripts/verify/verification-runtime-identity.mjs": [
       "scripts/verify/verification-evidence-integrity.test.mjs",
-      "scripts/verify/verification-executor.test.mjs"
+      "scripts/verify/verification-executor.test.mjs",
+      "scripts/goals/project-publication-integration.test.mjs"
     ],
     "scripts/verify/verification-session-lock.mjs": [
       "scripts/verify/verification-evidence-integrity.test.mjs",
@@ -894,7 +912,9 @@
     ],
     "scripts/repository/project-tool-environment.mjs": [
       "scripts/repository/project-tool-environment.test.mjs",
-      "scripts/setup/startup-session-controller.test.mjs"
+      "scripts/setup/startup-session-controller.test.mjs",
+      "scripts/repository/global-git-credential.test.mjs",
+      "scripts/goals/project-publication-integration.test.mjs"
     ],
     "scripts/repository/project-tool-executables.mjs": [
       "scripts/deps/project-tool-installation.test.mjs",
@@ -942,6 +962,32 @@
     ],
     "scripts/terminal/startup-presentation.mjs": [
       "scripts/terminal/startup-presentation.test.mjs"
+    ],
+    "scripts/goals/project-publication.mjs": [
+      "scripts/goals/project-publication.test.mjs",
+      ".agents/skills/reset-framework/scripts/publish-framework.test.mjs",
+      "scripts/goals/project-publication-integration.test.mjs"
+    ],
+    "scripts/goals/publish-project.mjs": [
+      "scripts/goals/project-publication.test.mjs",
+      ".agents/skills/reset-framework/scripts/publish-framework.test.mjs"
+    ],
+    "scripts/terminal/publication-output.mjs": [
+      "scripts/goals/project-publication.test.mjs",
+      ".agents/skills/reset-framework/scripts/publish-framework.test.mjs",
+      "scripts/goals/publication-command.test.mjs"
+    ],
+    "scripts/goals/publication-command.mjs": [
+      "scripts/goals/project-publication.test.mjs",
+      ".agents/skills/reset-framework/scripts/publish-framework.test.mjs",
+      "scripts/goals/publication-command.test.mjs"
+    ],
+    "scripts/repository/global-git-credential.mjs": [
+      "scripts/repository/global-git-credential.test.mjs"
+    ],
+    "scripts/repository/git-publication-identity.mjs": [
+      "scripts/repository/git-publication-identity.test.mjs",
+      "scripts/goals/project-publication-integration.test.mjs"
     ]
   },
   "exactConsumers": {

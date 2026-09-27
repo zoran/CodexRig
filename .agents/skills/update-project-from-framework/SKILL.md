@@ -33,7 +33,8 @@ license unrelated product repairs, deployments, commit or push.
    Named examples do not bound the applicable update: trace the underlying rule across affected
    existing consumers and the admission of future ones while respecting the accepted update scope.
    Reconcile the shared tool/account isolation boundary, actual project account adapters and their
-   startup/install/verification consumers. Preserve project credentials in place; never borrow host
+   startup/install/verification consumers. Preserve project credentials in place. The canonical
+   GitHub/GitLab HTTPS adapter is the only default global-login exception; never borrow other host
    or sibling accounts to make an update pass. Report required local logins without reading secrets.
 
 ## Reconcile One Current Contract

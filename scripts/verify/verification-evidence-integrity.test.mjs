@@ -135,6 +135,50 @@ test("runtime identity canonicalizes locale and timezone across lifecycle caller
   }
 });
 
+test("verification normalizes terminal presentation without weakening semantic runtime identity", () => {
+  const root = fixture();
+  const cosmetics = ["TERM", "TERM_PROGRAM", "COLORTERM", "NO_COLOR", "FORCE_COLOR"];
+  const controls = ["CI", "NODE_ENV", "VERIFY_MAX_PARALLEL"];
+  const previous = new Map([...cosmetics, ...controls].map((key) => [key, process.env[key]]));
+  try {
+    for (const key of [...cosmetics, ...controls]) delete process.env[key];
+    const baselineEnvironment = verificationChildEnvironment(process.env, root);
+    const baseline = normalizedVerificationRuntimeIdentity(undefined, { cwd: root });
+    for (const appearance of [
+      {
+        TERM: "xterm-256color",
+        TERM_PROGRAM: "fixture-terminal",
+        COLORTERM: "truecolor",
+        FORCE_COLOR: "3",
+      },
+      { TERM: "dumb", NO_COLOR: "1" },
+    ]) {
+      for (const key of cosmetics) delete process.env[key];
+      Object.assign(process.env, appearance);
+      assert.deepEqual(verificationChildEnvironment(process.env, root), baselineEnvironment);
+      assert.deepEqual(normalizedVerificationRuntimeIdentity(undefined, { cwd: root }), baseline);
+    }
+    for (const [key, value] of [
+      ["CI", "1"],
+      ["NODE_ENV", "production"],
+      ["VERIFY_MAX_PARALLEL", "2"],
+    ]) {
+      process.env[key] = value;
+      assert.equal(verificationChildEnvironment(process.env, root)[key], value);
+      assert.notEqual(
+        normalizedVerificationRuntimeIdentity(undefined, { cwd: root }).environment,
+        baseline.environment,
+      );
+      delete process.env[key];
+    }
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test("runtime identity hashes every forwarded semantic child control", () => {
   const root = fixture();
   const unknownName = "VERIFICATION_UNBOUND_TEST_CONTROL";

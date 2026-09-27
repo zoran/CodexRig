@@ -20,12 +20,12 @@ how a future member of the class receives the same rule without another special-
 
 ## Repository-Local Tool And Account Isolation
 
-Every account-bearing tool, CLI, SDK, plugin and subprocess must use the current repository's
-private account and mutable tool state. This applies to existing and future tools, interactive
-commands, startup, maintenance, builds, verification and delivery adapters. Named providers are
-illustrations, never the admission boundary. Shared installed executables may serve as read-only
-bootstrap; project work must not update them or write host or sibling configuration, caches,
-credentials or accounts.
+Except for the explicit GitHub/GitLab HTTPS fallback and publication metadata reads below, every
+account-bearing tool, CLI, SDK, plugin and subprocess must use the current repository's private
+account and mutable tool state. This applies to existing and future tools, interactive commands,
+startup, maintenance, builds, verification and delivery adapters. Named providers are illustrations,
+never the admission boundary. Shared installed executables may serve as read-only bootstrap; project
+work must not update them or write host or sibling configuration, caches, credentials or accounts.
 
 Use `bash scripts/setup/run-project.sh <command> [arguments]` as the external-command entry from a
 host shell; `pnpm project:run -- <command> [arguments]` is its alias inside an isolated session. The
@@ -38,23 +38,54 @@ not wrap every nested command in another Mise process. The initial installer mus
 environment before invoking Mise itself. Mise version selection or optional sandboxing alone does
 not isolate preparation or native credential stores. Use existing project account owners. Start from
 explicit safe inheritance, with repository-bound home, configuration, data, cache and temporary
-directories. Do not copy host credentials, inherit ambient tokens or agent sockets, silently use a
-system keyring, follow external credential/configuration includes, or fall back to a host/instance
-identity. Keep private paths out of Git, context, generation and transfer; routine reset and
-housekeeping must preserve accounts. Separate current credentials from disposable caches and
-obsolete installations. Rebind existing dependency installations through their package-manager owner
-when their metadata still points to host storage. At successful quiescent startup, retire verified
-replaced tool bundles and let Mise prune unused runtimes; preserve declared secondary pins and every
-account. Existing project-specific identities and deployment approvals retain their original owners.
+directories. Outside the explicit GitHub/GitLab exception below, do not copy host credentials,
+inherit ambient tokens or agent sockets, silently use a system keyring, follow external
+credential/configuration includes, or fall back to a host/instance identity. Keep private paths out
+of Git, context, generation and transfer; routine reset and housekeeping must preserve accounts.
+Separate current credentials from disposable caches and obsolete installations. Rebind existing
+dependency installations through their package-manager owner when their metadata still points to
+host storage. At successful quiescent startup, retire verified replaced tool bundles and let Mise
+prune unused runtimes; preserve declared secondary pins and every account. Existing project-specific
+identities and deployment approvals retain their original owners.
+
+Git HTTPS access to the GitHub and GitLab hosts declared in `.codex/tooling.json` first uses the
+private project credential store. If no credential is available, the repository's shared Git
+credential adapter may query the operating-system user's existing global Git helpers and then the
+matching GitHub CLI (`gh`) or GitLab CLI (`glab`) login, before Git asks for credentials. This is
+the sole default host-account exception: only credential `get`, only HTTPS for a configured provider
+host, with no ambient tokens, repository-local host-helper configuration, automatic login, or host
+`store`/`erase` calls. Native helpers resolve their user-home configuration and desktop keyring;
+temporary adapter files stay private and project-local. Git may cache a successfully used fallback
+credential in the private project store. Other tools, providers, API-policy credentials, sibling
+accounts and SSH identities retain the isolation rules above. This exception grants no publication
+or deployment authority.
+
+For publication, the shared Git identity resolver may read only missing `user.name` and `user.email`
+values from the operating-system user's standard global Git configuration, with includes disabled.
+Project values and explicit author/committer settings take precedence. This non-secret commit
+metadata does not grant account access: global hooks, signing configuration, credentials and
+arbitrary configuration remain excluded. Before verifying a new commit, resolve and validate both
+native Git identities; recheck them before staging and bind only their name/email values to the
+commit process. Do not modify global or project configuration, derive an identity from commit
+history, or require an author identity merely to publish an existing unchanged commit.
+
+After Git rejects a credential during authorized publication, the same adapter may record only a
+keyed credential fingerprint in a private, short-lived context bound to that HTTPS host and
+repository path. The publication owner may retry the identical fetch, push or remote-confirmation
+operation at most twice after distinct confirmed rejections, without another interactive prompt.
+Already rejected candidates are skipped; ordinary command failures, signals and timeouts do not
+authorize a retry. Dispose of the owned context on every exit. Global credential store/erase and
+automatic login remain forbidden.
 
 Before admitting a new tool, integration or account flow, trace its real state locations and
 credential discovery, including child processes and platform-specific fallbacks. Standard home
 variables alone are not proof. Integrate nonstandard behavior at the shared execution boundary or
 the tool's explicit project adapter, and verify it with isolated host and sibling sentinels before
 authenticated use. Unsupported isolation blocks that tool's affected operation; it never licenses
-host fallback. Explicit job-scoped CI/workload credentials require their own project binding and
-must not be confused with inherited developer accounts. If an interactive login is necessary, name
-the exact project-bound command without initiating or transferring credentials on the user's behalf.
+host fallback beyond the explicit GitHub/GitLab adapter above. Explicit job-scoped CI/workload
+credentials require their own project binding and must not be confused with inherited developer
+accounts. If an interactive login is necessary, name the exact project-bound command without
+initiating or transferring credentials on the user's behalf.
 
 Every affected plan, audit, toolchain update and child update checks this isolation boundary and the
 admission path for future tools. Prove local state and untouched host/sibling sentinels through
@@ -1199,33 +1230,34 @@ executables once. It captures the startup-critical input and toolchain basis, at
 pending native-picker lease, and then validates ignored root `config.toml` before any Codex process
 can consume it. The one current runtime-config contract permits only private, non-executable
 repository trust, prior hook state, notice state, approval routing, service-tier metadata, typed
-terminal preferences, and bounded Codex-persisted model/reasoning preferences. Tracked project
-config remains the model/reasoning source of truth, and the controller projects its exact values
-into every fresh or resumed Codex CLI launch; `notify`, MCP, plugin, provider, or any unknown key
-blocks canonical startup. The controller then injects one SessionStart and one Stop command through
-session-only CLI configuration. The exact external hook shell is forced through the sanitized child
-environment and encoded command shape; the same Codex executable's stable `hooks/list` inventory
-must be warning-free and contain exactly the two hooks with the controller-derived hashes, synthetic
-session-flag identities, enabled state, and `trusted` status. No additional hook may remain loaded.
-No global hook-trust bypass is permitted, and tracked `.codex/hooks.json` contains no executable
-handler. Only after that proof may the controller bind a gated foreground supervisor and open its
-token-bound loopback lifecycle endpoint. The current schema-6 lease records the controller,
-supervisor, durable spawn-handoff phase, and exact Codex PID. The gate opens only after the handoff
-becomes durable. The state owner accepts mutation only from the exact registered controller process.
-Lease release requires that controller to authenticate the terminal child-exit proof against the
-private issue-time gate secret and persist a `completed` transition first; a normal wrapper exit
-code alone is not child completion evidence. A private parent-liveness pipe makes a controller crash
-terminate and reap the child, while a killed supervisor cannot hide the separately recorded Codex
-process. A crash before exact PID binding remains an ownership-confirmation blocker, so concurrent
-launchers cannot reuse an indeterminate selection. At a proven terminal child exit, the controller
-releases its short-lived lease while retaining the separate verified recovery ID; an interrupted
-controller instead leaves mechanically recoverable stale state. The picker owns native session
-selection. Authenticated SessionStart binds its actual session ID; it may report a resumed or new
-session. Cancellation before SessionStart releases only the pending lease and creates no activation
-or recovery record. A failed selection never triggers an automatic fresh fallback. A failed
-SessionStart cannot be reported as successful activation. Any attestation drift ends the controller
-instead of blessing changed startup code. No repository script, mise configuration, or package is
-loaded or executed after admission; the selected session performs the complete reconstruction above.
+terminal preferences, and bounded Codex-persisted model/reasoning and voice preferences. Tracked
+project config remains the model/reasoning source of truth, and the controller projects its exact
+values into every fresh or resumed Codex CLI launch; `notify`, MCP, plugin, provider, or any unknown
+key blocks canonical startup. The controller then injects one SessionStart and one Stop command
+through session-only CLI configuration. The exact external hook shell is forced through the
+sanitized child environment and encoded command shape; the same Codex executable's stable
+`hooks/list` inventory must be warning-free and contain exactly the two hooks with the
+controller-derived hashes, synthetic session-flag identities, enabled state, and `trusted` status.
+No additional hook may remain loaded. No global hook-trust bypass is permitted, and tracked
+`.codex/hooks.json` contains no executable handler. Only after that proof may the controller bind a
+gated foreground supervisor and open its token-bound loopback lifecycle endpoint. The current
+schema-6 lease records the controller, supervisor, durable spawn-handoff phase, and exact Codex PID.
+The gate opens only after the handoff becomes durable. The state owner accepts mutation only from
+the exact registered controller process. Lease release requires that controller to authenticate the
+terminal child-exit proof against the private issue-time gate secret and persist a `completed`
+transition first; a normal wrapper exit code alone is not child completion evidence. A private
+parent-liveness pipe makes a controller crash terminate and reap the child, while a killed
+supervisor cannot hide the separately recorded Codex process. A crash before exact PID binding
+remains an ownership-confirmation blocker, so concurrent launchers cannot reuse an indeterminate
+selection. At a proven terminal child exit, the controller releases its short-lived lease while
+retaining the separate verified recovery ID; an interrupted controller instead leaves mechanically
+recoverable stale state. The picker owns native session selection. Authenticated SessionStart binds
+its actual session ID; it may report a resumed or new session. Cancellation before SessionStart
+releases only the pending lease and creates no activation or recovery record. A failed selection
+never triggers an automatic fresh fallback. A failed SessionStart cannot be reported as successful
+activation. Any attestation drift ends the controller instead of blessing changed startup code. No
+repository script, mise configuration, or package is loaded or executed after admission; the
+selected session performs the complete reconstruction above.
 
 Each launcher binds one durable Codex session. Switching to another chat with `/new` or `/resume`
 inside the same CLI retains that launcher and is rejected before invalid startup state or source
@@ -1568,8 +1600,9 @@ form of planning into the repository.
 For every already-authorized outcome that spans multiple goals or sessions—or enters guarded or
 critical capacity because interruption is now plausible—create or update the single optional
 `docs/project-context.md` before the first slice can be mistaken for a handoff. It is a compact
-working-memory cache, not a diary or an authority source. Its first content must be one exact
-bounded machine-readable marker:
+working-memory cache, not a diary or an authority source. The portable root `.gitignore` excludes
+this exact path; local Git excludes must not carry that privacy boundary. Recovery reads it
+directly. Its first content must be one exact bounded machine-readable marker:
 
 ```text
 <!-- codexrig-work-state
@@ -2343,6 +2376,13 @@ never write those surfaces, even from an otherwise writable isolated checkout.
   checks prove packaging/routing, not obedience. Add no evaluation service or process archive.
 
 ## Verification
+
+Acceptance for a launcher or publication change must exercise the normal documented command with
+persistently prepared project tools. A direct verifier run with temporary environments or extra
+selectors proves only that invocation. Test the assembled launcher, publication gate and pre-push
+path, including unchanged evidence reuse, semantic-input invalidation and useful failure output.
+Preserve declared tool selectors and verification controls across those boundaries; verification
+must not install prerequisites or silently discard a real toolchain change.
 
 Run the smallest useful focused command while iterating; this controls execution cost, not the
 preferred breadth of newly added durable tests. `pnpm verify:changed -- --print-plan` exposes the

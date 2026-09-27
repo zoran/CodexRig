@@ -1,6 +1,7 @@
 /** Checks the current project's portable entry documents and isolated native state boundary. */
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { projectContextPath } from "../docs/document-scope.mjs";
 import {
   repositoryCodexHomeGitignoreBehaviorFindings,
   repositoryCodexHomeGitignoreFindings,
@@ -64,9 +65,10 @@ export function portableContextContractFindings({ repositoryRoot }) {
       ...repositoryCodexHomeGitignoreFindings(readFileSync(gitignorePath, "utf8")).map(
         (finding) => `portable context contract ${finding}`,
       ),
-      ...repositoryCodexHomeGitignoreBehaviorFindings({ root: repositoryRoot }).map(
-        (finding) => `portable context contract ${finding}`,
-      ),
+      ...repositoryCodexHomeGitignoreBehaviorFindings({
+        root: repositoryRoot,
+        additionalPrivatePaths: [projectContextPath],
+      }).map((finding) => `portable context contract ${finding}`),
     );
   }
   return findings;

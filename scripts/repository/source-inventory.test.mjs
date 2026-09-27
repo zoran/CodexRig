@@ -101,6 +101,7 @@ test("Git-less inventory excludes private root Codex state before directory desc
   write(root, "auth.json", "private auth\n");
   write(root, "sessions/deep/private-thread.jsonl", "private session\n");
   write(root, "cache/private.bin", "private cache\n");
+  write(root, "tui-luna-reserve/capacity.json", "private native capacity\n");
   write(root, ".project-state/private.json", "private process state\n");
 
   assert.equal(existsSync(path.join(root, ".git")), false);

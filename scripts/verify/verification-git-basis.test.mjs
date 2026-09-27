@@ -10,10 +10,12 @@ import {
   changedPathsSinceVerificationBasis,
   rootManifestChangeIsVerifyOnly,
 } from "./verification-git-basis.mjs";
+import { changedPathsFromGit } from "./adaptive-state.mjs";
 
 function git(repositoryRoot, ...args) {
   const result = spawnSync("git", args, {
     cwd: repositoryRoot,
+    env: { ...process.env, GIT_ALLOW_PROTOCOL: "file" },
     encoding: "utf8",
     input: "",
     stdio: "pipe",
@@ -52,6 +54,37 @@ function fixture(t) {
   git(repositoryRoot, "commit", "-qm", "basis A");
   return repositoryRoot;
 }
+
+test("fresh Git bases retain staged-only removal and rename without trusting hidden index flags", (t) => {
+  const repositoryRoot = fixture(t);
+  write(repositoryRoot, ".gitignore", "/docs/project-context.md\n");
+  write(repositoryRoot, "docs/project-context.md", "Private fixture context.\n");
+  git(repositoryRoot, "add", "--force", ".gitignore", "docs/project-context.md");
+  git(repositoryRoot, "commit", "-qm", "Previously tracked context");
+  git(repositoryRoot, "rm", "--cached", "--", "docs/project-context.md");
+  git(repositoryRoot, "mv", "package.json", "renamed-package.json");
+  git(repositoryRoot, "update-index", "--assume-unchanged", "src/product.mjs");
+  write(repositoryRoot, "src/product.mjs", "export const product = 2;\n");
+  const expected = [
+    "docs/project-context.md",
+    "package.json",
+    "renamed-package.json",
+    "src/product.mjs",
+  ];
+  assert.deepEqual(captureVerificationGitBasis({ repositoryRoot }).dirtyPaths, expected);
+  assert.deepEqual(changedPathsFromGit({ repositoryRoot }).paths, expected);
+});
+
+test("adaptive staged paths remain available before the first commit", (t) => {
+  const repositoryRoot = mkdtempSync(path.join(os.tmpdir(), "verification-git-unborn-"));
+  t.after(() => rmSync(repositoryRoot, { force: true, recursive: true }));
+  git(repositoryRoot, "init", "-q");
+  write(repositoryRoot, ".gitignore", "/first.mjs\n");
+  write(repositoryRoot, "first.mjs", "export const first = true;\n");
+  git(repositoryRoot, "add", "--force", ".gitignore", "first.mjs");
+  assert.deepEqual(changedPathsFromGit({ repositoryRoot }).paths, [".gitignore", "first.mjs"]);
+  assert.equal(captureVerificationGitBasis({ repositoryRoot }).complete, false);
+});
 
 test("delta retains a formerly untracked path after it is deleted", (t) => {
   const repositoryRoot = fixture(t);

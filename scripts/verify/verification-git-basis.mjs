@@ -14,7 +14,13 @@ import {
   captureStableRepositoryFileIdentity,
   readStableRepositoryFile,
 } from "../repository/stable-file-snapshot.mjs";
-import { normalizePath, parseNameStatus, parsePorcelainStatus, root } from "./adaptive-state.mjs";
+import {
+  normalizePath,
+  parseNameStatus,
+  parsePorcelainStatus,
+  root,
+  stagedPathsFromGit,
+} from "./adaptive-state.mjs";
 
 const objectIdPattern = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const maximumBasisPaths = 20_000;
@@ -138,7 +144,12 @@ export function captureVerificationGitBasis({ repositoryRoot = root } = {}) {
   const status = freshHeadStatus(canonicalRoot);
   if (!head || !objectIdPattern.test(head) || status === null) return incompleteBasis();
   try {
-    const dirtyPaths = parsePorcelainStatus(status);
+    const dirtyPaths = [
+      ...new Set([
+        ...parsePorcelainStatus(status),
+        ...stagedPathsFromGit({ repositoryRoot: canonicalRoot }),
+      ]),
+    ].sort();
     return normalizedVerificationGitBasis({ complete: true, dirtyPaths, head });
   } catch {
     return incompleteBasis();

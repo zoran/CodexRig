@@ -29,6 +29,10 @@ const inheritedPresentationKeys = new Set([
   "TZ",
   "WINDIR",
 ]);
+// Verification semantics must survive the project launcher, publisher and native pre-push hook.
+// This is the sole inheritance policy; the verifier still owns normalization and value validation.
+const inheritedVerificationControlPattern =
+  /^(?:IMAGE_ASSET_[A-Z0-9_]+|NODE_ENV|VERIFY_MAX_CAPTURE_BYTES|VERIFY_MAX_PARALLEL)$/u;
 
 /** Resolves only public path names; never reads account contents or borrows another home's state. */
 export function projectToolPaths(root) {
@@ -76,7 +80,27 @@ export function prepareProjectToolDirectories(root) {
     )
       throw new Error("Project tool storage must be private and owned by the current developer.");
   }
+  assertGitCredentialStore(locations);
   return locations;
+}
+
+function assertGitCredentialStore(locations) {
+  // The preparation owner has already validated every parent directory without reading accounts.
+  let stats;
+  try {
+    stats = lstatSync(path.join(locations.home, ".git-credentials"));
+  } catch (error) {
+    if (error.code === "ENOENT") return;
+    throw error;
+  }
+  if (
+    stats.isSymbolicLink() ||
+    !stats.isFile() ||
+    stats.nlink !== 1 ||
+    (stats.mode & 0o077) !== 0 ||
+    (typeof process.getuid === "function" && stats.uid !== process.getuid())
+  )
+    throw new Error("Git credentials require private project-owned storage.");
 }
 
 /**
@@ -88,15 +112,18 @@ export function prepareProjectToolDirectories(root) {
  */
 export function projectToolEnvironment({ root, inherited = process.env } = {}) {
   const p = projectToolPaths(root);
+  const credentialStore = path.join(p.home, ".git-credentials");
   const environment = {};
   for (const [key, value] of Object.entries(inherited)) {
+    const normalizedKey = process.platform === "win32" ? key.toUpperCase() : key;
     if (
-      !inheritedPresentationKeys.has(process.platform === "win32" ? key.toUpperCase() : key) ||
+      (!inheritedPresentationKeys.has(normalizedKey) &&
+        !inheritedVerificationControlPattern.test(normalizedKey)) ||
       typeof value !== "string" ||
       value.includes("\0")
     )
       continue;
-    environment[process.platform === "win32" ? key.toUpperCase() : key] = value;
+    environment[normalizedKey] = value;
   }
   return {
     ...environment,
@@ -132,9 +159,19 @@ export function projectToolEnvironment({ root, inherited = process.env } = {}) {
     GNUPGHOME: path.join(p.config, "gnupg"),
     GIT_CONFIG_GLOBAL: path.join(p.config, "git", "config"),
     GIT_CONFIG_NOSYSTEM: "1",
-    GIT_CONFIG_COUNT: "1",
+    GIT_CONFIG_COUNT: "5",
     GIT_CONFIG_KEY_0: "user.useConfigOnly",
     GIT_CONFIG_VALUE_0: "true",
+    // Git owns approve/get/reject and its private atomic credential file. Reset lower-priority
+    // helpers; only the explicit GitHub/GitLab fallback below may consult a global login.
+    GIT_CONFIG_KEY_1: "credential.helper",
+    GIT_CONFIG_VALUE_1: "",
+    GIT_CONFIG_KEY_2: "credential.helper",
+    GIT_CONFIG_VALUE_2: `store --file='${credentialStore.replaceAll("'", "'\\''")}'`,
+    GIT_CONFIG_KEY_3: "credential.useHttpPath",
+    GIT_CONFIG_VALUE_3: "true",
+    GIT_CONFIG_KEY_4: "credential.helper",
+    GIT_CONFIG_VALUE_4: `!${[process.execPath, path.join(p.root, "scripts/repository/global-git-credential.mjs")].map((value) => `'${value.replaceAll("'", "'\\''")}'`).join(" ")}`,
     // OpenSSH resolves its default home through the OS account database, not HOME. Git's SSH
     // transport therefore binds keys/known-hosts explicitly and never consults host agents/config.
     GIT_SSH_COMMAND: [

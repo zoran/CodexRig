@@ -27,7 +27,7 @@ perform an explicit native repair. Never manually remove runtime or a worktree d
 
 Treat examples as non-exhaustive; follow
 [Interpreting Examples And Scope](instructions.md#interpreting-examples-and-scope) across the
-authorized class and its future additions. All tools use
+authorized class and its future additions. All tools follow
 [repository-local account and tool state](instructions.md#repository-local-tool-and-account-isolation);
 new tools must satisfy the same isolation boundary before authenticated use.
 

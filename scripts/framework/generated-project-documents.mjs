@@ -78,7 +78,7 @@ ambiguous writers and broken worktree directories. A side conversation remains i
 Treat examples as non-exhaustive; follow
 [Interpreting Examples And Scope](instructions.md#interpreting-examples-and-scope) across the
 authorized class and its future additions.
-All tools use [repository-local account and tool state](instructions.md#repository-local-tool-and-account-isolation);
+All tools follow [repository-local account and tool state](instructions.md#repository-local-tool-and-account-isolation);
 new tools must satisfy the same isolation boundary before authenticated use.
 
 A pending definition requires the focused requirements intake. A brief does not authorize code.
@@ -190,6 +190,57 @@ Use \`pnpm tooling:doctor\` for local tool diagnosis, \`pnpm worktree:status -- 
 inventory, \`pnpm verify:changed -- --print-plan\` for selected evidence and \`pnpm verify\` for final
 verification. \`pnpm repo:housekeeping -- --apply\` reconciles local repository facts. These commands
 require their own explicit publication and deployment authority.
+
+## Publish Source Changes
+
+Review all non-ignored changes and exit this project's Codex sessions with \`/quit\`. Then run:
+
+\`\`\`bash
+bash scripts/setup/run-project.sh pnpm project:publish --message "<commit message>"
+\`\`\`
+
+This explicitly authorizes committing all non-ignored changes on the current branch and pushing
+that exact verified commit to its configured upstream. The eight-phase display shows the current
+task and elapsed time; add \`--verbose\` for sanitized check output. Failed checks stop publication;
+a rejected push preserves the local commit for retry without an empty commit. No branch switch,
+automatic merge, force push, native-session reset or direct deployment is performed. Existing Git
+hooks, branch protections and any CI/deployment approvals still apply. A missing upstream must be
+configured explicitly before publication.
+
+Verification reuses successful evidence for unchanged source and the same effective toolchain.
+Use \`pnpm verify:changed -- --print-plan\` to inspect the selected checks and admission reason.
+Captured checks normalize terminal colors and presentation; changing terminals alone does not rerun
+the product suite. Changed tools, verification controls or uncovered source require new evidence.
+Use the project wrapper above to keep the selected toolchain consistent.
+
+Persistent public tool settings belong in the project-private Mise configuration at
+\`.auth/project-tools/config/mise/config.toml\`. The normal project wrapper loads them before
+verification and publication. Prepare required SDKs or test runtimes once through their product
+setup owner; use defaults that preserve explicit tool selections. Verification never installs them.
+
+Commit author names and email addresses use project Git configuration first. When a value is
+missing, publication reads only \`user.name\` and \`user.email\` from the operating-system user's
+standard global Git configuration, without includes. It validates the resulting author and
+committer before repository verification and rechecks them before staging. Global hooks, signing
+settings and credentials are not imported; existing project signing remains in effect. No Git
+configuration is changed. If neither configuration supplies a complete identity, the error shows
+project-local \`git config\` commands.
+
+Git remembers successful HTTPS sign-in in \`.auth/project-tools/home/.git-credentials\`, scoped to
+the protocol, host and repository path. Enter a personal access token at Git's password prompt on
+the first successful sign-in or after expiration/revocation. If no project credential is available
+for a GitHub or GitLab host configured in \`.codex/tooling.json\`, the shared adapter tries global
+Git helpers and then the matching existing CLI login (\`gh\` or \`glab\`), including self-hosted
+instances. Native helpers resolve their user-home configuration and keyring. It never initiates login or sends global
+credential store/erase requests. Git can cache an approved fallback account in the project store.
+After a confirmed authentication rejection, publication tries remaining global credentials in up
+to two automatic retries without another prompt, skipping already rejected credentials. Other Git
+failures still stop the affected phase; global accounts remain unchanged.
+The file is unencrypted, protected by owner-only permissions and excluded from source control and
+generation. It survives housekeeping. Other providers, SSH and sibling accounts remain isolated.
+A browser-only session does not authenticate Git; use \`gh auth login --hostname github.com\` or
+\`glab auth login --hostname gitlab.com\` in a normal host terminal (substitute your configured host
+for self-hosted instances). Never put a token in a command or a chat.
 
 ## Project Licensing
 

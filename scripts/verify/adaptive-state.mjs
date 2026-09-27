@@ -210,6 +210,13 @@ export function parseNameStatus(output) {
   return [...paths].sort();
 }
 
+/** Captures staged-only changes, including ignored additions and locally retained deletions. */
+export function stagedPathsFromGit({ repositoryRoot = root } = {}) {
+  return parseNameStatus(
+    git(["diff", "--cached", "--name-status", "-z", "--"], { repositoryRoot }),
+  );
+}
+
 function freshHeadStatus(repositoryRoot = root) {
   const temporaryDirectory = mkdtempSync(path.join(os.tmpdir(), "adaptive-verification-index-"));
   const environment = { GIT_INDEX_FILE: path.join(temporaryDirectory, "index") };
@@ -281,7 +288,11 @@ export function changedPathsFromGit({ repositoryRoot = root } = {}) {
     const worktreePaths = parsePorcelainStatus(output);
     const committed = committedPathsFromUpstream(repositoryRoot);
     return {
-      paths: unique([...worktreePaths, ...committed.paths]).sort(),
+      paths: unique([
+        ...worktreePaths,
+        ...stagedPathsFromGit({ repositoryRoot }),
+        ...committed.paths,
+      ]).sort(),
       incomplete: committed.incomplete,
       reason: committed.reason,
     };

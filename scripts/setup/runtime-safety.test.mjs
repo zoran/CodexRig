@@ -48,6 +48,32 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
+test("native voice preferences cannot introduce execution or transport configuration", () => {
+  const root = fixture();
+  const config = path.join(root, "config.toml");
+  writeFileSync(config, '[realtime]\nvoice = "marin"\n', { mode: 0o600 });
+  assert.equal(validateRuntimeCodexConfig(root).status, "present");
+  for (const invalid of [
+    "false",
+    '["marin"]',
+    '""',
+    '"https://example.invalid"',
+    '"voice;command"',
+  ]) {
+    writeFileSync(config, `[realtime]\nvoice = ${invalid}\n`);
+    assert.throws(() => validateRuntimeCodexConfig(root), /voice preference is invalid/u);
+  }
+  for (const entry of [
+    'command = "run-project-code"',
+    'transport = "websocket"',
+    'api_key = "fixture-unused"',
+    'voice = { command = "run-project-code" }',
+  ]) {
+    writeFileSync(config, `[realtime]\n${entry}\n`);
+    assert.throws(() => validateRuntimeCodexConfig(root));
+  }
+});
+
 test("project roles and ignored runtime config reject broadened execution", () => {
   const root = fixture();
   assert.doesNotThrow(() => validateCodexConfig(root));

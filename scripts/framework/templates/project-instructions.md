@@ -259,8 +259,10 @@ requirements. Do not generate review logs, history documents or a second task st
 
 Use known paths or scoped `rg`, then read matched source and trace actual consumers. Keep each fact
 at one owner and maintain discovery links when documents move. `docs/project-context.md` is an
-optional bounded resume cache with one current `codexrig-work-state` marker, never an authority.
-Refresh its current truth after material progress or remove it when no longer needed.
+optional bounded resume cache with one current `codexrig-work-state` marker, never an authority. Its
+exact path is excluded by the portable root `.gitignore`; recovery reads it directly. Do not rely on
+a local Git exclude to keep this working cache private. Refresh its current truth after material
+progress or remove it when no longer needed.
 
 ## Context And Skills
 
@@ -293,6 +295,13 @@ and recovery evidence. Distinguish static, simulated, rendered and native/accoun
 Configuration and hook outputs do not prove model obedience.
 
 ## Verification
+
+Acceptance for a launcher or publication change must exercise the normal documented command with
+persistently prepared project tools. A direct verifier run with temporary environments or extra
+selectors proves only that invocation. Test the assembled launcher, publication gate and pre-push
+path, including unchanged evidence reuse, semantic-input invalidation and useful failure output.
+Preserve declared tool selectors and verification controls across those boundaries; verification
+must not install prerequisites or silently discard a real toolchain change.
 
 `.codex/verification.json` declares this repository's checks and consumers. Use
 `pnpm verify:changed -- --print-plan`, then affected evidence. Unknown paths or missing Git basis

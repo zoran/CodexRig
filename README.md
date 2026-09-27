@@ -122,6 +122,13 @@ pnpm framework:reset --apply
 pnpm framework:publish --message "<commit message>"  # after exiting Codex
 ```
 
+Verification reuses successful evidence for unchanged source and the same effective toolchain.
+`verify:changed -- --print-plan` reports the selected checks and the reason before executing them.
+Captured checks use a consistent terminal presentation, so color settings or switching terminals do
+not trigger another product suite. Changes to verification controls, tools or uncovered source still
+require the corresponding evidence. Use the project wrapper from a host shell so the selected
+toolchain also remains consistent.
+
 The handover command is not routine housekeeping. After it reports a sealed path, the Codex session
 must stop without another action. To continue from that handover, exit Codex completely with
 `/quit`, then run `bash scripts/setup/start-codex.sh` from the project root in your terminal. Accept
@@ -138,14 +145,30 @@ bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit mess
 
 The wrapper establishes the project environment and executes the existing
 `bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"` pipeline.
-Git identity, signing and authentication must be configured in the project; no host accounts are
-imported.
+Project Git identity takes precedence, with the public name/email fallback described below. Signing
+remains project-owned. HTTPS authentication can reuse the explicit GitHub/GitLab global-login
+fallback.
+
+Publication shows eight numbered phases, the current task and elapsed time. Successful checks stay
+compact; a failure identifies the stopped phase and shows its diagnostic tail. Add `--verbose` after
+the commit message to show sanitized command output after each check. Interactive terminals show a
+live progress line; redirected output uses plain status lines. `NO_COLOR` disables colors. Git
+sign-in prompts remain interactive. After the first successful HTTPS authentication, subsequent
+publishes reuse the project credential described below until it expires or is revoked.
 
 Running this command explicitly authorizes publication of all non-ignored source changes on `main`.
 It performs reset, housekeeping, verification, commit and push; do not run its individual steps
 separately beforehand. See [Verification And Publication](instructions.md#verification) for the
 exact gates, evidence and recovery behavior. Generated projects do not include this source
 publisher.
+
+Generated projects receive their own `project:publish --message "<commit message>"` command through
+the same `bash scripts/setup/run-project.sh` entry. It verifies, commits and pushes the current
+branch to its configured upstream with the same progress display and project-local HTTPS sign-in. It
+preserves native session history and accounts and performs no framework reset or direct deployment.
+Review all non-ignored changes and exit the project's Codex sessions before running it; existing
+hooks, branch protections and CI/deployment approvals remain effective. In this source repository
+`project:publish` is an alias for the framework publisher above.
 
 ## Project Accounts
 
@@ -154,6 +177,42 @@ account boundary and future tool admission. Private tool home, configuration, in
 and temporary state live under `.auth/project-tools/`; native Codex state remains in the root
 `CODEX_HOME`. These paths are excluded from Git, context, generation and transfer. Login commands
 must run through `bash scripts/setup/run-project.sh`; existing project credentials remain private.
+
+Persistent public tool settings belong in the project-private Mise configuration at
+`.auth/project-tools/config/mise/config.toml`. The normal project wrapper loads them before
+verification and publication. Prepare required SDKs or test runtimes once through their product
+setup owner; use defaults that preserve explicit tool selections. Verification never installs them.
+
+Commit author names and email addresses use project Git configuration first. When a value is
+missing, publication reads only `user.name` and `user.email` from the operating-system user's
+standard global Git configuration, without includes. It validates the resulting author and committer
+before repository verification and rechecks them before staging. Global hooks, signing settings and
+credentials are not imported; existing project signing remains in effect. No Git configuration is
+changed. If neither configuration supplies a complete identity, the error shows project-local
+`git config` commands.
+
+Git HTTPS authentication uses Git's built-in `credential-store`, explicitly bound to
+`.auth/project-tools/home/.git-credentials`. Git remembers a successfully authenticated username and
+token there and removes rejected credentials through its normal credential lifecycle. The store is
+scoped by protocol, host and repository path, has owner-only file permissions, and survives reset.
+It is **unencrypted on disk** and excluded from Git and generated projects. If no project credential
+is available, the adapter tries the user's global Git helpers and then the matching existing CLI
+login: `gh` for GitHub or `glab` for GitLab. This applies equally to the provider hosts declared in
+`.codex/tooling.json`, including configured self-hosted instances. Native helpers resolve their
+user-home configuration and keyring; ambient token variables are not imported. The adapter never
+requests global credential storage/deletion or starts a login. Git may cache an approved fallback
+credential in the project store. Other providers and SSH accounts remain project-local.
+
+If Git rejects a credential during publication, the publisher tries the remaining available global
+credentials in up to two automatic retries, without another prompt. It skips already rejected
+credentials and preserves global accounts. This recovery applies only to confirmed authentication
+rejections; other Git failures still stop the affected phase.
+
+A browser-only session does not authenticate Git. If no local or global credential exists, establish
+one in a normal host terminal with `gh auth login --hostname github.com` or
+`glab auth login --hostname gitlab.com` (use your configured host for self-hosted instances), or
+enter a personal access token at Git's password prompt. Never put a token in a command, shell
+history or chat.
 
 The platform-policy API uses `.auth/git-platform.json`, with private owner-only permissions and
 exact fields `schemaVersion` (1), `provider`, `hostname`, `repository` (the selected remote's slug),

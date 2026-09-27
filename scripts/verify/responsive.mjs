@@ -9,6 +9,20 @@ import {
   webSurfaceSummary,
 } from "../web/web-quality-scan.mjs";
 
+function hasInteractiveSubject(selectors) {
+  return selectors.split(",").some((selector) => {
+    const subject =
+      selector
+        .trim()
+        .split(/[\s>+~]+/u)
+        .at(-1) ?? "";
+    if (subject.includes("::")) return false;
+    return /^(?:button\b|a(?=[.#:[\]]|$)|input\[type=["']?(?:button|checkbox|radio|submit)["']?\])|\.[A-Za-z0-9_-]*(?:button|control|icon-btn|tap-target)[A-Za-z0-9_-]*\b/iu.test(
+      subject,
+    );
+  });
+}
+
 export function responsiveFailures({ files, hasWebSurface }) {
   const failures = [];
   if (!hasWebSurface) return failures;
@@ -98,7 +112,7 @@ export function responsiveFailures({ files, hasWebSurface }) {
     }
 
     const layoutWidthPattern =
-      /(?:^|[}\n])\s*(?:body|main|#root|#app|\.app|\.page|\.layout|\.container|\.content|\.shell)\b[^{]*\{[^}]*\b(?:width|min-width)\s*:\s*(\d{3,})px/gi;
+      /(?:^|[}\n])\s*(?:body|main|#root|#app|\.app|\.page|\.layout|\.container|\.content|\.shell)\b[^{]*\{[^}]*(?<![-\w])(?:width|min-width)\s*:\s*(\d{3,})px/gi;
     for (const match of content.matchAll(layoutWidthPattern)) {
       const width = Number.parseInt(match[1], 10);
       if (Number.isFinite(width) && width > 480) {
@@ -125,9 +139,10 @@ export function responsiveFailures({ files, hasWebSurface }) {
     }
 
     const undersizedTargetPattern =
-      /(?:^|[}\n])\s*(?:button|a(?:\[[^\]]+\])?|input\[(?:type=["']?(?:button|checkbox|radio|submit)["']?)\]|\.[A-Za-z0-9_-]*(?:button|control|icon-btn|tap-target)[A-Za-z0-9_-]*)\b[^{]*\{[^}]*(?:\bheight|\bmin-height)\s*:\s*(\d{1,2})px/giu;
+      /(?:^|[}\n])\s*([^{}]+)\{[^}]*(?<![-\w])(?:height|min-height|max-height)\s*:\s*(\d{1,2})px/giu;
     for (const match of content.matchAll(undersizedTargetPattern)) {
-      const size = Number.parseInt(match[1], 10);
+      if (!hasInteractiveSubject(match[1])) continue;
+      const size = Number.parseInt(match[2], 10);
       if (Number.isFinite(size) && size < 40) {
         failures.push(
           failMessage(

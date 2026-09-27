@@ -1,6 +1,6 @@
 {
   "name": "codexrig",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "private": true,
   "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
@@ -48,7 +48,8 @@
     "context:map": "node scripts/context/context-cli.mjs map",
     "context:read": "node scripts/context/context-cli.mjs read",
     "context:check": "node scripts/context/context-cli.mjs check",
-    "project:run": "bash scripts/setup/run-project.sh"
+    "project:run": "bash scripts/setup/run-project.sh",
+    "project:publish": "node .agents/skills/reset-framework/scripts/publish-framework.mjs"
   },
   "devDependencies": {
     "prettier": "^3.9.6"

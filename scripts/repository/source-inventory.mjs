@@ -72,7 +72,21 @@ function splitNullBuffer(buffer) {
   return paths;
 }
 
-export function repositoryCodexHomeGitignoreBehaviorFindings({ root = repositoryRoot } = {}) {
+/** Checks native isolation plus caller-owned private paths without granting local-exclude rules. */
+export function repositoryCodexHomeGitignoreBehaviorFindings({
+  root = repositoryRoot,
+  additionalPrivatePaths = [],
+} = {}) {
+  if (
+    !Array.isArray(additionalPrivatePaths) ||
+    additionalPrivatePaths.some(
+      (relativePath) =>
+        typeof relativePath !== "string" ||
+        normalizeRelativePath(relativePath) !== relativePath ||
+        /[\r\n]/u.test(relativePath),
+    )
+  )
+    return ["private project ignore probes require canonical repository-relative paths"];
   const temporaryDirectory = mkdtempSync(path.join(os.tmpdir(), "codex-ignore-contract-"));
   const gitDirectory = path.join(temporaryDirectory, "git");
   const gitEnvironment = cleanGitEnvironment(process.env, root);
@@ -100,6 +114,7 @@ export function repositoryCodexHomeGitignoreBehaviorFindings({ root = repository
     const probes = [
       ...repositoryCodexHomeProtectedGitignoreProbePaths,
       ...portableCodexGitignoreProbePaths,
+      ...additionalPrivatePaths,
     ];
     const checkedArguments = isolatedGitArguments({
       args: ["check-ignore", "--no-index", "-z", "--stdin"],
@@ -126,6 +141,17 @@ export function repositoryCodexHomeGitignoreBehaviorFindings({ root = repository
       return ["effective root Codex ignore policy could not evaluate its isolated Git probe"];
     }
     const ignored = new Set(splitNullBuffer(checked.stdout));
+    // Ignore rules do not protect bytes already present in the real index. Inspect only the
+    // caller's private paths against bound metadata; Gitless generation has no index to publish.
+    const metadata = additionalPrivatePaths.length > 0 ? resolveOwnedGitMetadata(root) : null;
+    const trackedPrivatePaths = metadata
+      ? gitPathOutput(
+          root,
+          metadata.gitDirectory,
+          ["--literal-pathspecs", "ls-files", "--cached", "-z", "--", ...additionalPrivatePaths],
+          "Private project state index probe",
+        )
+      : [];
     return [
       ...repositoryCodexHomeProtectedGitignoreProbePaths
         .filter((relativePath) => !ignored.has(relativePath))
@@ -133,6 +159,12 @@ export function repositoryCodexHomeGitignoreBehaviorFindings({ root = repository
       ...portableCodexGitignoreProbePaths
         .filter((relativePath) => ignored.has(relativePath))
         .map((relativePath) => `portable Codex config is effectively ignored: ${relativePath}`),
+      ...additionalPrivatePaths
+        .filter((relativePath) => !ignored.has(relativePath))
+        .map((relativePath) => `private project state is not effectively ignored: ${relativePath}`),
+      ...trackedPrivatePaths.map(
+        (relativePath) => `private project state is tracked in Git: ${relativePath}`,
+      ),
     ];
   } catch {
     return ["effective root Codex ignore policy could not run its isolated Git probe"];
