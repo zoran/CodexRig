@@ -13,6 +13,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { after, before, test } from "node:test";
+import { pathToFileURL } from "node:url";
 import {
   cleanupTemporaryRoots,
   isolatedTrackedFrameworkSource,
@@ -20,6 +21,7 @@ import {
 } from "./project-initialization-test-helpers.mjs";
 import { stageProjectExport } from "../framework/stage-project-export.mjs";
 import { validateGeneratedProject } from "../framework/validate-staged-project.mjs";
+import { documentContextSections } from "../docs/document-context.mjs";
 
 let source;
 let pristine;
@@ -49,6 +51,43 @@ function stage() {
   cpSync(pristine, target, { recursive: true });
   return target;
 }
+
+test("generated children receive the canonical capacity recovery policy", async () => {
+  const target = stage();
+  const sourceInstructions = readFileSync(path.join(source, "instructions.md"), "utf8");
+  const generatedInstructions = readFileSync(path.join(target, "instructions.md"), "utf8");
+  const capacityBody = (content) => {
+    const sections = documentContextSections("instructions.md", content).filter(
+      ({ heading }) => heading === "Capacity Admission And Monitoring",
+    );
+    assert.equal(sections.length, 1, "Capacity policy must have exactly one owner.");
+    const { start, end } = sections[0];
+    return content.split(/\r?\n/u).slice(start, end).join(" ").replace(/\s+/gu, " ").trim();
+  };
+  assert.equal(capacityBody(generatedInstructions), capacityBody(sourceInstructions));
+  assert.doesNotMatch(generatedInstructions, /<!-- current-capacity-admission-policy -->/u);
+  await validateGeneratedProject(target);
+});
+
+test("generated validators reject primary policy that omits recovery before account exhaustion", async () => {
+  const target = stage();
+  const { validateCodexConfig } = await import(
+    pathToFileURL(path.join(target, "scripts/setup/validate-codex-config.mjs")).href
+  );
+  validateCodexConfig(target);
+  const configPath = path.join(target, ".codex/config.toml");
+  const current = readFileSync(configPath, "utf8");
+  const obsolete = current.replace(
+    /before classifying account-window\s+exhaustion/u,
+    "only before the critical threshold",
+  );
+  assert.notEqual(obsolete, current, "Generated primary policy must declare recovery ordering.");
+  writeFileSync(configPath, obsolete);
+  const expected =
+    /must include orchestration marker before classifying account-window exhaustion/u;
+  assert.throws(() => validateCodexConfig(target), expected);
+  await assert.rejects(validateGeneratedProject(target), expected);
+});
 
 test("source validation accepts the independent output and scans final staged bytes", async () => {
   const target = stage();

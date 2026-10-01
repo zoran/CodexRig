@@ -97,7 +97,12 @@ upgradeable product repositories while deliberately defining no child product or
   request or delegated need-based authority; policy validation does not prove model obedience. The
   four-subagent ceiling excludes the primary; plans select admissible concurrent assignments and
   refresh that selection after discovery, results, handoffs and slice boundaries. Generation retains
-  the portable configuration and roles alongside the project-owned workflow template.
+  the portable configuration and roles alongside the project-owned workflow template. Capacity
+  admission preserves native earned-reset and usage-permission evidence and resolves supported free
+  account recovery before account-only critical classification. Generation and reviewed child
+  updates project that canonical capacity section, while hard limits and terminal seals remain
+  binding. Generated-child tests verify emitted policy and validator enforcement, not model
+  obedience.
 - Runtime and technology: Declarative TOML, JSON, and Markdown consumed by Codex, with lifecycle
   entrypoints implemented in the framework's Node.js/Bash harness.
 - Public contract: Root `developer_instructions` and `[agents]` defaults in `.codex/config.toml`,
@@ -536,7 +541,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.2.0`.
+- Framework version: `6.3.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

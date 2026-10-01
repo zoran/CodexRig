@@ -44,6 +44,7 @@ export function currentProjectInstructions(sourceRoot) {
       "<!-- current-tool-account-isolation-policy -->",
     ],
     ["Repository Efficiency And Effectiveness", "<!-- current-repository-efficiency-policy -->"],
+    ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
   ]) {
     const matches = sections.filter((section) => section.heading === heading);
     if (matches.length !== 1 || template.split(marker).length !== 2)

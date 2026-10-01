@@ -370,13 +370,11 @@ mutation, commit, push or deploy authority. The primary owns protected policy, i
 closure. Never contact or control foreign/ambiguous processes. Accept handoffs and close unneeded
 owned agents.
 
-### Guarded And Critical Drain
+### Capacity Admission And Monitoring
 
-Use actual host capacity signals without assuming units or billing periods. Unknown capacity admits
-no new agent. Reserve primary integration/verification/handoff capacity. Ten percent or less of a
-reliable binding allocation is guarded; five percent, a host critical signal or an uncovered
-completion reserve is critical. Native no-cost redeems need confirmed supported controls and a fresh
-limit check; no purchase, paid overage, account/model switch or user Goal-budget increase.
+<!-- current-capacity-admission-policy -->
+
+### Guarded And Critical Drain
 
 At critical state start no work. Drain only provenance-bound agents/tasks at safe boundaries, update
 the bounded context with the exact Critical Budget Drain attestation, then run

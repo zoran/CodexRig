@@ -36,10 +36,13 @@ primary resolves it. Use known paths or rg for exact anchors; if module ownershi
 data ownership, allowed dependencies, consumer impact, or concurrent overlap is unclear, use manifest-led discovery with a concrete ownership question, then read every matched source used for implementation.
 Keep internals private, avoid deep imports and cross-module data writes, and preserve a replacement
 boundary. Monitor remaining capacity after discovery, scope changes, and long tool results without
-assuming a billing period. Treat a reliable remaining percentage of the binding allocation as
-guarded at 10% or less and critical at 5% or less; compare an absolute token/credit amount directly
-with the handoff and completion reserves. Any host critical/exhaustion signal or reserve shortfall
-is critical; unavailable redeem/reset capacity counts as zero. If the handoff reserve is threatened,
+assuming a billing period. Treat a reliable remaining percentage of the binding allocation as guarded at 10% or less.
+At an account-window remainder of 5% or less, report it and stop admitting work at a safe checkpoint
+while the primary resolves account-window recovery under Capacity Admission And Monitoring. Do not
+redeem credits or claim account authority. Compare an absolute token/credit amount directly with
+the handoff and completion reserves. Hard host/context/Goal critical signals or reserve shortfall
+are immediately critical; unavailable redeem/reset capacity counts as zero until the primary
+confirms recovery. If the handoff reserve is threatened,
 stop expansion, leave the worktree coherent, and return its root,
 changed and untracked files, exact checks/results, assumptions, risks, remaining work, and safest
 next action. On a provenance-valid primary critical-drain request, reach only the nearest declared

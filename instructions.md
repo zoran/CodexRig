@@ -2147,54 +2147,60 @@ complete provenance match; leave foreign and ambiguous processes untouched.
 
 ### Capacity Admission And Monitoring
 
-Before every spawn and follow-up, the primary performs an admission check from the most current
-usage signals the host exposes: absolute or percentage remaining tokens/capacity, context and goal
-budgets, completion budget, rate-limit windows, and confirmed additive or redeem/reset credits.
-Treat each signal according to its declared unit and scope. Never assume a daily, weekly, renewable,
-windowed, or percentage-based quota, and do not invent a denominator or precision when a signal is
-unavailable. Keep account-window limits, context pressure, request-token usage, native Goal budgets,
-and completion reserve distinct. A context or token counter is not account-capacity evidence. Public
-rate-limit observations must identify their actual window and observation time; unavailable account
-telemetry stays unavailable and does not justify a new account monitor or private API. Reserve
-enough capacity for primary integration, conflict repair, affected verification, reviews,
-documentation reconciliation, final audit, and user handoff; then assign each active/new agent a
-bounded worst-case work envelope plus handoff reserve and a safety margin. Start or continue the
-agent only when confirmed remaining capacity—including only genuinely available redeem
-capacity—covers all envelopes and the primary reserve. Unknown or marginal capacity means no new
-agent. The standing continuation mandate authorizes the primary to use already available native
-redeem/reset entitlements for this authorized work when they add no cost, unless the user restricts
-that authority. Reuse that authorization without asking again. Before critical state, use only an
-actually exposed, supported host control whose entitlement and effect are confirmed; do not guess a
-command, access private account APIs, purchase credits, enable paid overage, switch accounts or
-models, or increase a user-set Goal budget. A request to use existing redeems grants none of those
-actions. If the host consumes available credits automatically, leave that consumption with the host.
-After a permitted redemption or host-confirmed reset, refresh actual limits and completion reserve
-before admitting work, then continue the same authorized outcome when capacity permits. An
-unavailable control or unconfirmed balance remains unavailable; state the concrete limit rather than
-promising uninterrupted operation. Once critical state is observed, the mandatory drain and terminal
-seal below take precedence over redemption or automatic continuation.
+Use current host signals at startup/resume, before every spawn or follow-up, after material results,
+scope changes and long waits, and at every slice/course checkpoint, including primary-only work.
+Keep account windows, context pressure, request-token usage, native Goal budgets and completion
+reserve distinct. Record the actual unit, window and observation time; never invent an allocation,
+precision or future reset. Unknown capacity admits no new agent. Reserve primary integration,
+verification, repair and handoff capacity before assigning bounded work and safety margins. Admit or
+continue agents only when confirmed capacity covers all active and proposed worst-case work
+envelopes together, each handoff reserve and safety margin, plus the primary reserve. React
+immediately to changed host usage counters or budget warnings rather than waiting for a tool result
+or scheduled checkpoint.
 
-Classify current capacity as `healthy`, `guarded`, or `critical` from the most constraining current
-host signal rather than one model-specific counter or billing period. If the host exposes a reliable
-remaining percentage for the binding total allocation, regardless of whether that allocation is a
-token pool or a time window, `10%` or less is guarded and `5%` or less is unconditionally critical.
-Compare an absolute remaining token or credit amount directly with the bounded envelopes and primary
-completion reserve: capacity is guarded when current work remains finishable but the next optional
-slice plus its reserve is doubtful, and critical when the primary completion reserve itself is not
-covered. A host-provided critical/exhaustion warning is critical regardless of units or counter
-names. Treat redeem/reset capacity as zero until it is both actually available and authorized. Never
-sum counters unless the host identifies them as additive, average a healthy counter with an
-exhausted one, infer an unknown percentage, or assume a future reset will arrive in time.
+Before classifying account-window exhaustion, the primary resolves supported no-additional-cost
+recovery. A low account percentage alone is a recovery candidate, not an instruction to seal before
+checking earned resets. Discover available controls from current official documentation and the
+installed native schema; use the existing repository-local account boundary. Do not invent a private
+API or an account monitor. For the supported Codex app-server contract:
 
-Budget monitoring is event-driven and slice-gated. Re-evaluate before every spawn or follow-up,
-after every material tool or agent result, on a material scope or assumption change, after a long
-wait, and immediately when the host changes a usage counter or emits a budget warning. Use the same
-primary checkpoint as [Long-Session Course Checks](#long-session-course-checks), including work
-without subagents; each active subagent also has a task-appropriate expected checkpoint. At every
-completed slice, perform a hard budget, primary-reserve, live-agent, handoff, and ownership check
-before admitting the next slice. Completed-goal housekeeping performs the deeper lifecycle cleanup
-and documentation/audit gates, but it is not the first budget trigger. Stop/Resume validates
-preserved state; it must never be the first time low capacity is noticed.
+- Read account/rateLimits/read without dropping rateLimits, rateLimitsByLimitId,
+  rateLimitResetCredits or ordinaryUsageAllowed. A helper that omits a field has not established
+  that field's absence. Distinguish earned reset credits from spendable credit balances.
+- rateLimitResetCredits.availableCount is authoritative even when detail rows are null or capped; do
+  not replace the count with the detail-list length. Missing entitlement or an unavailable supported
+  control is unknown, never confirmed recovery capacity.
+- Startup/resume discovers capacity; healthy usage does not consume a scarce reset. At guarded
+  account capacity (10% or less remaining), or when account capacity cannot cover the next bounded
+  work plus its reserve, use an available, authorized free reset before admitting that work or
+  declaring an account-only 5%-or-less critical state. Standing continuation authority permits these
+  earned no-cost resets unless the user restricts it; reuse that authority without asking.
+- Use account/rateLimitResetCredit/consume with a private persisted idempotencyKey for one logical
+  attempt. An optional creditId must come from the native read; omission lets the service select.
+  Retain the same key after an uncertain result; never blindly issue a new redemption attempt.
+- After every completed attempt, refresh the authoritative read before any work admission. reset and
+  alreadyRedeemed acknowledge consumption, not refreshed capacity; nothingToReset, noCredit and
+  errors prove neither recovery nor continued exhaustion. A fresh read decides. Require
+  ordinaryUsageAllowed=true or equivalent supported host confirmation of ordinary usage, every
+  binding window and the primary reserve to permit continuation. Never infer permission from a lower
+  percentage, a reset timestamp or the consume response alone. Missing confirmation remains an
+  evidence limit; do not start work on an unconfirmed extension.
+
+Use only actually exposed supported free entitlements: no purchase, paid overage, account/model
+switch, increased user Goal budget or consumption inferred from a spendable balance. Leave
+host-automatic consumption to the host. Never sum non-additive counters or average a healthy window
+with an exhausted one. After the bounded account-recovery check, classify the most constraining
+current binding signal: a reliable 10% or less remainder is guarded and 5% or less is critical when
+recovery is unavailable, unsuccessful or unconfirmed. An explicit host critical/terminal stop,
+critical context or Goal limit, or uncovered primary completion/handoff reserve requires immediate
+drain; an account reset cannot repair those limits. Do not start recovery when that safe reserve is
+already absent. Once critical state is established, follow Guarded And Critical Drain; a successful
+handover seal is terminal and can never be reopened by redemption in that session.
+
+Subagents do not consume resets or infer extra account authority. They report account pressure to
+the primary and stop admitting work at their safe checkpoint while the primary resolves recovery.
+Hard context/host/reserve limits still require their immediate coherent handoff. Re-evaluate the
+actual remaining capacity after recovery before delegating or continuing the same authorized work.
 
 ### Guarded And Critical Drain
 

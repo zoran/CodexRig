@@ -16,7 +16,10 @@ Root `developer_instructions` in the tracked config make the primary the sole or
 for new features and extensive, complex, or materially risky work, carry
 the [long-session continuation and course contract](../instructions.md#long-session-course-checks),
 bind owned-work provenance, require exact GPT Astra/`ultra` parity, and enforce the critical drain
-and terminal stop. They also carry the
+and terminal stop. The canonical
+[capacity policy](../instructions.md#capacity-admission-and-monitoring) resolves supported earned
+resets before account-only critical classification and requires a fresh native usage-permission
+check; hard context/host/reserve limits and an existing terminal seal remain binding. They also carry the
 [parallel-development default](../instructions.md#admission-intelligence-and-provenance).
 `[agents]` owns the four-thread ceiling and matching global defaults;
 `.codex/agents/*.toml` injects bounded role behavior. This is an executable policy layer, not a

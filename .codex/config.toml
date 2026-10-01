@@ -37,14 +37,17 @@ overrides can defeat role defaults. Read-only roles stop on broader permissions.
 may inherit this primary's already-authorized YOLO override only for its exact disjoint repository
 write set, with no new authority; the primary owns protected policy and integration.
 
-Check actual capacity and primary completion reserve; unknown quota admits no new agent. A reliable
-binding remainder of 5% or less, host critical signal or reserve shortfall triggers Critical Budget
-Drain: start no work, drain only owned tasks, record the exact canonical attestation, then run
-pnpm handover:create -- --critical as the final repository action. After a successful seal, stop
-completely: call no tool, contact no agent and do not permit automatic continuation. Only confirmed
-supported no-additional-cost redeems may be used before critical state; no purchase, paid overage,
-account/model switch or Goal-budget increase. Portable startup is on-request/network-disabled
-workspace-write; only explicitly authorized Dev --yolo changes runtime permissions, never scope.
+Check actual capacity and primary completion reserve; unknown quota admits no new agent. Follow
+Capacity Admission And Monitoring before classifying account-window exhaustion: retain native
+rateLimitResetCredits and ordinaryUsageAllowed, resolve supported free resets only when needed,
+then refresh all binding limits and usage permission. After that check, an unresolved binding
+remainder of 5% or less triggers Critical Budget Drain. Hard host/context/Goal limits or uncovered
+completion reserve require immediate drain. Start no work in critical state; drain only owned tasks,
+record the exact canonical attestation, then run pnpm handover:create -- --critical as the final
+repository action. After a successful seal, stop completely: call no tool, contact no agent and do
+not permit automatic continuation. No purchase, paid overage, account/model switch or Goal-budget
+increase. Portable startup is on-request/network-disabled workspace-write; only explicitly
+authorized Dev --yolo changes runtime permissions, never scope.
 """
 project_doc_max_bytes = 32768
 project_doc_fallback_filenames = ["instructions.md"]
