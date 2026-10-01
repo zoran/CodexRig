@@ -1,5 +1,6 @@
 /** Exercises retained project runtime trust boundaries in owned isolated fixtures. */
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { afterEach, test } from "node:test";
 import {
   cpSync,
@@ -25,6 +26,56 @@ import {
 import { evaluateAutonomousContinuation } from "../context/session-stop-lifecycle.mjs";
 import { diagnoseTooling } from "./tooling-doctor.mjs";
 const roots = [];
+
+// A permissive host umask must not make newly installed tools writable by another user.
+// Exercise a real descendant: setting HOME or protecting only the storage root is insufficient.
+test("project tool preparation contains inherited file permissions in descendant installers", (t) => {
+  if (process.platform === "win32") return t.skip("POSIX creation permissions");
+  for (const mask of [0o002, 0o027, 0o077]) {
+    const root = mkdtempSync(path.join(os.tmpdir(), "project-tool-permissions-"));
+    roots.push(root);
+    const moduleUrl = new URL("../repository/project-tool-environment.mjs", import.meta.url).href;
+    const result = spawnSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `
+      import { mkdirSync, writeFileSync, statSync } from 'node:fs';
+      import { spawnSync } from 'node:child_process';
+      import path from 'node:path';
+      import { prepareProjectToolDirectories } from ${JSON.stringify(moduleUrl)};
+      process.umask(${mask});
+      const root = ${JSON.stringify(root)};
+      const sentinel = path.join(root, 'existing');
+      writeFileSync(sentinel, 'preserve');
+      const before = statSync(sentinel).mode;
+      const locations = prepareProjectToolDirectories(root);
+      const child = spawnSync(process.execPath, ['-e', \`
+        const fs = require('node:fs'), path = require('node:path');
+        const directory = path.join(process.argv[1], 'installation');
+        fs.mkdirSync(directory);
+        fs.writeFileSync(path.join(directory, 'package'), 'package');
+        fs.writeFileSync(path.join(directory, 'tool'), 'tool', {mode: 0o777});
+        console.log(JSON.stringify([directory, path.join(directory, 'package'), path.join(directory, 'tool')].map(p => fs.statSync(p).mode & 0o777)));
+      \`, locations.data], {encoding: 'utf8'});
+      if (child.status !== 0) throw new Error(child.stderr);
+      console.log(JSON.stringify({mask: process.umask(), modes: JSON.parse(child.stdout), preserved: before === statSync(sentinel).mode}));
+    `,
+      ],
+      { encoding: "utf8", timeout: 10_000 },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const observed = JSON.parse(result.stdout);
+    assert.equal(observed.mask, mask | 0o022, "preserve stricter caller restrictions");
+    assert.deepEqual(
+      observed.modes,
+      [0o777, 0o666, 0o777].map((mode) => mode & ~(mask | 0o022)),
+    );
+    assert.equal(observed.preserved, true, "existing files are never chmodded by preparation");
+  }
+});
+
 function fixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "project-runtime-safety-"));
   roots.push(root);

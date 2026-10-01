@@ -190,13 +190,17 @@ upgradeable product repositories while deliberately defining no child product or
   project's private pnpm store. Existing installations bound to a former host store are rebuilt
   through pnpm while preserving the lockfile. Failures retain bounded, sanitized pnpm diagnostics.
   Canonical startup invokes the same owner's compatible project-local toolchain and reviewed stable
-  CI maintenance. Mise versions/checksums come from its official public distribution; action pins
-  come from isolated native Git tags with commit verification for newer releases, avoiding GitHub
-  REST quotas and credentials. Official Mise binaries, complete Codex platform bundles and their
-  integrity records remain under ignored `.auth/project-tools`; host executables are never updated.
-  Successful, quiescent canonical startup retires verified replaced bundles and lets Mise prune
-  unused runtimes. Stable CI uses the same maintenance owner with `--locked`, skipping release
-  refresh and reproducing frozen dependencies before entering the common command wrapper.
+  CI maintenance. Native pnpm release selection probes every supported platform archive over public
+  HTTPS and retains the current complete release when newer releases lack artifacts; unavailable
+  metadata remains a startup error. The shared toolchain contract validates staged lockfiles before
+  installation and publication as well as during repository verification. Mise versions/checksums
+  come from its official public distribution; action pins come from isolated native Git tags with
+  commit verification for newer releases, avoiding GitHub REST quotas and credentials. Official Mise
+  binaries, complete Codex platform bundles and their integrity records remain under ignored
+  `.auth/project-tools`; host executables are never updated. Successful, quiescent canonical startup
+  retires verified replaced bundles and lets Mise prune unused runtimes. Stable CI uses the same
+  maintenance owner with `--locked`, skipping release refresh and reproducing frozen dependencies
+  before entering the common command wrapper.
 - Runtime and technology: Node.js ESM orchestrating the pnpm and mise toolchain.
 - Public contract: `deps:install`, `deps:report`, and `deps:update*` commands; the
   lifecycle-delegated `install-compatible.mjs --reproduce-locked` and `--reproduce-toolchain`
@@ -541,7 +545,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.3.0`.
+- Framework version: `6.4.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

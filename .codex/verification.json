@@ -481,6 +481,25 @@
       "coveredTestPaths": [],
       "reason": "portable publication and GitHub/GitLab fallback preserve destinations, verified snapshots, ownership, retry safety and the explicit global-account boundary",
       "phase": "preflight"
+    },
+    {
+      "key": "toolchain-admission",
+      "label": "portable toolchain release and candidate admission",
+      "executable": "$node",
+      "args": [
+        "--test",
+        "scripts/contracts/mise-toolchain-configuration.test.mjs",
+        "scripts/deps/toolchain-releases.test.mjs",
+        "scripts/deps/toolchain-maintenance.test.mjs"
+      ],
+      "artifactOwners": [],
+      "coveredTestPaths": [
+        "scripts/contracts/mise-toolchain-configuration.test.mjs",
+        "scripts/deps/toolchain-releases.test.mjs",
+        "scripts/deps/toolchain-maintenance.test.mjs"
+      ],
+      "phase": "preflight",
+      "reason": "portable startup must reject unavailable releases and incomplete foreign-platform locks before publication"
     }
   ],
   "testConsumers": {
@@ -955,10 +974,12 @@
       "scripts/framework/toolchain-maintenance.test.mjs"
     ],
     "scripts/deps/maintain-toolchain.mjs": [
-      "scripts/framework/toolchain-maintenance.test.mjs"
+      "scripts/framework/toolchain-maintenance.test.mjs",
+      "scripts/deps/toolchain-maintenance.test.mjs"
     ],
     "scripts/deps/toolchain-releases.mjs": [
-      "scripts/framework/toolchain-maintenance.test.mjs"
+      "scripts/framework/toolchain-maintenance.test.mjs",
+      "scripts/deps/toolchain-releases.test.mjs"
     ],
     "scripts/framework/prepare-compatibility-track.mjs": [
       "scripts/framework/toolchain-maintenance.test.mjs"
@@ -1001,6 +1022,9 @@
     "scripts/goals/project-publication.fixture.mjs": [
       "scripts/goals/project-publication-integration.test.mjs",
       ".agents/skills/reset-framework/scripts/publication-integration.test.mjs"
+    ],
+    "scripts/contracts/mise-toolchain-configuration.mjs": [
+      "scripts/contracts/mise-toolchain-configuration.test.mjs"
     ]
   },
   "exactConsumers": {

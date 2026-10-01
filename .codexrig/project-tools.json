@@ -65,6 +65,7 @@
       "scripts/contracts/delivery-configuration.mjs",
       "scripts/contracts/localization-configuration.mjs",
       "scripts/contracts/mise-toolchain-configuration.mjs",
+      "scripts/contracts/mise-toolchain-configuration.test.mjs",
       "scripts/contracts/portable-toml.mjs",
       "scripts/contracts/product-configuration.mjs",
       "scripts/contracts/semver-contract.mjs",
@@ -73,6 +74,7 @@
       "scripts/contracts/tooling-configuration.mjs"
     ],
     "deps": [
+      "scripts/deps/ci-toolchain-contract.mjs",
       "scripts/deps/dependency-inputs.mjs",
       "scripts/deps/dependency-plan.mjs",
       "scripts/deps/dependency-policy.mjs",
@@ -80,12 +82,13 @@
       "scripts/deps/dependency-transaction.mjs",
       "scripts/deps/install-compatible.mjs",
       "scripts/deps/maintain-toolchain.mjs",
-      "scripts/deps/project-tool-installation.mjs",
       "scripts/deps/project-runtime-admission.mjs",
+      "scripts/deps/project-tool-installation.mjs",
       "scripts/deps/report.mjs",
-      "scripts/deps/ci-toolchain-contract.mjs",
       "scripts/deps/toolchain-maintenance-inputs.mjs",
+      "scripts/deps/toolchain-maintenance.test.mjs",
       "scripts/deps/toolchain-releases.mjs",
+      "scripts/deps/toolchain-releases.test.mjs",
       "scripts/deps/trusted-pnpm-command.mjs",
       "scripts/deps/update.mjs",
       "scripts/deps/verify-pnpm-execution-policy.mjs"
@@ -315,6 +318,7 @@
     "api-security",
     "format",
     "runtime-safety",
+    "toolchain-admission",
     "module-imports",
     "project-publication"
   ],

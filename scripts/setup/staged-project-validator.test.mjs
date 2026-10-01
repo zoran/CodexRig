@@ -1,5 +1,6 @@
 /** Verifies the source-owned validator against independently generated staging trees. */
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import {
   appendFileSync,
   cpSync,
@@ -92,6 +93,18 @@ test("generated validators reject primary policy that omits recovery before acco
 test("source validation accepts the independent output and scans final staged bytes", async () => {
   const target = stage();
   await validateGeneratedProject(target);
+  const runtimeContracts = spawnSync(
+    process.execPath,
+    [
+      "--test",
+      "scripts/setup/runtime-safety.test.mjs",
+      "scripts/contracts/mise-toolchain-configuration.test.mjs",
+      "scripts/deps/toolchain-releases.test.mjs",
+      "scripts/deps/toolchain-maintenance.test.mjs",
+    ],
+    { cwd: target, encoding: "utf8", timeout: 60_000 },
+  );
+  assert.equal(runtimeContracts.status, 0, runtimeContracts.stderr || runtimeContracts.stdout);
   appendFileSync(path.join(target, "README.md"), `${["sk-", "a".repeat(24)].join("")}\n`);
   await assert.rejects(validateGeneratedProject(target), /potential secret material/i);
   const ignored = stage();

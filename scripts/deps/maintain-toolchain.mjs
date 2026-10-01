@@ -13,6 +13,10 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
+import {
+  candidateMiseLockFindings,
+  validateMinimalMiseTools,
+} from "../contracts/mise-toolchain-configuration.mjs";
 import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 import { toolingRoot, serializeCanonicalJson } from "../filesystem/repository-files.mjs";
 import { verifyInputRecords } from "../deps/dependency-inputs.mjs";
@@ -68,6 +72,24 @@ function stageWrite(stage, relativePath, content) {
   writeFileSync(target, content, { mode: 0o600 });
 }
 
+function assertCandidateLock(stage, candidate) {
+  const configuration = validateMinimalMiseTools(
+    readFileSync(path.join(stage, ".codex/mise.toml"), "utf8"),
+  );
+  const findings = [
+    ...configuration.errors,
+    ...candidateMiseLockFindings(
+      readFileSync(path.join(stage, ".codex/mise.lock"), "utf8"),
+      configuration.versionLists,
+    ),
+  ];
+  for (const tool of ["node", "pnpm"])
+    if (configuration.versions[tool] !== candidate.stable[tool].version)
+      findings.push(`mise.toml ${tool} must match the selected candidate version`);
+  if (findings.length)
+    throw new Error(`Candidate toolchain lock is invalid: ${findings.join("; ")}.`);
+}
+
 function commandRunner(root, capability) {
   return (command, args, { cwd = root, delegation, env = {} } = {}) => {
     const environment = { ...pnpmHooksDisabledEnvironment(process.env, root), ...env };
@@ -112,6 +134,7 @@ export async function maintainToolchain({
   admitProjectTools = assertInstalledProjectTools,
   onInventory = () => {},
   onProgress = () => {},
+  onReleaseNotice = () => {},
 } = {}) {
   root = realpathSync.native(root);
   const inventory = inspectRepositoryWorktrees({ root });
@@ -156,7 +179,7 @@ export async function maintainToolchain({
     const candidate =
       locked && candidateResolver === resolveToolchainReleases
         ? current
-        : await candidateResolver(current, { fetchImpl });
+        : await candidateResolver(current, { fetchImpl, onProgress: onReleaseNotice });
     const projected = projectToolchainConfiguration(inputs.contents, current, candidate);
     if (!locked)
       projected[".github/workflows/ci.yml"] = await refreshGithubActions(
@@ -192,6 +215,7 @@ export async function maintainToolchain({
       current.stable.pnpm.version !== candidate.stable.pnpm.version
     )
       run(bootstrap.mise, ["lock", "node", "pnpm"], stageOptions);
+    assertCandidateLock(stage, candidate);
     onProgress("Installing and validating the isolated candidate toolchain and dependency graph.");
     run(bootstrap.mise, ["install", "--locked"], stageOptions);
     admitProjectTools({
@@ -213,6 +237,7 @@ export async function maintainToolchain({
       ],
       { ...stageOptions, delegation: { operation: "dependency", role: "toolchain-dependency" } },
     );
+    assertCandidateLock(stage, candidate);
     const desired = Object.fromEntries(
       [...toolchainConfigurationPaths, "package.json", "pnpm-lock.yaml"].map((relativePath) => [
         relativePath,
@@ -274,6 +299,10 @@ async function main() {
     },
     onProgress: (message) => {
       if (startup) startupStatus(`${++phase}/5`, message);
+      else console.log(message);
+    },
+    onReleaseNotice: (message) => {
+      if (startup) startupStatus("pnpm", message);
       else console.log(message);
     },
   });

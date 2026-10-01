@@ -168,6 +168,9 @@ test("empty generation excludes source capabilities, private markers and new uns
       "scripts/goals/project-publication-integration.test.mjs",
       "scripts/repository/git-publication-identity.test.mjs",
       "scripts/repository/publication-session.test.mjs",
+      "scripts/contracts/mise-toolchain-configuration.test.mjs",
+      "scripts/deps/toolchain-releases.test.mjs",
+      "scripts/deps/toolchain-maintenance.test.mjs",
     ],
   );
   for (const file of [".github/workflows/ci.yml", ".gitlab-ci.yml"])

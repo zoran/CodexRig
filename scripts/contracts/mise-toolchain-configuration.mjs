@@ -1,4 +1,4 @@
-/** Validates the minimal, exact-version mise tool configuration used by portable repositories. */
+/** Owns portable exact-version mise configuration and native toolchain artifact admission. */
 import { parseSemver } from "./semver-contract.mjs";
 export function validateMinimalMiseTools(content) {
   const versions = Object.create(null);
@@ -113,6 +113,93 @@ export function miseLockFindings(content, versionLists) {
         findings.push(`${label} ${platform} needs a SHA-256 checksum`);
       if (!/^url = "https:\/\/[^"\r\n]+"$/mu.test(artifact))
         findings.push(`${label} ${platform} needs an HTTPS URL`);
+    }
+  }
+  return findings;
+}
+
+/** Native pnpm releases must provide every retained framework platform before admission. */
+export function nativePnpmArtifactUrls(version) {
+  parseSemver(version, "Native pnpm version");
+  const release = `https://github.com/pnpm/pnpm/releases/download/v${version}`;
+  return Object.freeze({
+    "linux-arm64": `${release}/pnpm-linux-arm64.tar.gz`,
+    "linux-arm64-musl": `${release}/pnpm-linux-arm64-musl.tar.gz`,
+    "linux-x64": `${release}/pnpm-linux-x64.tar.gz`,
+    "linux-x64-musl": `${release}/pnpm-linux-x64-musl.tar.gz`,
+    "macos-arm64": `${release}/pnpm-darwin-arm64.tar.gz`,
+    "windows-x64": `${release}/pnpm-win32-x64.zip`,
+  });
+}
+
+function nodeArtifactUrls(version) {
+  const release = `https://nodejs.org/dist/v${version}/node-v${version}`;
+  const musl = `https://unofficial-builds.nodejs.org/download/release/v${version}/node-v${version}`;
+  return {
+    "linux-arm64": `${release}-linux-arm64.tar.gz`,
+    "linux-arm64-musl": `${musl}-linux-arm64-musl.tar.gz`,
+    "linux-x64": `${release}-linux-x64.tar.gz`,
+    "linux-x64-musl": `${musl}-linux-x64-musl.tar.gz`,
+    "macos-arm64": `${release}-darwin-arm64.tar.gz`,
+    "macos-x64": `${release}-darwin-x64.tar.gz`,
+    "windows-x64": `${release}-win-x64.zip`,
+  };
+}
+
+function uniqueLockedField(block, field) {
+  const declarations = [...block.matchAll(new RegExp(`^${field}\\s*=.*$`, "gm"))];
+  return declarations.length === 1
+    ? (new RegExp(`^${field} = "([^"\\r\\n]+)"$`, "u").exec(declarations[0][0])?.[1] ?? "")
+    : "";
+}
+
+/**
+ * Shared candidate/publication and repository-smoke gate for the portable native toolchain.
+ * Product-specific tools and secondary runtimes retain their configured lock requirements.
+ */
+export function candidateMiseLockFindings(content, versionLists) {
+  const findings = miseLockFindings(content, versionLists);
+  const blocks = miseLockBlocks(content);
+  for (const tool of ["node", "pnpm"]) {
+    const version = versionLists[tool]?.[0];
+    if (!version) {
+      findings.push(`mise.lock requires a configured primary ${tool} version`);
+      continue;
+    }
+    const block =
+      blocks.find((entry) => entry.tool === tool && entry.version === version)?.block ?? "";
+    const platformBlocks = [
+      ...block.matchAll(
+        new RegExp(
+          `^\\[tools\\.${tool}\\."platforms\\.([^"\\r\\n]+)"\\]\\r?\\n([\\s\\S]*?)(?=^\\[|$(?![\\s\\S]))`,
+          "gmu",
+        ),
+      ),
+    ];
+    const urls = tool === "pnpm" ? nativePnpmArtifactUrls(version) : nodeArtifactUrls(version);
+    if (platformBlocks.map((match) => match[1]).join(",") !== Object.keys(urls).join(","))
+      findings.push(`mise.lock ${tool} platforms must match the supported artifact matrix exactly`);
+    const backend = tool === "node" ? "core:node" : "aqua:pnpm/pnpm";
+    for (const [field, expected] of Object.entries({ version, backend })) {
+      if (uniqueLockedField(block, field) !== expected)
+        findings.push(`mise.lock ${tool} entry must include exactly one ${field} = "${expected}"`);
+    }
+    for (const [platform, expectedUrl] of Object.entries(urls)) {
+      const artifact = platformBlocks.find((match) => match[1] === platform)?.[2] ?? "";
+      const label = `mise.lock ${tool} ${platform}`;
+      if (!/^sha256:[a-f0-9]{64}$/u.test(uniqueLockedField(artifact, "checksum")))
+        findings.push(`${label} entry must include exactly one SHA-256 checksum`);
+      if (uniqueLockedField(artifact, "url") !== expectedUrl)
+        findings.push(`${label} URL must match its official versioned artifact exactly once`);
+      if (tool !== "pnpm") continue;
+      if (uniqueLockedField(artifact, "provenance") !== "github-attestations")
+        findings.push(`${label} entry must include exactly one GitHub attestation provenance`);
+      if (
+        !/^https:\/\/api\.github\.com\/repos\/pnpm\/pnpm\/releases\/assets\/[1-9]\d*$/u.test(
+          uniqueLockedField(artifact, "url_api"),
+        )
+      )
+        findings.push(`${label} URL API must identify exactly one official GitHub asset`);
     }
   }
   return findings;

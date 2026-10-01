@@ -6,8 +6,7 @@ import { toolingRoot as root, readRepositoryFile } from "../filesystem/repositor
 import { portableContextContractFindings } from "../context/portable-context-contract.mjs";
 import {
   validateMinimalMiseTools,
-  miseLockBlocks,
-  miseLockFindings,
+  candidateMiseLockFindings,
 } from "../contracts/mise-toolchain-configuration.mjs";
 import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
 import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
@@ -113,117 +112,7 @@ if (
 }
 
 const miseLock = readRelative(".codex/mise.lock");
-failures.push(...miseLockFindings(miseLock, miseValidation.versionLists));
-const lockedBlocks = miseLockBlocks(miseLock);
-function lockedToolBlock(tool) {
-  return (
-    lockedBlocks.find((entry) => entry.tool === tool && entry.version === miseVersions[tool])
-      ?.block ?? ""
-  );
-}
-
-function lockedPlatformBlock(tool, platform) {
-  const toolBlock = lockedToolBlock(tool);
-  const marker = `[tools.${tool}."platforms.${platform}"]`;
-  const start = toolBlock.indexOf(marker);
-  if (start < 0) return "";
-  const next = toolBlock.indexOf(`\n[tools.${tool}."platforms.`, start + marker.length);
-  return toolBlock.slice(start, next < 0 ? undefined : next);
-}
-
-function lockedField(block, field) {
-  return block.match(new RegExp(`^${field} = "([^"\\r\\n]+)"$`, "m"))?.[1] ?? "";
-}
-
-function lockedPlatformsForTool(tool) {
-  return [
-    ...lockedToolBlock(tool).matchAll(/^\[tools\.[a-z0-9_-]+\."platforms\.([^"]+)"\]$/gm),
-  ].map(([, platform]) => platform);
-}
-
-const lockedPlatforms = {
-  node: [
-    "linux-arm64",
-    "linux-arm64-musl",
-    "linux-x64",
-    "linux-x64-musl",
-    "macos-arm64",
-    "macos-x64",
-    "windows-x64",
-  ],
-  pnpm: [
-    "linux-arm64",
-    "linux-arm64-musl",
-    "linux-x64",
-    "linux-x64-musl",
-    "macos-arm64",
-    "windows-x64",
-  ],
-};
-for (const [tool, platforms] of Object.entries(lockedPlatforms)) {
-  const block = lockedToolBlock(tool);
-  const expectedBackend = tool === "node" ? "core:node" : "aqua:pnpm/pnpm";
-  if (lockedPlatformsForTool(tool).join(",") !== platforms.join(",")) {
-    failures.push(`mise.lock ${tool} platforms must match the supported artifact matrix exactly`);
-  }
-  for (const expected of [`version = "${miseVersions[tool]}"`, `backend = "${expectedBackend}"`]) {
-    if (!block.includes(expected))
-      failures.push(`mise.lock ${tool} entry must include ${expected}`);
-  }
-  for (const platform of platforms) {
-    const platformBlock = lockedPlatformBlock(tool, platform);
-    if (!/^checksum = "sha256:[a-f0-9]{64}"$/m.test(platformBlock)) {
-      failures.push(`mise.lock ${tool} ${platform} entry must include a SHA-256 checksum`);
-    }
-    if (!/^url = "https:\/\/[^"]+"$/m.test(platformBlock)) {
-      failures.push(`mise.lock ${tool} ${platform} entry must include an HTTPS URL`);
-    }
-    if (tool === "pnpm" && !platformBlock.includes('provenance = "github-attestations"')) {
-      failures.push(`mise.lock pnpm ${platform} entry must include GitHub attestation provenance`);
-    }
-  }
-}
-const officialArtifactUrls = {
-  node: {
-    "linux-arm64": `https://nodejs.org/dist/v${miseVersions.node}/node-v${miseVersions.node}-linux-arm64.tar.gz`,
-    "linux-arm64-musl": `https://unofficial-builds.nodejs.org/download/release/v${miseVersions.node}/node-v${miseVersions.node}-linux-arm64-musl.tar.gz`,
-    "linux-x64": `https://nodejs.org/dist/v${miseVersions.node}/node-v${miseVersions.node}-linux-x64.tar.gz`,
-    "linux-x64-musl": `https://unofficial-builds.nodejs.org/download/release/v${miseVersions.node}/node-v${miseVersions.node}-linux-x64-musl.tar.gz`,
-    "macos-arm64": `https://nodejs.org/dist/v${miseVersions.node}/node-v${miseVersions.node}-darwin-arm64.tar.gz`,
-    "macos-x64": `https://nodejs.org/dist/v${miseVersions.node}/node-v${miseVersions.node}-darwin-x64.tar.gz`,
-    "windows-x64": `https://nodejs.org/dist/v${miseVersions.node}/node-v${miseVersions.node}-win-x64.zip`,
-  },
-  pnpm: {
-    "linux-arm64": `https://github.com/pnpm/pnpm/releases/download/v${miseVersions.pnpm}/pnpm-linux-arm64.tar.gz`,
-    "linux-arm64-musl": `https://github.com/pnpm/pnpm/releases/download/v${miseVersions.pnpm}/pnpm-linux-arm64-musl.tar.gz`,
-    "linux-x64": `https://github.com/pnpm/pnpm/releases/download/v${miseVersions.pnpm}/pnpm-linux-x64.tar.gz`,
-    "linux-x64-musl": `https://github.com/pnpm/pnpm/releases/download/v${miseVersions.pnpm}/pnpm-linux-x64-musl.tar.gz`,
-    "macos-arm64": `https://github.com/pnpm/pnpm/releases/download/v${miseVersions.pnpm}/pnpm-darwin-arm64.tar.gz`,
-    "windows-x64": `https://github.com/pnpm/pnpm/releases/download/v${miseVersions.pnpm}/pnpm-win32-x64.zip`,
-  },
-};
-for (const [tool, platformUrls] of Object.entries(officialArtifactUrls)) {
-  for (const [platform, expectedUrl] of Object.entries(platformUrls)) {
-    const platformBlock = lockedPlatformBlock(tool, platform);
-    if (lockedField(platformBlock, "url") !== expectedUrl) {
-      failures.push(`mise.lock ${tool} ${platform} URL must match its official versioned artifact`);
-    }
-    if (tool === "pnpm") {
-      if (lockedField(platformBlock, "provenance") !== "github-attestations") {
-        failures.push(
-          `mise.lock pnpm ${platform} entry must include GitHub attestation provenance`,
-        );
-      }
-      if (
-        !/^https:\/\/api\.github\.com\/repos\/pnpm\/pnpm\/releases\/assets\/[1-9]\d*$/.test(
-          lockedField(platformBlock, "url_api"),
-        )
-      ) {
-        failures.push(`mise.lock pnpm ${platform} URL API must identify an official GitHub asset`);
-      }
-    }
-  }
-}
+failures.push(...candidateMiseLockFindings(miseLock, miseValidation.versionLists));
 
 if (failures.length) {
   console.error("Project tooling verification failed:");

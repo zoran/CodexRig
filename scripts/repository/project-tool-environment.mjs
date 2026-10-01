@@ -81,6 +81,9 @@ export function prepareProjectToolDirectories(root) {
       throw new Error("Project tool storage must be private and owned by the current developer.");
   }
   assertGitCredentialStore(locations);
+  // Umask is process state, not an environment variable. Installers and their descendants
+  // must not inherit a host's group/other write allowance; retain stricter caller restrictions.
+  process.umask(process.umask() | 0o022);
   return locations;
 }
 

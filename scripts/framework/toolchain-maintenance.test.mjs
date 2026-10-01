@@ -97,6 +97,8 @@ function registry({ tamper = false, newerNode = false } = {}) {
       ];
     else if (decoded === "https://registry.npmjs.org/pnpm")
       data = { versions: { [matrix.stable.pnpm.version]: {}, "12.0.0": {} } };
+    else if (decoded.startsWith("https://github.com/pnpm/pnpm/releases/download/"))
+      return new Response(null, { status: 200 });
     else if (decoded.startsWith("https://registry.npmjs.org/pnpm/"))
       data = {
         name: "pnpm",
@@ -419,6 +421,13 @@ for (const failure of ["network", "peer", "reproduce", "concurrent", "pending", 
     const runCommand = (command, args, options = {}) => {
       calls.push([command, ...args]);
       if (args[0] === "--version") return matrix.ci.miseVersion;
+      if (args[0] === "lock" && failure === "reproduce") {
+        const file = path.join(options.cwd, ".codex/mise.lock");
+        writeFileSync(
+          file,
+          readFileSync(file, "utf8").replaceAll(matrix.stable.node.version, "24.99.0"),
+        );
+      }
       if (args.includes("--stage-toolchain")) {
         assert.equal(args.at(-1), root);
         if (failure === "peer") throw new Error("peer dependency conflict");
@@ -608,8 +617,17 @@ test("disposable compatibility preparation preserves dependencies and passes the
       return { mise: layout.mise.executable, codex: layout.codex.executable };
     },
     admitProjectTools: () => {},
-    runCommand: (command, args) => {
+    runCommand: (command, args, options = {}) => {
       calls.push(args);
+      if (args[0] === "lock") {
+        const file = path.join(options.cwd, ".codex/mise.lock");
+        writeFileSync(
+          file,
+          readFileSync(file, "utf8")
+            .replaceAll(matrix.stable.node.version, "26.1.0")
+            .replaceAll(matrix.stable.pnpm.version, "11.27.0"),
+        );
+      }
       return "";
     },
   };

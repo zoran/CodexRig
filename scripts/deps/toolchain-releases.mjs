@@ -21,6 +21,7 @@ import {
   miseBinaryPlatforms,
   validateToolchainConfiguration,
 } from "../contracts/toolchain-configuration.mjs";
+import { nativePnpmArtifactUrls } from "../contracts/mise-toolchain-configuration.mjs";
 
 /** Reads bounded public metadata or release bytes without credentials or cached fallback. */
 export async function releaseBytes(url, maximumBytes, fetchImpl = globalThis.fetch) {
@@ -68,6 +69,73 @@ export function latestCompatibleVersion(versions, range, current) {
   if (!selected || compareSemver(selected, current) < 0)
     throw new Error("Compatible release freshness is indeterminate; refusing a downgrade.");
   return selected;
+}
+
+async function nativeArtifactAvailable(url, fetchImpl) {
+  let address = new URL(url);
+  const signal = AbortSignal.timeout(180_000);
+  for (let redirects = 0; redirects <= 4; redirects += 1) {
+    if (address.protocol !== "https:" || address.username || address.password)
+      throw new Error("Native pnpm artifact sources must use public HTTPS.");
+    const response = await fetchImpl(address.href, {
+      method: "HEAD",
+      redirect: "manual",
+      credentials: "omit",
+      headers: { "User-Agent": "CodexRig-toolchain-maintenance" },
+      signal,
+    });
+    if (response.status === 200) return true;
+    // Only absence at the canonical release URL establishes a missing artifact. A stale
+    // redirected CDN URL, rate limit or unavailable service cannot justify an older release.
+    if (response.status === 404 && redirects === 0) return false;
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get("location");
+      if (!location) throw new Error("Native pnpm artifact redirect has no location.");
+      address = new URL(location, address);
+      continue;
+    }
+    throw new Error(
+      `Native pnpm artifact lookup returned HTTP ${response.status}; release availability is indeterminate.`,
+    );
+  }
+  throw new Error("Native pnpm artifact lookup exceeded its redirect bound.");
+}
+
+async function missingNativePnpmPlatforms(version, fetchImpl) {
+  const artifacts = Object.entries(nativePnpmArtifactUrls(version));
+  const results = await Promise.allSettled(
+    artifacts.map(([, url]) => nativeArtifactAvailable(url, fetchImpl)),
+  );
+  for (const result of results) if (result.status === "rejected") throw result.reason;
+  return artifacts.filter((_, index) => !results[index].value).map(([platform]) => platform);
+}
+
+async function latestCompatibleNativePnpm(versions, range, current, { fetchImpl, onProgress }) {
+  // Keep the shared freshness check: absence of a non-older npm version is indeterminate.
+  latestCompatibleVersion(versions, range, current);
+  const candidates = versions
+    .filter(
+      (version) =>
+        stableVersion(version) &&
+        versionSatisfiesSimpleRange(version, range) &&
+        compareSemver(version, current) >= 0,
+    )
+    .sort((left, right) => compareSemver(right, left));
+  let skipped = false;
+  for (const version of candidates) {
+    const missing = await missingNativePnpmPlatforms(version, fetchImpl);
+    if (missing.length) {
+      onProgress(
+        `Skipping pnpm ${version}: official native artifacts missing for ${missing.join(", ")}.`,
+      );
+      skipped = true;
+      continue;
+    }
+    if (skipped && version === current)
+      onProgress(`Retaining pnpm ${current}: all required native artifacts are available.`);
+    return version;
+  }
+  throw new Error("No complete compatible native pnpm release is available; refusing a downgrade.");
 }
 
 function npmUrl(name, version = "") {
@@ -150,6 +218,11 @@ export async function resolveCompatibilityToolchain(
     !versionMatchesReleaseSelector(matrix.ci.codexVersion, track.codex)
   )
     throw new Error("Resolved compatibility release does not match its declared selector.");
+  const missing = await missingNativePnpmPlatforms(pnpm.version, fetchImpl);
+  if (missing.length)
+    throw new Error(
+      `Compatibility pnpm ${pnpm.version} is missing official native artifacts for ${missing.join(", ")}.`,
+    );
   matrix.stable.pnpm.version = pnpm.version;
   for (const tool of ["node", "pnpm"])
     matrix.stable[tool].range = `>=${matrix.stable[tool].version} <=${matrix.stable[tool].version}`;
@@ -158,7 +231,10 @@ export async function resolveCompatibilityToolchain(
 }
 
 /** Reviews official stable releases before the shared project-local installer consumes them. */
-export async function resolveToolchainReleases(current, { fetchImpl = globalThis.fetch } = {}) {
+export async function resolveToolchainReleases(
+  current,
+  { fetchImpl = globalThis.fetch, onProgress = () => {} } = {},
+) {
   validateToolchainConfiguration(current);
   const results = await Promise.allSettled([
     releaseJson("https://nodejs.org/dist/index.json", fetchImpl),
@@ -173,10 +249,11 @@ export async function resolveToolchainReleases(current, { fetchImpl = globalThis
     current.stable.node.range,
     current.stable.node.version,
   );
-  matrix.stable.pnpm.version = latestCompatibleVersion(
+  matrix.stable.pnpm.version = await latestCompatibleNativePnpm(
     Object.keys(pnpm.versions ?? {}),
     current.stable.pnpm.range,
     current.stable.pnpm.version,
+    { fetchImpl, onProgress },
   );
   noDowngrade(matrix.ci.codexVersion, current.ci.codexVersion, "Codex");
   const miseVersion = mise.toString("utf8").trim();
