@@ -15,7 +15,7 @@ Root `developer_instructions` in the tracked config make the primary the sole or
 [automatic planning and the review/audit contract](../instructions.md#planning-goals-slices-review-loops-and-audits)
 for new features and extensive, complex, or materially risky work, carry
 the [long-session continuation and course contract](../instructions.md#long-session-course-checks),
-bind owned-work provenance, require exact GPT Astra/`ultra` parity, and enforce the critical drain
+bind owned-work provenance, require exact GPT Astra/`max` parity, and enforce the critical drain
 and terminal stop. The canonical
 [capacity policy](../instructions.md#capacity-admission-and-monitoring) resolves supported earned
 resets before account-only critical classification and requires a fresh native usage-permission
@@ -39,8 +39,11 @@ It adds no scheduler, account monitor, or hook. Changed tracked instructions and
 take effect on the next canonical launch; editing them does not reload an already-running session.
 Static validation proves configuration and packaging, not model obedience over hours of work.
 
-The primary and all roles default to `gpt-6-astra` with `ultra` reasoning. Standard processing is
-the default: portable config leaves `service_tier` unset, and roles inherit the session tier.
+The primary and all roles use the configured model's second-highest supported effort: currently
+`gpt-6-astra` with `max` reasoning, one level below `ultra`. Installed-catalog validation checks
+the rank as well as support; model changes must update the shared policy and all roles together.
+Standard processing is the default: portable config leaves `service_tier` unset, and roles inherit
+the session tier.
 
 Role sandbox values are requested defaults because live parent permissions, including YOLO, can be
 reapplied to children. Every child reports its effective permissions before repository work.
@@ -189,8 +192,8 @@ private runtime from Git, staging, export, and generated projects.
 
 Portable defaults may vary by project but contain no secrets, telemetry targets, notification
 commands, persisted trust entries, personal paths, or local domains. After changing
-model/reasoning/features/TUI/hooks, keep every role on the exact primary GPT Astra model with `ultra`
-reasoning and run `bash scripts/setup/run-project.sh pnpm codex:validate`.
+model/reasoning/features/TUI/hooks, keep every role on the exact primary GPT Astra model with its
+second-highest supported effort and run `bash scripts/setup/run-project.sh pnpm codex:validate`.
 
 The canonical lifecycle does not require a manual `/hooks` approval: the issue-time controller
 computes trust for only its two exact session-owned definitions, and the Codex preflight proves the

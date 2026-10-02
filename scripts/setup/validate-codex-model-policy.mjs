@@ -12,6 +12,8 @@ import {
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(scriptDirectory, "..", "..");
+// Native effort order; catalog presentation order is not a ranking contract.
+const reasoningEffortOrder = ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"];
 
 export function validateModelCatalog(catalog, primaryModel, primaryReasoningEffort) {
   if (!catalog || !Array.isArray(catalog.models)) {
@@ -45,6 +47,22 @@ export function validateModelCatalog(catalog, primaryModel, primaryReasoningEffo
   ) {
     throw new Error(
       `Configured reasoning effort ${primaryReasoningEffort} is not supported by primary model ${primaryModel}.`,
+    );
+  }
+  const supportedEfforts = new Set(
+    primaryTier.supported_reasoning_levels.map((entry) => entry?.effort),
+  );
+  if ([...supportedEfforts].some((effort) => !reasoningEffortOrder.includes(effort))) {
+    throw new Error(
+      `Primary model ${primaryModel} has an unknown reasoning effort; review its ranking.`,
+    );
+  }
+  const secondHighest = reasoningEffortOrder
+    .filter((effort) => supportedEfforts.has(effort))
+    .at(-2);
+  if (!secondHighest || primaryReasoningEffort !== secondHighest) {
+    throw new Error(
+      `Primary and subagent reasoning must use the second-highest supported effort for ${primaryModel}; expected ${secondHighest ?? "at least two supported levels"}, got ${primaryReasoningEffort}.`,
     );
   }
   return {

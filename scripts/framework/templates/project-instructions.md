@@ -343,7 +343,9 @@ user to request it. Keep at most four live; use fewer or work serially for small
 work or insufficient permissions, isolation or capacity, and briefly state why. Each delegation must
 advance the authorized outcome and justify its coordination and integration cost; never invent work
 or split cohesive changes merely to fill slots. Subagents never delegate further. Never override the
-configured GPT Astra/ultra model pair.
+configured GPT Astra model and its second-highest supported reasoning effort, currently `max`. Keep
+primary, global agent defaults, roles and the shared validation policy in agreement; the installed
+model catalog must confirm the configured effort's rank before canonical startup.
 
 Make the plan name assignments that can start now with an outcome, focused evidence, exact scope,
 dependency boundary, selected role, checkpoint and primary integration order. Choose discovery,

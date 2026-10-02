@@ -425,16 +425,17 @@ upgradeable product repositories while deliberately defining no child product or
   working directory. It reserves the checkout before selection and binds the selected session only
   at authenticated SessionStart, preloads every lifecycle module, accepts bounded non-executable
   Codex model/reasoning and voice preferences beneath tracked project policy, rejects executable or
-  unknown ignored runtime configuration, projects the tracked Astra/`ultra` policy into every fresh
-  or resumed CLI launch, and injects exactly two session-owned hook definitions. Codex's stable
-  `hooks/list` inventory must contain only those exact trusted/enabled definitions; only afterward
-  may the controller bind the gated supervisor, durable handoff, and exact Codex PID. Lease release
-  requires the exact controller to authenticate the supervisor's terminal child-exit proof against
-  its private issue-time gate secret and persist completion; a wrapper exit code alone is
-  insufficient, and cancellation before SessionStart creates no activation or recovery record. The
-  embedded built-in-only client is bound to the controller's exact Node executable and token-bound
-  loopback endpoint. Attestation expiry bounds the machine-controlled Codex PID handoff; subsequent
-  picker selection and same-session verification require the unchanged issue-time proof and the
+  unknown ignored runtime configuration, validates the model's second-highest supported effort
+  (currently Astra/`max`), projects that tracked policy into every fresh or resumed CLI launch, and
+  injects exactly two session-owned hook definitions. Codex's stable `hooks/list` inventory must
+  contain only those exact trusted/enabled definitions; only afterward may the controller bind the
+  gated supervisor, durable handoff, and exact Codex PID. Lease release requires the exact
+  controller to authenticate the supervisor's terminal child-exit proof against its private
+  issue-time gate secret and persist completion; a wrapper exit code alone is insufficient, and
+  cancellation before SessionStart creates no activation or recovery record. The embedded
+  built-in-only client is bound to the controller's exact Node executable and token-bound loopback
+  endpoint. Attestation expiry bounds the machine-controlled Codex PID handoff; subsequent picker
+  selection and same-session verification require the unchanged issue-time proof and the
   individually live controller, supervisor and Codex processes, without renewing the proof. Durable
   chat switches report the existing session binding before invalid startup state or input drift,
   directing the developer to a full launcher restart. Transcriptless native side conversations are
@@ -545,7 +546,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.4.0`.
+- Framework version: `6.5.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

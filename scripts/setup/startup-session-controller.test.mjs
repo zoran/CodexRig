@@ -44,7 +44,7 @@ const projectIntelligenceArguments = Object.freeze([
   "-c",
   'model="gpt-6-astra"',
   "-c",
-  'model_reasoning_effort="ultra"',
+  'model_reasoning_effort="max"',
 ]);
 
 test("non-current private state points to the project's own post-exit recovery procedure", () => {
@@ -367,7 +367,7 @@ test("controller accepts non-executable Codex model preferences beneath project 
     path.join(runtimeDirectory, "config.toml"),
     [
       'model = "gpt-6-astra"',
-      'model_reasoning_effort = "max"',
+      'model_reasoning_effort = "ultra"',
       "[tui]",
       "screen_reader_detection_done = true",
       "",
@@ -385,7 +385,7 @@ test("controller accepts non-executable Codex model preferences beneath project 
     ),
     projectIntelligenceArguments,
   );
-  assert.equal(call.args.includes('model_reasoning_effort="max"'), false);
+  assert.equal(call.args.includes('model_reasoning_effort="ultra"'), false);
   assert.equal(inspectRuntimeSessionLease({ root: fixture.project }).status, "absent");
   assert.equal(inspectRuntimeSessionRecovery({ root: fixture.project }).status, "present");
 });

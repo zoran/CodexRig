@@ -1,7 +1,7 @@
 name = "explorer"
 description = "Read-only repository exploration, evidence gathering, and bounded review."
 model = "gpt-6-astra"
-model_reasoning_effort = "ultra"
+model_reasoning_effort = "max"
 sandbox_mode = "read-only"
 developer_instructions = """
 Before any repository tool, report whether the effective runtime sandbox is read-only. If a live

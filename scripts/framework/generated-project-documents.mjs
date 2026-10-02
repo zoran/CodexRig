@@ -112,7 +112,7 @@ primary when substantial disjoint work, permissions, confirmed capacity and inte
 Keep at most four live; use fewer or work serially when necessary, briefly state why, and never
 invent work to fill slots. Name runnable assignments in the plan, start admitted work concurrently,
 and reassess after discovery, material results, handoffs and slice boundaries. Require exact
-GPT Astra/ultra parity, effective permission checks,
+GPT Astra/max parity, effective permission checks,
 provenance and a completion reserve. At critical capacity drain owned work and
 seal with \`pnpm handover:create -- --critical\` as the final action, then stop completely.
 
@@ -262,7 +262,7 @@ third-party dependencies retain their applicable licenses.
     `# Project Session Configuration
 
 This directory owns inspectable native Codex policy and local tooling configuration.
-\`config.toml\` and \`agents/\` select the exact GPT Astra/ultra policy and requested permissions.
+\`config.toml\` and \`agents/\` select the exact GPT Astra/max policy and requested permissions.
 \`tooling.json\` owns startup and provider settings; \`toolchain.json\` owns reviewed stable pins and
 archive integrity; \`verification.json\` declares this project's checks.
 

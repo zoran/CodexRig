@@ -134,10 +134,10 @@ test("skill metadata preserves native implicit and explicit activation choices",
 test("Codex config parser accepts only the complete typed portable policy", () => {
   assert.deepEqual(validateCodexConfig(configFixture()), {
     developer_instructions:
-      "Act as the primary orchestrator. Retain exactly one current internal contract per concern. Keep at most four live agents and never pass a model or reasoning override; all use the exact GPT Astra model with ultra reasoning. Register every owned subagent and background task and leave foreign or ambiguous processes untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. After every completed slice, run pnpm worktree:status -- --json as the worktree settlement trigger; preservation is a safety state, never completion. Follow Capacity Admission And Monitoring before classifying account-window exhaustion; retain rateLimitResetCredits and ordinaryUsageAllowed, resolve needed supported free resets and refresh binding capacity. At unresolved 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.\n",
+      "Act as the primary orchestrator. Retain exactly one current internal contract per concern. Keep at most four live agents and never pass a model or reasoning override; all use the exact GPT Astra model with max reasoning. Register every owned subagent and background task and leave foreign or ambiguous processes untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. After every completed slice, run pnpm worktree:status -- --json as the worktree settlement trigger; preservation is a safety state, never completion. Follow Capacity Admission And Monitoring before classifying account-window exhaustion; retain rateLimitResetCredits and ordinaryUsageAllowed, resolve needed supported free resets and refresh binding capacity. At unresolved 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.\n",
     project_doc_max_bytes: 32_768,
     project_doc_fallback_filenames: ["instructions.md"],
-    model_reasoning_effort: "ultra",
+    model_reasoning_effort: "max",
     model_verbosity: "medium",
     web_search: "cached",
     cli_auth_credentials_store: "file",
@@ -149,7 +149,7 @@ test("Codex config parser accepts only the complete typed portable policy", () =
     "sandbox_workspace_write.network_access": false,
     "agents.enabled": true,
     "agents.default_subagent_model": "gpt-6-astra",
-    "agents.default_subagent_reasoning_effort": "ultra",
+    "agents.default_subagent_reasoning_effort": "max",
     "agents.max_concurrent_threads_per_session": 4,
     "agents.interrupt_message": true,
     "features.goals": true,
@@ -209,7 +209,7 @@ test("Codex config parser accepts only the complete typed portable policy", () =
     .replace('theme = "catppuccin-mocha"', 'theme = "light"');
   const customizedPolicy = parsePortableCodexConfig(customizedProjectDefaults);
   assert.equal(customizedPolicy.model, "gpt-7-astra");
-  assert.equal(customizedPolicy.model_reasoning_effort, "ultra");
+  assert.equal(customizedPolicy.model_reasoning_effort, "max");
 
   assert.equal(Object.hasOwn(parsePortableCodexConfig(validPortableConfig), "service_tier"), false);
   assert.equal(Object.hasOwn(validateCodexConfig(root), "service_tier"), false);
@@ -273,7 +273,7 @@ test("Codex config parser accepts only the complete typed portable policy", () =
     [
       "unsupported reasoning level",
       validPortableConfig.replace(
-        'model_reasoning_effort = "ultra"',
+        'model_reasoning_effort = "max"',
         'model_reasoning_effort = "high"',
       ),
       /outside the portable project policy/,
@@ -618,7 +618,7 @@ test("startup attestation binds the complete preloaded controller closure", () =
   assert.equal(releaseRuntimeSessionLease({ root: fixture, pid: process.pid }), true);
 });
 
-test("project roles enforce exact Astra/ultra parity with the primary", () => {
+test("project roles enforce exact Astra/max parity with the primary", () => {
   const defaultAgent = readFileSync(path.join(root, ".codex", "agents", "default.toml"), "utf8");
   const parsedDefault = parseProjectAgentConfig(defaultAgent, "default");
   assert.equal(parsedDefault.model, "gpt-6-astra");
@@ -641,7 +641,7 @@ test("project roles enforce exact Astra/ultra parity with the primary", () => {
   assert.throws(
     () =>
       parseProjectAgentConfig(
-        defaultAgent.replace('model_reasoning_effort = "ultra"', 'model_reasoning_effort = "high"'),
+        defaultAgent.replace('model_reasoning_effort = "max"', 'model_reasoning_effort = "high"'),
         "default",
       ),
     /model_reasoning_effort|reasoning effort/u,
@@ -706,7 +706,7 @@ test("project roles enforce exact Astra/ultra parity with the primary", () => {
   );
   assert.throws(
     () => validateCodexConfig(mismatchedFixture),
-    /Agent default must use exactly the primary intelligence gpt-6-astra with ultra reasoning/,
+    /Agent default must use exactly the primary intelligence gpt-6-astra with max reasoning/,
   );
 
   const futureFixture = configFixture();
@@ -730,7 +730,7 @@ test("project roles enforce exact Astra/ultra parity with the primary", () => {
   assert.equal(validateCodexConfig(futureFixture).model, "gpt-7-astra");
 });
 
-test("installed model catalog requires the shared future-compatible Astra/ultra intelligence", () => {
+test("installed model catalog requires the shared future-compatible Astra/second-highest intelligence", () => {
   const catalog = {
     models: [
       {
@@ -759,31 +759,43 @@ test("installed model catalog requires the shared future-compatible Astra/ultra 
       },
     ],
   };
-  assert.equal(validateModelCatalog(catalog, "gpt-6-astra", "ultra").delegatedModel, "gpt-6-astra");
-  assert.equal(validateModelCatalog(catalog, "gpt-7-astra", "ultra").primaryModel, "gpt-7-astra");
+  assert.equal(validateModelCatalog(catalog, "gpt-6-astra", "max").delegatedModel, "gpt-6-astra");
+  assert.equal(validateModelCatalog(catalog, "gpt-7-astra", "max").primaryModel, "gpt-7-astra");
   assert.throws(
-    () => validateModelCatalog(catalog, "gpt-5.6-terra", "ultra"),
+    () => validateModelCatalog(catalog, "gpt-5.6-terra", "max"),
     /not a supported GPT Astra model/,
   );
   assert.throws(
     () => validateModelCatalog(catalog, "gpt-6-astra", "xhigh"),
-    /Primary and subagent reasoning must remain ultra/,
+    /Primary and subagent reasoning must remain max/,
   );
   const primaryMissing = structuredClone(catalog);
   primaryMissing.models[0].slug = "unavailable-model";
   assert.throws(
-    () => validateModelCatalog(primaryMissing, "gpt-6-astra", "ultra"),
+    () => validateModelCatalog(primaryMissing, "gpt-6-astra", "max"),
     /Configured primary model gpt-6-astra is unavailable/,
   );
-  const ultraEffortMissing = structuredClone(catalog);
-  ultraEffortMissing.models[0].supported_reasoning_levels = [
+  const maxEffortMissing = structuredClone(catalog);
+  maxEffortMissing.models[0].supported_reasoning_levels = [
     { effort: "xhigh" },
-    { effort: "max" },
+    { effort: "ultra" },
   ];
   assert.throws(
-    () => validateModelCatalog(ultraEffortMissing, "gpt-6-astra", "ultra"),
-    /configured reasoning effort ultra.*gpt-6-astra/i,
+    () => validateModelCatalog(maxEffortMissing, "gpt-6-astra", "max"),
+    /configured reasoning effort max.*gpt-6-astra/i,
   );
+  // A supported effort must also be the second-highest, regardless of catalog entry order.
+  const reordered = structuredClone(catalog);
+  reordered.models[0].supported_reasoning_levels.reverse();
+  assert.equal(validateModelCatalog(reordered, "gpt-6-astra", "max").primaryReasoningEffort, "max");
+  for (const levels of [["xhigh", "max"], ["max"], ["max", "ultra", "unknown"]]) {
+    const drifted = structuredClone(catalog);
+    drifted.models[0].supported_reasoning_levels = levels.map((effort) => ({ effort }));
+    assert.throws(
+      () => validateModelCatalog(drifted, "gpt-6-astra", "max"),
+      /second-highest|unknown reasoning effort/i,
+    );
+  }
 });
 
 test("hook installation is managed and never overwrites an unrelated hook", () => {

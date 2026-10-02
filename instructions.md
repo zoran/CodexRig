@@ -630,13 +630,13 @@ runtime is preserved until a separate full reset after exit.
    delivery block in `docs/project.md`. It also checks manifest/module truth, documentation and
    heading anchors, current source/declaration headers, localization, physical product, Identity and
    Access, and white-label boundaries, secrets and path hygiene, dependency/lock consistency, skill
-   and Astra/ultra model policy, framework health, and formatting. Explicit declarations preserve
-   real external environments that have no tracked adapter. A possible `staging` or `prod` hint
-   outside a recognized typed boundary is never guessed: ask the developer whether it is real, then
-   declare it or move the adapter to its owning boundary. In the reusable source framework, the same
-   atomic apply also reconciles the release version from active changes since the unique live commit
-   of the configured central integration branch, which must match its local remote-tracking ref, as
-   defined under
+   and Astra/max model policy, framework health, and formatting. Explicit declarations preserve real
+   external environments that have no tracked adapter. A possible `staging` or `prod` hint outside a
+   recognized typed boundary is never guessed: ask the developer whether it is real, then declare it
+   or move the adapter to its owning boundary. In the reusable source framework, the same atomic
+   apply also reconciles the release version from active changes since the unique live commit of the
+   configured central integration branch, which must match its local remote-tracking ref, as defined
+   under
    [Framework Lifecycle, Compatibility, And Git Platforms](#framework-lifecycle-compatibility-and-git-platforms).
    Source apply then delegates offline frozen installation to the dependency owner under the held
    lifecycle lock, preserving manifests and the lockfile. It repeats this derived-state recovery
@@ -2121,7 +2121,7 @@ default. Subagents never spawn or delegate to further agents.
 This authority is injected as well as documented. Root `developer_instructions` in tracked
 `.codex/config.toml` bind the primary orchestrator, ownership/provenance boundary, intelligence
 parity, critical drain, and terminal handover stop. The same file's `[agents]` table owns the exact
-global Astra/`ultra` defaults and four-thread ceiling; project-scoped `.codex/agents/*.toml` layers
+global Astra/`max` defaults and four-thread ceiling; project-scoped `.codex/agents/*.toml` layers
 inject the bounded role behavior into spawned sessions. Never pass a model or reasoning override at
 spawn. `pnpm codex:validate` fails closed when the primary policy, role policy, permissions, or
 exact primary/subagent intelligence pair is missing or divergent.
@@ -2324,18 +2324,20 @@ permission provenance is uncertain, the worker performs no repository work and t
 ### Intelligence Parity And Integration Authority
 
 The primary and every role under `.codex/agents/` must use exactly the same configured GPT Astra
-model and `ultra` reasoning. `.codex/config.toml` is the intelligence source of truth and pins both
-global delegated defaults to the primary; validation fails closed on any default, role-model, or
-reasoning mismatch. Never pass a different model or effort in a spawn override. No secondary tier,
-cheaper model, lower reasoning level, or silent fallback is allowed. A future GPT Astra version may
-replace the current one only when the primary config, global subagent default, and every role move
-to that exact model in the same change and the installed model catalog confirms `ultra` support. If
-the active harness cannot guarantee that exact parity, do not delegate. `explorer` and `default` are
-explicitly read-only. `worker` requests `workspace-write` with command network disabled, while an
-explicitly inherited primary YOLO override is governed by the narrower task authority above;
-protected Git, Codex, agent-policy, out-of-scope, and out-of-root paths remain forbidden. Hosted
-apps and tools need equivalent read-only/no-external-mutation policy because command sandboxing does
-not govern them.
+model and its second-highest supported reasoning effort, currently `max` for `gpt-6-astra`.
+`.codex/config.toml` is the intelligence source of truth and pins both global delegated defaults to
+the primary; validation fails closed on any default, role-model, or reasoning mismatch. Never pass a
+different model or effort in a spawn override. No secondary tier, cheaper model, lower reasoning
+level, or silent fallback is allowed. A future GPT Astra version may replace the current one only
+when the primary config, global subagent default, and every role move to that exact model and its
+second-highest supported effort in the same change. The shared policy, injected instructions and
+roles must agree; installed-catalog validation rejects a different rank, unknown effort levels or
+fewer than two supported levels instead of silently falling back. If the active harness cannot
+guarantee that exact parity, do not delegate. `explorer` and `default` are explicitly read-only.
+`worker` requests `workspace-write` with command network disabled, while an explicitly inherited
+primary YOLO override is governed by the narrower task authority above; protected Git, Codex,
+agent-policy, out-of-scope, and out-of-root paths remain forbidden. Hosted apps and tools need
+equivalent read-only/no-external-mutation policy because command sandboxing does not govern them.
 
 Subagents never commit, amend, merge, rebase, tag, push, force-push, publish, open/merge a change
 request, mutate provider protection, deploy a shared environment, consume credentials, or remove a

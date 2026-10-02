@@ -26,7 +26,7 @@ const defaultRoot = path.resolve(scriptDirectory, "..", "..");
 
 export const sharedAgentIntelligencePolicy = Object.freeze({
   modelPattern: /^gpt-[a-z0-9]+(?:[.-][a-z0-9]+)*-astra$/u,
-  reasoningEffort: "ultra",
+  reasoningEffort: "max",
 });
 
 export const startupAttestationHookPolicy = Object.freeze({
@@ -114,7 +114,7 @@ const requiredPrimaryInstructionFragments = Object.freeze([
   "exactly one current internal contract",
   "at most four live",
   "never pass a model or reasoning override",
-  "exact GPT Astra model with ultra reasoning",
+  "exact GPT Astra model with max reasoning",
   "owned subagent and background task",
   "foreign or ambiguous processes",
   "5% or less",

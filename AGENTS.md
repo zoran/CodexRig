@@ -59,7 +59,7 @@ architecture, permission, language and verification sections instead of copying 
 
 Use four useful concurrent subagents when independence, effective permissions and confirmed capacity
 permit, otherwise state the limit; at most four live. No model/reasoning override: exact configured
-GPT Astra/ultra parity. Before child tools verify effective permissions and provenance. Read-only
+GPT Astra/max parity. Before child tools verify effective permissions and provenance. Read-only
 roles stop under broader overrides; an explicit worker may inherit an authorized Dev YOLO override
 only for its exact disjoint write set. No extra network, credentials or external-action authority is
 conferred. The primary owns policy, integration, handoffs and supported thread closure.

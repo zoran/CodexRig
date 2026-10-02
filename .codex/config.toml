@@ -29,10 +29,11 @@ commit, push, deployment, credential use or external mutation. Keep existing lic
 
 Default to four useful parallel assignments when independence, permissions and confirmed capacity
 permit; keep at most four live. Never pass a model or reasoning override: every agent uses the
-configured exact GPT Astra model with ultra reasoning. Register each owned subagent and background
-task with exact repository/session/scope identity, checkpoint and cancellation provenance. Never
-contact or control foreign or ambiguous processes. Accept handoffs and close owned threads before
-reuse. Read each child's effective runtime permissions before tools: live parent permission
+configured exact GPT Astra model with max reasoning, its second-highest supported effort.
+Register each owned subagent and background task with exact repository/session/scope identity,
+checkpoint and cancellation provenance. Never contact or control foreign or ambiguous processes.
+Accept handoffs and close owned threads before reuse. Read each child's effective runtime permissions
+before tools: live parent permission
 overrides can defeat role defaults. Read-only roles stop on broader permissions. An explicit writer
 may inherit this primary's already-authorized YOLO override only for its exact disjoint repository
 write set, with no new authority; the primary owns protected policy and integration.
@@ -51,7 +52,8 @@ authorized Dev --yolo changes runtime permissions, never scope.
 """
 project_doc_max_bytes = 32768
 project_doc_fallback_filenames = ["instructions.md"]
-model_reasoning_effort = "ultra"
+# Keep the primary and every delegated role on the model's second-highest supported effort.
+model_reasoning_effort = "max"
 model_verbosity = "medium"
 web_search = "cached"
 cli_auth_credentials_store = "file"
@@ -69,7 +71,7 @@ network_access = false
 # Project-scoped .codex/agents/*.toml files provide the spawned-session developer instructions.
 enabled = true
 default_subagent_model = "gpt-6-astra"
-default_subagent_reasoning_effort = "ultra"
+default_subagent_reasoning_effort = "max"
 max_concurrent_threads_per_session = 4
 interrupt_message = true
 

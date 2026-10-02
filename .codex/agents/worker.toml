@@ -1,7 +1,7 @@
 name = "worker"
 description = "Isolated bounded implementation, repair, or test work delegated by the primary."
 model = "gpt-6-astra"
-model_reasoning_effort = "ultra"
+model_reasoning_effort = "max"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 Before any repository tool, report the effective runtime sandbox, approval policy, network access,
