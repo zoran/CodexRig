@@ -874,7 +874,8 @@ detected ecosystem, but the following boundaries are mandatory:
 - infrastructure, IaC, CI/CD, environment wiring, and deployment manifests use dedicated tracked
   infrastructure/delivery roots outside product runtime modules. Runtime provider adapters may
   remain private inside their owning module, but provisioning files and product logic never share a
-  directory or source file; and
+  directory or source file. Follow [Infrastructure As Code](#infrastructure-as-code) for tool
+  selection, repository layout and lifecycle ownership; and
 - composition roots may connect these surfaces but may not absorb their implementation. Every file
   has one primary owner and responsibility; reject mixed `app`, `platform`, `server`, `shared`, or
   `config` dumping grounds that blur two or more surfaces.
@@ -1874,6 +1875,121 @@ rewritten directive or durable manifest decision to surviving canonical text or 
 authorized retirement, check authority order and projected copies for contradictions, and preserve
 the directive or decision when its status is uncertain. Keep the result in the conversation; never
 create a review artifact.
+
+## Infrastructure As Code
+
+Infrastructure is built and maintained as version-controlled, reviewable, reproducible code by
+default. Use Ansible, Terraform or Pulumi according to the responsibility and target platform. This
+applies to provisioning, configuration, changes, recovery and retirement across on-premises, cloud
+and hybrid environments: compute, networks, storage, databases, identity-provider resources,
+permissions, DNS, certificates, observability and comparable operational resources. Manage the
+desired configuration in source; keep live resource state and secrets at their protected owners.
+Console clicks, undocumented host changes and ad hoc scripts must not become the durable source of
+truth.
+
+### Infrastructure Tool Selection And Ownership
+
+Before infrastructure implementation, use `$architecture-evolution` to compare viable tools against
+provider/API coverage, existing ownership, team expertise, licensing, state operations, security and
+maintenance cost. Record the chosen responsibility split and rationale at the established
+requirements/design owner. Location alone does not determine the tool: on-premises resources can
+have provisioning APIs, and cloud hosts can need configuration management.
+
+| Responsibility                                                        | Tool selection                                                                                                                                                                                         |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Operating-system, host, package, service and configuration management | Use Ansible with idempotent modules and roles where supported. This includes on-premises and cloud hosts.                                                                                              |
+| API-managed resource provisioning and lifecycle                       | Choose Terraform for declarative provider/module configuration, or Pulumi when a supported programming language and its abstractions fit the project better. Check the actual provider's capabilities. |
+| Provisioning followed by host/service configuration                   | Combine Terraform or Pulumi with Ansible through explicit outputs and inventory inputs; each resource and configuration setting has one managing owner.                                                |
+
+Choose one provisioning owner per resource set; never let Terraform and Pulumi, or a provisioning
+tool and Ansible, independently reconcile the same object or setting. Separate owners may cooperate
+through documented inputs/outputs without exposing whole state files. Keep CI/CD as the caller of
+the owned entrypoints, not a second implementation of infrastructure behavior. Shell wrappers may
+select targets and invoke those entrypoints; native deployment manifests may remain at their
+delivery owner. Neither replaces IaC ownership of the resources they depend on. Do not rewrite
+unrelated existing tooling merely because it uses shell or provider APIs.
+
+### Infrastructure Repository Layout
+
+When infrastructure is in scope, create and maintain its real files under a dedicated tracked root,
+normally `infrastructure/`; preserve an established coherent equivalent such as `infra/`. Keep it
+outside Product Roots and separate from runtime provider adapters. Select only the needed tool
+subtrees and real environments. These are layout examples, not a requirement to scaffold every tool,
+component or environment:
+
+| Selected owner | Files and directories under the infrastructure root                                                                                                                                                                                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ansible        | `ansible/ansible.cfg`, pinned collection/role requirements, `ansible/playbooks/`, `ansible/roles/<role>/` with its required tasks/defaults/handlers/templates, and `ansible/inventories/<target>/` with non-secret inventory and group/host variables. Configure role lookup explicitly when playbooks live in a separate directory.   |
+| Terraform      | `terraform/modules/<module>/` for reusable components and `terraform/environments/<target>/<component>/` for independently managed root modules. Keep resource declarations, input/output contracts, provider/version constraints, non-secret backend configuration and `.terraform.lock.hcl` at their appropriate module/root owners. |
+| Pulumi         | `pulumi/<component>/Pulumi.yaml`, the program and its dependency manifest/lockfile, and non-secret `Pulumi.<target>.yaml` stack settings; use the declared stack configuration directory if customized. Keep reusable components separately owned within this subtree.                                                                 |
+
+Each `<target>` maps explicitly to `dev`, `staging` or `prod` under
+[Delivery Environments](#delivery-environments). Isolate state, credentials, inventory and access
+between targets; a directory, workspace or stack name alone does not prove that isolation. Share
+reusable modules/roles and use bounded environment inputs instead of copying entire implementations.
+Split state and deployment units by ownership, lifecycle and failure impact, not one unit per file.
+
+Keep non-secret inputs, schemas/examples, pinned tool/provider/module/collection dependencies and
+supported lockfiles in Git. Maintain ignore rules for local caches, generated inventories, state,
+state backups, plan artifacts and secret-bearing variable files without hiding the source or
+lockfiles needed to reproduce a run. Document actual entrypoints, target selection, prerequisites,
+input/output contracts, backend bootstrap, drift checks and recovery at the existing operational
+documentation owner, with README discovery. Record only integrated tools, roots, owners and
+configured/deployed environments in `docs/project.md`. Keep `config/delivery.json` as the
+environment inventory owner; do not introduce a competing registry. Neutral frameworks and pending
+products retain an explicit absence of product infrastructure until a real requirement justifies
+files.
+
+### Infrastructure State, Verification And Change Lifecycle
+
+Apply [Repository-Local Tool And Account Isolation](#repository-local-tool-and-account-isolation)
+before admitting an IaC tool or provider, including plugins, caches, configuration and credential
+discovery. Use environment-scoped project or explicitly bound workload credentials and
+[Permission Design](#permission-design). Source edits never grant deployment, credential-use or
+external-mutation authority; [Delivery Environments](#delivery-environments) retains its existing
+selection and approval gates.
+
+- For shared Terraform/Pulumi infrastructure, use an access-controlled state backend with
+  encryption, concurrency protection, backup and recovery. Document bootstrap and ownership so
+  recreating the backend is not circular. Do not commit live state or plan files, expose state to
+  unrelated consumers, or treat a sensitive-output flag as encryption. Source reproducibility does
+  not restore application data; preserve the separate data backup/restoration contract.
+- Resolve secrets through the approved secret owner at execution time. Keep plaintext secrets,
+  credentials and decryption keys out of source, examples, inventories, plans published as logs and
+  diagnostic output. Account for secrets in state and suppress sensitive Ansible diffs/output.
+- Before a change, run proportionate formatting, syntax/schema validation, lint/security checks and
+  a target-specific Terraform plan, Pulumi preview or supported Ansible check/diff. Record skipped
+  or unsupported checks honestly. These tools can execute plugins, programs or tasks and may need
+  provider reads; inspect their behavior and authority before running them. Ansible tasks can
+  override check mode, and a dry-run label does not establish read-only safety. Ordinary repository
+  verification stays offline and non-deploying unless its explicit contract authorizes more.
+- Bind reviewed changes to the actual source, dependency locks, inputs, target and state basis.
+  Replan when that basis changes. Use trusted CI inputs and serialize mutations to the same state or
+  resource owner, including overlapping Ansible runs. Respect the delivery policy's safe
+  cancellation boundaries; never interrupt an unsafe atomic update to satisfy latest-wins Dev.
+- Exercise representative creation/change, repeat-run idempotence and recovery in an authorized
+  isolated target when needed for acceptance. Check drift and health after authorized application;
+  syntax checks or previews alone do not prove deployed behavior. Define rollback, roll-forward or
+  restoration according to the resource lifecycle; reverting a Git commit is not automatic recovery.
+- For existing resources, inspect ownership and drift and use reviewed import/adoption before taking
+  control. A tool migration moves the resource/state ownership and every consumer together; avoid
+  competing managers, accidental replacement or destruction. Destructive replacement,
+  decommissioning and state repair retain their explicit authority and recovery requirements.
+- A manual bootstrap, unsupported provider operation or emergency intervention is a bounded
+  exception under existing authority. Document the reason, exact boundary, owner, recovery and
+  reconciliation condition at the operational owner without secrets. Bring the resulting desired
+  state back under code management as soon as supported; an exception must not establish a parallel
+  permanent workflow. Do not infer an emergency from ordinary delivery urgency.
+
+Use `$system-coherence`, `$security-review` and `$task-quality` for changed infrastructure
+boundaries and their actual consumers. Provider-specific commands and limitations follow the
+selected pinned version's official documentation:
+[Ansible project layout](https://docs.ansible.com/projects/ansible/latest/tips_tricks/sample_setup.html)
+and
+[check/diff behavior](https://docs.ansible.com/projects/ansible-core/stable-2.21/playbook_guide/playbooks_checkmode.html),
+[Terraform lifecycle](https://developer.hashicorp.com/terraform/intro) and
+[sensitive data](https://developer.hashicorp.com/terraform/language/manage-sensitive-data), and
+[Pulumi projects, stacks and state](https://www.pulumi.com/docs/iac/concepts/).
 
 ## Delivery Environments
 

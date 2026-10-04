@@ -44,6 +44,7 @@ export function currentProjectInstructions(sourceRoot) {
       "<!-- current-tool-account-isolation-policy -->",
     ],
     ["Repository Efficiency And Effectiveness", "<!-- current-repository-efficiency-policy -->"],
+    ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
   ]) {
     const matches = sections.filter((section) => section.heading === heading);
@@ -81,6 +82,9 @@ Treat examples as non-exhaustive; follow
 authorized class and its future additions.
 All tools follow [repository-local account and tool state](instructions.md#repository-local-tool-and-account-isolation);
 new tools must satisfy the same isolation boundary before authenticated use.
+Build and maintain infrastructure as code with scenario-appropriate Ansible, Terraform or Pulumi;
+follow [Infrastructure As Code](instructions.md#infrastructure-as-code) for tool ownership, real
+repository structures, state/secrets and verification before infrastructure work.
 
 A pending definition requires the focused requirements intake. A brief does not authorize code.
 Honor any static-UI acceptance gate before application implementation. README owns setup/use and
@@ -171,6 +175,7 @@ workflows, boundaries and acceptance before implementation. Preserve separate UI
 ## Documentation
 
 - [Workflow and safety](instructions.md)
+- [Infrastructure as Code: tools, layout and lifecycle](instructions.md#infrastructure-as-code)
 - [Current technical inventory](docs/project.md)
 - [Deferred module candidates](docs/future-modules.md)
 - [Native session configuration](.codex/README.md)

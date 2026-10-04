@@ -49,6 +49,9 @@ Inspect the changed neighborhood for material defects:
   coupling, environment or tenant drift, and an assembled flow broken despite local green tests;
 - mixed domain/application, presentation, interface, Identity and Access or infrastructure concerns,
   and physical files or source/declaration headers that still describe the former owner;
+- infrastructure drift, competing resource managers, copied environment implementations or missing
+  state/recovery ownership under
+  [Infrastructure As Code](../../../instructions.md#infrastructure-as-code);
 - unrequested UI/navigation/interaction changes or shared component/token effects. Route actual
   interactive changes to `$ui-ux-review`; do not duplicate its visual review or claim rendered
   acceptance from source. Route changed trust surfaces to `$security-review`;

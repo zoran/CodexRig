@@ -279,6 +279,10 @@ rollback. A frozen install proves reproducibility, not registry freshness. CI us
 pins, frozen inputs, disabled install scripts/pnpmfile and verified archives. Report offline or
 registry uncertainty honestly; do not substitute unverified success or automatic source repairs.
 
+## Infrastructure As Code
+
+<!-- current-infrastructure-as-code-policy -->
+
 ## Delivery Environments
 
 `config/delivery.json` owns declared and detected environments. Dev is the default, not evidence

@@ -54,6 +54,9 @@ presentation, Identity and Access, transport and infrastructure distinct. Preser
 require acceptance of a new direction. Product identity, delivery, tenancy and localization have
 separate typed owners; preserve deny-by-default tenant isolation. Follow the applicable
 architecture, permission, language and verification sections instead of copying their rules here.
+Build and maintain infrastructure as code with scenario-appropriate Ansible, Terraform or Pulumi;
+follow [Infrastructure As Code](instructions.md#infrastructure-as-code) for tool ownership, real
+repository structures, state/secrets and verification before infrastructure work.
 
 ## Coordination And Closure
 

@@ -49,7 +49,10 @@ Review the implemented change and report findings; do not edit files.
 7. Check remaining secret/private-data exposure, input validation, encoding, retention, logging,
    telemetry, and error disclosure where relevant.
 8. Check shell argument handling, paths, symlinks, permissions, archive extraction, hooks, CI,
-   dependency provenance, install scripts, and network failure semantics where relevant.
+   dependency provenance, install scripts, and network failure semantics where relevant. For
+   infrastructure, apply [Infrastructure As Code](../../../instructions.md#infrastructure-as-code):
+   inspect state/plan exposure, backend access and locking, environment credentials, executable
+   preview/check paths and destructive-change recovery at the actual tool owner.
 9. For public endpoints, assess abuse controls and resource exhaustion as well as ordinary access
    control.
 10. Distinguish exploitable defects from hardening ideas and unsupported hypothetical risks.

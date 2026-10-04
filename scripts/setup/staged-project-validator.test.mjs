@@ -53,20 +53,28 @@ function stage() {
   return target;
 }
 
-test("generated children receive the canonical capacity recovery policy", async () => {
+test("generated children receive canonical capacity recovery and infrastructure policies", async () => {
   const target = stage();
   const sourceInstructions = readFileSync(path.join(source, "instructions.md"), "utf8");
   const generatedInstructions = readFileSync(path.join(target, "instructions.md"), "utf8");
-  const capacityBody = (content) => {
+  const policyBody = (content, expectedHeading) => {
     const sections = documentContextSections("instructions.md", content).filter(
-      ({ heading }) => heading === "Capacity Admission And Monitoring",
+      ({ heading }) => heading === expectedHeading,
     );
-    assert.equal(sections.length, 1, "Capacity policy must have exactly one owner.");
+    assert.equal(sections.length, 1, `${expectedHeading} must have exactly one owner.`);
     const { start, end } = sections[0];
     return content.split(/\r?\n/u).slice(start, end).join(" ").replace(/\s+/gu, " ").trim();
   };
-  assert.equal(capacityBody(generatedInstructions), capacityBody(sourceInstructions));
-  assert.doesNotMatch(generatedInstructions, /<!-- current-capacity-admission-policy -->/u);
+  for (const [heading, marker] of [
+    ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
+    ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
+  ]) {
+    assert.equal(
+      policyBody(generatedInstructions, heading),
+      policyBody(sourceInstructions, heading),
+    );
+    assert.equal(generatedInstructions.includes(marker), false);
+  }
   await validateGeneratedProject(target);
 });
 

@@ -57,7 +57,9 @@ ${deliveryProjection}
   embedded, or real-time product surface is integrated.
 - Tenant isolation runtime: no product tenant resolver or data plane is integrated; the initial
   invariant contract is owned by \`${tenancyConfigurationPath}\` with pending resolution.
-- Product infrastructure roots: none are integrated.
+- Product infrastructure roots: none are integrated; Ansible, Terraform or Pulumi selection and
+  layout remain pending actual requirements under the
+  [Infrastructure As Code policy](../instructions.md#infrastructure-as-code).
 - Public product identity and brand: not configured.
 
 ${activeModuleInventoryHeading}

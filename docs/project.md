@@ -51,6 +51,10 @@ upgradeable product repositories while deliberately defining no child product or
   toolchain declarations live in `.codex/mise.toml`, `.codex/mise.lock`, and workspace manifests,
   and provider or delivery orchestration lives under `scripts/platform` and `scripts/setup`, while
   goal housekeeping lives under `scripts/goals`; none is mixed into a product runtime root.
+- Product infrastructure state: no Ansible, Terraform or Pulumi implementation, state backend or
+  product infrastructure root is integrated. The portable
+  [Infrastructure As Code policy](../instructions.md#infrastructure-as-code) is projected from the
+  canonical instructions into generated projects; tool and layout selection awaits actual scope.
 
 <!-- project:delivery-inventory:start -->
 
@@ -546,7 +550,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.5.0`.
+- Framework version: `6.6.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

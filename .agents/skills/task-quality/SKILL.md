@@ -24,6 +24,9 @@ publication.
 - Distinguish source/static checks, isolated fixtures, rendered flows, actual targets and native
   model behavior. Claim only what the observed evidence proves. Missing coverage is a finding only
   with a concrete recurrence path or material-risk invariant.
+- For infrastructure, select evidence under
+  [Infrastructure As Code](../../../instructions.md#infrastructure-as-code); distinguish static
+  validation and plans/previews from authorized target, idempotence, drift and recovery evidence.
 
 ## Route Review Once Per Concern
 

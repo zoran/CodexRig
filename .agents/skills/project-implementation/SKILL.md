@@ -73,7 +73,9 @@ establishes a domain; there is no generic catch-all placement.
    module, mutates its data or silently owns its behavior. Separate domain/application,
    UI/presentation, web, Identity and Access, API contracts/transport, adapters and infrastructure.
    Use the current Product Roots and `scripts/verify/path-hygiene.mjs`; move stale files with
-   changed ownership.
+   changed ownership. Infrastructure work follows
+   [Infrastructure As Code](../../../instructions.md#infrastructure-as-code): implement the selected
+   tool's real directory/file structure, owned inputs/state and verification together.
 4. Read the existing typed owners for white-label identity and branding (`config/product.json`),
    delivery (`config/delivery.json`), tenant context/isolation (`config/tenancy.json`) and locales
    (`config/localization.json`). Resolve relevant pending product choices before implementation.

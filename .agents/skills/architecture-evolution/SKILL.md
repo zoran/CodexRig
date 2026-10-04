@@ -65,6 +65,9 @@ Read only the canonical contracts affected by this decision:
   [Delivery](../../../instructions.md#delivery-environments): preserve separate typed owners
   `config/product.json`, `config/delivery.json`, `config/tenancy.json` and
   `config/localization.json`; configuration resolution belongs at composition, secrets separately.
+- [Infrastructure As Code](../../../instructions.md#infrastructure-as-code): select Ansible,
+  Terraform or Pulumi by responsibility and scenario; define resource ownership, real tool roots,
+  environment/state boundaries and recovery before provisioning or configuration work.
 
 These links retain the detailed rules; do not clone them into a new design document or skill. Keep
 decision-ready plans in the conversation or the applicable existing bounded work cache.
