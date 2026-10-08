@@ -159,8 +159,9 @@ Publication shows eight numbered phases, the current task and elapsed time. Succ
 compact; a failure identifies the stopped phase and shows its diagnostic tail. Add `--verbose` after
 the commit message to show sanitized command output after each check. Interactive terminals show a
 live progress line; redirected output uses plain status lines. `NO_COLOR` disables colors. Git
-sign-in prompts remain interactive. After the first successful HTTPS authentication, subsequent
-publishes reuse the project credential described below until it expires or is revoked.
+sign-in prompts remain interactive, with access-token guidance in the publish display. After the
+first successful HTTPS authentication, subsequent publishes reuse the project credential described
+below until it expires or is revoked.
 
 Running this command explicitly authorizes publication of all non-ignored source changes on `main`.
 It performs source cleanup, housekeeping, verification, commit and push; do not run its individual
@@ -224,8 +225,11 @@ rejections; other Git failures still stop the affected phase.
 A browser-only session does not authenticate Git. If no local or global credential exists, establish
 one in a normal host terminal with `gh auth login --hostname github.com` or
 `glab auth login --hostname gitlab.com` (use your configured host for self-hosted instances), or
-enter a personal access token at Git's password prompt. Never put a token in a command, shell
-history or chat.
+enter a personal access token at Git's password prompt. For GitHub HTTPS, enter your GitHub username
+at `Username` and your personal access token (PAT) at `Password`. The native Git prompt still says
+`Password`, but GitHub requires a token instead of your account password. See
+[GitHub's token instructions](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#using-a-personal-access-token-on-the-command-line).
+Never put a token in a command, shell history or chat.
 
 The platform-policy API uses `.auth/git-platform.json`, with private owner-only permissions and
 exact fields `schemaVersion` (1), `provider`, `hostname`, `repository` (the selected remote's slug),

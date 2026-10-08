@@ -54,6 +54,8 @@ export function createPublicationOutput({
       line(paint(`\n  ${safe(displayName)}  /  Publish`, "1;36"));
       line("  Prepare > Verify > Commit > Push");
       line("  Sign-in: project credential > global GitHub/GitLab login > prompt.");
+      line("  GitHub HTTPS: enter your GitHub username at 'Username'.");
+      line("  At 'Password', enter a personal access token (PAT), not your GitHub password.");
       line();
     },
     task(label, { prompt = false } = {}) {
