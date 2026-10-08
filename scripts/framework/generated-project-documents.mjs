@@ -44,6 +44,7 @@ export function currentProjectInstructions(sourceRoot) {
       "<!-- current-tool-account-isolation-policy -->",
     ],
     ["Repository Efficiency And Effectiveness", "<!-- current-repository-efficiency-policy -->"],
+    ["Maintenance Scope And Verification", "<!-- current-maintenance-scope-policy -->"],
     ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
   ]) {
@@ -91,6 +92,9 @@ Honor any static-UI acceptance gate before application implementation. README ow
 links, the manifest owns current technical inventory, the specification owns requirements/acceptance,
 a UI reference is separate, and project context owns only this project's current bounded task.
 Keep the task scope bounded to this repository and the authorized outcome.
+Apply [Maintenance Scope And Verification](instructions.md#maintenance-scope-and-verification)
+before startup, dependency maintenance, verification and cleanup; these commands cannot expand the
+task into product work.
 
 ## Delivery And Safety
 
@@ -105,8 +109,9 @@ benefit or material risk. Every audit follows
 [Repository Efficiency And Effectiveness](instructions.md#repository-efficiency-and-effectiveness).
 Run \`pnpm context:check\` for instruction/context changes and preserve full requirements through
 bounded reads. Apply the Long-Session Course Checks in instructions.md.
-Stable tools and product checks are declared in \`.codex/verification.json\`; unknown paths must not
-omit real product tests. Tool failures are bounded findings, not a new maintenance campaign.
+Stable tools and product checks are declared in \`.codex/verification.json\`; select evidence under
+the maintenance scope boundary without weakening publication gates. Tool failures are bounded
+findings, not a new maintenance campaign.
 
 Portable startup requests on-request approval and network-disabled workspace-write. Explicit Dev
 \`--yolo\` changes runtime permissions only within existing authority. No unapproved staging/prod,
@@ -200,8 +205,10 @@ Platform-policy apply reads the private \`.auth/git-platform.json\` file with ex
 it never inherits a host token. Keep this file and its parent private and outside source control.
 Use \`pnpm tooling:doctor\` for local tool diagnosis, \`pnpm worktree:status -- --json\` for session
 inventory, \`pnpm verify:changed -- --print-plan\` for selected evidence and \`pnpm verify\` for final
-verification. \`pnpm repo:housekeeping -- --apply\` reconciles local repository facts. These commands
-require their own explicit publication and deployment authority.
+verification. \`pnpm repo:housekeeping -- --apply\` reconciles local repository facts. Apply
+[Maintenance Scope And Verification](instructions.md#maintenance-scope-and-verification) before
+these commands; inspect their side effects and selected checks against the accepted task.
+Publication and deployment require their own explicit authority.
 
 ## Publish Source Changes
 

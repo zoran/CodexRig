@@ -286,7 +286,9 @@ substitute a customized checkout for that reference. Maintained product document
 custom verification require local reconciliation, not blind replacement. Generated projects contain
 no self-updater or installation receipt. See
 [Framework Lifecycle](instructions.md#framework-lifecycle-compatibility-and-git-platforms) and
-[Repository Update Scope](instructions.md#repository-update-scope).
+[Repository Update Scope](instructions.md#repository-update-scope). Select acceptance commands under
+[Maintenance Scope And Verification](instructions.md#maintenance-scope-and-verification): an update
+does not start product development, refresh product dependencies or require broad product execution.
 
 ## License And Attribution
 

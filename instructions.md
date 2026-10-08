@@ -297,6 +297,47 @@ Keep this mechanism bounded: one replace-in-place successful-evidence record and
 session lock. Do not add per-run receipts, checkpoint chains, or verification history unless a
 measured project-specific need justifies that complexity.
 
+## Maintenance Scope And Verification
+
+A repository, framework or tooling update authorizes maintenance of the named existing surface. In a
+framework-maintenance context, “update repository X” means reconcile the selected framework into X,
+not continue its product roadmap. Product implementation, feature completion, redesign, product
+dependency upgrades and unrelated repairs require their own accepted scope. This boundary applies in
+the framework and in every generated project; independently authorized product work remains allowed.
+Recover the current request and later corrections before using old plans, backlog items or
+work-state metadata. None of those artifacts grants a new task or revives stopped work.
+
+Task scope governs commands and their side effects as well as file edits. Generic requirements to
+continue, start, audit, verify, clean up or finish never expand that scope. Before running a
+launcher, dependency maintenance, housekeeping or verification, inspect its actual operation and
+selected checks. A framework update alone does not authorize compatible dependency refresh, lockfile
+regeneration, repository-wide product formatting, product builds or a broad product test campaign.
+Do not run such a command on the product repository merely to satisfy an update checklist. Inspect
+retained product contracts and command plans without executing their unrelated lifecycles.
+
+Use existing checks for the changed framework owners and affected integration boundaries. A focused
+product check or repair belongs to update acceptance only when a concrete causal link to the
+selected update makes it necessary; state that link before proceeding. A pre-existing defect,
+scanner finding, missing verification cache or unknown-path fallback supplies evidence, not broader
+authority. Read `verify:changed -- --print-plan` before choosing evidence. If the aggregate command
+exceeds the accepted scope, use the existing affected checks directly and name the unexecuted gate;
+never change routing, omit failures from evidence or claim whole-project verification.
+
+Exercise launcher or dependency-maintenance changes in isolated fixtures or a disposable generated
+project when their real-target path would refresh product dependencies or exceed the task. Do not
+start the target's normal maintenance launcher as an update smoke test in that case. Frozen
+dependency reproduction is appropriate only when needed for the selected update and must preserve
+the target's manifests and lockfile. Fixture or frozen-install evidence does not establish actual
+target startup. Report an unverified path and any required restart accurately; do not perform
+unrequested product maintenance to obtain a “start-ready” claim.
+
+Apply this boundary before the general verification and closure sequences in these instructions,
+skills and generated guidance. Complete in-scope repairs, evidence and owned cleanup without a
+routine approval pause. Preserve separately authorized publication and deployment gates: focused
+update evidence cannot replace their required checks. Seek additional authority only when a concrete
+remaining action actually exceeds the accepted task; an unrelated finding is not a reason to start
+another task or leave the authorized maintenance unfinished.
+
 ## Authorized Work And Native Codex
 
 Within the user's authorized objective, continue autonomously through the planned slices, focused
@@ -572,7 +613,9 @@ live agents, checkpoints, handoffs, ownership, bounded work state, and any share
 channel; it runs on the event triggers above, as a hard gate after every slice, and deeply at every
 goal. Repository Housekeeping is the `repo:housekeeping` command; it observes only repository facts
 and therefore never claims to inspect or close conversations or read host usage. One primary-owned
-sequence runs both layers and closes every completed goal:
+sequence runs both layers and closes every completed goal. First apply
+[Maintenance Scope And Verification](#maintenance-scope-and-verification) to the commands below;
+closure does not authorize unrelated product lifecycle work:
 
 Preservation is a safety state, never completion. Every Worktree Settlement trigger assigns each
 no-longer-needed resource one terminal disposition: integrate developer-owned state into central
@@ -655,9 +698,9 @@ runtime is preserved until a separate full reset after exit.
    actual integrated result and rerun read-only housekeeping plus every affected review,
    documentation, course-check, audit, and verification gate. Any new drift reopens the owning
    change; never manufacture an empty marker commit.
-5. On the stable actual target-`main` state, invoke adaptive final verification once. Complete
-   source cleanup, exact commit and push only in the authorized publication path; preserve the
-   verified calling session and its private runtime. After a clean, verified, published central
+5. On the stable actual target-`main` state, invoke the scope-appropriate final verification once.
+   Complete source cleanup, exact commit and push only in the authorized publication path; preserve
+   the verified calling session and its private runtime. After a clean, verified, published central
    `main`, immediately run `pnpm goal:new`; it proves the clean publication and exact-current
    successful evidence before another goal opens. Continue the next already-approved goal without
    returning merely because a checkpoint completed.
@@ -1460,12 +1503,10 @@ followed by affected consumer regression evidence.
 
 ## Repository Update Scope
 
-This section governs work performed from the CodexRig source repository when updating another
-repository. It is source-only workflow policy: do not project it into generated projects, managed
-child configuration or skills, child policy concepts, or project-owned documents. It places no
-restriction on a child's product capabilities, development scope or independently authorized work.
-An instruction correcting CodexRig's update behavior belongs here; it does not authorize installing
-new restrictions in the target project.
+This section owns the source-to-child update procedure. The portable authority boundary is
+[Maintenance Scope And Verification](#maintenance-scope-and-verification): project that shared
+policy into generated projects and reconcile it in explicitly requested child updates. Keep this
+source-specific procedure here; preserve each child's independently authorized product work.
 
 A request to update a child repository from CodexRig authorizes its selected framework changes,
 necessary local policy/documentation reconciliation, and repairs to integration regressions caused
@@ -2503,12 +2544,16 @@ never write those surfaces, even from an otherwise writable isolated checkout.
 
 ## Verification
 
-Acceptance for a launcher or publication change must exercise the normal documented command with
-persistently prepared project tools. A direct verifier run with temporary environments or extra
-selectors proves only that invocation. Test the assembled launcher, publication gate and pre-push
-path, including unchanged evidence reuse, semantic-input invalidation and useful failure output.
-Preserve declared tool selectors and verification controls across those boundaries; verification
-must not install prerequisites or silently discard a real toolchain change.
+First apply [Maintenance Scope And Verification](#maintenance-scope-and-verification). The launcher,
+final-verification and cleanup requirements below operate within the accepted task; broad product
+execution is not an implicit condition of a framework update.
+
+When target execution is authorized, acceptance for a launcher or publication change must exercise
+the normal documented command with persistently prepared project tools. A direct verifier run with
+temporary environments or extra selectors proves only that invocation. Test the assembled launcher,
+publication gate and pre-push path, including unchanged evidence reuse, semantic-input invalidation
+and useful failure output. Preserve declared tool selectors and verification controls across those
+boundaries; verification must not install prerequisites or silently discard a real toolchain change.
 
 Run the smallest useful focused command while iterating; this controls execution cost, not the
 preferred breadth of newly added durable tests. `pnpm verify:changed -- --print-plan` exposes the
@@ -2516,9 +2561,9 @@ adaptive current-delta decision without executing it; the plan reports targeted 
 full-relevant and unknown paths, uncovered paths, focused command owners, the exact admission
 reason, and whether the successful basis can advance. After every completed slice, repeat bounded
 review, repair, and affected focused verification until no relevant finding remains, then perform
-the fresh audit required above. Invoke `pnpm verify` once on the actual target-`main` state only
-after the final goal audit and cleanup are clean. Both entries use the same admission owner; a
-previous failure cannot bypass it.
+the fresh audit required above. When its selected checks fit the accepted scope, invoke
+`pnpm verify` once on the actual target-`main` state only after the final goal audit and cleanup are
+clean. Both entries use the same admission owner; a previous failure cannot bypass it.
 
 Framework publication and private runtime sanitation are separate boundaries. After framework
 changes, clear completed source process artifacts through the reset owner's publication mode. The

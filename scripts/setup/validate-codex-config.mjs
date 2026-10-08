@@ -111,6 +111,7 @@ const requiredAgentInstructionFragments = Object.freeze([
 ]);
 const requiredPrimaryInstructionFragments = Object.freeze([
   "primary orchestrator",
+  "Maintenance Scope And Verification",
   "exactly one current internal contract",
   "at most four live",
   "never pass a model or reasoning override",

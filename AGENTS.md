@@ -34,9 +34,11 @@ new tools must satisfy the same isolation boundary before authenticated use.
 The user's accepted scope persists. Continue authorized work through repairs, evidence and cleanup;
 status questions do not cancel it. Honor explicit pause, cancellation, read-only mode and
 publication or environment gates. A tool failure, old work note or deferred candidate creates no
-task. Child updates obey [Repository Update Scope](instructions.md#repository-update-scope). Pending
-products need [definition intake](instructions.md#first-prompt-project-definition-intake), not
-guessed code.
+task. Apply [Maintenance Scope And Verification](instructions.md#maintenance-scope-and-verification)
+before startup, dependency maintenance, verification and cleanup; these commands cannot expand the
+task into product work. Child updates also obey
+[Repository Update Scope](instructions.md#repository-update-scope). Pending products need
+[definition intake](instructions.md#first-prompt-project-definition-intake), not guessed code.
 
 Before features or extensive/complex/risky work apply
 [Planning](instructions.md#planning-goals-slices-review-loops-and-audits): review to no relevant
@@ -73,8 +75,8 @@ the canonical Critical Budget Drain attestation and run `pnpm handover:create --
 final action, then stop completely. Follow the exact restart/acceptance protocol later.
 
 After each completed slice run `pnpm worktree:status -- --json`; preservation is not completion.
-Follow goal housekeeping and verification, using focused checks during work and `pnpm verify` on the
-stable integration state. The README's
+Follow goal housekeeping and verification within the maintenance scope boundary, using focused
+checks during work and the applicable final evidence on the stable integration state. The README's
 `bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"` supports
 explicitly authorized publication from the verified owning session after its other writers drain. It
 cleans source, verifies, commits and pushes while preserving active runtime; full runtime reset

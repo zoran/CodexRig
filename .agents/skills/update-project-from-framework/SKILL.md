@@ -10,7 +10,9 @@ description:
 
 This source-only procedure owns convergence with the current generated output. Follow
 [Repository Update Scope](../../../instructions.md#repository-update-scope). An update does not
-license unrelated product repairs, deployments, commit or push.
+license product development or unrelated repairs, deployments, commit or push. Apply
+[Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification) to
+every command below, including startup, dependency maintenance, verification and cleanup.
 
 ## Reconstruct And Compare
 
@@ -29,13 +31,14 @@ license unrelated product repairs, deployments, commit or push.
    commands, verification routing, CI, README, manifest and local tool/config owners in the review.
    A preserved file is not evidence that a framework fix reached it. Reconcile canonical shared
    policies into maintained child instructions as well as generated defaults, including
-   [Interpreting Examples And Scope](../../../instructions.md#interpreting-examples-and-scope).
-   Named examples do not bound the applicable update: trace the underlying rule across affected
-   existing consumers and the admission of future ones while respecting the accepted update scope.
-   Reconcile the shared tool/account isolation boundary, actual project account adapters and their
-   startup/install/verification consumers. Preserve project credentials in place. The canonical
-   GitHub/GitLab HTTPS adapter is the only default global-login exception; never borrow other host
-   or sibling accounts to make an update pass. Report required local logins without reading secrets.
+   [Interpreting Examples And Scope](../../../instructions.md#interpreting-examples-and-scope) and
+   the portable maintenance scope boundary. Named examples do not bound the applicable update: trace
+   the underlying rule across affected existing consumers and the admission of future ones while
+   respecting the accepted update scope. Reconcile the shared tool/account isolation boundary,
+   actual project account adapters and their startup/install/verification consumers. Preserve
+   project credentials in place. The canonical GitHub/GitLab HTTPS adapter is the only default
+   global-login exception; never borrow other host or sibling accounts to make an update pass.
+   Report required local logins without reading secrets.
 
 ## Reconcile One Current Contract
 
@@ -49,9 +52,10 @@ license unrelated product repairs, deployments, commit or push.
    name actual runtime context boundaries and existing negative-test owners. Reuse composed product
    tests; neither empty generation defaults nor artificial per-module test scripts establish
    isolation. Generic scanner defects belong at the source owner, while product boundary repairs
-   require the applicable repair authority. Apply the patch/SDK constraint review in
-   `$dependency-maintenance` before enabling compatible startup refresh. Preserving patch files and
-   an old lockfile alone does not preserve their use.
+   require the applicable repair authority. Inspect patch/SDK constraints when changing their
+   framework consumers; preserve dependency manifests, patches and the lockfile. Use
+   `$dependency-maintenance` for separately authorized dependency work. Installing current startup
+   tooling does not authorize running its compatible dependency refresh on the target.
 5. For each divergent existing file, prepare an ephemeral JSON array of decisions from the preview:
    retain `path`, `currentHash`, `currentMode`, `desiredHash`, `desiredMode`; replace `kind` with
    `action` (`source`, `keep`, `replace` or explicitly reviewed `remove`) and a concrete `reason`. A
@@ -98,19 +102,19 @@ license unrelated product repairs, deployments, commit or push.
 
 ## Prove Convergence
 
-8. Run context map/check and selected-section reads on real target requirements, validate native
-   policy/startup and tooling, and inspect `verify:changed -- --print-plan` for retained product
-   checks. Exercise the affected assembled paths, including custom package/stack roots. Use focused
-   evidence during repair and full verification on the stable state; classify unrelated existing
-   blockers without repairing them under update authority. Preserve product-specific toolchains,
-   secondary runtimes, dependency patches and grouped tests; inspect assembled plans for duplicate
-   execution as well as lost coverage. Remove obsolete context dependencies only after tracing all
-   consumers. Do not claim a new framework scanner's historical product finding is an update
-   regression, or weaken a check to obtain a green result. Startup acceptance must exercise the
-   launcher's actual maintenance mode and subsequent admission checks on the target. `--locked`
-   reproduction does not prove compatible refresh. Preserve the user's session ownership: a native
-   picker smoke may stop before selecting a session or sending a prompt. If the actual path remains
-   unverified or blocked, do not call the target start-ready.
+8. Run context map/check and selected-section reads on real target requirements. Validate changed
+   native policy and tooling with existing affected checks; inspect `verify:changed -- --print-plan`
+   to assess preserved routing without automatically executing product checks. Establish the causal
+   need for each target integration check before running it. Exercise startup/maintenance changes in
+   isolated fixtures or a disposable generated project when the target command would exceed update
+   scope. Do not run the target's compatible refresh or broad product verification merely to
+   complete this update. Preserve product-specific toolchains, secondary runtimes, dependency
+   patches and grouped tests; inspect assembled plans for duplicate execution as well as lost
+   coverage. Remove obsolete context dependencies only after tracing all consumers. Classify
+   unrelated findings without repairing them, and never weaken a check to obtain a green result.
+   Distinguish fixture, frozen-install and actual target evidence; a normal launcher run requires
+   authority for its side effects. Report an unexecuted gate or required restart, and do not call an
+   unverified target start-ready.
 9. Run a fresh current-output preview. Every remaining difference needs an explained intentional
    product adaptation; no unexplained old workflow, hidden compatibility branch or retired consumer
    may remain. Reuse the bounded findings in the handoff, not an installation receipt or a second

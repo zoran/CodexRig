@@ -129,12 +129,14 @@ contract/data drift and the next highest-value unfinished step. Use `$task-quali
 slice/goal boundary, `$security-review` for changed trust surfaces, and other reviews only where
 relevant. Keep results in the conversation.
 
-Use `pnpm verify:changed -- --print-plan` for admission and focused evidence while iterating; one
-final `pnpm verify` belongs on the stable integrated candidate. Preserve Dev feedback priority. The
-verification and documentation sections of [instructions](../../../instructions.md) define full
-audit, document currency, critical-document preservation and applicable housekeeping/publication
-gates. Preserve the durable project manifest and never bypass a gate because an intermediate slice
-is green.
+Apply
+[Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification)
+before selecting commands. Use `pnpm verify:changed -- --print-plan` for admission and focused
+evidence while iterating; final verification belongs on the stable integrated candidate within the
+accepted scope. Preserve Dev feedback priority. The verification and documentation sections of
+[instructions](../../../instructions.md) define full audit, document currency, critical-document
+preservation and applicable housekeeping/publication gates. Preserve the durable project manifest
+and never bypass a gate because an intermediate slice is green.
 
 The
 [orchestration authority](../../../instructions.md#subagent-orchestration-and-integration-authority)

@@ -265,6 +265,9 @@ upgradeable product repositories while deliberately defining no child product or
   `.project-state/framework-upgrade/` journals disappear after settlement. Source selection is
   `.codexrig/project-tools.json`; products have no installation receipt or source release identity.
   The same generation owner emits sibling trees and archives from explicit selection and templates.
+  It projects the canonical maintenance scope boundary into child instructions; generated agent
+  entry points and verification guidance route command selection through that policy. Portable
+  configuration validation requires the primary's reference to it.
 - Tenant isolation: Not applicable; no product data plane.
 - Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/deps`, `scripts/docs`,
   `scripts/filesystem`, `scripts/goals`, `scripts/platform`, `scripts/repository`, `scripts/setup`,
@@ -551,7 +554,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.7.0`.
+- Framework version: `6.8.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

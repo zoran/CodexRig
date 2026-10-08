@@ -10,6 +10,9 @@ applicable sections with pnpm context:read, not an unconditional document stack.
 writes reconstruct actual worktrees/session ownership and a bounded repository map. Current files
 and accepted user authority outrank memory. Read-only tasks remain read-only; continue authorized
 implementation through acceptance, cleanup and the real authority boundaries without routine pauses.
+Apply Maintenance Scope And Verification before startup, dependency maintenance, verification and
+cleanup. A framework update grants no product-development or product-dependency-refresh authority;
+generic completion requirements and old work state cannot expand the accepted task.
 
 Before features or extensive, complex or risky work, follow Planning, Goals, Slices, Review Loops,
 And Audits in instructions.md: compare viable designs, review to clean, audit afresh, then implement.

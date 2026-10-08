@@ -17,6 +17,10 @@ existing specification owner. A static UI reference is a separate design artifac
 
 <!-- current-repository-efficiency-policy -->
 
+## Maintenance Scope And Verification
+
+<!-- current-maintenance-scope-policy -->
+
 ## Authorized Work And Native Codex
 
 Work only on the user's current product outcome and accepted steering. Tool maintenance requires an
@@ -300,23 +304,28 @@ Configuration and hook outputs do not prove model obedience.
 
 ## Verification
 
-Acceptance for a launcher or publication change must exercise the normal documented command with
-persistently prepared project tools. A direct verifier run with temporary environments or extra
-selectors proves only that invocation. Test the assembled launcher, publication gate and pre-push
-path, including unchanged evidence reuse, semantic-input invalidation and useful failure output.
-Preserve declared tool selectors and verification controls across those boundaries; verification
-must not install prerequisites or silently discard a real toolchain change.
+First apply [Maintenance Scope And Verification](#maintenance-scope-and-verification). The launcher,
+final-verification and cleanup requirements below operate within the accepted task; broad product
+execution is not an implicit condition of a framework update.
+
+When target execution is authorized, acceptance for a launcher or publication change must exercise
+the normal documented command with persistently prepared project tools. A direct verifier run with
+temporary environments or extra selectors proves only that invocation. Test the assembled launcher,
+publication gate and pre-push path, including unchanged evidence reuse, semantic-input invalidation
+and useful failure output. Preserve declared tool selectors and verification controls across those
+boundaries; verification must not install prerequisites or silently discard a real toolchain change.
 
 `.codex/verification.json` declares this repository's checks and consumers. Use
 `pnpm verify:changed -- --print-plan`, then affected evidence. Unknown paths or missing Git basis
-must still include real product/workspace lifecycles. Document/UI planning does not authorize
-application implementation. Stable tools have their own bounded safety tests.
+cannot establish full coverage without real product/workspace lifecycles; they grant no authority to
+run them outside the accepted task. Document/UI planning does not authorize application
+implementation. Stable tools have their own bounded safety tests.
 
-Run `pnpm verify` on the stable integrated state. Preserve failures, diagnose with the smallest
-owning check, batch repairs and reuse sound evidence. A failure alone never justifies another full
-run. A tooling defect blocks only the affected unsafe operation; name the blocker without changing
-the product task. Pre-push checks current successful evidence, the actual pushed objects and
-secrets.
+When its selected checks fit the accepted scope, run `pnpm verify` on the stable integrated state.
+Preserve failures, diagnose with the smallest owning check, batch repairs and reuse sound evidence.
+A failure alone never justifies another full run. A tooling defect blocks only the affected unsafe
+operation; name the blocker without changing the product task. Pre-push checks current successful
+evidence, the actual pushed objects and secrets.
 
 Explicitly authorized publication and deployment may run directly from the owning Codex session. Use
 the README's `project:publish` command to verify, commit and push the current branch to its
@@ -330,8 +339,9 @@ continue an already-authorized deployment through the project's actual delivery 
 
 ## Completed-Goal Closure And Repository Housekeeping
 
-Finish authorized code, documentation, cleanup and reviews. Settle every no-longer-needed owned
-worktree and coordination claim through its owner. Preserve ambiguous directories and active
+Apply [Maintenance Scope And Verification](#maintenance-scope-and-verification) before the commands
+below. Finish authorized code, documentation, cleanup and reviews. Settle every no-longer-needed
+owned worktree and coordination claim through its owner. Preserve ambiguous directories and active
 runtime; never manually delete `.codex/runtime/` or a worktree directory. Run
 `bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply`, audit current truth and
 verify the stable state. Commit/push only with authority and the actual integration policy;

@@ -53,7 +53,7 @@ function stage() {
   return target;
 }
 
-test("generated children receive canonical capacity recovery and infrastructure policies", async () => {
+test("generated children receive canonical maintenance scope, capacity and infrastructure policies", async () => {
   const target = stage();
   const sourceInstructions = readFileSync(path.join(source, "instructions.md"), "utf8");
   const generatedInstructions = readFileSync(path.join(target, "instructions.md"), "utf8");
@@ -66,6 +66,7 @@ test("generated children receive canonical capacity recovery and infrastructure 
     return content.split(/\r?\n/u).slice(start, end).join(" ").replace(/\s+/gu, " ").trim();
   };
   for (const [heading, marker] of [
+    ["Maintenance Scope And Verification", "<!-- current-maintenance-scope-policy -->"],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
     ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
   ]) {
@@ -76,6 +77,42 @@ test("generated children receive canonical capacity recovery and infrastructure 
     assert.equal(generatedInstructions.includes(marker), false);
   }
   await validateGeneratedProject(target);
+});
+
+test("generated validators reject primary policy without the maintenance scope boundary", async () => {
+  const target = stage();
+  const { validateCodexConfig } = await import(
+    pathToFileURL(path.join(target, "scripts/setup/validate-codex-config.mjs")).href
+  );
+  validateCodexConfig(target);
+  const configPath = path.join(target, ".codex/config.toml");
+  const current = readFileSync(configPath, "utf8");
+  const obsolete = current.replace("Maintenance Scope And Verification", "general completion");
+  assert.notEqual(obsolete, current);
+  writeFileSync(configPath, obsolete);
+  const expected = /must include orchestration marker Maintenance Scope And Verification/u;
+  assert.throws(() => validateCodexConfig(target), expected);
+  await assert.rejects(validateGeneratedProject(target), expected);
+});
+
+test("generation refuses a missing canonical maintenance scope policy without publishing a child", async () => {
+  const incompleteSource = isolatedTrackedFrameworkSource("stage-missing-scope-");
+  const instructionsPath = path.join(incompleteSource, "instructions.md");
+  const current = readFileSync(instructionsPath, "utf8");
+  const incomplete = current.replace("## Maintenance Scope And Verification", "## Removed Policy");
+  assert.notEqual(incomplete, current);
+  writeFileSync(instructionsPath, incomplete);
+  const target = path.join(temporaryRoot("stage-rejected-scope-"), "project");
+  await assert.rejects(
+    stageProjectExport({
+      sourceRoot: incompleteSource,
+      targetRoot: target,
+      projectName: "Missing Scope",
+      includeUntracked: true,
+    }),
+    /Shared policy Maintenance Scope And Verification needs one canonical owner and one projection/u,
+  );
+  assert.equal(existsSync(target), false);
 });
 
 test("generated validators reject primary policy that omits recovery before account exhaustion", async () => {

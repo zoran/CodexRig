@@ -18,8 +18,10 @@ publication.
   planning state, accepting risk or performing external mutations.
 - Finish/handoff mode repairs findings only within the authorized implementation scope.
 - Establish the requested outcome, acceptance criteria, changed owners/consumers and actual risks.
-  Inspect `pnpm verify:changed -- --print-plan`; use focused checks while iterating and the
-  [Test Strategy](../../../instructions.md#test-strategy). A failing check is not broad-rerun
+  Apply
+  [Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification)
+  before command selection. Inspect `pnpm verify:changed -- --print-plan`; use focused checks and
+  the [Test Strategy](../../../instructions.md#test-strategy). A failing check is not broad-rerun
   authority.
 - Distinguish source/static checks, isolated fixtures, rendered flows, actual targets and native
   model behavior. Claim only what the observed evidence proves. Missing coverage is a finding only
@@ -72,7 +74,7 @@ report limits and preserve requirements. Static byte checks do not establish mod
    [Closure And Repository Housekeeping](../../../instructions.md#completed-goal-closure-and-repository-housekeeping)
    sequence, including orchestration housekeeping, `repo:housekeeping`, active-document currency,
    critical-document preservation review and fresh audit. Do not copy or reorder that sequence here.
-4. Invoke final `pnpm verify` once on the stable actual integration state under
+4. Run the scope-appropriate final evidence once on the stable actual integration state under
    [Verification](../../../instructions.md#verification). Follow the repository’s applicable
    cleanup, publication and `pnpm goal:new` gates; never invent additional closure work or
    manufacture completion.
