@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
 import {
@@ -31,6 +32,7 @@ import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manif
 import {
   acquireRuntimeLifecycleLock,
   releaseRuntimeLifecycleLock,
+  runtimeLifecycleBusyErrorCode,
 } from "../repository/runtime-session-lease.mjs";
 import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycle-process.mjs";
 import {
@@ -121,6 +123,43 @@ function commandRunner(root, capability) {
   };
 }
 
+async function acquireMaintenanceCapability(root, { startup, onLifecycleWait, signal, timeout }) {
+  const started = performance.now();
+  let nextNotice = 0;
+  for (;;) {
+    signal?.throwIfAborted();
+    try {
+      return acquireRuntimeLifecycleLock({ root, operation: "toolchain-maintenance" });
+    } catch (error) {
+      if (
+        !startup ||
+        error.code !== runtimeLifecycleBusyErrorCode ||
+        error.lifecycle.status !== "active"
+      )
+        throw error;
+      const elapsed = performance.now() - started;
+      const { operation, pid, startedAt } = error.lifecycle;
+      const owner = `${operation} (coordinator PID ${pid}, started ${startedAt})`;
+      if (elapsed >= timeout)
+        throw new Error(
+          `Timed out waiting for ${owner}. The operation and its lock were preserved; retry after it finishes.`,
+          { cause: error },
+        );
+      if (elapsed >= nextNotice) {
+        await onLifecycleWait(
+          `Waiting for ${owner}; ${Math.floor(elapsed / 1000)}s elapsed, up to ${Math.ceil(timeout / 1000)}s. Ctrl-C cancels this startup only.`,
+        );
+        nextNotice = elapsed + 10_000;
+      }
+      await delay(
+        Math.min(1_000, Math.max(1, timeout - (performance.now() - started))),
+        undefined,
+        { signal },
+      );
+    }
+  }
+}
+
 /** Reviews in isolation and commits one recoverable batch only after the candidate installs. */
 export async function maintainToolchain({
   root = toolingRoot,
@@ -135,14 +174,29 @@ export async function maintainToolchain({
   onInventory = () => {},
   onProgress = () => {},
   onReleaseNotice = () => {},
+  onLifecycleWait = () => {},
+  lifecycleWaitTimeoutMilliseconds = 600_000,
+  signal,
 } = {}) {
+  if (
+    !Number.isSafeInteger(lifecycleWaitTimeoutMilliseconds) ||
+    lifecycleWaitTimeoutMilliseconds < 0 ||
+    lifecycleWaitTimeoutMilliseconds > 600_000
+  )
+    throw new Error("Lifecycle startup wait must be between zero and 600000 milliseconds.");
   root = realpathSync.native(root);
   const inventory = inspectRepositoryWorktrees({ root });
   onInventory(inventory);
   assertMaintenanceInventory(inventory, { startup });
-  const capability = acquireRuntimeLifecycleLock({ root, operation: "toolchain-maintenance" });
+  const capability = await acquireMaintenanceCapability(root, {
+    startup,
+    onLifecycleWait,
+    signal,
+    timeout: lifecycleWaitTimeoutMilliseconds,
+  });
   let stage;
   try {
+    assertMaintenanceInventory(inspectRepositoryWorktrees({ root }), { startup });
     const settlement = reconcileRepositoryWorktreeState({
       root,
       apply: true,
@@ -305,6 +359,7 @@ async function main() {
       if (startup) startupStatus("pnpm", message);
       else console.log(message);
     },
+    onLifecycleWait: (message) => startupStatus("wait", message),
   });
   const completed = `Toolchain ready; ${result.changedPaths.length} project input(s) updated.`;
   if (startup) startupStatus("OK", completed);

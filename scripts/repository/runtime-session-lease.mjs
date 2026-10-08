@@ -25,6 +25,7 @@ import {
 import { withRuntimeLifecycleUpdateMutex } from "./runtime-lifecycle-mutex.mjs";
 import {
   lifecycleGuardIdentity,
+  runtimeLifecycleBusyError,
   runtimeLifecycleOperationPattern,
   runtimeLifecycleStatus,
   sameLifecycleGuardIdentity,
@@ -56,6 +57,7 @@ export {
   validCodexSessionId,
 } from "./runtime-session-state.mjs";
 export const runtimeLifecycleLockName = "codexrig-lifecycle.lock";
+export { runtimeLifecycleBusyErrorCode } from "./runtime-lifecycle-schema.mjs";
 export const runtimeLifecycleGuardName = "codexrig-lifecycle.guard";
 export const runtimeLifecycleLockPath = `${repositoryCodexRuntimeDirectory}/${runtimeLifecycleLockName}`;
 const runtimeLifecycleGuardPath = `${repositoryCodexRuntimeDirectory}/${runtimeLifecycleGuardName}`;
@@ -287,13 +289,13 @@ export function acquireRuntimeLifecycleLock({
   }
   const canonical = realpathSync.native(root);
   if (lifecycleCapabilities.has(canonical)) {
-    throw new Error("Another Codex runtime lifecycle operation is active.");
+    throw runtimeLifecycleBusyError(lifecycleCapabilities.get(canonical), "reentrant");
   }
   ensureRuntimeDirectory(canonical, { testHooks });
   const current = readRuntimeLifecycleLock(canonical);
   try {
     if (current.status === "active" || current.status === "unknown") {
-      throw new Error("Another Codex runtime lifecycle operation is active.");
+      throw runtimeLifecycleBusyError(current.owner, current.status);
     }
     if (current.status === "stale")
       unlinkStableRuntimeLifecycleLock(canonical, current, { testHooks });

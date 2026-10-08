@@ -1,9 +1,29 @@
 /** Owns the exact lifecycle-capability schema and process-liveness classification. */
 import { inspectGuardHolders, inspectProcessIdentity } from "./runtime-process-identity.mjs";
+import process from "node:process";
 
 export const runtimeLifecycleOperationPattern = /^[a-z][a-z0-9-]{1,63}$/u;
+export const runtimeLifecycleBusyErrorCode = "CODEXRIG_RUNTIME_LIFECYCLE_BUSY";
 const delegationGraceMilliseconds = 10_000;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+
+/** Exposes only safe contention metadata; capabilities and delegation tokens stay private. */
+export function runtimeLifecycleBusyError(owner, status) {
+  const lifecycle = Object.freeze({
+    operation: owner.operation,
+    pid: owner.coordinator?.pid ?? process.pid,
+    startedAt: owner.startedAt ?? null,
+    status,
+  });
+  const error = new Error(
+    `Another Codex runtime lifecycle operation is active or unresolved. Operation: ${lifecycle.operation}; ` +
+      `coordinator PID: ${lifecycle.pid}; state: ${status}` +
+      (lifecycle.startedAt ? `; started: ${lifecycle.startedAt}.` : "."),
+  );
+  error.code = runtimeLifecycleBusyErrorCode;
+  error.lifecycle = lifecycle;
+  return error;
+}
 
 function validIsoInstant(value) {
   if (typeof value !== "string") return false;

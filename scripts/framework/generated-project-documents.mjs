@@ -156,6 +156,11 @@ bash scripts/setup/start-codex.sh
 Use \`--yolo\` only for an explicitly authorized Dev session; use \`--no-alt-screen\` when needed.
 Enter prompts after native session selection. Restart through the launcher after runtime-tool changes.
 
+If a verification or another lifecycle operation is still running, startup waits up to ten minutes
+and reports its operation, coordinator PID and start time. Ctrl-C cancels only the waiting startup.
+After release, startup checks session ownership again before maintenance. Uncertain ownership still
+blocks startup; never remove a live lock or terminate an unrelated process to bypass it.
+
 If startup reports an invalid or unsupported private session lease, exit all sessions using this
 project. Its maintenance/update owner must reconstruct the installed runtime and restore the current
 contract through a reviewed, quiescent regeneration. Preserve product changes, accounts and native

@@ -424,40 +424,41 @@ upgradeable product repositories while deliberately defining no child product or
 #### Setup And Project Portability
 
 - Root: `scripts/setup`
-- Responsibility: Inventories worktrees and invokes compatible tool/package/CI maintenance before
-  admission, then opens the native resume picker with repository-root CODEX_HOME and explicit
-  working directory. It reserves the checkout before selection and binds the selected session only
-  at authenticated SessionStart, preloads every lifecycle module, accepts bounded non-executable
-  Codex model/reasoning and voice preferences beneath tracked project policy, rejects executable or
-  unknown ignored runtime configuration, validates the model's second-highest supported effort
-  (currently Astra/`max`), projects that tracked policy into every fresh or resumed CLI launch, and
-  injects exactly two session-owned hook definitions. Codex's stable `hooks/list` inventory must
-  contain only those exact trusted/enabled definitions; only afterward may the controller bind the
-  gated supervisor, durable handoff, and exact Codex PID. Lease release requires the exact
-  controller to authenticate the supervisor's terminal child-exit proof against its private
-  issue-time gate secret and persist completion; a wrapper exit code alone is insufficient, and
-  cancellation before SessionStart creates no activation or recovery record. The embedded
-  built-in-only client is bound to the controller's exact Node executable and token-bound loopback
-  endpoint. Attestation expiry bounds the machine-controlled Codex PID handoff; subsequent picker
-  selection and same-session verification require the unchanged issue-time proof and the
-  individually live controller, supervisor and Codex processes, without renewing the proof. Durable
-  chat switches report the existing session binding before invalid startup state or input drift,
-  directing the developer to a full launcher restart. Transcriptless native side conversations are
-  acknowledged only under the active parent-bound launcher, without renewing its startup proof,
-  acquiring writer ownership, replacing recovery, or entering durable reconstruction and Stop
-  continuation. The capability also validates portable configuration and staged white-label
-  tenant-capable projects, installs hooks, initializes repositories, and exports explicitly selected
-  independent projects. Source-only generation/export uses one recipe and source-owned staged
-  validator. Local `.codex/tooling.json`, toolchain and verification configuration provide the
-  retained tools' contracts without source metadata. `project:run` inventories repository ownership
-  before preparing private tool state and executing the requested command through
-  `mise exec --locked` in the common repository environment; it grants no authentication,
-  publication or deployment authority. Mise pins and locks are explicitly loaded from `.codex/`,
-  outside host-shell ancestor discovery. Interactive Codex resume explicitly selects embedded mode
-  with `--no-daemon`, preserving its session-only hooks and controls. `startup.displayName` in
-  `.codex/tooling.json` owns the launcher's ASCII identity; generation sets the supplied project
-  name. A bounded terminal-only reveal precedes five progress phases, with static output for logs,
-  CI, dumb terminals and `NO_COLOR`.
+- Responsibility: Inventories worktrees, waits up to ten minutes for confirmed active lifecycle
+  operations with owner diagnostics and rechecks session ownership, then invokes compatible
+  tool/package/CI maintenance before admission, then opens the native resume picker with
+  repository-root CODEX_HOME and explicit working directory. It reserves the checkout before
+  selection and binds the selected session only at authenticated SessionStart, preloads every
+  lifecycle module, accepts bounded non-executable Codex model/reasoning and voice preferences
+  beneath tracked project policy, rejects executable or unknown ignored runtime configuration,
+  validates the model's second-highest supported effort (currently Astra/`max`), projects that
+  tracked policy into every fresh or resumed CLI launch, and injects exactly two session-owned hook
+  definitions. Codex's stable `hooks/list` inventory must contain only those exact trusted/enabled
+  definitions; only afterward may the controller bind the gated supervisor, durable handoff, and
+  exact Codex PID. Lease release requires the exact controller to authenticate the supervisor's
+  terminal child-exit proof against its private issue-time gate secret and persist completion; a
+  wrapper exit code alone is insufficient, and cancellation before SessionStart creates no
+  activation or recovery record. The embedded built-in-only client is bound to the controller's
+  exact Node executable and token-bound loopback endpoint. Attestation expiry bounds the
+  machine-controlled Codex PID handoff; subsequent picker selection and same-session verification
+  require the unchanged issue-time proof and the individually live controller, supervisor and Codex
+  processes, without renewing the proof. Durable chat switches report the existing session binding
+  before invalid startup state or input drift, directing the developer to a full launcher restart.
+  Transcriptless native side conversations are acknowledged only under the active parent-bound
+  launcher, without renewing its startup proof, acquiring writer ownership, replacing recovery, or
+  entering durable reconstruction and Stop continuation. The capability also validates portable
+  configuration and staged white-label tenant-capable projects, installs hooks, initializes
+  repositories, and exports explicitly selected independent projects. Source-only generation/export
+  uses one recipe and source-owned staged validator. Local `.codex/tooling.json`, toolchain and
+  verification configuration provide the retained tools' contracts without source metadata.
+  `project:run` inventories repository ownership before preparing private tool state and executing
+  the requested command through `mise exec --locked` in the common repository environment; it grants
+  no authentication, publication or deployment authority. Mise pins and locks are explicitly loaded
+  from `.codex/`, outside host-shell ancestor discovery. Interactive Codex resume explicitly selects
+  embedded mode with `--no-daemon`, preserving its session-only hooks and controls.
+  `startup.displayName` in `.codex/tooling.json` owns the launcher's ASCII identity; generation sets
+  the supplied project name. A bounded terminal-only reveal precedes five progress phases, with
+  static output for logs, CI, dumb terminals and `NO_COLOR`.
 - Runtime and technology: Node.js ESM and Bash on the mise-pinned framework toolchain.
 - Public contract: `codex:start`, `codex:validate`, `setup`, `hooks:install`, and `project:export`.
 - Private internals: Atomic native-picker reservation and authenticated selected-session binding,
@@ -550,7 +551,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.6.0`.
+- Framework version: `6.7.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

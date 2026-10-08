@@ -33,6 +33,11 @@ The launcher maintains compatible tools and dependencies before opening native C
 maintenance behavior and failure handling, and
 [Startup Repository Reconstruction](instructions.md#startup-repository-reconstruction) for recovery.
 
+If a verification or another lifecycle operation is still running, startup waits up to ten minutes
+and reports its operation, coordinator PID and start time. Ctrl-C cancels only the waiting startup.
+After release, startup checks session ownership again before maintenance. Uncertain ownership still
+blocks startup; never remove a live lock or terminate an unrelated process to bypass it.
+
 Use `/side` inside a running session for a separate temporary conversation. After a framework
 update, exit and restart through the canonical launcher so the updated lifecycle code takes effect.
 

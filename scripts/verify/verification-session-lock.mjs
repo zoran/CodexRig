@@ -17,6 +17,7 @@ import {
 import {
   acquireRuntimeLifecycleLock,
   releaseRuntimeLifecycleLock,
+  runtimeLifecycleBusyErrorCode,
 } from "../repository/runtime-session-lease.mjs";
 import {
   repositoryCodexRuntimeCacheDirectory,
@@ -132,8 +133,8 @@ export function acquireVerificationSessionLock({ repositoryRoot = toolingRoot, t
       testHooks,
     });
   } catch (error) {
-    if (error?.message === "Another Codex runtime lifecycle operation is active.") {
-      throw new Error(lockedMessage, { cause: error });
+    if (error?.code === runtimeLifecycleBusyErrorCode) {
+      throw new Error(`${lockedMessage} ${error.message}`, { cause: error });
     }
     throw error;
   }
