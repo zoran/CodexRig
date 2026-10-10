@@ -8,7 +8,13 @@ description:
 
 # Reset CodexRig Framework
 
-For a complete source-framework closure, use the existing publication orchestrator with explicit
+Apply [Task Scope And Completion](../../../instructions.md#task-scope-and-completion) and
+[Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification)
+before selecting cleanup. A local improvement task can finish without publication; this skill does
+not add commit/push, full runtime sanitation or another product phase to its scope. Preserve active
+runtime and unrelated work; use only the admitted source cleanup path when a live session owns it.
+
+For explicitly requested source-framework publication, use the existing orchestrator with explicit
 user authority, including from the verified owning Codex session after its other writers drain:
 
 ```bash
@@ -24,7 +30,7 @@ Settlement. Every failure stops subsequent steps. A rejected push preserves the 
 rerunning the command does not create an empty commit. This command and its implementation are
 excluded from generated projects. The command does not infer publication authority for an agent.
 
-Before a completion handoff, follow the command-selection rule in
+When publication guidance is part of the requested handoff, follow the command-selection rule in
 [Verification](../../../instructions.md#verification): confirm the current package script and README
 invocation, name its commit/push effects and ownership gate, and give the combined command. If
 publication is not authorized, explain that running it is the operator's explicit publication

@@ -28,6 +28,25 @@ after(() => {
   for (const root of roots) rmSync(root, { force: true, recursive: true });
 });
 
+test("documentation anchors are not keys while standalone API credentials stay detectable", () => {
+  const link = "[Scope](instructions.md#task-scope-and-completion)";
+  assert.deepEqual(findSecretMatches(link), []);
+  assert.equal(redactSecretMatches(link), link);
+
+  for (const prefix of ["sk-", "sk-proj-"]) {
+    const credential = prefix + "a".repeat(24);
+    for (const content of [
+      credential,
+      JSON.stringify({ key: credential }),
+      `Authorization: Bearer ${credential}`,
+      `https://example.test/?key=${credential}`,
+    ]) {
+      assert.ok(findSecretMatches(content).some(({ label }) => label === "OpenAI-style API key"));
+      assert.equal(redactSecretMatches(content).includes(credential), false);
+    }
+  }
+});
+
 test("secret scan covers arbitrary source extensions, binary bytes, and files over one MiB", async () => {
   const root = fixture();
   const apiToken = ["sk-", "a".repeat(24)].join("");

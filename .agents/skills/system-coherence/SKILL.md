@@ -21,10 +21,11 @@ Materially new boundaries use `$architecture-evolution` before dependent repair.
 
 ## Reconstruct The Slice In Context
 
-1. Read `docs/project.md`, the diff, affected source/tests, public contracts and composition points.
-   Identify the intended invariant, real producers/consumers, data/lifecycle owner and selected
-   delivery/surface constraints. Read established requirements and separate design-reference owners
-   under [Documentation Ownership](../../../instructions.md#documentation-ownership); distinguish
+1. Read relevant `docs/project.md` entries, the diff, affected source/tests, public contracts and
+   composition points. Identify the intended invariant, real producers/consumers, data/lifecycle
+   owner and selected delivery/surface constraints. Read established requirements and separate
+   design-reference owners under
+   [Documentation Ownership](../../../instructions.md#documentation-ownership); distinguish
    configured policy, implemented adapters, deployment and observed testing. Future candidates are
    not active capabilities.
 2. Follow [Context And Skills](../../../instructions.md#context-and-skills): scoped exact searches,
@@ -95,6 +96,11 @@ coherence from the bounded map and affected consumers. Fix only evidenced in-sco
 report limits and preserve requirements. Static byte checks do not establish model effectiveness.
 
 ## Report
+
+The primary owns whole-project acceptance. A delegated review ends at the assigned question and
+returns affected documentation owners/corrections under
+[Documentation Currency](../../../instructions.md#documentation-currency); it does not start another
+repository-wide audit or optional optimization pass.
 
 Return material findings by severity with a file reference, concrete failure mode, root-cause remedy
 and smallest proving check. Name the inspected assembled flow, retained intentional duplication,

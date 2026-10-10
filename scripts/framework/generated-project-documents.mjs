@@ -44,7 +44,9 @@ export function currentProjectInstructions(sourceRoot) {
       "<!-- current-tool-account-isolation-policy -->",
     ],
     ["Repository Efficiency And Effectiveness", "<!-- current-repository-efficiency-policy -->"],
+    ["Task Scope And Completion", "<!-- current-task-scope-policy -->"],
     ["Maintenance Scope And Verification", "<!-- current-maintenance-scope-policy -->"],
+    ["Documentation Currency", "<!-- current-documentation-currency-policy -->"],
     ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
   ]) {
@@ -63,8 +65,11 @@ export function initialProjectAgents(projectName) {
   return `# AGENTS.md
 
 This is the safe-entry guide for ${escapeMarkdownText(projectName)}. [Project Instructions](instructions.md)
-own this repository's workflow. Work only on its product outcome and accepted approvals.
-Native work-state metadata grants no new task or implementation authority.
+own this repository's workflow. Follow [Task Scope And Completion](instructions.md#task-scope-and-completion):
+the primary autonomously completes the accepted outcome and its necessary steps. Resolve routine
+ambiguity from evidence and reasonable reversible choices; existing authority needs no repeat approval.
+Plans, checks and agent handoffs are checkpoints. Explain actual blockers and continue safe work.
+Old work state grants no task. A framework update ends at update acceptance.
 
 ## Start And Reconstruct
 
@@ -91,7 +96,8 @@ A pending definition requires the focused requirements intake. A brief does not 
 Honor any static-UI acceptance gate before application implementation. README owns setup/use and
 links, the manifest owns current technical inventory, the specification owns requirements/acceptance,
 a UI reference is separate, and project context owns only this project's current bounded task.
-Keep the task scope bounded to this repository and the authorized outcome.
+Apply [Documentation Currency](instructions.md#documentation-currency) in each slice: update affected
+owners with the change and integrate agents' documentation corrections before acceptance.
 Apply [Maintenance Scope And Verification](instructions.md#maintenance-scope-and-verification)
 before startup, dependency maintenance, verification and cleanup; these commands cannot expand the
 task into product work.
@@ -104,8 +110,8 @@ findings, then audit it afresh before implementation. Audit findings reopen the 
 goals where useful, native Goals only with explicit request or delegated need-based authority.
 Repair at the actual owner, keep one current contract and one writer per surface, preserve user
 changes, and use relevant skills. After a slice, run focused evidence, system-coherence review to no
-relevant findings, a fresh audit and Worktree Settlement. Every extra iteration needs an acceptance
-benefit or material risk. Every audit follows
+relevant findings, a fresh audit and Worktree Settlement. The primary owns the whole-project assessment; children return assigned evidence.
+Every extra iteration needs an unfinished acceptance condition or concrete material risk. Every audit follows
 [Repository Efficiency And Effectiveness](instructions.md#repository-efficiency-and-effectiveness).
 Run \`pnpm context:check\` for instruction/context changes and preserve full requirements through
 bounded reads. Apply the Long-Session Course Checks in instructions.md.
@@ -121,8 +127,9 @@ primary when substantial disjoint work, permissions, confirmed capacity and inte
 Keep at most four live; use fewer or work serially when necessary, briefly state why, and never
 invent work to fill slots. Name runnable assignments in the plan, start admitted work concurrently,
 and reassess after discovery, material results, handoffs and slice boundaries. Require exact
-GPT Astra/max parity, effective permission checks,
-provenance and a completion reserve. At critical capacity drain owned work and
+GPT Astra/max parity, effective permission checks, provenance and a task-sized completion reserve.
+Historical estimates cannot establish a new critical state; apply current capacity admission.
+At confirmed critical capacity drain owned work and
 seal with \`pnpm handover:create -- --critical\` as the final action, then stop completely.
 
 Keep private state inside this root's ignored CODEX_HOME. Never delete active runtime or a worktree
@@ -176,6 +183,9 @@ After a critical handover, exit Codex completely with \`/quit\`, then run
 \`bash scripts/setup/start-codex.sh\` from this root in your terminal. Accept the preserved handover
 when the new session announces it. \`/new\` and \`/resume\` inside the running CLI retain the old
 launcher and cannot replace this restart. Keep the handover and runtime files intact.
+The receiving session reassesses current capacity under the
+[capacity policy](instructions.md#capacity-admission-and-monitoring); an old reserve or seal proves
+neither current exhaustion nor renewed account capacity.
 
 ## First Prompt: Define The Project
 
@@ -294,9 +304,14 @@ nor renews the persistent session's startup proof. See [Project Instructions](..
 ## Recovery And Authority
 
 Accept a reported handover before reading it. A valid active work marker can request continuation
-only of the authorized project task. Invalid state reports a diagnostic without inventing work.
+only of the authorized project task, once per unchanged state in the session, including later user
+turns. Apply [Task Scope And Completion](../instructions.md#task-scope-and-completion) before acting;
+the hook cannot infer current intent. Invalid state reports a diagnostic without inventing work.
 Explicit pauses and implementation approval gates remain authoritative. Preserve active runtime;
 exit and restart after changing runtime tools.
+Handover receipt adds the current capacity boundary without changing captured bytes or their digest.
+Historical reserve estimates are not binding; size the reserve for the next bounded step under
+[Capacity Admission And Monitoring](../instructions.md#capacity-admission-and-monitoring).
 `,
   );
   writeRelative(

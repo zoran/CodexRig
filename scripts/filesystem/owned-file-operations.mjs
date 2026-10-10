@@ -163,7 +163,7 @@ export function atomicWriteOwnedFile(
   targetPath,
   content,
   mode = 0o600,
-  { label = "repository output", testHooks } = {},
+  { label = "repository output", exactMode = false, testHooks } = {},
 ) {
   const root = ownedRoot(rootPath, label);
   const target = path.resolve(targetPath);
@@ -172,6 +172,7 @@ export function atomicWriteOwnedFile(
   try {
     return atomicReplaceOwnedFile(parent, path.basename(target), content, label, {
       mode,
+      exactMode,
       testHooks,
     });
   } finally {

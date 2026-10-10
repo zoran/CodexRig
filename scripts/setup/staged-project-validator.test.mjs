@@ -53,7 +53,7 @@ function stage() {
   return target;
 }
 
-test("generated children receive canonical maintenance scope, capacity and infrastructure policies", async () => {
+test("generated children receive canonical task, documentation, maintenance and safety policies", async () => {
   const target = stage();
   const sourceInstructions = readFileSync(path.join(source, "instructions.md"), "utf8");
   const generatedInstructions = readFileSync(path.join(target, "instructions.md"), "utf8");
@@ -66,6 +66,8 @@ test("generated children receive canonical maintenance scope, capacity and infra
     return content.split(/\r?\n/u).slice(start, end).join(" ").replace(/\s+/gu, " ").trim();
   };
   for (const [heading, marker] of [
+    ["Task Scope And Completion", "<!-- current-task-scope-policy -->"],
+    ["Documentation Currency", "<!-- current-documentation-currency-policy -->"],
     ["Maintenance Scope And Verification", "<!-- current-maintenance-scope-policy -->"],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
     ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
@@ -87,7 +89,10 @@ test("generated validators reject primary policy without the maintenance scope b
   validateCodexConfig(target);
   const configPath = path.join(target, ".codex/config.toml");
   const current = readFileSync(configPath, "utf8");
-  const obsolete = current.replace("Maintenance Scope And Verification", "general completion");
+  const obsolete = current.replace(
+    /Maintenance\s+Scope\s+And\s+Verification/u,
+    "general completion",
+  );
   assert.notEqual(obsolete, current);
   writeFileSync(configPath, obsolete);
   const expected = /must include orchestration marker Maintenance Scope And Verification/u;

@@ -94,19 +94,18 @@ upgradeable product repositories while deliberately defining no child product or
   effective-permission admission that fails closed when parent runtime overrides defeat a role
   sandbox. The setup controller injects and narrowly trusts the two lifecycle hooks at issue time;
   SessionStart requires complete same-clone worktree/session reconstruction before intake or writes.
-  Native developer instructions carry automatic planning for new features and extensive, complex, or
-  materially risky work, review-to-clean and fresh-audit gates, evidence-based proportionality,
-  long-session continuation, course/capacity checkpoints and incremental cleanup guidance through
-  the existing policy layer, including primary-only work. Native Goal selection preserves explicit
-  request or delegated need-based authority; policy validation does not prove model obedience. The
-  four-subagent ceiling excludes the primary; plans select admissible concurrent assignments and
-  refresh that selection after discovery, results, handoffs and slice boundaries. Generation retains
-  the portable configuration and roles alongside the project-owned workflow template. Capacity
-  admission preserves native earned-reset and usage-permission evidence and resolves supported free
-  account recovery before account-only critical classification. Generation and reviewed child
-  updates project that canonical capacity section, while hard limits and terminal seals remain
-  binding. Generated-child tests verify emitted policy and validator enforcement, not model
-  obedience.
+  Native guidance routes autonomous completion, task interpretation, concrete blocker handling,
+  per-slice documentation currency, planning and proportional review to canonical policy. Bounded
+  role handoffs include affected document owners; the primary owns whole-repository acceptance. The
+  four-subagent ceiling excludes the primary and requires confirmed capacity, independence and
+  effective permissions. Capacity admission preserves native earned-reset and usage-permission
+  evidence, resolves supported free account recovery before account-only critical classification,
+  and retains hard limits and terminal seals. Reserves require current evidence for the next bounded
+  work and closure in matching units; historical estimates and unknown costs cannot establish a new
+  critical state. Smaller useful work or fewer agents precede a reserve-shortfall decision.
+  Generated projects receive the same roles and canonical task, documentation and capacity policies;
+  source-to-child updates compare that current output for explicit local reconciliation. Validation
+  proves configuration and projection consistency, not model obedience.
 - Runtime and technology: Declarative TOML, JSON, and Markdown consumed by Codex, with lifecycle
   entrypoints implemented in the framework's Node.js/Bash harness.
 - Public contract: Root `developer_instructions` and `[agents]` defaults in `.codex/config.toml`,
@@ -125,15 +124,21 @@ upgradeable product repositories while deliberately defining no child product or
 - Root: `scripts/context`
 - Responsibility: Owns durable work-state validation, preloaded Stop continuation, portable context
   contracts, and private critical-budget handover creation, discovery, full receipt and exact-file
-  acknowledgement. The existing continuation response reminds the primary to reconcile outcome,
-  whole-project effects, proportionality, cleanup and current documentation before further work.
+  acknowledgement. A semantic work-state revision can trigger continuation once per session;
+  subsequent user turns do not re-arm unchanged state. The response requires current task-scope
+  validation, capacity reassessment and documentation currency before further work; it cannot infer
+  user intent from a marker. Releasing the loop guard is distinct from task completion; guidance
+  directs the primary to continue unfinished authorized work. Malformed context reports an evidence
+  limit without forcing a repair task.
 - Runtime and technology: Node.js ESM and built-ins on the framework's mise-pinned toolchain.
 - Public contract: `context:map`, bounded Markdown/HTML `context:read`, byte-based `context:check`
   (also part of documentation verification), `handover:create`, `handover:receive`,
   `handover:acknowledge`, exported portable context validators, and the preloaded Stop lifecycle.
   Receipt requires an active canonical session distinct from the sealing session and the exact
   accepted repository-bound artifact; acknowledgement removes only unchanged received bytes, not
-  native conversation history.
+  native conversation history. Receipt supplies current capacity guidance separately from the
+  integrity-bound historical prompt, including older artifacts. It does not measure native quota or
+  validate the prior capacity decision.
 - Private internals: Work-marker validation, bounded continuation loop state, private prompt binding
   and digest checks, and required portable-policy declarations. The context contract verifies that
   portable Git ignore rules keep `docs/project-context.md` private while explicit recovery reads
@@ -252,14 +257,19 @@ upgradeable product repositories while deliberately defining no child product or
   and current generated output, with explicit hash-bound policy/tool reconciliation or an optional
   pristine reference; product code and identity are preserved.
 - Private internals: Conservative SemVer classification, three-way file/package comparison, exact
-  target runtime exclusion, conflict planning, transactional journal and rollback. Explicit
-  old-child regeneration requires confirmed quiescence and binds recovery to the exact projected
-  source runtime without importing a partially installed target. Non-current reference metadata is
-  compared as opaque bytes, never interpreted as an older private schema. Explicit disposable CI
-  experiments use `prepare-compatibility-track.mjs` to resolve declared selectors through the same
-  private tool installer and advance only fixture release mirrors before full verification.
-  Read-only version checks allow detached CI against its unique actual integration upstream;
-  ordinary source housekeeping remains restricted to the integration branch.
+  target runtime exclusion, conflict planning, transactional journal and rollback. Explicit reviewed
+  file modes are applied before atomic publication and restored on rollback, independently of the
+  caller's umask; ordinary private writes retain their restrictive creation policy. Explicit
+  reconciliation retains reviewed child lifecycle modules and their transitive local imports when
+  staging the destination owner; unrelated product code and unreviewed imports remain excluded.
+  Missing or retired dependencies fail before target writes. Explicit old-child regeneration
+  requires confirmed quiescence and binds recovery to the exact projected source runtime without
+  importing a partially installed target. Non-current reference metadata is compared as opaque
+  bytes, never interpreted as an older private schema. Explicit disposable CI experiments use
+  `prepare-compatibility-track.mjs` to resolve declared selectors through the same private tool
+  installer and advance only fixture release mirrors before full verification. Read-only version
+  checks allow detached CI against its unique actual integration upstream; ordinary source
+  housekeeping remains restricted to the integration branch.
 - Owned data and migrations: Source `.codexrig/framework.json` release identity and
   `.codexrig/compatibility.json` nonblocking experiments; temporary target
   `.project-state/framework-upgrade/` journals disappear after settlement. Source selection is
@@ -554,7 +564,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.8.0`.
+- Framework version: `6.9.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

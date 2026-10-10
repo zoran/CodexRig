@@ -53,6 +53,7 @@ export function atomicWriteUpgradeFile(root, relativePath, content, mode, { test
   const target = resolveRepositoryPath(root, relativePath);
   return atomicWriteOwnedFile(root, target, content, mode, {
     label: `framework upgrade output ${relativePath}`,
+    exactMode: true,
     testHooks,
   });
 }

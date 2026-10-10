@@ -135,11 +135,15 @@ not trigger another product suite. Changes to verification controls, tools or un
 require the corresponding evidence. Use the project wrapper from a host shell so the selected
 toolchain also remains consistent.
 
-The handover command is not routine housekeeping. After it reports a sealed path, the Codex session
-must stop without another action. To continue from that handover, exit Codex completely with
+The handover command requires a current critical-capacity decision under
+[Capacity Admission And Monitoring](instructions.md#capacity-admission-and-monitoring); historical
+reserves and unknown costs alone cannot trigger it. After it reports a sealed path, the Codex
+session must stop without another action. To continue from that handover, exit Codex completely with
 `/quit`, then run `bash scripts/setup/start-codex.sh` from the project root in your terminal. Accept
 the handover when the new session announces it. `/new` and `/resume` inside the running CLI retain
 its existing launcher; they cannot replace this restart. Keep the handover and runtime files intact.
+The receiving session reassesses capacity; restarting proves neither renewed account capacity nor
+continued exhaustion. Receipt adds current guidance while preserving the exact captured artifact.
 
 To finish framework work, the existing `framework:publish` script runs the complete cleanup,
 verification, commit and push sequence. After reviewing all source changes and authorizing
@@ -261,6 +265,8 @@ measure actual tasks, not an Astra-specific performance guarantee.
 
 See [Documentation Ownership](instructions.md#documentation-ownership) for where content belongs and
 how README links are maintained when documents are added, moved or retired.
+[Documentation Currency](instructions.md#documentation-currency) defines the update point for each
+change; [Task Scope And Completion](instructions.md#task-scope-and-completion) defines acceptance.
 
 ## Update Generated Projects
 

@@ -2,6 +2,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { isBuiltin } from "node:module";
 import { pathToFileURL } from "node:url";
 import {
   readRepositoryFile,
@@ -83,6 +84,40 @@ export async function stageRegenerationRuntime(sourceRoot, expectedHash) {
   }
 }
 
+/** Ordinary updates admit child runtime extensions only through explicit file reconciliation. */
+function destinationRuntimeSources(plan) {
+  const admitted = new Set(readProjectToolSelection(plan.sourceRoot).files);
+  for (const decision of plan.resolutions ?? [])
+    if (["keep", "replace"].includes(decision.action)) admitted.add(decision.path);
+  const operations = new Map(plan.operations.map((operation) => [operation.path, operation]));
+  const sources = new Map();
+  const pending = ["scripts/repository/runtime-session-lease.mjs"];
+  while (pending.length) {
+    const file = pending.pop();
+    if (sources.has(file)) continue;
+    if (!admitted.has(file) || !file.endsWith(".mjs"))
+      throw new Error(`Destination lifecycle dependency requires explicit tool review: ${file}.`);
+    const operation = operations.get(file);
+    const content = operation
+      ? operation.action === "write"
+        ? operation.content
+        : undefined
+      : targetUpgradeFileState(plan.targetRoot, file).content;
+    if (content === undefined)
+      throw new Error(`Destination lifecycle dependency is absent or retired: ${file}.`);
+    sources.set(file, content);
+    for (const specifier of importSpecifiersForFile({ relativePath: file, content })) {
+      if (isBuiltin(specifier)) continue;
+      if (!specifier.startsWith("."))
+        throw new Error(
+          `Destination lifecycle requires a local reviewed dependency: ${specifier}.`,
+        );
+      pending.push(path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier)));
+    }
+  }
+  return sources;
+}
+
 /** Both installed and destination owners exclude writers until the journal and files settle. */
 export async function holdDestinationUpgradeRuntime(plan, installed) {
   const temporary = mkdtempSync(path.join(os.tmpdir(), "framework-upgrade-runtime-"));
@@ -95,20 +130,11 @@ export async function holdDestinationUpgradeRuntime(plan, installed) {
     );
   let lifecycle, owner;
   try {
-    // Stage only the positively selected current executable closure; never evaluate target product
-    // code or interpret an old private schema. Explicit roots bind both locks to the actual target.
-    const operations = new Map(plan.operations.map((operation) => [operation.path, operation]));
-    for (const file of readProjectToolSelection(plan.sourceRoot).files.filter((file) =>
-      file.endsWith(".mjs"),
-    )) {
+    // Traverse the reconciled lifecycle only, including reviewed child extensions. Never stage
+    // unrelated product code or interpret an old private schema. Both locks bind the actual target.
+    for (const [file, content] of destinationRuntimeSources(plan)) {
       const destination = path.join(temporary, file);
       mkdirSync(path.dirname(destination), { recursive: true });
-      const operation = operations.get(file);
-      if (operation?.action === "delete") continue;
-      const content =
-        operation?.content ??
-        readRepositoryFile(plan.targetRoot, file, { optional: true }) ??
-        projectOutputText(readRepositoryFile(plan.sourceRoot, file));
       writeFileSync(destination, content);
     }
     lifecycle = await import(

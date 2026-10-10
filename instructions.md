@@ -297,6 +297,46 @@ Keep this mechanism bounded: one replace-in-place successful-evidence record and
 session lock. Do not add per-run receipts, checkpoint chains, or verification history unless a
 measured project-specific need justifies that complexity.
 
+## Task Scope And Completion
+
+The primary's default is autonomous completion of the accepted outcome. Interpret the request by its
+intended result and the full session context. Authorization covers necessary implementation,
+diagnosis, in-scope repairs, evidence, documentation and owned cleanup even when the user did not
+list each step. Continue through those steps without requiring another "continue" or approval for
+ordinary means of achieving the already-accepted result.
+
+Identify the outcome, allowed changes, exclusions and observable completion condition in the
+conversation or existing bounded work cache; one sentence suffices for a routine edit. Plans and
+agent assignments inherit that contract. Resolve ordinary uncertainty from current source, accepted
+decisions and instruction priority. Choose a reasonable reversible implementation, state material
+assumptions briefly and proceed. A possible alternative, an unnamed necessary step or a skill's
+generic confirmation wording is not a new approval gate when the existing authority covers it.
+
+A completed plan, test, slice or agent handoff is a checkpoint while the outcome remains unfinished.
+The primary assesses an agent's blocker, repairs or reroutes in-scope work and continues remaining
+safe work; a child's stopping condition is not the parent's stopping condition. A status question,
+additive correction or user absence does not pause the task. A hook allowing a stop releases its
+loop guard; it neither declares completion nor instructs the primary to abandon authorized work.
+
+Stop the whole task only when the accepted outcome is complete, the user explicitly pauses, cancels
+or replaces it, or no safe in-scope progress remains behind a demonstrated authority, safety,
+ownership or external blocker. Ask for necessary missing information only when it materially changes
+the result and cannot be resolved from evidence, accepted delegation or a reasonable safe
+assumption. Pause only dependent work and continue disjoint work. Explain the exact blocked action,
+the applicable instruction or missing fact, and why existing authority or an in-scope alternative
+cannot resolve it. Hard capacity and terminal-handover controls remain binding.
+
+Autonomy preserves scope: old work markers, backlogs and unrelated findings cannot create a task or
+revive a product roadmap during maintenance. Preserve unrelated unfinished work. Every additional
+investigation or optimization needs an unfinished acceptance condition or concrete material risk;
+otherwise omit it. Reuse valid evidence and settled decisions without lowering correctness or
+security. Read-only and plan-only requests retain their modes.
+
+Hand off when acceptance, necessary repairs, proportionate evidence, affected documentation and
+owned cleanup are satisfied. Commit, push, deployment and a new product phase retain their authority
+gates. Unrequested publication does not keep a completed local task open; requested publication
+retains its required checks and blockers. A completed framework update ends at update acceptance.
+
 ## Maintenance Scope And Verification
 
 A repository, framework or tooling update authorizes maintenance of the named existing surface. In a
@@ -340,118 +380,65 @@ another task or leave the authorized maintenance unfinished.
 
 ## Authorized Work And Native Codex
 
-Within the user's authorized objective, continue autonomously through the planned slices, focused
-evidence, review fixes, audits, course checks, cleanup, and publication. Stop only for a real
-external blocker, unsafe or ambiguous scope, missing authority for a materially different action, or
-completion of the entire authorized outcome. A completed goal is a quality and integration
-checkpoint, not a conversational handoff: after publication, immediately run `pnpm goal:new` and,
-when it passes, begin the next already-authorized goal without waiting for another prompt. Never
-invent a subsequent product goal merely to stay busy. A failed publication or `goal:new` gate leaves
-the current goal open; it cannot complete the encompassing outcome or erase its bounded working
-state.
+Follow [Task Scope And Completion](#task-scope-and-completion). Continue the accepted outcome
+through its coherent slices, relevant repairs, evidence and cleanup without routine permission
+pauses. After a published intermediate goal, use `pnpm goal:new` before the next already-authorized
+goal; it verifies repository publication, creates no native Goal and grants no further scope. A
+failed required publication gate leaves that publication open. Do not manufacture publication
+boundaries for related unfinished work or infer publication from local maintenance.
 
-This continuation mandate applies throughout long sessions without another "continue" prompt. Use
-[Long-Session Course Checks](#long-session-course-checks) during ongoing work as well as at slice
-boundaries. After compaction or resume, recover the original outcome, later accepted steering,
-completed evidence, unresolved work and next safe action before continuing; the newest additive
-message does not replace the outcome. Native compaction manages context length, not account quota.
+Recover the original outcome, accepted steering, evidence and next safe action after compaction or
+resume. A recap, research result or completed plan belongs in commentary when implementation remains
+authorized. User absence is not a pause. Side conversations remain independent unless the user
+brings their content into the main stream. General improvement authority does not grant product
+features, redesign, destructive actions or process control.
 
-A requested recap, research result, plan, documentation gate, review, audit, definition synthesis,
-or statement that work is ready is an intermediate commentary update when implementation or a larger
-outcome is already authorized. Never end at "ready to implement" when implementation is already
-authorized. Begin the next planned implementation slice in the same working run. A user's absence,
-departure, or inability to monitor increases the need for autonomous persistence and is not a pause
-instruction. Honor an explicit user requirement to pause for approval before implementation; do not
-infer that pause from a recap request or absence. Persistence never broadens scope, bypasses
-approvals or safety controls, authorizes destructive or external action, invents a new product goal,
-or conceals a genuine blocker.
+Use the interpretation and blocker rules in [Task Scope And Completion](#task-scope-and-completion)
+before asking or stopping. Existing approvals remain valid within their scope. User instructions
+outrank skill guidance, never higher-priority host, permission or safety constraints.
 
-An approval remains effective for its confirmed scope until the user changes or withdraws it. Do not
-repeatedly ask permission for the same ordinary in-scope repository work. Interpret an additive
-question, status request, correction, or constraint in the main conversation, answer or incorporate
-it, then return to the still-authorized outcome. A genuine stop, pause, cancellation, or replacement
-changes that mandate; preserve unfinished work and do not automatically restart it. Side
-conversations remain independent unless the user explicitly brings their content into the main
-stream. Repository ownership does not make every file disposable or grant process control. A general
-improvement mandate is not permission for new product features or an unsolicited redesign.
+Codex owns Goals, plans, sessions, agents, models and approvals. Planning milestones do not create
+native Goals. Use a native Goal only on explicit request or expressly delegated need-based
+authority, when durable continuation and a verifiable stopping condition help. Reuse a matching
+unfinished Goal. Set a token budget only when requested and never increase it; use native
+pause/resume/clear controls when requested. A task's size, a green check or Goal completion proves
+neither broader acceptance nor authority. Compaction controls context length, not account quota.
 
-Choose reasonable reversible assumptions when they cannot materially change the result. Before a
-necessary question, complete safe authorized work that makes the decision concrete. Name the exact
-blocked action, missing decision, and recommended option; continue disjoint work. When a skill
-causes a pause or a change of direction, identify that skill and the applicable requirement.
-Explicit user instructions take precedence over skill guidelines, never over higher-priority host,
-permission, safety, or publication constraints.
-
-Codex owns native Goals, plans, sessions, subagents, approvals, models, and their controls. Planning
-goals describe acceptance milestones; they do not themselves create native Goals. Use a native Goal
-when the user explicitly requests one or expressly delegates need-based Goal use, and the authorized
-objective benefits from durable continuation across turns with a verifiable stopping condition.
-Honor that delegation without asking again; reuse an existing matching Goal rather than replacing
-unfinished work. A substantial task alone does not authorize native Goal creation. Set a token
-budget only when explicitly requested, and never raise a user-set budget. Prefer native
-pause/resume/clear controls when the user requests them. Native Goal completion, one successful
-check, and a finished slice are not proof that the broader authorized outcome is complete.
-`pnpm goal:new` is a repository publication check, not a native Goal creator or task store. Keep
-related unfinished slices in one coherent repository goal rather than manufacturing early
-publication boundaries. Missing publication authority or rejected publication leaves closure open;
-report that exact boundary without claiming completion, bypassing it, or discarding recovery
-context.
-
-Official [Codex Goals](https://learn.chatgpt.com/use-cases/follow-goals) provide continuation across
-turns;
+Official [Codex Goals](https://learn.chatgpt.com/use-cases/follow-goals) describe native
+continuation;
 [Astra guidance](https://developers.openai.com/api/docs/guides/latest-model#prompting-best-practices)
-supports scoped initiative and proportional clarification. API-only controls are not Codex config.
-Catalog support, configured values, delivered instructions, actual runtime permissions, and model
-compliance are different evidence. A changed file does not refresh an already-running root or child;
-use the supported native instruction channel and a fresh session when needed. Retire the existing
-bounded Stop guard only after the installed native path proves the required continuation, user
-pause/cancellation, side-conversation, recovery, and terminal-handover behavior. Until then preserve
-that current contract; add no scheduler, watchdog, endless loop, or second task runtime.
+describes scoped initiative. API controls are not Codex config. Configuration, delivered
+instructions, effective permissions and model compliance are separate evidence. Running sessions do
+not reload changed policy; use a supported native instruction channel or a fresh session. Preserve
+the bounded Stop guard until a native replacement proves continuation, pause/cancellation,
+side-conversation, recovery and terminal-handover behavior. Add no scheduler, watchdog or second
+task runtime.
 
 ### Long-Session Course Checks
 
-Perform a whole-repository course check after initial planning/discovery, every completed slice,
-major milestone and completed goal, after compaction or resume before dependent work, before the
-final gate and after publication before another authorized goal begins. During an unfinished slice,
-use the same check at material evidence or assumption changes, repeated failed approaches, expanding
-research/refactoring, and long tool returns. Even with no subagents, allow no more than ten minutes
-of active work between brief course/capacity checkpoints; use the next safe boundary of an
-already-running atomic operation and declare its expected checkpoint in advance. This is one
-event-driven primary workflow, not a timer process, extra hook, or repeated full scan.
+The primary checks course after discovery/planning, material results or changed assumptions, each
+slice/milestone, compaction/resume, before final acceptance and after publication before another
+authorized goal. During active work, leave at most ten minutes between brief course/capacity checks.
+For an already-running atomic operation, declare its next safe checkpoint in advance. This is an
+event-driven workflow, not a timer, extra hook or recurring full scan.
 
-Compare the original objective and current plan with the manifest and module map, implemented
-behavior, touched owners and consumers, remaining slices, risks, tests, documentation, runtime and
-publication boundaries, and unrelated or concurrent worktree state. Within a slice, inspect the
-changed evidence and affected relationships; reread broader context only when those facts warrant
-it. Ask whether the current activity still advances the highest-value unfinished acceptance
-condition, which downstream contracts/data/configuration or user flows it affects, and whether its
-complexity and evidence remain proportionate. Correct relevant problems at their owner. End
-speculative hardening, micro-optimization, redundant research, or cleanup that cannot name an
-authorized outcome, acceptance blocker, or material risk it improves. Never trade away correctness
-or durable design to save time or tokens.
+Compare the task contract and remaining acceptance with current source, the bounded module map,
+affected owners/consumers, evidence, documentation and concurrent work. Deepen only where new facts
+warrant it. Stop speculative hardening, repeated research, micro-optimization and cleanup without an
+acceptance benefit or material risk. The primary owns the whole-repository assessment; delegated
+agents report consequences at their assigned boundaries rather than restart repository-wide audits.
 
-At a slice boundary, refresh the available upstream view when a shared remote and network access
-exist, then compare changes since the slice base by path, module, public contract, schema, and
-migration. Disjoint concurrent changes do not stop progress. An overlap at an owned module or shared
-contract pauses further writes until the change is integrated or ownership and order are reconciled;
-rerun only affected evidence. A remote refresh failure is visible uncertainty: isolated disjoint
-work may continue, but shared-boundary work waits for a trustworthy integration view. This course
-check does not itself authorize broad verification.
+At slice boundaries, refresh the upstream view when a shared remote and authorized network access
+exist. Compare changes since the slice base by path, module, contract, schema and migration. Resolve
+overlap before affected writes and rerun only affected evidence. Disjoint work can continue through
+a failed remote refresh; shared-boundary integration waits for trustworthy evidence.
 
-At these safe checkpoints, remove proven-obsolete in-scope temporary files/directories and dead
-paths, consolidate superseded implementations with their consumers, and reconcile affected
-code/tests/configuration/docs at their existing owners. Check ownership, remaining consumers and
-recovery value before removal; being untracked, old, or quiet proves none of these. Worktree
-retirement and runtime cleanup use their existing settlement/reset owners. Preserve ambiguous
-directories and active state; never manually delete runtime or an actual worktree directory. Cleanup
-is incremental and outcome-driven, not a reason to restart repository-wide housekeeping or broad
-verification at every checkpoint.
-
-Refresh or delete the bounded project context as its lifecycle requires and update the in-session
-plan to current truth. Briefly report the outcome alignment, material finding or correction, and
-next concrete action in commentary, then continue the current or next authorized slice in the same
-run. No separate checkpoint log or permission ritual. At a completed-goal boundary, use the single
-closure sequence below; do not distribute, reorder, or silently omit its gates.
+Reconcile affected code, tests, configuration and document owners; retire proven-obsolete in-scope
+paths through their cleanup owner after checking consumers and recovery value. Preserve ambiguous
+state and active runtime. Worktree retirement uses settlement, never manual directory deletion.
+Reuse still-valid evidence; this checkpoint grants no broad-verification or housekeeping campaign.
+Refresh or remove bounded work context as its lifecycle requires. Briefly report alignment, any
+material correction and the next acceptance step, then continue or stop under the task contract.
 
 ## Planning, Goals, Slices, Review Loops, And Audits
 
@@ -468,7 +455,8 @@ Only the bounded multi-session context exception below permits a working-context
 plan as evidence or accepted steering changes its decisions; do not create a second task store or
 re-plan settled work without new evidence. The plan is decision-ready only when it identifies:
 
-- the authorized outcome, user-visible success conditions, scope, and non-goals;
+- the task contract from [Task Scope And Completion](#task-scope-and-completion), including its
+  observable stopping condition and affected documentation owners;
 - current-system evidence, owning boundaries, affected consumers, and relevant dependencies;
 - material product, architecture, data, migration, security, privacy, operational, and compatibility
   decisions or explicit unknowns that must be resolved before a dependent slice starts;
@@ -563,7 +551,7 @@ After every completed slice:
 
 1. Run the focused owner and consumer evidence needed for that slice.
 2. For every non-trivial implementation, architecture, configuration-boundary, or integration slice,
-   invoke `$system-coherence` against the complete implemented project before accepting the slice.
+   invoke `$system-coherence` on affected owners and assembled consumers before accepting the slice.
    Trace a representative assembled flow, compare the change with the manifest/module map and
    current consumers, search for semantically duplicated rules/types/configuration/adapters and
    competing sources of truth, and repair material ownership, dependency, layout, contract, and
@@ -571,8 +559,9 @@ After every completed slice:
    applicability decision; do not manufacture a broad rewrite. In Dev, run this lane in parallel
    with or after the latest developer deploy, but complete it before the slice becomes a stable
    dependency or promotion input.
-3. Review the result for correctness, acceptance criteria, regressions, root-cause quality,
-   maintainability, security/privacy where applicable, documentation drift, and whole-system impact.
+3. Review correctness, acceptance, regressions, root-cause quality, maintainability and applicable
+   security/privacy. Complete [Documentation Currency](#documentation-currency) in the same slice;
+   the primary combines agent evidence and owns the whole-system assessment once.
 4. Fix every relevant, evidence-backed finding within the authorized scope, batch same-root-cause
    corrections, and rerun only affected focused evidence.
 5. Repeat review, repair, and focused verification until no relevant finding remains.
@@ -597,14 +586,15 @@ not make a finding relevant. Planning risks need evidence and impact, not an alr
 implementation failure. Classify false positives, duplicates, unrelated suggestions, and optional
 micro-optimizations explicitly; they do not block closure or authorize extra work.
 
-Neither review loop has a fixed iteration limit: continue until no relevant finding remains, then
-audit the clean current state. An audit finding always reopens the affected review and repair loop.
-Do not manufacture new rounds, polish, abstractions, benchmarks, tests, or research after sufficient
-evidence; additional work must change an acceptance result or a material risk. If a relevant finding
-cannot be resolved within current authority or available evidence, state the blocker and resolution
-condition, continue safe independent work, and never declare that affected state clean. Review and
-audit findings remain conversation state; do not create review logs, audit reports, or per-slice
-documents.
+A delegated review returns findings or a scoped clean result; the primary owns the acceptance loop.
+Do not make every agent repeat a whole-project audit. Neither review loop has a fixed iteration
+limit: continue until no relevant finding remains, then audit the clean current state. An audit
+finding always reopens the affected review and repair loop. Do not manufacture new rounds, polish,
+abstractions, benchmarks, tests, or research after sufficient evidence; additional work must change
+an acceptance result or a material risk. If a relevant finding cannot be resolved within current
+authority or available evidence, state the blocker and resolution condition, continue safe
+independent work, and never declare that affected state clean. Review and audit findings remain
+conversation state; do not create review logs, audit reports, or per-slice documents.
 
 ### Completed-Goal Closure And Repository Housekeeping
 
@@ -613,7 +603,9 @@ live agents, checkpoints, handoffs, ownership, bounded work state, and any share
 channel; it runs on the event triggers above, as a hard gate after every slice, and deeply at every
 goal. Repository Housekeeping is the `repo:housekeeping` command; it observes only repository facts
 and therefore never claims to inspect or close conversations or read host usage. One primary-owned
-sequence runs both layers and closes every completed goal. First apply
+sequence runs both layers for the accepted closure boundary.
+[Task Scope And Completion](#task-scope-and-completion) distinguishes local completion from an
+explicitly requested publication goal. First apply
 [Maintenance Scope And Verification](#maintenance-scope-and-verification) to the commands below;
 closure does not authorize unrelated product lifecycle work:
 
@@ -687,11 +679,11 @@ runtime is preserved until a separate full reset after exit.
    resumes through
    `bash scripts/setup/run-project.sh node scripts/goals/repository-housekeeping.mjs --apply`. This
    source-only reproduction never requests registry freshness or bypasses the dependency guard.
-3. Perform the goal-wide documentation review and any required critical-document confirmation and
-   dedicated preservation review. Repeat affected focused checks, root-cause review and repair, the
-   whole-repository course check, and a fresh whole-goal audit until no relevant finding remains. A
-   repository edit at any point reopens housekeeping, affected checks, documentation gates, and the
-   fresh audit.
+3. Complete [Documentation Currency](#documentation-currency) from the slice owner decisions and any
+   required critical-document authority and dedicated preservation review. Repeat affected focused
+   checks, root-cause review and repair, the whole-repository course check, and a fresh whole-goal
+   audit until no relevant finding remains. A repository edit at any point reopens housekeeping,
+   affected checks, documentation gates, and the fresh audit.
 4. Choose the declared integration path. A serialized writer may continue on current `main` when
    policy permits. A temporary task branch or protected-`main` change is only a bounded integration
    input; one integrator or the detected provider serializer lands it. Refresh local `main` to the
@@ -707,10 +699,10 @@ runtime is preserved until a separate full reset after exit.
 
 The checked-in GitHub and GitLab schedules run `repo:housekeeping --check --online` read-only so
 environment inventory, tool compatibility and other bounded repository health do not depend only on
-an active goal. A scheduled finding opens maintenance work; CI never applies or publishes a repair.
-If housekeeping, publication, or `goal:new` fails, keep the current goal and encompassing work state
-open, continue safe disjoint work, and report the concrete authority, integration, safety, or
-external blocker when no such work remains.
+an active goal. A scheduled finding reports maintenance evidence; it grants no repair authority by
+itself. CI never applies or publishes a repair. If housekeeping, publication, or `goal:new` fails,
+keep the current goal and encompassing work state open, continue safe disjoint work, and report the
+concrete authority, integration, safety, or external blocker when no such work remains.
 
 ## Modular Architecture, Parallel Ownership, And Integration
 
@@ -1250,20 +1242,22 @@ and relationship analysis, not a requirement to load every file byte into the mo
 3. Follow [Context And Skills](#context-and-skills): exact searches for known anchors, manifest-led
    ownership discovery and direct matched-source reads. Trace representative assembled relationships
    without indiscriminate context loading.
-4. Determine whether an authorized prior outcome, goal, or slice is unfinished and whether current
+4. Apply [Task Scope And Completion](#task-scope-and-completion) before selecting old work.
+   Determine whether an authorized prior outcome, goal, or slice is unfinished and whether current
    state contains partial implementation, duplicate or contradictory concepts, obsolete/dead paths,
    stale generated residue, failed migration/transaction state, or concurrent ownership. In the
    one-host/one-developer model, changes in every visible same-host project worktree are
    developer-owned main-stream candidates regardless of Codex account or prior session; only process
    control remains provenance-bound. Invoke `$resume-project` for unfinished work and
    `$system-coherence` for material whole-project drift.
-5. Automatically select and continue the one coherent unfinished stream that matches the authorized
-   outcome. Safely integrate or consolidate it into the current writer worktree, remove only
-   unambiguous in-scope residue, update current truth, rerun affected focused evidence, and complete
-   the whole-repository course check. Preserve active writers, unrelated work, and incompatible or
-   semantically ambiguous candidates; ask one focused content question only when repository evidence
-   cannot choose between them. A pending product manifest proceeds to the definition intake only
-   after this reconstruction is coherent.
+5. Select and continue only the coherent unfinished stream matching current accepted authority. A
+   framework update ends at its own acceptance; unrelated product work stays preserved. Safely
+   integrate or consolidate it into the current writer worktree, remove only unambiguous in-scope
+   residue, update current truth, rerun affected focused evidence, and complete the whole-repository
+   course check. Preserve active writers, unrelated work, and incompatible or semantically ambiguous
+   candidates; ask one focused content question only when repository evidence cannot choose between
+   them. A pending product manifest proceeds to the definition intake only after this reconstruction
+   is coherent.
 
 Current files and command output outrank remembered conversation context.
 
@@ -1694,21 +1688,21 @@ The controller-injected trusted Stop hook validates this marker and, for `active
 official `decision: "block"` continuation response only when Codex supplies a non-null
 `transcript_path` for a durable local thread. Ephemeral side conversations and other transcriptless
 contexts exit the entire Stop lifecycle before work-state reads, loop-state writes, handover reads,
-or continuation, so they cannot resume parent-thread work. If Codex reports through
-`stop_hook_active` that the same durable turn was already continued and the semantic revision is
-unchanged, the hook allows that stop instead of creating an automatic loop; a changed revision can
-continue again. Malformed or unsafe durable context gets one bounded repair continuation. The
-private per-session loop record supports that comparison. A missing context file cannot be treated
-as evidence that the outcome is complete; the workflow policy still applies. Missing or rejected
-controller-hook trust blocks canonical startup before a writable session instead of silently
-disabling continuation. A critical-budget handover sealed during the current runtime session is
-different: the hook must allow that session to stop without autonomous continuation, regardless of
-an `active` work marker. A later canonical session still receives the candidate through
-`SessionStart`, but after explicit acceptance it may continue the authorized outcome, and stop
-normally.
+or continuation, so they cannot resume parent-thread work. Once a semantic revision has triggered
+continuation in a session, the hook allows later stops for that unchanged state, including new user
+turns. Only real progress or a real state change may refresh the marker; do not increment it merely
+to re-arm continuation. A changed state may continue again within current authority. Malformed or
+unsafe durable context is reported without continuation. The private per-session loop record
+supports that comparison. A missing context file cannot be treated as evidence that the outcome is
+complete; the workflow policy still applies. Missing or rejected controller-hook trust blocks
+canonical startup before a writable session instead of silently disabling continuation. A
+critical-budget handover sealed during the current runtime session is different: the hook must allow
+that session to stop without autonomous continuation, regardless of an `active` work marker. A later
+canonical session still receives the candidate through `SessionStart`, but after explicit acceptance
+it may continue the authorized outcome, and stop normally.
 
-`docs/project.md` is the always-read technical current-state index. Requirements and intended
-architecture stay at their established owners under
+`docs/project.md` is the technical current-state index; read its relevant owner sections.
+Requirements and intended architecture stay at their established owners under
 [Documentation Ownership](#documentation-ownership). Working context cannot override those owners,
 configuration, or observed integration evidence. Resolve disagreement at the relevant canonical
 owner before dependent implementation.
@@ -1857,23 +1851,38 @@ required even before a candidate exists. A code-only change is allowed and expec
 contract changed; the sole task-state exception is the bounded project-context lifecycle defined
 above.
 
-At every completed goal, before the final whole-goal audit and publication admission, perform one
-goal documentation review across every active documentation surface, including root and `docs/`
-documents, workflow/bootstrap policy, Codex guidance, and skill instructions. Compare each document
-with the completed behavior, current code and configuration, manifest truth, public contracts,
-operations, and still-active decisions. The review may correctly conclude that a document needs no
-change; it must not manufacture prose merely to prove that the review occurred. Validate that every
-document retains one descriptive top-level heading, a non-skipping heading hierarchy, unique stable
-heading anchors, and valid local heading-fragment links. Rename vague or colliding headings and
-update all references in the same change.
+### Documentation Currency
 
-Consolidation is conservative, not a shortening target. When a document is stale, update its
-canonical owner. Consolidate overlapping material, replace superseded text instead of appending
-history, remove obsolete content or an unjustified document, and keep secondary surfaces focused on
-a distinct audience-specific need or canonical link. Never remove useful context merely to shorten a
-document. Preserve every still-active requirement, constraint, rationale needed for safe operation,
-and deliberate audience-specific instruction. Documentation edits reopen affected content checks and
-the normal review loop before a fresh whole-goal audit.
+Documentation is part of the change that makes it true. Before accepting each slice, compare changed
+behavior, commands, contracts, configuration, decisions and module ownership with their document
+owners. Update affected facts in that same slice, before handoff or dependent work; do not defer
+them to goal completion, publication or a later reminder.
+
+| Changed fact                                                          | Canonical owner to reconcile                                                    |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Setup, use, operation or upgrade commands                             | README or the established operations guide                                      |
+| Integrated modules, roots, contracts, dependencies or evidence limits | `docs/project.md`                                                               |
+| Accepted requirements, decisions or acceptance criteria               | Existing requirements/design owner                                              |
+| Workflow, delegation or maintenance boundaries                        | `instructions.md` and affected bootstrap, role, skill and generated projections |
+| Current progress, blocker or next authorized action                   | Existing bounded `docs/project-context.md`, only when its lifecycle applies     |
+
+The writer names the affected owners and updates them within its write set. A delegated writer
+returns exact factual corrections for protected or unassigned documents to the primary. The primary
+integrates those corrections before accepting the slice. A brief conversation handoff names updated
+owners, or explains why the changed behavior leaves documented facts unchanged. No new tracking
+file, receipt or copied specification is required. Read-only reviewers report drift without editing.
+
+At task completion, review the active document inventory against the final diff and accumulated
+owner decisions; inspect affected documents and their consumers, not every unchanged document in
+full again. Broaden only for a concrete contradiction or missing owner. Preserve local links, unique
+stable anchors, one descriptive top-level heading and a non-skipping heading hierarchy. A passing
+structure check does not prove semantic currency, completeness or agent compliance.
+
+Replace stale content in place. Add a document only for a distinct audience and maintenance need;
+keep requirements and rationale needed for safe operation at one canonical owner. Update README
+discovery when documents move. Give critical-document edits the separate preservation review below.
+Close documentation work when current facts and consumers agree; do not add cosmetic rewrites,
+status history or new prose merely to demonstrate activity.
 
 ### Context Economy And Canonical Owners
 
@@ -1906,9 +1915,10 @@ or migration authority, and public-contract document the same way. Review a crit
 read-only first. Change it automatically only when the completed authorized work makes an exact
 factual correction necessary, its source of truth is unambiguous, and every active directive and
 durable manifest decision can be proven preserved. Any normative or interpretive authority change,
-consolidation or removal, ambiguous conflict, uncertain replacement, or other doubt requires
-explicit user confirmation before that critical-document write; pause only the affected write and
-ask rather than guessing, and never let autonomous continuation bypass the confirmation.
+consolidation or removal, ambiguous conflict, uncertain replacement, or other doubt requires user
+authority for that critical-document change. An explicit request to revise or consolidate the
+relevant policy already supplies that authority; do not ask again. Otherwise pause only the affected
+write for a focused decision. Never let autonomous continuation expand the accepted change.
 
 After an authorized critical-document change, give it a dedicated preservation review separate from
 the general goal review, preferably with an independent reviewer. Trace each removed or materially
@@ -2249,6 +2259,12 @@ slice must advance the authorized outcome without conflicting writes to modules,
 migrations, files, or generated artifacts, and its benefit must outweigh coordination, token cost,
 and integration.
 
+Every assignment inherits the task contract and states its result, exclusions and stopping
+condition. The primary owns the whole-repository course check and final audit. A child checks its
+assigned owners and affected consumers, returns material findings and documentation corrections,
+then stops. Do not delegate an unbounded instruction to keep improving, look for more issues or
+review the whole repository after a bounded result is already sufficient.
+
 Make the parallelism decision concrete in the current plan: identify which assignments are ready
 now, their expected outcome and focused evidence, exact read/write scope, dependency boundaries,
 selected role, checkpoint, and primary integration order. Include discovery, implementation, tests,
@@ -2308,12 +2324,34 @@ Use current host signals at startup/resume, before every spawn or follow-up, aft
 scope changes and long waits, and at every slice/course checkpoint, including primary-only work.
 Keep account windows, context pressure, request-token usage, native Goal budgets and completion
 reserve distinct. Record the actual unit, window and observation time; never invent an allocation,
-precision or future reset. Unknown capacity admits no new agent. Reserve primary integration,
-verification, repair and handoff capacity before assigning bounded work and safety margins. Admit or
-continue agents only when confirmed capacity covers all active and proposed worst-case work
-envelopes together, each handoff reserve and safety margin, plus the primary reserve. React
-immediately to changed host usage counters or budget warnings rather than waiting for a tool result
-or scheduled checkpoint.
+precision or future reset. An account percentage is not a context-token remainder or a Goal budget;
+compare costs only in matching units with a known basis. Missing conversion or unknown cost is an
+evidence limit, not zero usable capacity.
+
+Historical reserve estimates are not binding. At startup/resume and after changed scope or evidence,
+recompute the reserve for the next concrete coherent unit of work: required integration,
+verification, plausible repair, owned cleanup and handoff, with a justified uncertainty margin.
+Explain the necessary actions and basis briefly; do not reserve the whole remaining roadmap, charge
+the same closure work twice, or impose an inherited fixed percentage as a minimum. Old handovers,
+blocked markers, drain attestations and previous capacity classifications describe the prior
+decision; none proves the receiving session is critical. Replace superseded capacity prose in the
+current work cache, preserve actual unrelated blockers, and refresh status/next action from current
+authority and evidence. A prior seal remains terminal for its own session only.
+
+Unknown capacity admits no new agent. Delegation requires confirmed coverage of bounded, defensible
+work estimates and necessary reserves for all active/proposed assignments plus primary integration.
+If the proposed work does not fit, first use fewer agents, a smaller meaningful slice or
+primary-only work with shorter checkpoints. Do not invent assignments or reserves to reach four
+agents, sacrifice required acceptance, or begin an operation whose safe completion/rollback cannot
+be covered. Insufficient delegation capacity does not establish that the primary cannot make
+progress. When the host still permits ordinary work and no current hard or critical signal exists,
+missing telemetry or uncertain costs alone do not require a seal; continue a bounded coherent
+primary step.
+
+For example, 26% current account capacity plus an old estimate of “Root21 plus safety5” does not
+establish a 26% minimum reserve, zero usable capacity or a new critical state. Reassess the actual
+next unit and required closure; resealing requires independent current evidence of a binding limit.
+React immediately to changed host counters or warnings, without waiting for a scheduled checkpoint.
 
 Before classifying account-window exhaustion, the primary resolves supported no-additional-cost
 recovery. A low account percentage alone is a recovery candidate, not an instruction to seal before
@@ -2350,8 +2388,12 @@ with an exhausted one. After the bounded account-recovery check, classify the mo
 current binding signal: a reliable 10% or less remainder is guarded and 5% or less is critical when
 recovery is unavailable, unsuccessful or unconfirmed. An explicit host critical/terminal stop,
 critical context or Goal limit, or uncovered primary completion/handoff reserve requires immediate
-drain; an account reset cannot repair those limits. Do not start recovery when that safe reserve is
-already absent. Once critical state is established, follow Guarded And Critical Drain; a successful
+drain; an account reset cannot repair those limits. An uncovered reserve means current evidence
+shows that even the necessary closure of the smallest safe coherent unit cannot fit the applicable
+remaining capacity. Name the current binding signal, its unit/time and the required closure work; an
+old estimate, unknown cost or inability to fit the originally planned broad slice is insufficient.
+Do not defer a confirmed hard stop or demonstrated closure shortfall for further replanning or
+recovery. Once critical state is established, follow Guarded And Critical Drain; a successful
 handover seal is terminal and can never be reopened by redemption in that session.
 
 Subagents do not consume resets or infer extra account authority. They report account pressure to
@@ -2362,11 +2404,13 @@ actual remaining capacity after recovery before delegating or continuing the sam
 ### Guarded And Critical Drain
 
 In guarded state, shorten checkpoints, stop optional exploration, avoid new nonessential delegation,
-and start no broad slice whose bounded completion plus integration reserve is doubtful. Treat entry
-into guarded state as a likely cross-session outcome for Compact Project Memory: create or refresh
-the single bounded `docs/project-context.md` immediately, then increment its revision after each
-material result while guarded or critical. Below its fixed marker, replace the current resume
-summary with the authorized outcome/current goal and slice, last coherent repository basis, affected
+and start no broad slice whose bounded completion plus integration reserve is doubtful. Establish
+critical state only through the current evidence and task-sized reserve rules above; an inherited
+critical label or reservation is not a reason to repeat the drain. Treat entry into guarded state as
+a likely cross-session outcome for Compact Project Memory: create or refresh the single bounded
+`docs/project-context.md` immediately, then increment its revision after each material result while
+guarded or critical. Below its fixed marker, replace the current resume summary with the authorized
+outcome/current goal and slice, last coherent repository basis, affected
 modules/contracts/data/files, accepted decisions and assumptions, exact checks/results, remaining
 work and blockers, agent handoffs plus released ownership, and the next safe command or action.
 Record the observed budget category, timestamp, and available host signal without account identity,
@@ -2409,10 +2453,12 @@ a successful handover.
 
 The primary and every subagent re-check usage after discovery, a material scope change, a long tool
 result, and before any follow-up. When an envelope or completion reserve is threatened, stop
-exploration, leave the isolated worktree coherent, and hand off immediately. A handoff names the
-checkout/root and assigned scope, changed and untracked files, exact checks and results, remaining
-work, assumptions, risks/blocker, token state when observable, and the safest next action. Never let
-an interrupted delegated stream leave unexplained partial edits.
+exploration and reassess the current bounded assignment under Capacity Admission And Monitoring.
+When its actual safe-completion reserve is uncovered, leave the worktree coherent and hand off
+immediately; a child's handoff does not classify the whole primary session as critical. A handoff
+names the checkout/root and assigned scope, changed and untracked files, exact checks and results,
+remaining work, assumptions, risks/blocker, token state when observable, and the safest next action.
+Never let an interrupted delegated stream leave unexplained partial edits.
 
 ### Agent Lifecycle And Idle Cleanup
 
@@ -2609,13 +2655,14 @@ leases are discarded with quiescent disposable runtime without interpreting an o
 remove open databases, WAL files or active session state. Full reset never rewrites Git history and
 is not a prerequisite for an otherwise valid in-session publication.
 
-For completion guidance, inspect the current README, package script and reset skill publication
-entry. Lead with the existing combined command; explain its cleanup, verification, commit and push
-effects and whether authority is present. The `bash scripts/setup/run-project.sh` prefix selects the
-project environment and runtime for that command. Do not substitute individual steps, invent a
-wrapper or require `/quit` when calling-session admission succeeds. Without publication authority,
-state that the command remains unexecuted. Recommend full reset only for explicit local sanitation,
-export hygiene or diagnosed recovery, with its actual session-exit requirement.
+For requested publication guidance, inspect the current README, package script and reset skill
+publication entry. Lead with the existing combined command; explain its cleanup, verification,
+commit and push effects and whether authority is present. The `bash scripts/setup/run-project.sh`
+prefix selects the project environment and runtime for that command. Do not substitute individual
+steps, invent a wrapper or require `/quit` when calling-session admission succeeds. Without
+publication authority, state that the command remains unexecuted. Recommend full reset only for
+explicit local sanitation, export hygiene or diagnosed recovery, with its actual session-exit
+requirement.
 
 When admission identifies a real uncovered risk, the full plan covers syntax/format, tests,
 build/typecheck when present, repository contracts, secrets, dependencies, and relevant product
@@ -2625,32 +2672,33 @@ complete green focused delta coverage advances it. Pre-push remains read-only, r
 and pushed-object checks, and consumes exact-current successful evidence instead of repeating an
 unchanged product suite.
 
-A goal checkpoint is green only when its requested outcome is published on central `main` and the
-actual integrated state has focused evidence, a review state with no relevant findings, a completed
-goal documentation review, any required dedicated critical-document preservation review, a fresh
-audit, course check, cleanup, applicable reset, and publication admission. In serialized direct-main
-mode, the primary commits exactly the goal-owned changes and pushes `main`. Under parallel delivery
-or protected-main policy, bounded task-branch commits are integration inputs; one integrator or the
-detected provider's merge serializer publishes them, after which the primary refreshes local `main`
-and closes the required checks on that resulting commit without creating a marker commit. If
-unrelated changes cannot be safely separated, no upstream is configured, authentication is
-unavailable, integration is unresolved, or publication is rejected, report the goal-closure blocker
-instead of broadening a commit, bypassing checks, force-pushing, or rewriting history. Otherwise
-immediately run `pnpm goal:new` and continue the next already-authorized goal without waiting for
-another prompt; only the complete authorized outcome is a normal handoff boundary.
+A publication goal checkpoint is green only when its requested outcome is published on central
+`main` and the actual integrated state has focused evidence, a review state with no relevant
+findings, a completed goal documentation review, any required dedicated critical-document
+preservation review, a fresh audit, course check, cleanup, applicable reset, and publication
+admission. In serialized direct-main mode, the primary commits exactly the goal-owned changes and
+pushes `main`. Under parallel delivery or protected-main policy, bounded task-branch commits are
+integration inputs; one integrator or the detected provider's merge serializer publishes them, after
+which the primary refreshes local `main` and closes the required checks on that resulting commit
+without creating a marker commit. If unrelated changes cannot be safely separated, no upstream is
+configured, authentication is unavailable, integration is unresolved, or publication is rejected,
+report the goal-closure blocker instead of broadening a commit, bypassing checks, force-pushing, or
+rewriting history. Otherwise immediately run `pnpm goal:new` and continue the next
+already-authorized goal without waiting for another prompt; only the complete authorized outcome is
+a normal handoff boundary.
 
-Before opening any subsequent goal, run `bash scripts/setup/run-project.sh pnpm goal:new`
-immediately after the preceding goal is published. This command is the supported new-goal entry gate
-rather than a task-state document: it performs no fetch, commit, or push and creates no planning
-artifact. It fails closed unless it can prove that the canonical project is on central `main` with a
-clean non-ignored worktree, a commit, a configured remote `main` upstream, and zero commits ahead or
-behind its locally recorded remote-tracking ref. A missing repository, detached or non-`main`
-branch, local-branch pseudo-upstream, missing remote/upstream, dirty worktree, malformed Git result,
-or local/upstream difference blocks the new goal. The gate does not contact the remote; the required
-preceding push owns authentication and updates the local remote-tracking publication evidence. It
-also requires exact-current successful verification evidence, so a push that bypassed pre-push
-cannot authorize another goal. Ignored project-local Codex runtime and verification evidence do not
-count as unfinished work.
+Before opening a subsequent goal in an authorized publication stream, run
+`bash scripts/setup/run-project.sh pnpm goal:new` immediately after the preceding goal is published.
+This command is the supported new-goal entry gate rather than a task-state document: it performs no
+fetch, commit, or push and creates no planning artifact. It fails closed unless it can prove that
+the canonical project is on central `main` with a clean non-ignored worktree, a commit, a configured
+remote `main` upstream, and zero commits ahead or behind its locally recorded remote-tracking ref. A
+missing repository, detached or non-`main` branch, local-branch pseudo-upstream, missing
+remote/upstream, dirty worktree, malformed Git result, or local/upstream difference blocks the new
+goal. The gate does not contact the remote; the required preceding push owns authentication and
+updates the local remote-tracking publication evidence. It also requires exact-current successful
+verification evidence, so a push that bypassed pre-push cannot authorize another goal. Ignored
+project-local Codex runtime and verification evidence do not count as unfinished work.
 
 Use a bounded scope for each review iteration, but repeat the iteration after fixes until no
 relevant, evidence-backed finding remains. Add specialized security, UI/UX, content, image, or

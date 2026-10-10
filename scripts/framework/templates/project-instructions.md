@@ -17,15 +17,20 @@ existing specification owner. A static UI reference is a separate design artifac
 
 <!-- current-repository-efficiency-policy -->
 
+## Task Scope And Completion
+
+<!-- current-task-scope-policy -->
+
 ## Maintenance Scope And Verification
 
 <!-- current-maintenance-scope-policy -->
 
 ## Authorized Work And Native Codex
 
-Work only on the user's current product outcome and accepted steering. Tool maintenance requires an
-explicit request or a material blocker of that authorized outcome. Report unrelated findings
-separately. A tooling finding cannot reopen completed product work or authorize another phase.
+Follow [Task Scope And Completion](#task-scope-and-completion) for the current accepted outcome.
+Tool maintenance requires an explicit request or a material blocker of that authorized outcome.
+Report unrelated findings separately. A tooling finding cannot reopen completed product work or
+authorize another phase.
 
 Continue authorized implementation through relevant repairs, verification and cleanup. Honor pauses,
 cancellation and approval gates, including “approve the static UI before application
@@ -83,7 +88,8 @@ surfaces, contracts, data, configuration, delivery, dependencies, tests and comp
 safe inventory across inconsistencies. Preserve competing/indeterminate writers and broken Git
 worktree directories; native repair requires confirmed directory ownership.
 
-Resume only the unique coherent authorized stream belonging to this project. Current source and
+Resume only a coherent stream matching current accepted authority. Preserve unrelated old product
+work during maintenance; finish the update at its own acceptance boundary. Current source and
 commands outrank remembered context. A native side conversation is independent and must not read
 work context or trigger durable continuation. Accept a SessionStart-announced handover explicitly
 before reading its prompt; use `$resume-project`, validate it against this repository, then receive
@@ -122,11 +128,12 @@ gates; otherwise continue authorized implementation after planning without a rou
 Use the native plan facility when available, otherwise the conversation; only the bounded project
 context lifecycle permits a working-context copy. Establish outcome, acceptance, non-goals, current
 system evidence, owners/consumers, viable designs, material decisions/unknowns, risks, ordered
-coherent slices, focused evidence, audit criteria, cleanup and real authority boundaries. Use
-intermediate goals only where distinct acceptance or dependencies help; assess native Goal
-suitability under [Authorized Work And Native Codex](#authorized-work-and-native-codex). Update the
-current plan on new evidence or accepted steering; do not duplicate task state or reopen settled
-decisions without cause.
+coherent slices, affected document owners, stopping condition, focused evidence, audit criteria,
+cleanup and real authority boundaries. Use intermediate goals only where distinct acceptance or
+dependencies help; assess native Goal suitability under
+[Authorized Work And Native Codex](#authorized-work-and-native-codex). Update the current plan on
+new evidence or accepted steering; do not duplicate task state or reopen settled decisions without
+cause.
 
 Include the current parallelism decision from
 [Subagent Orchestration](#subagent-orchestration-and-integration-authority): useful independent
@@ -259,6 +266,10 @@ specification owner, including a project-owned HTML specification. A static UI r
 separate artifact. The future-module index links confirmed deferred candidates without duplicating
 requirements. Do not generate review logs, history documents or a second task store.
 
+### Documentation Currency
+
+<!-- current-documentation-currency-policy -->
+
 ### Context Economy And Canonical Owners
 
 Use known paths or scoped `rg`, then read matched source and trace actual consumers. Keep each fact
@@ -266,7 +277,16 @@ at one owner and maintain discovery links when documents move. `docs/project-con
 optional bounded resume cache with one current `codexrig-work-state` marker, never an authority. Its
 exact path is excluded by the portable root `.gitignore`; recovery reads it directly. Do not rely on
 a local Git exclude to keep this working cache private. Refresh its current truth after material
-progress or remove it when no longer needed.
+progress or remove it when no longer needed. The Stop guard cannot infer current intent from this
+cache. An unchanged state triggers at most once per session, including across later user turns; only
+real progress or a real state change may refresh it. Malformed context does not force repair.
+
+Read critical workflow, trust, operations, migration and public-contract documents before changing
+them. Preserve active requirements, constraints, rationale and evidence limits; trace removals to
+surviving owners or an authorized retirement. A requested policy revision or consolidation supplies
+authority within its scope; otherwise obtain a focused decision before changing normative authority
+or resolving ambiguous content. Give authorized critical-document changes a separate preservation
+review before the fresh audit. Keep that evidence in the conversation.
 
 ## Context And Skills
 
@@ -361,12 +381,17 @@ configured GPT Astra model and its second-highest supported reasoning effort, cu
 primary, global agent defaults, roles and the shared validation policy in agreement; the installed
 model catalog must confirm the configured effort's rank before canonical startup.
 
-Make the plan name assignments that can start now with an outcome, focused evidence, exact scope,
-dependency boundary, selected role, checkpoint and primary integration order. Choose discovery,
-implementation, test or review work for actual independence and benefit, not a fixed four-role
-checklist. Planning discovery may run before the plan audit; delegated implementation must wait for
-that audit and resolution of material decisions. Start admitted assignments concurrently, and let
-the primary continue disjoint useful work while owning shared decisions and integration.
+The primary owns the whole-repository course check and final audit. Children return evidence and
+document corrections for their assigned boundaries, then stop at their result or blocker. Do not
+turn a bounded assignment into an independent optimization or repository-wide audit campaign.
+
+Make the plan name assignments that can start now with an outcome, stopping condition, exclusions,
+affected document owners, focused evidence, exact scope, dependency boundary, selected role,
+checkpoint and primary integration order. Choose discovery, implementation, test or review work for
+actual independence and benefit, not a fixed four-role checklist. Planning discovery may run before
+the plan audit; delegated implementation must wait for that audit and resolution of material
+decisions. Start admitted assignments concurrently, and let the primary continue disjoint useful
+work while owning shared decisions and integration.
 
 Reassess after discovery, material results, handoffs and every slice boundary. An initially serial
 phase does not make later independent work serial. Accept handoffs and close completed owned threads
@@ -392,12 +417,14 @@ owned agents.
 
 ### Guarded And Critical Drain
 
-At critical state start no work. Drain only provenance-bound agents/tasks at safe boundaries, update
-the bounded context with the exact Critical Budget Drain attestation, then run
-`pnpm handover:create -- --critical` as the final repository action. After a successful seal stop
-completely: no tool, agent contact, check or automatic continuation. Return only the handover path
-and the developer's full-restart instruction from [Session Start](#session-start); this authorizes
-no further action in the sealing session. Required attestation:
+Establish critical state through current evidence under Capacity Admission And Monitoring above; an
+inherited estimate or classification cannot trigger a new seal. At critical state start no work.
+Drain only provenance-bound agents/tasks at safe boundaries, update the bounded context with the
+exact Critical Budget Drain attestation, then run `pnpm handover:create -- --critical` as the final
+repository action. After a successful seal stop completely: no tool, agent contact, check or
+automatic continuation. Return only the handover path and the developer's full-restart instruction
+from [Session Start](#session-start); this authorizes no further action in the sealing session.
+Required attestation:
 
 ```text
 ## Critical Budget Drain

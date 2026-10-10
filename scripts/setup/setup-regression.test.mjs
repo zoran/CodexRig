@@ -134,7 +134,7 @@ test("skill metadata preserves native implicit and explicit activation choices",
 test("Codex config parser accepts only the complete typed portable policy", () => {
   assert.deepEqual(validateCodexConfig(configFixture()), {
     developer_instructions:
-      "Act as the primary orchestrator. Apply Maintenance Scope And Verification before selecting commands. Retain exactly one current internal contract per concern. Keep at most four live agents and never pass a model or reasoning override; all use the exact GPT Astra model with max reasoning. Register every owned subagent and background task and leave foreign or ambiguous processes untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. After every completed slice, run pnpm worktree:status -- --json as the worktree settlement trigger; preservation is a safety state, never completion. Follow Capacity Admission And Monitoring before classifying account-window exhaustion; retain rateLimitResetCredits and ordinaryUsageAllowed, resolve needed supported free resets and refresh binding capacity. At unresolved 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.\n",
+      "Act as the primary orchestrator. Apply Maintenance Scope And Verification before selecting commands. Retain exactly one current internal contract per concern. Keep at most four live agents and never pass a model or reasoning override; all use the exact GPT Astra model with max reasoning. Register every owned subagent and background task and leave foreign or ambiguous processes untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. After every completed slice, run pnpm worktree:status -- --json as the worktree settlement trigger; preservation is a safety state, never completion. Historical reserve estimates are not binding. Follow Capacity Admission And Monitoring before classifying account-window exhaustion; retain rateLimitResetCredits and ordinaryUsageAllowed, resolve needed supported free resets and refresh binding capacity. At unresolved 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.\n",
     project_doc_max_bytes: 32_768,
     project_doc_fallback_filenames: ["instructions.md"],
     model_reasoning_effort: "max",
@@ -222,6 +222,11 @@ test("Codex config parser accepts only the complete typed portable policy", () =
   assert.equal(customTierPolicy.service_tier, "fast");
 
   for (const [label, content, expected] of [
+    [
+      "missing current-reserve boundary",
+      validPortableConfig.replace("Historical reserve estimates are not binding. ", ""),
+      /orchestration marker historical reserve estimates are not binding/u,
+    ],
     [
       "commented required value",
       validPortableConfig.replace(
@@ -621,6 +626,14 @@ test("startup attestation binds the complete preloaded controller closure", () =
 test("project roles enforce exact Astra/max parity with the primary", () => {
   const defaultAgent = readFileSync(path.join(root, ".codex", "agents", "default.toml"), "utf8");
   const parsedDefault = parseProjectAgentConfig(defaultAgent, "default");
+  assert.throws(
+    () =>
+      parseProjectAgentConfig(
+        defaultAgent.replace(/Historical\s+reserve estimates are not binding\./u, ""),
+        "default",
+      ),
+    /orchestration marker historical reserve estimates are not binding/u,
+  );
   assert.equal(parsedDefault.model, "gpt-6-astra");
   assert.equal(parsedDefault.model_reasoning_effort, sharedAgentIntelligencePolicy.reasoningEffort);
   assert.equal(
@@ -681,7 +694,7 @@ test("project roles enforce exact Astra/max parity with the primary", () => {
   assert.throws(
     () =>
       parseProjectAgentConfig(
-        defaultAgent.replace("newest relevant primary or official sources", "available sources"),
+        defaultAgent.replace(/newest relevant primary or official\s+sources/u, "available sources"),
         "default",
       ),
     /orchestration marker newest relevant primary or official sources/,

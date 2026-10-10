@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "reviewedOn": "2026-10-08",
+  "reviewedOn": "2026-10-09",
   "ci": {
     "codexNpmPackage": "@openai/codex",
     "codexNpmPlatformIntegrities": {
@@ -10,14 +10,14 @@
       "win32-x64": "sha512-W8kqHaqpW0qPz71E0rRT5dq+socGz1BbJyYN7o3SP1TWQt8Zl6ML74R9Hvt/xn1NNLVlDTRfXqNmaMkte6yEMQ=="
     },
     "codexVersion": "0.162.0",
-    "miseVersion": "2026.10.4",
+    "miseVersion": "2026.10.6",
     "miseBinarySha256": {
-      "linux-x64": "2b8ce21f550872807bcaabf45b6bc5c64bfbd6dc3bf49dd4e67de700ef3ceb75",
-      "linux-arm64": "9013ce1d7d9bbbf65254cda178562f5450c474a705907c18b77e6b678bb10041",
-      "linux-x64-musl": "46ecfd7d391a22d442a650c4a7d717b3d35a01d6c3b8f37808f71abbcaa855ab",
-      "linux-arm64-musl": "7f92c8a883a489b31ef09862e9e198cc1b80ab32a67efebc9ae75146b7ea0e4c",
-      "macos-arm64": "5c530143fc750e8a98c9a36be8d361e5dd953fa0b004d58f7577783f7cf2ac24",
-      "windows-x64": "c46f53d0b5d0a416ce89b2a2cfdfd8448a852f9256868a173ea60df6679f2d62"
+      "linux-x64": "3f44343eebc7e0d6623bcea46e304864f02dff648edd75c82871b53cc697b366",
+      "linux-arm64": "5f3187febbe9ff98e4c78b3596c7bbfde0e3ef8e4b1820494d03efd499de7b6e",
+      "linux-x64-musl": "77e093165d79344d3185349800913e4f3e604593f2ac158083c5205c415d092f",
+      "linux-arm64-musl": "311ed43b2522dc642fd32a892cd42540a07a2a5ce9a4e1e9662def83c07813e7",
+      "macos-arm64": "bbcea7b0f844d026424a4c8335357a15a2f5c9e9132c9408de990d9be6f26101",
+      "windows-x64": "efbc42b67482607d58beb9b5671b61a6e03a71d2b3659fd2e964b241a102fb5d"
     }
   },
   "stable": {

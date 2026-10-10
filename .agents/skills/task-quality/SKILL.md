@@ -17,8 +17,9 @@ publication.
 - Review-only requests stay read-only: report defects and uncertainty, without editing files,
   planning state, accepting risk or performing external mutations.
 - Finish/handoff mode repairs findings only within the authorized implementation scope.
-- Establish the requested outcome, acceptance criteria, changed owners/consumers and actual risks.
-  Apply
+- Recover the task contract and stopping condition from
+  [Task Scope And Completion](../../../instructions.md#task-scope-and-completion). Establish changed
+  owners/consumers and actual risks; optional improvements cannot extend acceptance. Apply
   [Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification)
   before command selection. Inspect `pnpm verify:changed -- --print-plan`; use focused checks and
   the [Test Strategy](../../../instructions.md#test-strategy). A failing check is not broad-rerun
@@ -32,7 +33,10 @@ publication.
 
 ## Route Review Once Per Concern
 
-Use the applicable specialized procedure, not every available skill:
+The primary composes existing evidence once per concern; delegated reviewers stop at their assigned
+result. Their handoff or blocker is input for the primary to resolve while continuing safe
+authorized work. A review checkpoint does not end an unfinished outcome. Use the applicable
+specialized procedure:
 
 - `$system-coherence`: code quality, root cause, ownership, duplication and representative
   assembled-flow integration for every non-trivial completed slice. It also supports read-only
@@ -60,13 +64,15 @@ report limits and preserve requirements. Static byte checks do not establish mod
 
 ## Audit And Settle
 
-1. Reconcile changed-contract docs, source/declaration headers, dead paths and bounded work context
-   before auditing. Recheck the request, plan, manifest, owners/consumers, residual risks and
-   evidence. Apply [Documentation Ownership](../../../instructions.md#documentation-ownership):
-   preserve unique requirements, stable links and evidence limits at their established owners; do
-   not treat structural checks as semantic preservation proof. Check README discovery for both
-   existing and newly created documents and reject copied requirements or document summaries. An
-   audit finding reopens the owning repair and targeted review.
+1. Check [Documentation Currency](../../../instructions.md#documentation-currency) from the slice
+   handoffs: integrate outstanding corrections at protected owners before acceptance. Reconcile
+   source/declaration headers, dead paths and bounded work context before auditing. Recheck the
+   request, plan, manifest, owners/consumers, residual risks and evidence. Apply
+   [Documentation Ownership](../../../instructions.md#documentation-ownership): preserve unique
+   requirements, stable links and evidence limits at their established owners; do not treat
+   structural checks as semantic preservation proof. Check README discovery for both existing and
+   newly created documents and reject copied requirements or document summaries. An audit finding
+   reopens the owning repair and targeted review.
 2. Perform the whole-repository course check and Worktree Settlement from
    [Slice Acceptance](../../../instructions.md#best-available-engineering-not-quick-fixes). A passed
    check or finished intermediate slice is not the complete authorized outcome.
@@ -84,5 +90,6 @@ report limits and preserve requirements. Static byte checks do not establish mod
 
 Continue the remaining authorized outcome under
 [Authorized Work](../../../instructions.md#authorized-work-and-native-codex). Return a final handoff
-only at the complete outcome or a real blocker: state the result, actual evidence, review/audit
-status, material limits and exact remaining action. Create no review or completion document.
+only at the accepted completion condition or a real blocker: state the result, actual evidence,
+review/audit status, material limits and exact remaining action. Create no review or completion
+document.

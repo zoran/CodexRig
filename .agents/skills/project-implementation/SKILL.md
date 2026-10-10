@@ -15,45 +15,22 @@ publication and cleanup; read those applicable sections through `pnpm context:re
 loading the complete reference. Use `pnpm context:map` for navigation; an outline never substitutes
 for relevant evidence.
 
-## Authority And Preflight
+## Establish The Task
 
-An implementation/fix request authorizes in-scope changes. An explanation, diagnosis or design
-request without implementation stays read-only. Follow
-[Authorized Work And Native Codex](../../../instructions.md#authorized-work-and-native-codex):
-approvals persist within scope, additive questions return to the active outcome, explicit pauses are
-respected, and neither user absence nor an intermediate result is completion. Never end at "ready to
-implement" when implementation is already authorized.
+Follow [Task Scope And Completion](../../../instructions.md#task-scope-and-completion): identify the
+accepted result, write scope, exclusions and stopping condition. Complete startup reconstruction and
+ownership checks before writes. For features or extensive, complex or risky work use the canonical
+[Planning](../../../instructions.md#planning-goals-slices-review-loops-and-audits) review/audit;
+keep decisions in the conversation or sole bounded context cache. Reuse settled parent decisions.
+The primary makes ordinary reversible implementation choices and continues necessary in-scope steps
+without repeat approval. A delegated assignment ends at its result; the primary integrates that
+handoff and continues the accepted outcome. Escalate only demonstrated blockers under the task
+contract.
 
-Automatically complete the decision-ready plan, review to no relevant findings, and fresh plan audit
-before a new feature or other extensive, complex, or materially risky task. Follow
-[Planning](../../../instructions.md#planning-goals-slices-review-loops-and-audits) for triggers,
-proportionate plan depth, native Goal suitability, and the evidence that makes a finding relevant.
-Audit findings reopen the affected loop; a clean plan leads directly into authorized implementation.
-Use the native plan facility or conversation and only the sole bounded project-context cache when
-its lifecycle applies. Reuse settled decisions unless new evidence changes them. Before extra work,
-identify the outcome, blocker or material risk it improves; do not invent review rounds or optional
-micro-optimizations after sufficient evidence.
-
-Complete
-[Startup Repository Reconstruction](../../../instructions.md#startup-repository-reconstruction) and
-the pre-slice coordination check before writing or expanding the write set. One primary owns
-integration; every writer has an exact disjoint scope. Make the plan's parallelism decision under
-[Subagent Orchestration](../../../instructions.md#subagent-orchestration-and-integration-authority):
-use four useful concurrent subagents when admissible, otherwise state the actual limit and reassess
-after discovery, handoffs and slice boundaries. Read the established requirements and design owners
-linked from the manifest under
-[Documentation Ownership](../../../instructions.md#documentation-ownership), then current source,
-nearest package/build/test configuration and relevant durable decisions. Use
-[Context And Skills](../../../instructions.md#context-and-skills) for manifest-led discovery, scoped
-exact searches and direct matched-source reads before acting.
-
-A pending generated product first follows
-[Project Definition Intake](../../../instructions.md#first-prompt-project-definition-intake). Do not
-infer a product from framework tooling. Confirm decision-relevant scope, surface and module
-technology before dependent implementation; invite the user to confirm, override or delegate
-choices. Use `$architecture-evolution` for material topology, surface, trust, ownership or layout
-changes. A new feature extends its current owner, creates a new module in an existing domain, or
-establishes a domain; there is no generic catch-all placement.
+Read applicable requirements/design and affected current owners through bounded context navigation.
+A pending product follows definition intake; framework tooling is not product evidence. Material
+architecture or ownership changes use `$architecture-evolution`. Declare one writer per surface and
+apply canonical orchestration/capacity admission for useful independent assignments.
 
 ## Implement At The Owner
 
@@ -113,34 +90,24 @@ need; remove them after use.
 For interactive surface work, read [Rendered UI Implementation](references/rendered-ui.md). Other
 work does not load that conditional workflow.
 
-## Verify, Review And Continue
+## Verify And Accept
 
-Apply the [Test Strategy](../../../instructions.md#test-strategy). For a material behavior
-correction, observe the original failing regression before the fix and document the problem/contract
-concisely in the existing owner suite. Prefer realistic lifecycle evidence; use narrow coverage for
-important deterministic boundaries that cannot be exercised proportionately through a broad flow.
-Editorial changes alone need no implementation-mirroring test. Source checks do not prove native
-delivery, rendered UX, model compliance or actual account-backed behavior.
+Apply [Test Strategy](../../../instructions.md#test-strategy): for material behavior corrections,
+observe the original regression before the fix and cover it in the existing owner suite. Prefer
+realistic lifecycle evidence; justify narrow tests by a concrete boundary and proving value.
+Editorial changes need no implementation-mirroring test. Distinguish source, fixture, rendered,
+native and real-target evidence.
 
-At every non-trivial completed slice, use `$system-coherence`, then proportionate review and repair
-to zero relevant findings, a fresh audit and the canonical repository efficiency/effectiveness
-assessment plus course check. Examine real consumers, unrequested UI changes, shared styles,
-contract/data drift and the next highest-value unfinished step. Use `$task-quality` at the planned
-slice/goal boundary, `$security-review` for changed trust surfaces, and other reviews only where
-relevant. Keep results in the conversation.
+Apply [Documentation Currency](../../../instructions.md#documentation-currency) before slice
+handoff: update affected owners within the write set and give the primary exact corrections for
+protected documents. The primary integrates them before acceptance. Use `$system-coherence` for a
+non-trivial slice and `$task-quality` at the acceptance boundary; specialist reviews apply only to
+changed risks. Reuse their evidence in one primary review and fresh audit, including the canonical
+whole-repository effectiveness, efficiency and quality assessment.
 
 Apply
 [Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification)
-before selecting commands. Use `pnpm verify:changed -- --print-plan` for admission and focused
-evidence while iterating; final verification belongs on the stable integrated candidate within the
-accepted scope. Preserve Dev feedback priority. The verification and documentation sections of
-[instructions](../../../instructions.md) define full audit, document currency, critical-document
-preservation and applicable housekeeping/publication gates. Preserve the durable project manifest
-and never bypass a gate because an intermediate slice is green.
-
-The
-[orchestration authority](../../../instructions.md#subagent-orchestration-and-integration-authority)
-owns permission checks, agent/process provenance, capacity admission, ownership and drain. A
-critical handover uses `pnpm handover:create -- --critical` as the final repository action after the
-exact drain attestation; then no tool or continuation is allowed. Otherwise continue the authorized
-outcome and state a concrete blocker only when no safe in-scope progress remains.
+before commands. Inspect `pnpm verify:changed -- --print-plan`, iterate with focused checks and
+verify the stable integrated result within scope. Preserve Dev scheduling and actual publication
+gates. Continue only unfinished accepted work; stop when its completion condition is satisfied.
+Canonical capacity, provenance, settlement and terminal-handover rules remain binding.

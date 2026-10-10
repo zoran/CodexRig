@@ -25,17 +25,28 @@ This skill owns recovery of the authorized workstream, not a second session or t
    gaps. Follow [Documentation Ownership](../../../instructions.md#documentation-ownership): read
    existing specifications and separate UI references before intake; preserve their decisions and
    approvals without copying requirements into the manifest, README or temporary context.
-3. Select the unique coherent unfinished authorized stream. Same-host project changes belong to the
-   developer regardless of account; process control still requires exact provenance. Preserve
-   ambiguous or overlapping state and continue safe reconstruction. Ask one focused content question
-   only when evidence cannot choose between incompatible outcomes.
+3. Apply [Task Scope And Completion](../../../instructions.md#task-scope-and-completion). Select
+   only unfinished work matching the current request and still-applicable authority. Maintenance
+   does not revive a product roadmap; preserve unrelated context without following its next action.
+   Same-host project changes belong to the developer regardless of account; process control still
+   requires exact provenance. Preserve ambiguous or overlapping state and continue safe
+   reconstruction. Ask one focused content question only when evidence cannot choose between
+   incompatible outcomes.
 4. State the recovered outcome, completed evidence, current slice, affected owners/consumers, risks,
    blocker if any, and next coherent action. Perform the whole-repository course check and pre-slice
    coordination before writing. A local lease is not proof another developer's clone is idle.
-5. Replace stale entries in the existing bounded cache when applicable; create no process history.
-   Resume authorized implementation immediately. Additive questions do not cancel it, while explicit
-   pause, cancellation or replacement does. Never end at "ready to implement" when implementation is
-   already authorized. Follow
+   Reassess capacity under
+   [Capacity Admission And Monitoring](../../../instructions.md#capacity-admission-and-monitoring):
+   historical reserve estimates and critical/blocked labels are not current limits. Size the reserve
+   for the next useful coherent step; consider fewer agents or a smaller step before a new drain.
+   Replace stale budget prose and prior drain attestations in the current cache, preserving real
+   unrelated blockers and user pauses; update its status/next action only from current evidence.
+5. Reconcile affected document owners under
+   [Documentation Currency](../../../instructions.md#documentation-currency) after recovery and
+   material progress. Replace stale entries in the matching bounded cache when applicable; create no
+   process history. Resume authorized implementation immediately. Additive questions do not cancel
+   it, while explicit pause, cancellation or replacement does. Never end at "ready to implement"
+   when implementation is already authorized. Follow
    [Authorized Work](../../../instructions.md#authorized-work-and-native-codex).
 
 ## Receive An Accepted Critical Handover
@@ -48,7 +59,9 @@ of process ownership.
 1. In the later active canonical session, run `pnpm handover:receive -- <exact-path>`.
 2. Read the complete output and compare its repository/work-state binding, scope, ownership and
    proposed action with current manifest, source, tests and durable authority. Incomplete or
-   truncated delivery cannot be acknowledged.
+   truncated delivery cannot be acknowledged. Apply the receiver's current capacity boundary even
+   when the captured prompt predates it; the old seal proves no current exhaustion or minimum
+   reserve.
 3. Briefly acknowledge the recovered project, authorized outcome, constraints and next action in the
    conversation, then run `pnpm handover:acknowledge -- <exact-path> --sha256 <received-digest>`.
 4. Only the exact unchanged private file is removed; native conversation/provider history is not.

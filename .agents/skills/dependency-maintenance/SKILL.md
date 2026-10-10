@@ -11,6 +11,11 @@ description:
 
 ## Rules
 
+- First apply
+  [Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification).
+  A report stays read-only; framework updates do not authorize product dependency refresh. Select
+  only commands within the accepted dependency scope, and stop at its acceptance condition.
+
 - Keep deterministic manifest/lock consistency separate from network-dependent registry freshness.
 - Preserve workspace, manifest, dependency section, current spec, and current version identity for
   every recommendation and update. Never collapse updates by package name alone.

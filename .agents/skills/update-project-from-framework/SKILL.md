@@ -14,6 +14,15 @@ license product development or unrelated repairs, deployments, commit or push. A
 [Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification) to
 every command below, including startup, dependency maintenance, verification and cleanup.
 
+## Bound The Update
+
+State the selected source and targets, framework surfaces, preserved product adaptations and update
+acceptance before writing. The result is reconciled tooling/policy, current affected documentation,
+focused integration evidence and owned cleanup. Preserve unrelated product work state as recovery
+input; do not adopt its next action as this update's next slice. No product roadmap, dependency
+refresh or unrelated defect investigation follows from this assignment. Apply
+[Task Scope And Completion](../../../instructions.md#task-scope-and-completion) through handoff.
+
 ## Reconstruct And Compare
 
 1. Inventory source and every selected target's Git/worktrees, safe recovery and live writers. Stop
@@ -32,13 +41,13 @@ every command below, including startup, dependency maintenance, verification and
    A preserved file is not evidence that a framework fix reached it. Reconcile canonical shared
    policies into maintained child instructions as well as generated defaults, including
    [Interpreting Examples And Scope](../../../instructions.md#interpreting-examples-and-scope) and
-   the portable maintenance scope boundary. Named examples do not bound the applicable update: trace
-   the underlying rule across affected existing consumers and the admission of future ones while
-   respecting the accepted update scope. Reconcile the shared tool/account isolation boundary,
-   actual project account adapters and their startup/install/verification consumers. Preserve
-   project credentials in place. The canonical GitHub/GitLab HTTPS adapter is the only default
-   global-login exception; never borrow other host or sibling accounts to make an update pass.
-   Report required local logins without reading secrets.
+   the portable maintenance scope, task-completion and documentation-currency boundaries. Named
+   examples do not bound the applicable update: trace the underlying rule across affected existing
+   consumers and the admission of future ones while respecting the accepted update scope. Reconcile
+   the shared tool/account isolation boundary, actual project account adapters and their
+   startup/install/verification consumers. Preserve project credentials in place. The canonical
+   GitHub/GitLab HTTPS adapter is the only default global-login exception; never borrow other host
+   or sibling accounts to make an update pass. Report required local logins without reading secrets.
 
 ## Reconcile One Current Contract
 
@@ -70,10 +79,13 @@ every command below, including startup, dependency maintenance, verification and
 6. Preview again with `--reconcile <absolute-decisions.json>`, review to clean and audit afresh.
    Changed source/target hashes or modes invalidate decisions. Only then add `--apply`. The target's
    installed current runtime owner must enforce quiescence; one journal covers policy and tool
-   changes through cleanup. Do not manually delete private runtime to force admission. Supported
-   recovery is `--target <root> --recover`; never interpret superseded private schemas. For an old
-   target without the installed runtime owner, generate a small temporary current child, reconcile
-   existing product owners and verification into it, and use explicit `--regenerate` with
+   changes through cleanup. For an ordinary update, reconcile any child-specific lifecycle modules
+   and their transitive local dependencies explicitly; destination staging uses only that admitted
+   runtime closure. Do not replace a working child runtime merely to avoid reviewing its extensions.
+   Do not manually delete private runtime to force admission. Supported recovery is
+   `--target <root> --recover`; never interpret superseded private schemas. For an old target
+   without the installed runtime owner, generate a small temporary current child, reconcile existing
+   product owners and verification into it, and use explicit `--regenerate` with
    `--confirm-quiescent --apply` only after confirmed stopped writers and a fresh worktree/process
    inventory. The confirmation is an operator attestation, not a lock that fences old launchers.
    Never strip the live target first or copy its dependency, build or native-session directories.
@@ -91,14 +103,16 @@ every command below, including startup, dependency maintenance, verification and
    history/authentication, and validate before releasing ownership. Never relax the validator or
    discard unknown private state to obtain startup success.
 7. Reconcile maintained README/manifest and product-owned command consumers within the same accepted
-   migration. Keep these documents factual and bounded to their owners. A real pristine generated
-   ancestor may additionally support the `--baseline` three-way comparison, but it does not replace
-   policy review or prove product adaptations received current fixes. Preserve each target's exact
-   Mise pins and artifact locks when relocating them to `.codex/mise.toml` and `.codex/mise.lock`;
-   retire the old discovery paths in the same cutover. Keep the target's confirmed name in
-   `.codex/tooling.json` at `startup.displayName` for its startup animation, independently of source
-   branding and product identity. Reconcile every affected reader and host-shell command, including
-   Git hooks; verify both isolated execution and outer-shell discovery after exit.
+   migration. Apply [Documentation Currency](../../../instructions.md#documentation-currency) within
+   each slice; keep factual corrections at their owners before dependent work, not just at final
+   handoff. A real pristine generated ancestor may additionally support the `--baseline` three-way
+   comparison, but it does not replace policy review or prove product adaptations received current
+   fixes. Preserve each target's exact Mise pins and artifact locks when relocating them to
+   `.codex/mise.toml` and `.codex/mise.lock`; retire the old discovery paths in the same cutover.
+   Keep the target's confirmed name in `.codex/tooling.json` at `startup.displayName` for its
+   startup animation, independently of source branding and product identity. Reconcile every
+   affected reader and host-shell command, including Git hooks; verify both isolated execution and
+   outer-shell discovery after exit.
 
 ## Prove Convergence
 
@@ -120,4 +134,6 @@ every command below, including startup, dependency maintenance, verification and
    may remain. Reuse the bounded findings in the handoff, not an installation receipt or a second
    tracking system. Apply Repository Efficiency And Effectiveness at every audit and settle target
    and source worktrees. Remove owned ephemeral decisions after successful verification. State any
-   unresolved acceptance gate and the required complete launcher restart.
+   unresolved acceptance gate and the required complete launcher restart. Once update acceptance is
+   satisfied, report the update result and stop. Do not run `goal:new` to select product work or
+   continue a preserved product backlog without a separately accepted task.

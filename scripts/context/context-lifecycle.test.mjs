@@ -118,11 +118,17 @@ test("preloaded Stop lifecycle preserves continuation and terminal handover", as
   const project = temporaryDirectory("context-stop-lifecycle-");
   copyToolingConfiguration(project);
   mkdirSync(path.join(project, ".codex"), { recursive: true });
-  writeWorkingContext(project, workState());
+  writeWorkingContext(
+    project,
+    workState(),
+    "# Current work\nHistorical reserve: Root21 plus safety5 at 26% remaining.\n",
+  );
 
   const activeOutput = await runStopLifecycle({ root: project, hookInput: stopHookInput() });
   assert.equal(activeOutput.decision, "block");
   assert.match(activeOutput.reason, /Continue only this project’s already-authorized outcome/u);
+  assert.match(activeOutput.reason, /Reassess current capacity under Capacity Admission/u);
+  assert.match(activeOutput.reason, /historical reserve estimates.*prove no current exhaustion/u);
 
   const now = Date.now();
   writeRuntimeSessionLease(project, new Date(now - 1_000).toISOString());
@@ -220,6 +226,15 @@ test("Stop lifecycle continues active outcomes and bounds unchanged automatic lo
   });
   assert.equal(Object.hasOwn(unchanged, "decision"), false);
   assert.match(unchanged.systemMessage, /allowed this stop to avoid an automatic loop/);
+
+  // A later user turn (for example, a completed framework update or a status question) must
+  // not re-arm an unchanged product backlog merely because stop_hook_active is false again.
+  const laterTurn = evaluateAutonomousContinuation({
+    root: project,
+    hookInput: stopHookInput({ turn_id: "later-maintenance-turn", stop_hook_active: false }),
+  });
+  assert.equal(Object.hasOwn(laterTurn, "decision"), false);
+  assert.equal(readFileSync(continuationPath, "utf8").includes('"revision":1'), true);
 
   writeWorkingContext(
     project,
@@ -420,16 +435,22 @@ test("critical-budget handover seals privately, asks before resume, and terminat
 });
 
 // Problem: sealed handovers had no exact receiving/acknowledgement lifecycle and could be offered again.
-// Contract: a later canonical session reads the complete bound artifact and acknowledges only unchanged bytes.
+// Contract: a later session receives current capacity guidance even for the unchanged historical
+// prompt format; acknowledgement still consumes only the exact received bytes.
 test("handover receipt and acknowledgement consume only the exact unchanged later-session artifact", () => {
   const project = temporaryDirectory("handover-receipt-");
   copyToolingConfiguration(project);
   const now = Date.now();
   writeRuntimeSessionLease(project, new Date(now - 1_000).toISOString());
-  writeWorkingContext(project, workState(), criticalDrainBody);
+  writeWorkingContext(
+    project,
+    workState(),
+    `${criticalDrainBody}\nHistorical estimate: Root21 plus safety5; 26% remaining was all reserved.\n`,
+  );
   const sealed = createCriticalBudgetHandover({ root: project, now: () => now });
   const target = path.join(project, sealed.relativePath);
   const before = readFileSync(target, "utf8");
+  assert.doesNotMatch(before, /Historical reserve estimates are not binding/u);
   const options = { root: project, relativePath: sealed.relativePath };
   assert.equal(typeof handoverLifecycle.receiveCriticalBudgetHandover, "function");
   assert.equal(typeof handoverLifecycle.acknowledgeCriticalBudgetHandover, "function");
@@ -438,6 +459,9 @@ test("handover receipt and acknowledgement consume only the exact unchanged late
   const received = handoverLifecycle.receiveCriticalBudgetHandover(options);
   assert.equal(received.content, before);
   assert.equal(received.sha256, createHash("sha256").update(before).digest("hex"));
+  assert.match(received.resumeBoundary, /Historical reserve estimates are not binding/u);
+  assert.match(received.resumeBoundary, /current.*Capacity Admission And Monitoring/u);
+  assert.match(received.content, /Root21 plus safety5; 26% remaining/u);
   assert.equal(readFileSync(target, "utf8"), before);
   const acknowledgement = { ...options, expectedSha256: received.sha256 };
   assert.throws(

@@ -197,6 +197,15 @@ function compactTimestamp(isoTimestamp) {
   return isoTimestamp.replace(/[-:.]/gu, "");
 }
 
+const capacityResumeBoundary =
+  "Historical reserve estimates are not binding. Reassess current capacity under Capacity Admission And Monitoring " +
+  "in instructions.md before choosing the next bounded step or declaring a new critical state. " +
+  "Old percentages, blocked labels and drain attestations prove no current exhaustion; consider smaller useful work " +
+  "or fewer agents. Keep account quota, context and Goal limits distinct, and honor current hard limits. " +
+  "Receipt does not measure host capacity or authorize paid overage, account/model switches or budget increases.";
+
+// Schema 2 binds the exact prompt bytes. Put current receiving guidance outside this historical
+// artifact so updating policy neither invalidates older handovers nor weakens integrity checks.
 function renderPrompt({ context, metadata }) {
   return [
     "<!-- codexrig-critical-budget-handover",
@@ -402,7 +411,12 @@ export function receiveCriticalBudgetHandover({
   testHooks,
 } = {}) {
   return withReceivingPrompt({ root, relativePath, testHooks }, ({ snapshot }) =>
-    Object.freeze({ relativePath, content: snapshot.content, sha256: sha256(snapshot.content) }),
+    Object.freeze({
+      relativePath,
+      content: snapshot.content,
+      sha256: sha256(snapshot.content),
+      resumeBoundary: capacityResumeBoundary,
+    }),
   );
 }
 
@@ -465,6 +479,7 @@ function main() {
     const received = receiveCriticalBudgetHandover({ relativePath: args[1] });
     console.log(`Handover SHA-256: ${received.sha256}`);
     console.log(received.content);
+    console.log(`Current receiving-session boundary: ${received.resumeBoundary}`);
     console.log(
       "Read the complete output, acknowledge the project/outcome/next action, then acknowledge this exact digest.",
     );

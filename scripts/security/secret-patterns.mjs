@@ -14,7 +14,7 @@ export const secretPatterns = Object.freeze([
   },
   {
     label: "OpenAI-style API key",
-    regex: /sk-(?:proj-)?[A-Za-z0-9_-]{20,}/,
+    regex: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}/,
   },
   {
     label: "Slack token",

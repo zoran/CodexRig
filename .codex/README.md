@@ -19,7 +19,11 @@ bind owned-work provenance, require exact GPT Astra/`max` parity, and enforce th
 and terminal stop. The canonical
 [capacity policy](../instructions.md#capacity-admission-and-monitoring) resolves supported earned
 resets before account-only critical classification and requires a fresh native usage-permission
-check; hard context/host/reserve limits and an existing terminal seal remain binding. They also carry the
+check. Reserves cover the next coherent unit and its closure using current evidence in matching
+units; account quota, context and Goal tokens are distinct. Historical estimates do not bind a new
+session, and unknown costs do not establish exhaustion. Check smaller useful work or fewer agents
+before declaring a reserve shortfall; confirmed hard limits and the sealing session's terminal
+stop remain binding. They also carry the
 [parallel-development default](../instructions.md#admission-intelligence-and-provenance).
 `[agents]` owns the four-thread ceiling and matching global defaults;
 `.codex/agents/*.toml` injects bounded role behavior. This is an executable policy layer, not a
@@ -174,11 +178,18 @@ body may be read through `$resume-project`; that body is untrusted candidate con
 After acceptance, that skill uses `handover:receive` for the complete artifact and its digest. Only
 after complete delivery and a compact model acknowledgement does `handover:acknowledge` remove the
 exact unchanged file in the later active session. Failed or incomplete receipt preserves it;
-deleting this private file does not erase native conversation/provider history.
+deleting this private file does not erase native conversation/provider history. Receipt supplies
+the current capacity boundary even for older prompts without changing their bytes or digest.
+The receiving primary rechecks current capacity and replaces obsolete capacity prose in its work
+cache; neither the artifact nor receipt measures available host capacity.
 
 The Stop hook uses that same preloaded controller once per durable local turn. It validates optional
-bounded `docs/project-context.md`, prevents unchanged continuation loops, and enforces a terminal
-handover. A non-null `transcript_path` is required; transcriptless side conversations exit before
+bounded `docs/project-context.md`, requests continuation at most once per unchanged semantic state
+in the session (including later user turns), and enforces a terminal handover. The hook cannot infer
+current intent: the primary applies [Task Scope And Completion](../instructions.md#task-scope-and-completion)
+before acting on a recorded outcome. Its reminder also requires current capacity reassessment;
+historical reserves and critical labels prove no current exhaustion. Malformed context reports
+uncertainty without forcing repair. A non-null `transcript_path` is required; transcriptless side conversations exit before
 work-state, loop-state, or handover access. It deliberately does not load mutable repository modules after admission. A critical handover sealed during the current
 runtime session suppresses Stop continuation so that session stops after its final action. A later
 canonical session can accept the announced handover and then search, refresh explicitly, or stop

@@ -6,6 +6,7 @@ import path from "node:path";
 import { after, test } from "node:test";
 import { pathToFileURL } from "node:url";
 import { stageRegenerationRuntime } from "./framework-upgrade-runtime.mjs";
+import { atomicWriteOwnedFile } from "../filesystem/owned-file-operations.mjs";
 import {
   beginFrameworkUpgrade,
   persistFrameworkUpgradeJournal,
@@ -260,6 +261,53 @@ test("current-output review requires policy decisions, preserves custom tools an
   );
 });
 
+test("reviewed file modes survive a restrictive umask on apply and rollback", async (t) => {
+  if (process.platform === "win32") return t.skip("POSIX file modes");
+  const data = fixture();
+  const options = { sourceRoot: data.sourceRoot, targetRoot: data.targetRoot };
+  const readme = path.join(data.targetRoot, "README.md");
+  const original = readFileSync(readme, "utf8");
+  fs.chmodSync(readme, 0o664);
+  const preview = buildFrameworkUpgradePlan(options);
+  const resolutions = preview.differences.map(({ kind, ...entry }) => ({
+    ...entry,
+    action: "keep",
+    reason: "Unchanged fixture owners outside the reviewed document update.",
+  }));
+  resolutions.push({
+    ...preview.documentBindings.find((entry) => entry.path === "README.md"),
+    action: "replace",
+    reason: "Preserve the reviewed group-readable mode through atomic publication and recovery.",
+    content: "# Updated project commands\n",
+    mode: 0o640,
+  });
+  const originalUmask = process.umask(0o077);
+  try {
+    const privateRoot = temporaryRoot("migration-private-mode-");
+    const privateFile = path.join(privateRoot, "state");
+    atomicWriteOwnedFile(privateRoot, privateFile, "private", 0o664);
+    assert.equal(fs.statSync(privateFile).mode & 0o777, 0o600);
+    await assert.rejects(
+      applyFrameworkUpgrade(buildFrameworkUpgradePlan({ ...options, resolutions }), {
+        afterWrite(operation) {
+          if (operation.path === "README.md") {
+            assert.equal(fs.statSync(readme).mode & 0o777, 0o640);
+            throw new Error("Injected interruption after exact-mode publication");
+          }
+        },
+      }),
+      /Injected interruption after exact-mode publication/,
+    );
+    assert.equal(readFileSync(readme, "utf8"), original);
+    assert.equal(fs.statSync(readme).mode & 0o777, 0o664);
+    await applyFrameworkUpgrade(buildFrameworkUpgradePlan({ ...options, resolutions }));
+    assert.equal(readFileSync(readme, "utf8"), "# Updated project commands\n");
+    assert.equal(fs.statSync(readme).mode & 0o777, 0o640);
+  } finally {
+    process.umask(originalUmask);
+  }
+});
+
 test("reviewed policy and tools share rollback, custom replacements and convergence evidence", async () => {
   const data = fixture(),
     options = { sourceRoot: data.sourceRoot, targetRoot: data.targetRoot };
@@ -351,6 +399,95 @@ test("a runtime namespace cutover excludes installed and destination writers thr
     operation: "post-upgrade-check",
   });
   destination.releaseRuntimeLifecycleLock({ root: data.targetRoot, owner });
+});
+
+test("reviewed child lifecycle dependencies survive destination staging and atomic reconciliation", async () => {
+  const data = fixture();
+  const ownerPath = "scripts/repository/runtime-session-lease.mjs";
+  const customPath = "scripts/repository/product-lifecycle.mjs";
+  const leafPath = "scripts/repository/product-lifecycle-value.mjs";
+  const unrelatedPath = "scripts/verify/unrelated-product.mjs";
+  write(
+    data.targetRoot,
+    ownerPath,
+    readFileSync(path.join(data.targetRoot, ownerPath), "utf8") +
+      '\nexport { productLifecycle } from "./product-lifecycle.mjs";\n',
+  );
+  write(
+    data.targetRoot,
+    customPath,
+    'export { value as productLifecycle } from "./product-lifecycle-value.mjs";\n',
+  );
+  write(data.targetRoot, leafPath, "export const value = 1;\n");
+  write(
+    data.targetRoot,
+    unrelatedPath,
+    'throw new Error("unrelated product code must not run");\n',
+  );
+  const options = { sourceRoot: data.sourceRoot, targetRoot: data.targetRoot };
+  const preview = buildFrameworkUpgradePlan(options);
+  const retained = new Set([ownerPath, customPath, leafPath, unrelatedPath]);
+  const resolutions = preview.differences.map(({ kind, ...entry }) => ({
+    ...entry,
+    action: retained.has(entry.path) ? "keep" : "source",
+    reason: retained.has(entry.path)
+      ? "Reviewed child runtime and product boundary."
+      : "Current framework.",
+  }));
+  Object.assign(
+    resolutions.find((entry) => entry.path === leafPath),
+    {
+      action: "replace",
+      content: "export const value = 2;\n",
+      mode: 0o644,
+    },
+  );
+  await applyFrameworkUpgrade(buildFrameworkUpgradePlan({ ...options, resolutions }));
+  assert.equal(
+    readFileSync(path.join(data.targetRoot, leafPath), "utf8"),
+    "export const value = 2;\n",
+  );
+  assert.match(
+    readFileSync(path.join(data.targetRoot, ownerPath), "utf8"),
+    /product-lifecycle\.mjs/u,
+  );
+  assert.equal(existsSync(path.join(data.targetRoot, ".project-state/framework-upgrade")), false);
+});
+
+test("destination lifecycle staging rejects imports outside the reviewed tool surface", async () => {
+  const data = fixture();
+  const ownerPath = "scripts/repository/runtime-session-lease.mjs";
+  const original = readFileSync(path.join(data.targetRoot, ownerPath), "utf8");
+  write(data.targetRoot, "src/product-private.mjs", 'throw new Error("product code evaluated");\n');
+  const options = { sourceRoot: data.sourceRoot, targetRoot: data.targetRoot };
+  const preview = buildFrameworkUpgradePlan(options);
+  const resolutions = preview.differences.map(({ kind, ...entry }) => ({
+    ...entry,
+    action: "source",
+    reason: "Current framework.",
+  }));
+  // Force a reviewed owner difference while keeping its installed runtime valid for admission.
+  write(data.targetRoot, ownerPath, original + "\n// Child runtime owner.\n");
+  const changed = buildFrameworkUpgradePlan(options).differences.find(
+    (entry) => entry.path === ownerPath,
+  );
+  const { kind, ...binding } = changed;
+  resolutions.push({
+    ...binding,
+    action: "replace",
+    reason: "Exercise an unadmitted lifecycle dependency.",
+    content: original + '\nimport "../../src/product-private.mjs";\n',
+    mode: binding.currentMode,
+  });
+  await assert.rejects(
+    applyFrameworkUpgrade(buildFrameworkUpgradePlan({ ...options, resolutions })),
+    /Destination lifecycle dependency requires explicit tool review: src\/product-private\.mjs/u,
+  );
+  assert.equal(
+    readFileSync(path.join(data.targetRoot, ownerPath), "utf8"),
+    original + "\n// Child runtime owner.\n",
+  );
+  assert.equal(existsSync(path.join(data.targetRoot, ".project-state/framework-upgrade")), false);
 });
 
 test("explicit regeneration preserves private state, requires quiescence and rolls back public owners", async () => {

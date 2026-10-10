@@ -280,7 +280,14 @@ export function ownedDirectoryChildPath(binding, basename, label) {
   return path.join(binding.operationPath, basename);
 }
 
-export function createExclusiveOwnedFile(binding, basename, content, label, mode = 0o600) {
+export function createExclusiveOwnedFile(
+  binding,
+  basename,
+  content,
+  label,
+  mode = 0o600,
+  { exactMode = false } = {},
+) {
   const target = ownedDirectoryChildPath(binding, basename, label);
   let descriptor;
   try {
@@ -291,9 +298,15 @@ export function createExclusiveOwnedFile(binding, basename, content, label, mode
     );
     writeFileSync(descriptor, content);
     fsyncSync(descriptor);
-    const stats = fstatSync(descriptor);
+    let stats = fstatSync(descriptor);
     if (!stats.isFile() || stats.nlink !== 1) {
       throw new Error(`Repository path safety created an unsafe ${label}.`);
+    }
+    // Reviewed migrations bind exact modes; ordinary private writes retain the caller's umask.
+    if (exactMode) {
+      fchmodSync(descriptor, mode);
+      fsyncSync(descriptor);
+      stats = fstatSync(descriptor);
     }
     validateOwnedDirectoryBinding(binding, label);
     fsyncSync(binding.descriptor);
@@ -308,7 +321,7 @@ export function atomicReplaceOwnedFile(
   basename,
   content,
   label,
-  { mode = 0o600, testHooks } = {},
+  { mode = 0o600, exactMode = false, testHooks } = {},
 ) {
   const target = ownedDirectoryChildPath(binding, basename, label);
   if (existsSync(target)) safeArtifactStats(target, "file", label);
@@ -316,7 +329,7 @@ export function atomicReplaceOwnedFile(
   const temporary = ownedDirectoryChildPath(binding, temporaryName, label);
   let created;
   try {
-    created = createExclusiveOwnedFile(binding, temporaryName, content, label, mode);
+    created = createExclusiveOwnedFile(binding, temporaryName, content, label, mode, { exactMode });
     testHooks?.beforeAtomicReplace?.({ binding, label, target, temporary });
     validateOwnedDirectoryBinding(binding, label);
     renameSync(temporary, target);
