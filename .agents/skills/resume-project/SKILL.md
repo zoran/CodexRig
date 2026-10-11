@@ -33,8 +33,11 @@ This skill owns recovery of the authorized workstream, not a second session or t
    requires exact provenance. Preserve ambiguous or overlapping state and continue safe
    reconstruction. Ask one focused content question only when evidence cannot choose between
    incompatible outcomes.
-4. State the recovered outcome, completed evidence, current slice, affected owners/consumers, risks,
-   blocker if any, and next coherent action. Reconcile the visible plan under the
+4. Recover usable results, missing outcomes, cumulative effort and stalled attempts under
+   [Long-Session Course Checks](../../../instructions.md#long-session-course-checks) before
+   selecting the next action; a resume does not validate the previous approach or reset its cost.
+   State that assessment, current slice, affected owners/consumers, risks and any real blocker.
+   Reconcile the visible plan under the
    [Planning Entry Gate](../../../instructions.md#planning-entry-gate) before continuing
    implementation. Perform the whole-repository course check and pre-slice coordination before
    writing. A local lease is not proof another developer's clone is idle. Reassess capacity under

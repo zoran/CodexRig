@@ -95,18 +95,19 @@ upgradeable product repositories while deliberately defining no child product or
   sandbox. The setup controller injects and narrowly trusts the two lifecycle hooks at issue time;
   SessionStart requires complete same-clone worktree/session reconstruction before intake or writes.
   Native guidance routes autonomous completion, task interpretation, concrete blocker handling,
-  per-slice documentation currency, the visible plan prerequisite and proportional review to
-  canonical policy. Bounded role handoffs include affected document owners; the primary owns
-  whole-repository acceptance. The four-subagent ceiling excludes the primary and requires confirmed
-  capacity, independence and effective permissions. Capacity admission preserves native earned-reset
-  and usage-permission evidence, resolves supported free account recovery before account-only
-  critical classification, and retains hard limits and terminal seals. Reserves require current
-  evidence for the next bounded work and closure in matching units; historical estimates and unknown
-  costs cannot establish a new critical state. Smaller useful work or fewer agents precede a
-  reserve-shortfall decision. Generated projects receive the same roles and canonical task,
-  planning, documentation and capacity policies; source-to-child updates compare that current output
-  for explicit local reconciliation. Validation proves configuration and projection consistency, not
-  model obedience.
+  per-slice documentation currency, the visible plan prerequisite, proportional review and course
+  correction against the original outcome and cumulative effort to canonical policy. Generation
+  projects the canonical course contract; review and recovery skills route to it. Bounded role
+  handoffs include affected document owners; the primary owns whole-repository acceptance. The
+  four-subagent ceiling excludes the primary and requires confirmed capacity, independence and
+  effective permissions. Capacity admission preserves native earned-reset and usage-permission
+  evidence, resolves supported free account recovery before account-only critical classification,
+  and retains hard limits and terminal seals. Reserves require current evidence for the next bounded
+  work and closure in matching units; historical estimates and unknown costs cannot establish a new
+  critical state. Smaller useful work or fewer agents precede a reserve-shortfall decision.
+  Generated projects receive the same roles and canonical task, planning, documentation and capacity
+  policies; source-to-child updates compare that current output for explicit local reconciliation.
+  Validation proves configuration and projection consistency, not model obedience.
 - Runtime and technology: Declarative TOML, JSON, and Markdown consumed by Codex, with lifecycle
   entrypoints implemented in the framework's Node.js/Bash harness.
 - Public contract: Root `developer_instructions` and `[agents]` defaults in `.codex/config.toml`,
@@ -551,7 +552,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.11.0`.
+- Framework version: `6.12.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

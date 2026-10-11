@@ -314,9 +314,12 @@ generic confirmation wording is not a new approval gate when the existing author
 
 A completed plan, test, slice or agent handoff is a checkpoint while the outcome remains unfinished.
 The primary assesses an agent's blocker, repairs or reroutes in-scope work and continues remaining
-safe work; a child's stopping condition is not the parent's stopping condition. A status question,
-additive correction or user absence does not pause the task. A hook allowing a stop releases its
-loop guard; it neither declares completion nor instructs the primary to abandon authorized work.
+safe work; a child's stopping condition is not the parent's stopping condition. Continuing the
+outcome does not require preserving the approach: apply
+[Long-Session Course Checks](#long-session-course-checks) before extending a failing route. A status
+question, additive correction or user absence does not pause the task. A hook allowing a stop
+releases its loop guard; it neither declares completion nor instructs the primary to abandon
+authorized work.
 
 Stop the whole task only when the accepted outcome is complete, the user explicitly pauses, cancels
 or replaces it, or no safe in-scope progress remains behind a demonstrated authority, safety,
@@ -387,11 +390,12 @@ goal; it verifies repository publication, creates no native Goal and grants no f
 failed required publication gate leaves that publication open. Do not manufacture publication
 boundaries for related unfinished work or infer publication from local maintenance.
 
-Recover the original outcome, accepted steering, evidence and next safe action after compaction or
-resume. A recap, research result or completed plan belongs in commentary when implementation remains
-authorized. User absence is not a pause. Side conversations remain independent unless the user
-brings their content into the main stream. General improvement authority does not grant product
-features, redesign, destructive actions or process control.
+Recover the original outcome, accepted steering, usable results, cumulative effort and stalled
+attempts after compaction or resume; apply [Long-Session Course Checks](#long-session-course-checks)
+before selecting the next action. A recap, research result or completed plan belongs in commentary
+when implementation remains authorized. User absence is not a pause. Side conversations remain
+independent unless the user brings their content into the main stream. General improvement authority
+does not grant product features, redesign, destructive actions or process control.
 
 Use the interpretation and blocker rules in [Task Scope And Completion](#task-scope-and-completion)
 before asking or stopping. Existing approvals remain valid within their scope. User instructions
@@ -418,20 +422,60 @@ task runtime.
 
 Check course after discovery/planning, material results, changed assumptions, each slice,
 compaction/resume, before acceptance and after publication. During active work allow at most ten
-minutes between brief course/capacity checks; declare the next safe checkpoint for an atomic
-operation. Measure progress by the accepted user outcome. Tests, reviews, reports and cleanup are
-supporting work, not another delivered product or infrastructure section. If two successive
-checkpoints show no outcome progress, freeze supporting scope, compare a shorter safe route and
-address the concrete bottleneck. Another status report or higher timeout is not a corrective action.
+minutes between brief course/capacity checks. This is the single course-correction contract for
+planning, implementation, reviews, audits, delegation and recovery.
 
-Compare accepted scope, current source, the bounded module map, evidence, docs and concurrent work.
-The primary owns the whole-repository assessment; children supply bounded evidence. Deepen only for
-unfinished acceptance or material risk. At slice boundaries refresh an authorized shared upstream;
-resolve overlapping contracts/migrations before writes, while disjoint work may continue. Reconcile
-canonical owners and consumers, retire proven-obsolete owned artifacts through their cleanup owner,
-preserve ambiguous state and active runtime, and use settlement for worktrees. Reuse valid evidence,
-maintain only necessary bounded context, report the next acceptance step and continue authorized
-work.
+At every check, compare the original user request and accepted steering with the usable result
+actually reached, the outcomes still missing and the entire effort spent so far. An internal
+milestone counts only when it demonstrably advances that result or provides required acceptance
+evidence about it; successful work on supporting machinery alone is not usable progress. Track
+elapsed time, repeated attempts and lack of usable progress across subtasks, agents, retries,
+context switches and resumed sessions. Renaming, replanning, a new review or completing a supporting
+task never resets that assessment. Use available evidence; identify missing measurements as unknown,
+never invent totals. Carry the bounded cumulative assessment in the conversation and, when already
+needed for recovery, the existing work context; create no monitor, history ledger or separate
+management process.
+
+Challenge the chosen approach itself: does its scope and complexity still fit the request, would
+established standard tools suffice, and do agent-created abstractions, approval layers, special
+cases or verification mechanisms now cost more than they contribute? Earlier investment does not
+justify continuing an unsuitable design. The primary owns total effort and the whole-repository
+assessment; children supply bounded evidence under the same overall outcome and correction/stop
+conditions, not merely their local technical objective.
+
+Two successive checks without usable outcome progress, clearly disproportionate effort, or a user
+complaint about drift or effort require reassessment of the whole approach immediately. Stop
+starting or expanding supporting mechanisms and dependent agent assignments. Name the drift, briefly
+compare realistic simpler routes, choose the smallest viable route to the next usable result, and
+implement that correction within existing authority. Cancel or redirect owned dependent work at its
+safe boundary. When drift is confirmed, change execution before another supporting step. Another
+status message, higher timeout, renamed workflow or repair of the same supporting machinery is not a
+correction. Retaining the approach requires evidence that disproves the suspected drift and shows it
+remains proportionate; state that evidence and the next usable result. Never silently reduce
+acceptance to make the route appear successful.
+
+Finish or controllably stop an actual in-flight atomic change at a named safe checkpoint; identify
+the specific interruption risk and boundary. A long agent-built workflow is not one indivisible
+operation, and its remaining steps do not inherit that exception. Preserve real safety, authority,
+ownership and capacity limits. Simplify or remove self-created process barriers within existing
+authority; if a real blocker remains, pause only dependent work and explain it under
+[Task Scope And Completion](#task-scope-and-completion). Duration alone does not require abandoning
+necessary work with demonstrable progress.
+
+Every additional test, review, audit, documentation task or technical improvement must name the
+specific missing acceptance evidence or material risk it addresses and justify its cost against the
+overall result. Reuse valid evidence; do not turn these checks into recursive assurance loops. When
+required evidence is sufficient, deliver. A course update briefly states what already works for the
+user, what remains, whether total effort is proportionate, and whether the approach is retained or
+changed and why. Internal IDs, plan status and small check steps cannot substitute for this
+judgment.
+
+Ground the assessment in current source, the bounded module map, evidence, docs and concurrent work.
+At slice boundaries refresh an authorized shared upstream; resolve overlapping contracts/migrations
+before writes while disjoint work may continue. Reconcile canonical owners and consumers, retire
+proven-obsolete owned artifacts through their cleanup owner, preserve ambiguous state and active
+runtime, and use settlement for worktrees. Maintain only necessary bounded context and continue the
+accepted outcome through the corrected route.
 
 ## Planning, Goals, Slices, Review Loops, And Audits
 
@@ -487,11 +531,13 @@ The plan is decision-ready only when it identifies:
 - review surfaces, audit criteria, cleanup expectations, publication boundaries, and any point that
   genuinely requires user or external input.
 
-Review the plan for omissions, contradictions, unsafe assumptions, and unnecessary work. Resolve
-every relevant finding and repeat the plan review until none remains, then perform a fresh plan
-audit against the request, manifest, repository state, and downstream system before implementation.
-If that audit finds a relevant issue, correct the plan, repeat the review loop, and audit again.
-Audit afresh from the authorized outcome and actual system, including a representative path through
+Review the plan for omissions, contradictions, unsafe assumptions, unnecessary work and whether the
+approach is proportionate to the original user outcome under
+[Long-Session Course Checks](#long-session-course-checks). Resolve relevant findings, then perform a
+fresh plan audit against the request, manifest, repository state and downstream system before
+implementation. A material audit finding reopens only the affected decision and evidence; repeat
+review/audit only to resolve that finding, subject to the same course-correction contract. Audit
+afresh from the authorized outcome and actual system, including a representative path through
 affected owners and consumers and
 [Repository Efficiency And Effectiveness](#repository-efficiency-and-effectiveness); merely
 rereading the prior findings is insufficient. Once the plan passes, continue the authorized
@@ -580,10 +626,12 @@ After every completed slice:
    the primary combines agent evidence and owns the whole-system assessment once.
 4. Fix every relevant, evidence-backed finding within the authorized scope, batch same-root-cause
    corrections, and rerun only affected focused evidence.
-5. Repeat review, repair, and focused verification until no relevant finding remains.
+5. Resolve remaining relevant findings with affected review, repair and focused verification under
+   [Long-Session Course Checks](#long-session-course-checks); stalled repairs require reassessing
+   the approach, not extending the loop by default.
 6. Only from that clean reviewed state, perform a fresh audit against the plan, current goal,
-   manifest, touched boundaries, and repository state. An audit finding reopens the slice: fix it,
-   repeat the review loop to zero relevant findings, and audit again.
+   manifest, touched boundaries, and repository state. A relevant audit finding reopens its affected
+   repair and evidence; audit the corrected state without repeating unaffected checks.
 7. Perform [Long-Session Course Checks](#long-session-course-checks) against the complete current
    repository and available upstream state. Reconcile concurrent changes before beginning the next
    dependent slice.
@@ -603,12 +651,13 @@ implementation failure. Classify false positives, duplicates, unrelated suggesti
 micro-optimizations explicitly; they do not block closure or authorize extra work.
 
 A delegated review returns findings or a scoped clean result; the primary owns the acceptance loop.
-Do not make every agent repeat a whole-project audit. Neither review loop has a fixed iteration
-limit: continue until no relevant finding remains, then audit the clean current state. An audit
-finding always reopens the affected review and repair loop. Do not manufacture new rounds, polish,
-abstractions, benchmarks, tests, or research after sufficient evidence; additional work must change
-an acceptance result or a material risk. If a relevant finding cannot be resolved within current
-authority or available evidence, state the blocker and resolution condition, continue safe
+Do not make every agent repeat a whole-project audit. Reviews and audits remain subject to
+[Long-Session Course Checks](#long-session-course-checks); unresolved findings do not license
+unlimited investment in the same approach. Fix or avoid the underlying defect through a simpler
+valid route without waiving acceptance or concealing a finding. Do not manufacture new rounds,
+polish, abstractions, benchmarks, tests or research after sufficient evidence; additional work must
+change an acceptance result or a material risk. If a relevant finding cannot be resolved within
+current authority or available evidence, state the blocker and resolution condition, continue safe
 independent work, and never declare that affected state clean. Review and audit findings remain
 conversation state; do not create review logs, audit reports, or per-slice documents.
 
@@ -697,9 +746,10 @@ runtime is preserved until a separate full reset after exit.
    source-only reproduction never requests registry freshness or bypasses the dependency guard.
 3. Complete [Documentation Currency](#documentation-currency) from the slice owner decisions and any
    required critical-document authority and dedicated preservation review. Repeat affected focused
-   checks, root-cause review and repair, the whole-repository course check, and a fresh whole-goal
-   audit until no relevant finding remains. A repository edit at any point reopens housekeeping,
-   affected checks, documentation gates, and the fresh audit.
+   checks, root-cause review and repair only for unresolved relevant findings, subject to
+   [Long-Session Course Checks](#long-session-course-checks), then audit the corrected whole-goal
+   state. A repository edit reopens affected housekeeping, evidence and documentation gates; reuse
+   unaffected evidence in the fresh audit.
 4. Choose the declared integration path. A serialized writer may continue on current `main` when
    policy permits. A temporary task branch or protected-`main` change is only a bounded integration
    input; one integrator or the detected provider serializer lands it. Refresh local `main` to the
@@ -1676,6 +1726,8 @@ Keep only:
 
 - the current goal and its success condition;
 - one current slice with a concrete outcome;
+- the original outcome and bounded cumulative effort/progress assessment required by
+  [Long-Session Course Checks](#long-session-course-checks);
 - essential invariants, constraints, and still-active decisions;
 - blockers and the few next actions needed to resume.
 
@@ -1906,8 +1958,9 @@ Replace superseded current context instead of appending corrections. On recovery
 approval interpretations, blockers and reserve estimates with current source, evidence and user
 authority before making decisions. Missing evidence is unknown, not success or a confirmed blocker.
 Condense completed history to current state, still-relevant decisions and scoped evidence; preserve
-safety, authorization, licensing and operational constraints. Use existing Git/decision or required
-archival records for retained detail, never a new repair journal.
+safety, authorization, licensing and operational constraints and the cumulative effort/stagnation
+assessment required by [Long-Session Course Checks](#long-session-course-checks). Use existing
+Git/decision or required archival records for retained detail, never a new repair journal.
 
 Close when affected owners and generated consumers agree, resolved current tasks are removed,
 remaining uncertainty is explicit and focused checks pass. Preserve discovery links, stable unique
@@ -2291,11 +2344,14 @@ slice must advance the authorized outcome without conflicting writes to modules,
 migrations, files, or generated artifacts, and its benefit must outweigh coordination, token cost,
 and integration.
 
-Every assignment inherits the task contract and states its result, exclusions and stopping
-condition. The primary owns the whole-repository course check and final audit. A child checks its
-assigned owners and affected consumers, returns material findings and documentation corrections,
-then stops. Do not delegate an unbounded instruction to keep improving, look for more issues or
-review the whole repository after a bounded result is already sufficient.
+Every assignment inherits the original user outcome, task contract and the correction/stop
+conditions in [Long-Session Course Checks](#long-session-course-checks), and states its bounded
+result, exclusions and local stopping condition. The primary owns cumulative effort, the
+whole-repository course check and final audit. A child reports stalled or disproportionate work
+against that overall outcome, checks its assigned owners and affected consumers, returns material
+findings and documentation corrections, then stops. Do not delegate an unbounded instruction to keep
+improving, look for more issues or review the whole repository after a bounded result is already
+sufficient.
 
 Make the parallelism decision concrete in the current plan: identify which assignments are ready
 now, their expected outcome and focused evidence, exact read/write scope, dependency boundaries,
@@ -2750,11 +2806,13 @@ verification evidence, so a push that bypassed pre-push cannot authorize another
 project-local Codex runtime and verification evidence do not count as unfinished work.
 
 Use a bounded scope for each review iteration, but repeat the iteration after fixes until no
-relevant, evidence-backed finding remains. Add specialized security, UI/UX, content, image, or
-search review only for surfaces that actually changed. Once reviews are clean, perform a fresh
-whole-goal audit before publication admission. Any audit finding reopens focused repair and the
-review-and-repair loop before the audit is repeated. Keep every review and audit in the
-conversation; do not create process documents.
+relevant, evidence-backed finding remains, subject to
+[Long-Session Course Checks](#long-session-course-checks); no review or audit overrides its
+mandatory approach reassessment. Add specialized security, UI/UX, content, image, or search review
+only for surfaces that actually changed. Once reviews are clean, perform a fresh whole-goal audit
+before publication admission. Any audit finding reopens focused repair and the review-and-repair
+loop before the audit is repeated. Keep every review and audit in the conversation; do not create
+process documents.
 
 ## Done
 

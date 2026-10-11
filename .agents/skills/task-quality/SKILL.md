@@ -53,8 +53,11 @@ Avoid duplicate findings across reviews. When external evidence supports a decis
 primary-source applicability. Apply the evidence and relevance criteria from
 [Slice Acceptance](../../../instructions.md#best-available-engineering-not-quick-fixes): fix
 relevant evidence-backed findings in finish mode, batch by root cause, and repeat only affected
-review/evidence until none remains. In review-only mode, report rather than repair; do not call a
-known-defective state clean.
+review/evidence under
+[Long-Session Course Checks](../../../instructions.md#long-session-course-checks). Required findings
+must be resolved, but review/audit loops cannot override mandatory approach reassessment or extend
+work after sufficient acceptance evidence. In review-only mode, report rather than repair; do not
+call a known-defective state clean.
 
 Every audit applies
 [Repository Efficiency And Effectiveness](../../../instructions.md#repository-efficiency-and-effectiveness):

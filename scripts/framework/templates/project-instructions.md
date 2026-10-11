@@ -125,11 +125,12 @@ benefit or material risk. A temporary mitigation needs explicit authority or imm
 a removal condition and an honest unfinished follow-up. Speed or quota pressure never lowers
 quality.
 
-After each nontrivial slice, perform `$system-coherence`, trace an assembled flow, repair relevant
-findings and repeat affected review and focused evidence until none remains. Then perform a fresh
-audit against outcome, plan, manifest and consumers; audit findings reopen the same loop. Neither
-plan nor implementation review has a fixed iteration limit. The relevance and proportionality
-criteria below prevent optional work from extending either loop after sufficient evidence. A real
+After each nontrivial slice, perform `$system-coherence`, trace an assembled flow and resolve
+relevant findings with affected review and focused evidence. Then perform a fresh audit against
+outcome, plan, manifest and consumers; a relevant finding reopens only affected repair and evidence.
+All iterations follow [Long-Session Course Checks](#long-session-course-checks); unresolved findings
+do not license unlimited investment in the same approach. Reuse unaffected evidence and deliver when
+acceptance is satisfied. The relevance criteria below apply to every proposed follow-up. A real
 authority or evidence blocker stays explicit with its resolution condition; continue safe
 independent work and never label the affected state clean.
 
@@ -339,9 +340,12 @@ configured GPT Astra model and its second-highest supported reasoning effort, cu
 primary, global agent defaults, roles and the shared validation policy in agreement; the installed
 model catalog must confirm the configured effort's rank before canonical startup.
 
-The primary owns the whole-repository course check and final audit. Children return evidence and
-document corrections for their assigned boundaries, then stop at their result or blocker. Do not
-turn a bounded assignment into an independent optimization or repository-wide audit campaign.
+Every assignment inherits the original user outcome and the correction/stop conditions from
+[Long-Session Course Checks](#long-session-course-checks). The primary owns cumulative effort, the
+whole-repository course check and final audit. Children report stalled or disproportionate work
+against that overall outcome and return evidence and document corrections for their assigned
+boundaries, then stop at their result or blocker. Do not turn a bounded assignment into an
+independent optimization or repository-wide audit campaign.
 
 Make the plan name assignments that can start now with an outcome, stopping condition, exclusions,
 affected document owners, focused evidence, exact scope, dependency boundary, selected role,
