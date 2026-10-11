@@ -36,7 +36,10 @@ reassesses after discovery, handoffs and slice boundaries. An open idle thread s
 slot. Generated projects retain this configuration and the role policies, with their own workflow
 instructions; a numeric ceiling alone does not cause delegation.
 
-Planning uses the native instruction layer; native Goals follow the
+The [Planning Entry Gate](../instructions.md#planning-entry-gate) owns plan selection, visible
+creation before implementation and reconciliation during work and recovery. The config and safe
+entry route to it; generation and update review project the canonical planning section unchanged.
+Native Goals follow the
 [explicit request or need-based delegation boundary](../instructions.md#authorized-work-and-native-codex).
 Long-session guidance uses this same instruction layer and the existing bounded Stop reminder.
 It adds no scheduler, account monitor, or hook. Changed tracked instructions and preloaded Stop code

@@ -34,9 +34,10 @@ This skill owns recovery of the authorized workstream, not a second session or t
    reconstruction. Ask one focused content question only when evidence cannot choose between
    incompatible outcomes.
 4. State the recovered outcome, completed evidence, current slice, affected owners/consumers, risks,
-   blocker if any, and next coherent action. Perform the whole-repository course check and pre-slice
-   coordination before writing. A local lease is not proof another developer's clone is idle.
-   Reassess capacity under
+   blocker if any, and next coherent action. Reconcile the visible plan under the
+   [Planning Entry Gate](../../../instructions.md#planning-entry-gate) before continuing
+   implementation. Perform the whole-repository course check and pre-slice coordination before
+   writing. A local lease is not proof another developer's clone is idle. Reassess capacity under
    [Capacity Admission And Monitoring](../../../instructions.md#capacity-admission-and-monitoring):
    historical reserve estimates and critical/blocked labels are not current limits. Size the reserve
    for the next useful coherent step; consider fewer agents or a smaller step before a new drain.

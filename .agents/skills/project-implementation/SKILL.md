@@ -19,13 +19,15 @@ for relevant evidence.
 
 Follow [Task Scope And Completion](../../../instructions.md#task-scope-and-completion): identify the
 accepted result, write scope, exclusions and stopping condition. Complete startup reconstruction and
-ownership checks before writes. For features or extensive, complex or risky work use the canonical
-[Planning](../../../instructions.md#planning-goals-slices-review-loops-and-audits) review/audit;
-keep decisions in the conversation or sole bounded context cache. Reuse settled parent decisions.
-The primary makes ordinary reversible implementation choices and continues necessary in-scope steps
-without repeat approval. A delegated assignment ends at its result; the primary integrates that
-handoff and continues the accepted outcome. Escalate only demonstrated blockers under the task
-contract.
+ownership checks before writes. Apply the canonical
+[Planning Entry Gate](../../../instructions.md#planning-entry-gate), including its visible plan and
+[review/audit](../../../instructions.md#plan-content-and-review), before implementation. For a
+delegated slice, reuse the accepted parent plan and return progress or missing material decisions to
+the primary; resolve those decisions before dependent writes. Keep decisions in the plan or sole
+bounded context cache. The primary makes ordinary reversible implementation choices and continues
+necessary in-scope steps without repeat approval. A delegated assignment ends at its result; the
+primary integrates that handoff and continues the accepted outcome. Escalate only demonstrated
+blockers under the task contract.
 
 Read applicable requirements/design and affected current owners through bounded context navigation.
 A pending product follows definition intake; framework tooling is not product evidence. Material

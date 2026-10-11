@@ -57,7 +57,7 @@ function stage() {
   return target;
 }
 
-test("generated children receive canonical task, documentation, maintenance and safety policies", async () => {
+test("generated children receive canonical task, planning, documentation, maintenance and safety policies", async () => {
   const target = stage();
   const sourceInstructions = readFileSync(path.join(source, "instructions.md"), "utf8");
   const generatedInstructions = readFileSync(path.join(target, "instructions.md"), "utf8");
@@ -71,6 +71,7 @@ test("generated children receive canonical task, documentation, maintenance and 
   };
   for (const [heading, marker] of [
     ["Task Scope And Completion", "<!-- current-task-scope-policy -->"],
+    ["Planning, Goals, Slices, Review Loops, And Audits", "<!-- current-planning-policy -->"],
     ["Documentation Ownership", "<!-- current-documentation-ownership-policy -->"],
     ["Documentation Currency", "<!-- current-documentation-currency-policy -->"],
     ["Maintenance Scope And Verification", "<!-- current-maintenance-scope-policy -->"],

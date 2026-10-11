@@ -45,6 +45,7 @@ export function currentProjectInstructions(sourceRoot) {
     ],
     ["Repository Efficiency And Effectiveness", "<!-- current-repository-efficiency-policy -->"],
     ["Task Scope And Completion", "<!-- current-task-scope-policy -->"],
+    ["Planning, Goals, Slices, Review Loops, And Audits", "<!-- current-planning-policy -->"],
     ["Maintenance Scope And Verification", "<!-- current-maintenance-scope-policy -->"],
     ["Long-Session Course Checks", "<!-- current-course-check-policy -->"],
     ["Verification Selection And Runtime", "<!-- current-verification-runtime-policy -->"],
@@ -107,9 +108,11 @@ task into product work.
 
 ## Delivery And Safety
 
-Automatically follow [Planning](instructions.md#planning-goals-slices-review-loops-and-audits)
-before new features or extensive, complex, or materially risky work: review the plan to no relevant
-findings, then audit it afresh before implementation. Audit findings reopen the affected loop. Use
+Apply the [Planning Entry Gate](instructions.md#planning-entry-gate) before implementation: state
+whether a plan is needed. For features or extensive, complex or risky work, create a visible plan
+with the native plan tool, or in commentary when unavailable, before edits or implementation
+delegation. Review and audit it under [Planning](instructions.md#plan-content-and-review), then
+continue authorized work. Reconcile the current plan at material changes, slice boundaries and resume. Use
 goals where useful, native Goals only with explicit request or delegated need-based authority.
 Repair at the actual owner, keep one current contract and one writer per surface, preserve user
 changes, and use relevant skills. After a slice, run focused evidence, system-coherence review to no

@@ -114,43 +114,7 @@ keep evidence proportional to the outcome and risks. One writer owns each surfac
 
 ## Planning, Goals, Slices, Review Loops, And Audits
 
-Automatically plan before implementing every new feature or other extensive, complex, or materially
-risky task. Multiple dependent steps or owners and substantial acceptance coverage count as extent
-even when individual edits are simple. Consequential unknowns, interacting contracts and difficult
-failure modes require planning even for a small diff. A routine isolated low-risk edit needs only a
-brief outcome/owner/check statement. Preserve plan-only or read-only authority and explicit approval
-gates; otherwise continue authorized implementation after planning without a routine pause.
-
-Use the native plan facility when available, otherwise the conversation; only the bounded project
-context lifecycle permits a working-context copy. Establish outcome, acceptance, non-goals, current
-system evidence, owners/consumers, viable designs, material decisions/unknowns, risks, ordered
-coherent slices, affected document owners, stopping condition, focused evidence, audit criteria,
-cleanup and real authority boundaries. Use intermediate goals only where distinct acceptance or
-dependencies help; assess native Goal suitability under
-[Authorized Work And Native Codex](#authorized-work-and-native-codex). Update the current plan on
-new evidence or accepted steering; do not duplicate task state or reopen settled decisions without
-cause.
-
-Include the current parallelism decision from
-[Subagent Orchestration](#subagent-orchestration-and-integration-authority): useful independent
-assignments, dependencies, exact read/write scopes, roles, admission evidence, checkpoints and
-integration order. Target four subagents plus the primary when admissible; otherwise state the
-concrete limiting reason.
-
-Review the plan, repair every relevant omission, contradiction or unsafe assumption, and repeat
-until no relevant finding remains. Then audit afresh against the request and actual system,
-including a representative path through affected owners and consumers and the
-[repository efficiency/effectiveness assessment](#repository-efficiency-and-effectiveness). An audit
-finding reopens the affected review/repair loop; audit again only from a clean reviewed state before
-implementation.
-
-After each nontrivial slice, perform `$system-coherence`, trace an assembled flow, repair relevant
-findings and repeat affected review and focused evidence until none remains. Then perform a fresh
-audit against outcome, plan, manifest and consumers; audit findings reopen the same loop. Neither
-plan nor implementation review has a fixed iteration limit. The relevance and proportionality
-criteria below prevent optional work from extending either loop after sufficient evidence. A real
-authority or evidence blocker stays explicit with its resolution condition; continue safe
-independent work and never label the affected state clean.
+<!-- current-planning-policy -->
 
 ## Best-Available Engineering, Not Quick Fixes
 
@@ -160,6 +124,14 @@ change the decision. Avoid symptom patches, speculative hardening and cleanup wi
 benefit or material risk. A temporary mitigation needs explicit authority or immediate containment,
 a removal condition and an honest unfinished follow-up. Speed or quota pressure never lowers
 quality.
+
+After each nontrivial slice, perform `$system-coherence`, trace an assembled flow, repair relevant
+findings and repeat affected review and focused evidence until none remains. Then perform a fresh
+audit against outcome, plan, manifest and consumers; audit findings reopen the same loop. Neither
+plan nor implementation review has a fixed iteration limit. The relevance and proportionality
+criteria below prevent optional work from extending either loop after sufficient evidence. A real
+authority or evidence blocker stays explicit with its resolution condition; continue safe
+independent work and never label the affected state clean.
 
 For both plans and implementation, a relevant finding needs evidence of a reproducible defect,
 demonstrated omission/contradiction, or plausible material failure path and its consequence for the

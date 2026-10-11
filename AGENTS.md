@@ -33,12 +33,15 @@ ends at update acceptance; product development needs its own authority. Apply
 startup, dependencies, verification and cleanup, and
 [Repository Update Scope](instructions.md#repository-update-scope) for child updates.
 
-Use [Planning](instructions.md#planning-goals-slices-review-loops-and-audits) before features or
-extensive, complex or risky work: compare viable designs, review to clean, audit afresh, implement.
-Every extra action needs an acceptance benefit or material risk. Keep one current internal contract
-and migrate owners/consumers together. Use relevant skills and one writer per surface. Read-only
-requests stay read-only. Continue accepted implementation to its real completion without routine
-approval pauses; commit, push, deployment and credential use retain their authority gates.
+Apply the [Planning Entry Gate](instructions.md#planning-entry-gate) before implementation: state
+whether a plan is needed. For features or extensive, complex or risky work, create a visible plan
+with the native plan tool, or in commentary when unavailable, before edits or implementation
+delegation. Review and audit it under [Planning](instructions.md#plan-content-and-review), then
+continue authorized work. Reconcile the current plan at material changes, slice boundaries and
+resume. Every extra action needs an acceptance benefit or material risk. Keep one current internal
+contract and migrate owners/consumers together. Use relevant skills and one writer per surface.
+Read-only requests stay read-only. Continue accepted implementation to its real completion without
+routine approval pauses; commit, push, deployment and credential use retain their authority gates.
 
 Apply [Documentation Currency](instructions.md#documentation-currency) in each slice: update
 affected canonical owners with the change and integrate agents' documentation corrections before
@@ -79,7 +82,10 @@ drain only owned work, record the exact Critical Budget Drain attestation and ru
 `pnpm handover:create -- --critical` as the final repository action, then stop all tools and
 continuation. After each completed slice run `pnpm worktree:status -- --json` and follow settlement;
 preservation alone is not completion. Use the README's publication command only with explicit
-authority and its verified ownership gates. Full runtime reset requires session exit.
+authority and its verified ownership gates. Full runtime reset requires session exit. End final
+repository responses with the combined command under
+[Publication Guidance](instructions.md#verification-and-publication-gates); displaying it grants no
+execution authority.
 
 Portable startup is on-request, network-disabled workspace-write. Only explicitly authorized Dev
 `--yolo` changes runtime permissions, never scope; staging/production retain their stronger gates.

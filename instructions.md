@@ -435,22 +435,45 @@ work.
 
 ## Planning, Goals, Slices, Review Loops, And Audits
 
-Automatically plan before implementing every new feature and every other extensive, complex, or
-materially risky task. Extent includes multiple dependent steps or owners and substantial acceptance
-coverage even when each edit is simple. Complexity includes consequential unknowns, interacting
-contracts, or difficult failure modes; material risk can require planning even for a small diff. For
-a routine, isolated, low-risk edit, a brief outcome/owner/check statement suffices. Do not make the
-user request planning separately or introduce a plan-approval pause when implementation is already
-authorized. A read-only or plan-only request remains within that authority.
+### Planning Entry Gate
 
-Use the native plan facility when available; otherwise keep the current plan in the conversation.
-Only the bounded multi-session context exception below permits a working-context copy. Update the
-plan as evidence or accepted steering changes its decisions; do not create a second task store or
-re-plan settled work without new evidence. The plan is decision-ready only when it identifies:
+After mandatory reconstruction, state whether the task needs a plan; use bounded discovery only
+where needed to make that decision. For clearly qualifying tasks, publish the initial plan before
+deeper investigation, then refine it as evidence arrives. A required plan must precede the first
+implementation edit, mutating implementation command or implementation delegation. Plan for every
+new feature and every extensive, complex or materially risky task. Multiple dependent steps or
+owners and substantial acceptance coverage count as extent even when each edit is simple.
+Consequential unknowns, interacting contracts or difficult failure modes count as complexity;
+material risk can require planning for a small diff. For a routine, isolated, low-risk edit, state
+the outcome, owner and check briefly and proceed. Reassess this decision before discovered
+complexity or expanded scope turns a small edit into material work.
+
+When planning applies, create the user-visible plan with the native plan tool (`update_plan` when
+exposed). If no plan tool is available, publish the ordered plan in commentary before
+implementation. An announcement such as "I will investigate and fix it", private reasoning, a
+verification command's check list or a retrospectively written plan does not satisfy this gate.
+Planning is an execution prerequisite in the current mode: do not wait for the user to request a
+plan, switch modes or approve ordinary already-authorized implementation. Preserve explicit approval
+gates and read-only or plan-only scope. Bounded discovery can resolve planning questions; it must
+not turn into unplanned implementation.
+
+Keep one current plan in that native tool or conversation, with concrete outcomes, ordered steps,
+the step in progress and observable acceptance checks. Size it to the task; do not turn every tool
+call into a step. Only the bounded multi-session context exception permits a working-context copy;
+create no separate plan files or task store. Reconcile the plan after material evidence, accepted
+steering and completed slices. On resume or compaction, recover and update the still-authorized plan
+before continuing; create a missing required plan before further implementation. Reuse settled
+decisions and valid evidence. Mark steps complete only when their outcomes are met. Complete
+[Plan Content And Review](#plan-content-and-review) before implementation.
+
+### Plan Content And Review
+
+The plan is decision-ready only when it identifies:
 
 - the task contract from [Task Scope And Completion](#task-scope-and-completion), including its
   observable stopping condition and affected documentation owners;
 - current-system evidence, owning boundaries, affected consumers, and relevant dependencies;
+- viable approaches, the selected design and the tradeoffs that determine the choice;
 - material product, architecture, data, migration, security, privacy, operational, and compatibility
   decisions or explicit unknowns that must be resolved before a dependent slice starts;
 - the acceptance evidence and ordered slices with a concrete outcome, dependencies, likely files or
@@ -2679,14 +2702,16 @@ leases are discarded with quiescent disposable runtime without interpreting an o
 remove open databases, WAL files or active session state. Full reset never rewrites Git history and
 is not a prerequisite for an otherwise valid in-session publication.
 
-For requested publication guidance, inspect the current README, package script and reset skill
-publication entry. Lead with the existing combined command; explain its cleanup, verification,
-commit and push effects and whether authority is present. The `bash scripts/setup/run-project.sh`
-prefix selects the project environment and runtime for that command. Do not substitute individual
-steps, invent a wrapper or require `/quit` when calling-session admission succeeds. Without
-publication authority, state that the command remains unexecuted. Recommend full reset only for
-explicit local sanitation, export hygiene or diagnosed recovery, with its actual session-exit
-requirement.
+End every final response about framework repository work with the current combined reset,
+verification, commit and push command in a fenced shell block, using a task-appropriate commit
+message. This standing publication guidance never authorizes executing the command. Before giving
+it, inspect the current README, package script and reset skill publication entry; reuse those reads
+when unchanged. Explain its cleanup, verification, commit and push effects and whether authority is
+present, then put the command last. The `bash scripts/setup/run-project.sh` prefix selects the
+project environment and runtime. Do not substitute individual steps, invent a wrapper or require
+`/quit` when calling-session admission succeeds. Without publication authority, state that the
+command remains unexecuted. Recommend full reset only for explicit local sanitation, export hygiene
+or diagnosed recovery, with its actual session-exit requirement.
 
 When admission identifies a real uncovered risk, the full plan covers syntax/format, tests,
 build/typecheck when present, repository contracts, secrets, dependencies, and relevant product

@@ -70,7 +70,8 @@ Read only the canonical contracts affected by this decision:
   environment/state boundaries and recovery before provisioning or configuration work.
 
 These links retain the detailed rules; do not clone them into a new design document or skill. Keep
-decision-ready plans in the conversation or the applicable existing bounded work cache.
+the decision-ready plan under the canonical
+[Planning Entry Gate](../../../instructions.md#planning-entry-gate).
 
 ## Migrate Architecture And Files Together
 
