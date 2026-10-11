@@ -1,6 +1,10 @@
 /** Owns verification executor behavior for the repository verification boundary. */
 import process from "node:process";
-import { spawnRuntimeLifecycleCommand } from "../repository/runtime-lifecycle-process.mjs";
+import { performance } from "node:perf_hooks";
+import {
+  spawnRuntimeLifecycleCommand,
+  requestRuntimeLifecycleCommandStop,
+} from "../repository/runtime-lifecycle-process.mjs";
 import { currentRuntimeLifecycleCapability } from "../repository/runtime-session-lease.mjs";
 import {
   formatContextError,
@@ -124,6 +128,7 @@ export function printPlan(plan) {
   console.log("\nSelected checks:");
   for (const command of commands) {
     console.log(`- Would run [${command.phase}]: ${safePrintableCommand(command)}`);
+    console.log(`  Key: ${safeField(command.key)}`);
     console.log(`  Reason: ${safeField(command.reason)}`);
   }
 }
@@ -218,7 +223,8 @@ async function withVerificationSignalForwarding(action) {
     const handler = () => {
       if (handledSignal) return;
       handledSignal = signal;
-      for (const child of activeVerificationSupervisors) child.kill(signal);
+      for (const child of activeVerificationSupervisors)
+        requestRuntimeLifecycleCommandStop(child, signal);
     };
     handlers.set(signal, handler);
     process.on(signal, handler);
@@ -243,8 +249,10 @@ function verificationLifecycleCapability(repositoryRoot) {
   return lifecycleCapability;
 }
 
-function runUnsupervisedCommand(command, repositoryRoot) {
+function runCommand(command, repositoryRoot, requireDiagnosis) {
   return new Promise((resolve) => {
+    const startedAt = performance.now();
+    console.log(`[verification:start] ${safeField(command.key)} (${command.phase})`);
     const child = spawnRuntimeLifecycleCommand({
       args: command.args,
       command: command.executable,
@@ -261,12 +269,32 @@ function runUnsupervisedCommand(command, repositoryRoot) {
     const stdout = boundedOutputCollector();
     const stderr = boundedOutputCollector();
     let settled = false;
+    let diagnosticRequired = false;
+    // Five minutes is the conservative diagnosis checkpoint for unmeasured project commands,
+    // not permission to kill them. Measured owners can declare a tighter execution contract.
+    const diagnosticAfterMs = command.diagnosticAfterMs ?? 300_000;
+    const timer = setTimeout(() => {
+      diagnosticRequired = true;
+      requireDiagnosis();
+      console.error(
+        `[verification:diagnose] ${safeField(command.key)} exceeded ${diagnosticAfterMs}ms; ` +
+          `stop scheduling checks and investigate this active command before repeating it. ` +
+          (command.cancellable === true
+            ? "Cancelling the owned local check."
+            : "Awaiting safe completion; no external operation is interrupted."),
+      );
+      if (command.cancellable === true) requestRuntimeLifecycleCommandStop(child);
+    }, diagnosticAfterMs);
+    timer.unref();
     const finish = (result) => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
       activeVerificationSupervisors.delete(child);
       resolve({
         ...result,
+        diagnosticRequired,
+        elapsedMs: Math.round(performance.now() - startedAt),
         command,
         stderr: stderr.buffer(),
         stdout: stdout.buffer(),
@@ -279,10 +307,6 @@ function runUnsupervisedCommand(command, repositoryRoot) {
   });
 }
 
-function runCommand(command, repositoryRoot) {
-  return runUnsupervisedCommand(command, repositoryRoot);
-}
-
 function writeBuffer(stream, buffer) {
   if (!buffer || buffer.length === 0) return;
   const sanitized = sanitizeMultilineForTerminal(buffer.toString("utf8"), root);
@@ -292,6 +316,9 @@ function writeBuffer(stream, buffer) {
 }
 
 function printResult(result) {
+  const status =
+    result.error || result.status !== 0 || result.diagnosticRequired ? "failed" : "passed";
+  console.log(`[verification:${status}] ${safeField(result.command.key)} ${result.elapsedMs}ms`);
   console.log(`\n[${safeField(result.command.label)}] ${safePrintableCommand(result.command)}`);
   writeBuffer(process.stdout, result.stdout);
   writeBuffer(process.stderr, result.stderr);
@@ -349,8 +376,15 @@ async function runArtifactSafeCommands(commands, failurePrefix, repositoryRoot) 
       const shard = shards[nextShard++];
       for (const index of shard) {
         if (phaseFailed) break;
-        results[index] = await runCommand(commands[index], repositoryRoot);
-        if (results[index].error || results[index].status !== 0) {
+        results[index] = await runCommand(commands[index], repositoryRoot, () => {
+          phaseFailed = true;
+        });
+        printResult(results[index]);
+        if (
+          results[index].error ||
+          results[index].status !== 0 ||
+          results[index].diagnosticRequired
+        ) {
           phaseFailed = true;
           break;
         }
@@ -363,8 +397,8 @@ async function runArtifactSafeCommands(commands, failurePrefix, repositoryRoot) 
   const failures = [];
   for (const result of results) {
     if (!result) continue;
-    printResult(result);
-    if (result.error || result.status !== 0) failures.push(safeField(result.command.label));
+    if (result.error || result.status !== 0 || result.diagnosticRequired)
+      failures.push(safeField(result.command.label));
   }
   if (failures.length > 0) {
     throw new Error(`${failurePrefix}: ${failures.join(", ")}`);

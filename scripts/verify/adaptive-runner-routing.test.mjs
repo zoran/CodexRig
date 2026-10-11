@@ -12,10 +12,12 @@ import {
 import { buildPlan, completeVerificationCommands } from "./adaptive-runner.mjs";
 import {
   consolidateFocusedTestOwners,
+  commandCoversTest,
   dedupeCommands,
   focusedTestCommand,
 } from "./verification-admission-commands.mjs";
 import { internalDependencies, route, writeManifest } from "./adaptive-runner-test-helpers.mjs";
+import { readVerificationConfiguration } from "./verification-configuration.mjs";
 
 // Combined edits used to select both an existing suite and its individual files. Keep the suite
 // once, rebind every affected path to that executed owner, and never broaden a standalone route.
@@ -108,6 +110,74 @@ test("complete verification covers installed framework suites including source-o
       (relativePath.startsWith("scripts/") || relativePath.startsWith(".agents/skills/")),
   );
   assert.deepEqual([...new Set(selected)].sort(), installed.sort());
+});
+
+test("a registered contract group stays focused and runs once inside its complete owner", () => {
+  const source = "scripts/verify/verification-executor.mjs";
+  const testPath = "scripts/verify/verification-executor.test.mjs";
+  const narrow = route([source, testPath]);
+  assert.equal(narrow.admission.mode, "targeted");
+  const keys = narrow.readOnlyCommands.map((command) => command.key);
+  assert.equal(keys.filter((key) => key === "verification-executor-regressions").length, 1);
+  assert.equal(keys.includes("verification-orchestration-regressions"), false);
+  assert.equal(
+    narrow.readOnlyCommands.some(
+      (command) => command.key.startsWith("focused-test:") && command.args.includes(testPath),
+    ),
+    false,
+  );
+  const broad = route([source, "unclassified-new-boundary"], {
+    basis: { trusted: false, reason: "no accepted foundation" },
+  });
+  const broadKeys = broad.readOnlyCommands.map((command) => command.key);
+  assert.equal(broad.admission.mode, "full");
+  assert.ok(broadKeys.includes("verification-orchestration-regressions"));
+  assert.equal(broadKeys.includes("verification-executor-regressions"), false);
+});
+
+test("complete-owner declarations reject filtered coverage, changed runtime and cycles", (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), "verification-covered-owner-"));
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  mkdirSync(path.join(root, ".codex"));
+  const file = "src/contract.test.mjs";
+  const parent = { key: "complete", executable: "$node", args: ["--test", file], phase: "broad" };
+  const child = { ...parent, key: "focused", phase: "preflight", coveredBy: "complete" };
+  const read = (commands) => {
+    writeFileSync(
+      path.join(root, ".codex/verification.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        commands,
+        prePushChecks: [],
+        risks: [],
+        testConsumers: {},
+        exactConsumers: {},
+        ownedCategories: {},
+      }),
+    );
+    return readVerificationConfiguration(root);
+  };
+  assert.equal(read([parent, child]).commands.length, 2);
+  for (const commands of [
+    [{ ...parent, args: ["--test-name-pattern=one", ...parent.args] }, child],
+    [parent, { ...child, args: ["--conditions=other", ...child.args] }],
+    [parent, { ...child, args: ["--test", "src/missing.test.mjs"] }],
+    [{ ...parent, coveredBy: "focused" }, child],
+  ])
+    assert.throws(() => read(commands), /Invalid complete verification owner/u);
+  assert.equal(commandCoversTest({ ...parent, executable: process.execPath }, file), true);
+  assert.equal(
+    commandCoversTest(
+      {
+        ...parent,
+        executable: process.execPath,
+        args: ["--test-name-pattern=one", ...parent.args],
+      },
+      file,
+    ),
+    false,
+  );
+  assert.equal(commandCoversTest({ ...parent, args: ["scripts/verify/docs.mjs"] }, file), false);
 });
 
 test("successful basis plus a fully owned product delta stays targeted even at the full entry", () => {

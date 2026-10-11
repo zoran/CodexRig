@@ -46,11 +46,7 @@ and never creates a Goal. Do not add a scheduler or second task store.
 
 ### Long-Session Course Checks
 
-After reconstruction, material changes, each slice and compaction, recover the original outcome,
-accepted steering, evidence, remaining work and next safe action. During active work allow at most
-ten minutes between brief course/capacity checks; declare the later safe boundary of an already
-running atomic operation. Check project-wide effects, real owners and consumers, proportionality,
-cleanup and documentation. Give a concise course update and continue safe authorized work.
+<!-- current-course-check-policy -->
 
 ## Session Start
 
@@ -260,17 +256,13 @@ their separate typed owners; secrets never belong in public configuration.
 
 ## Documentation Ownership
 
-README explains setup/use and links every active document under `docs/`. The manifest is a technical
-inventory with concise discovery links. Requirements and acceptance stay at the established
-specification owner, including a project-owned HTML specification. A static UI reference stays a
-separate artifact. The future-module index links confirmed deferred candidates without duplicating
-requirements. Do not generate review logs, history documents or a second task store.
+<!-- current-documentation-ownership-policy -->
 
-### Documentation Currency
+## Documentation Currency
 
 <!-- current-documentation-currency-policy -->
 
-### Context Economy And Canonical Owners
+## Context Economy And Canonical Owners
 
 Use known paths or scoped `rg`, then read matched source and trace actual consumers. Keep each fact
 at one owner and maintain discovery links when documents move. `docs/project-context.md` is an
@@ -335,17 +327,11 @@ publication gate and pre-push path, including unchanged evidence reuse, semantic
 and useful failure output. Preserve declared tool selectors and verification controls across those
 boundaries; verification must not install prerequisites or silently discard a real toolchain change.
 
-`.codex/verification.json` declares this repository's checks and consumers. Use
-`pnpm verify:changed -- --print-plan`, then affected evidence. Unknown paths or missing Git basis
-cannot establish full coverage without real product/workspace lifecycles; they grant no authority to
-run them outside the accepted task. Document/UI planning does not authorize application
-implementation. Stable tools have their own bounded safety tests.
+### Verification Selection And Runtime
 
-When its selected checks fit the accepted scope, run `pnpm verify` on the stable integrated state.
-Preserve failures, diagnose with the smallest owning check, batch repairs and reuse sound evidence.
-A failure alone never justifies another full run. A tooling defect blocks only the affected unsafe
-operation; name the blocker without changing the product task. Pre-push checks current successful
-evidence, the actual pushed objects and secrets.
+<!-- current-verification-runtime-policy -->
+
+### Verification And Publication Gates
 
 Explicitly authorized publication and deployment may run directly from the owning Codex session. Use
 the README's `project:publish` command to verify, commit and push the current branch to its

@@ -104,10 +104,10 @@ refresh or unrelated defect investigation follows from this assignment. Apply
    discard unknown private state to obtain startup success.
 7. Reconcile maintained README/manifest and product-owned command consumers within the same accepted
    migration. Apply [Documentation Currency](../../../instructions.md#documentation-currency) within
-   each slice; keep factual corrections at their owners before dependent work, not just at final
-   handoff. A real pristine generated ancestor may additionally support the `--baseline` three-way
-   comparison, but it does not replace policy review or prove product adaptations received current
-   fixes. Preserve each target's exact Mise pins and artifact locks when relocating them to
+   each slice and consolidate affected current claims, resolved tasks, scoped approvals and evidence
+   before acceptance. A real pristine generated ancestor may additionally support the `--baseline`
+   three-way comparison, but it does not replace policy review or prove product adaptations received
+   current fixes. Preserve each target's exact Mise pins and artifact locks when relocating them to
    `.codex/mise.toml` and `.codex/mise.lock`; retire the old discovery paths in the same cutover.
    Keep the target's confirmed name in `.codex/tooling.json` at `startup.displayName` for its
    startup animation, independently of source branding and product identity. Reconcile every

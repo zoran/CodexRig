@@ -408,6 +408,85 @@ test("a failed command does not schedule the remaining same-phase suffix", async
   assert.deepEqual(readFileSync(markerFile, "utf8").trim().split("\n"), ["first-failure"]);
 });
 
+test("a failure is reported while a same-phase peer is still running", async (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "verification-early-failure-"));
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  const reported = path.join(root, "reported");
+  const originalLog = console.log;
+  console.log = (...args) => {
+    if (String(args[0]).startsWith("[verification:failed] early-failure "))
+      writeFileSync(reported, "reported");
+    originalLog(...args);
+  };
+  try {
+    const peer = {
+      ...markerCommand(path.join(root, "order"), "waiting-peer", "preflight"),
+      args: [
+        "--input-type=module",
+        "--eval",
+        `
+        import { existsSync } from 'node:fs';
+        const deadline = Date.now() + 5000;
+        while (!existsSync(${JSON.stringify(reported)})) {
+          if (Date.now() > deadline) process.exit(71);
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }`,
+      ],
+    };
+    await assert.rejects(
+      runLockedPlan(
+        executionPlan(
+          [markerCommand(path.join(root, "order"), "early-failure", "preflight", 1), peer],
+          [],
+        ),
+        root,
+      ),
+      /^Error: Preflight verification checks failed: early-failure$/u,
+    );
+    assert.ok(existsSync(reported));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("overrun diagnosis stops admission and cancels only explicitly local checks", async (t) => {
+  for (const cancellable of [false, true]) {
+    const root = mkdtempSync(path.join(os.tmpdir(), "verification-overrun-"));
+    t.after(() => rmSync(root, { force: true, recursive: true }));
+    const completed = path.join(root, "completed");
+    const suffix = path.join(root, "suffix");
+    const command = {
+      ...markerCommand(completed, "overrun", "preflight"),
+      artifactOwners: ["shared"],
+      diagnosticAfterMs: 100,
+      cancellable,
+      args: [
+        "--input-type=module",
+        "--eval",
+        `
+        import { writeFileSync } from 'node:fs';
+        await new Promise(resolve => setTimeout(resolve, 400));
+        writeFileSync(${JSON.stringify(completed)}, 'safe completion');`,
+      ],
+    };
+    await assert.rejects(
+      runLockedPlan(
+        executionPlan(
+          [
+            command,
+            { ...markerCommand(suffix, "unstarted", "preflight"), artifactOwners: ["shared"] },
+          ],
+          [],
+        ),
+        root,
+      ),
+      /Preflight verification checks failed: overrun/u,
+    );
+    assert.equal(existsSync(suffix), false);
+    assert.equal(existsSync(completed), !cancellable);
+  }
+});
+
 test("successful phases complete in preflight, broad, build, test, delivery order", async (t) => {
   const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), "verification-phase-order-"));
   const markerFile = path.join(fixtureRoot, "order.txt");

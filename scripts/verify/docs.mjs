@@ -17,6 +17,7 @@ import { listActiveFiles, repositoryRoot } from "../repository/source-inventory.
 import { readmeDocumentationFindings } from "../docs/project-document-policy.mjs";
 
 import { inspectContextBudget } from "../context/context-budget.mjs";
+import { projectWorkContextFindings } from "../context/project-work-state.mjs";
 import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
 
 const root = repositoryRoot;
@@ -27,7 +28,7 @@ const manifestCheck = spawnSync(
 );
 if (manifestCheck.status !== 0) process.exit(manifestCheck.status ?? 1);
 
-const failures = [...inspectContextBudget(root).findings];
+const failures = [...inspectContextBudget(root).findings, ...projectWorkContextFindings(root)];
 failures.push(
   ...readmeDocumentationFindings({
     readme: readFileSync(path.join(root, "README.md"), "utf8"),
@@ -94,4 +95,6 @@ if (failures.length > 0) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
-console.log("Documentation verification passed without generating project files.");
+console.log(
+  "Documentation structure, references and work-state checks passed; semantic currency requires source/evidence review. No files generated.",
+);

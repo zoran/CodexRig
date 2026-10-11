@@ -119,6 +119,36 @@ test("budget distinguishes injected scopes, conditional roles and complete refer
   assert.equal(contextCommand(["check"], root).failed, true);
 });
 
+test("context check validates optional work state without inventing work or certifying its prose", (t) => {
+  const { root, write } = fixture(t);
+  assert.equal(contextCommand(["check"], root).failed, false);
+  const state = {
+    version: 1,
+    revision: 1,
+    status: "complete",
+    outcome: "Repair the accepted defect",
+    currentGoal: "Repair",
+    currentSlice: null,
+    nextAction: null,
+    blocker: { kind: "external", reason: "Already resolved" },
+  };
+  const save = () =>
+    write(
+      "docs/project-context.md",
+      `<!-- codexrig-work-state\n${JSON.stringify(state)}\n-->\n\n# Work\n`,
+    );
+  save();
+  const invalid = contextCommand(["check", "--json"], root);
+  assert.equal(invalid.failed, true);
+  assert.match(invalid.output, /complete work cannot declare a next action or blocker/u);
+  state.blocker = null;
+  save();
+  assert.equal(contextCommand(["check"], root).failed, false);
+  assert.match(contextCommand(["check"], root).output, /does not establish semantic currency/u);
+  write("docs/project-context.md", "# Stale task without the required marker\n");
+  assert.equal(contextCommand(["check"], root).failed, true);
+});
+
 test("individually bounded scopes cannot overflow a delegated assembled context", (t) => {
   const { root, write } = fixture(t);
   write("AGENTS.md", "a".repeat(8100));

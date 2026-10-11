@@ -23,6 +23,10 @@ import {
 import { stageProjectExport } from "../framework/stage-project-export.mjs";
 import { validateGeneratedProject } from "../framework/validate-staged-project.mjs";
 import { documentContextSections } from "../docs/document-context.mjs";
+import {
+  prepareProjectToolDirectories,
+  projectToolEnvironment,
+} from "../repository/project-tool-environment.mjs";
 
 let source;
 let pristine;
@@ -67,8 +71,11 @@ test("generated children receive canonical task, documentation, maintenance and 
   };
   for (const [heading, marker] of [
     ["Task Scope And Completion", "<!-- current-task-scope-policy -->"],
+    ["Documentation Ownership", "<!-- current-documentation-ownership-policy -->"],
     ["Documentation Currency", "<!-- current-documentation-currency-policy -->"],
     ["Maintenance Scope And Verification", "<!-- current-maintenance-scope-policy -->"],
+    ["Long-Session Course Checks", "<!-- current-course-check-policy -->"],
+    ["Verification Selection And Runtime", "<!-- current-verification-runtime-policy -->"],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
     ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
   ]) {
@@ -79,6 +86,38 @@ test("generated children receive canonical task, documentation, maintenance and 
     assert.equal(generatedInstructions.includes(marker), false);
   }
   await validateGeneratedProject(target);
+  const contextPath = path.join(target, "docs/project-context.md");
+  const marker = /`([a-z]+-work-state)`/u.exec(generatedInstructions)?.[1];
+  assert.ok(marker, "Generated instructions must name their current work-state marker.");
+  const state = {
+    version: 1,
+    revision: 1,
+    status: "complete",
+    outcome: "Fixture repair",
+    currentGoal: "Fixture",
+    currentSlice: null,
+    nextAction: null,
+    blocker: { kind: "external", reason: "Resolved" },
+  };
+  const save = () =>
+    writeFileSync(contextPath, `<!-- ${marker}\n${JSON.stringify(state)}\n-->\n\n# Work\n`);
+  save();
+  prepareProjectToolDirectories(target);
+  const docs = () =>
+    spawnSync(process.execPath, ["scripts/verify/docs.mjs"], {
+      cwd: target,
+      env: projectToolEnvironment({ root: target }),
+      encoding: "utf8",
+      timeout: 10000,
+    });
+  const rejected = docs();
+  assert.equal(rejected.status, 1, rejected.stderr);
+  assert.match(rejected.stderr, /complete work cannot declare a next action or blocker/u);
+  state.blocker = null;
+  save();
+  const accepted = docs();
+  assert.equal(accepted.status, 0, accepted.stderr);
+  assert.match(accepted.stdout, /semantic currency requires source\/evidence review/u);
 });
 
 test("generated validators reject primary policy without the maintenance scope boundary", async () => {

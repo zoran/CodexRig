@@ -416,29 +416,22 @@ task runtime.
 
 ### Long-Session Course Checks
 
-The primary checks course after discovery/planning, material results or changed assumptions, each
-slice/milestone, compaction/resume, before final acceptance and after publication before another
-authorized goal. During active work, leave at most ten minutes between brief course/capacity checks.
-For an already-running atomic operation, declare its next safe checkpoint in advance. This is an
-event-driven workflow, not a timer, extra hook or recurring full scan.
+Check course after discovery/planning, material results, changed assumptions, each slice,
+compaction/resume, before acceptance and after publication. During active work allow at most ten
+minutes between brief course/capacity checks; declare the next safe checkpoint for an atomic
+operation. Measure progress by the accepted user outcome. Tests, reviews, reports and cleanup are
+supporting work, not another delivered product or infrastructure section. If two successive
+checkpoints show no outcome progress, freeze supporting scope, compare a shorter safe route and
+address the concrete bottleneck. Another status report or higher timeout is not a corrective action.
 
-Compare the task contract and remaining acceptance with current source, the bounded module map,
-affected owners/consumers, evidence, documentation and concurrent work. Deepen only where new facts
-warrant it. Stop speculative hardening, repeated research, micro-optimization and cleanup without an
-acceptance benefit or material risk. The primary owns the whole-repository assessment; delegated
-agents report consequences at their assigned boundaries rather than restart repository-wide audits.
-
-At slice boundaries, refresh the upstream view when a shared remote and authorized network access
-exist. Compare changes since the slice base by path, module, contract, schema and migration. Resolve
-overlap before affected writes and rerun only affected evidence. Disjoint work can continue through
-a failed remote refresh; shared-boundary integration waits for trustworthy evidence.
-
-Reconcile affected code, tests, configuration and document owners; retire proven-obsolete in-scope
-paths through their cleanup owner after checking consumers and recovery value. Preserve ambiguous
-state and active runtime. Worktree retirement uses settlement, never manual directory deletion.
-Reuse still-valid evidence; this checkpoint grants no broad-verification or housekeeping campaign.
-Refresh or remove bounded work context as its lifecycle requires. Briefly report alignment, any
-material correction and the next acceptance step, then continue or stop under the task contract.
+Compare accepted scope, current source, the bounded module map, evidence, docs and concurrent work.
+The primary owns the whole-repository assessment; children supply bounded evidence. Deepen only for
+unfinished acceptance or material risk. At slice boundaries refresh an authorized shared upstream;
+resolve overlapping contracts/migrations before writes, while disjoint work may continue. Reconcile
+canonical owners and consumers, retire proven-obsolete owned artifacts through their cleanup owner,
+preserve ambiguous state and active runtime, and use settlement for worktrees. Reuse valid evidence,
+maintain only necessary bounded context, report the next acceptance step and continue authorized
+work.
 
 ## Planning, Goals, Slices, Review Loops, And Audits
 
@@ -1761,22 +1754,27 @@ repository, and tests or verifier helpers whose only subject no longer exists sh
 
 ## Documentation Ownership
 
-`docs/project.md` is the technical current-state index: a short product definition and discovery
-links, real roots/modules, configuration owners, integrated interfaces/adapters/infrastructure, and
-honest evidence limits. Its Users And Outcome and Scope sections orient readers and link detailed
-requirements; System Shape records actual composition; Constraints And Decisions records current
-constraints and links accepted decisions. None is a second detailed specification or design history.
+Each fact has one current owner; other documents link it and retain only necessary local context.
 
-Detailed product requirements, intended architecture, proposed or confirmed choices and acceptance
-criteria belong to the established requirements/design owner. Read that owner's relevant sections
-before intake, resume, architecture, implementation or review; use its outline instead of
-unconditional full-text loading. Keep proposed choices, confirmed requirements, integrated
-implementation, deployment and observed testing distinguishable. Configuration files own exact
-settings; validated manifest projections may summarize them. A configured policy, an integrated
-adapter, a deployed service and successful account-backed testing are different facts. A static HTML
-UI reference is an existing artifact, not proof that its illustrated operations are implemented. The
-product specification describes what the product must do; the interactive UI reference shows
-appearance and interaction. Preserve their separate roles even when both are HTML.
+| Concern               | Current owner                                                              |
+| --------------------- | -------------------------------------------------------------------------- |
+| Intent and acceptance | Established requirements/design document, including intended architecture  |
+| Integrated state      | Source/configuration, indexed in `docs/project.md` with evidence limits    |
+| Use and operation     | README or the established operations guide                                 |
+| Verification          | Existing check/CI results, bound to the checked state and scope            |
+| Authorization         | Relevant decision/operations owner, bound to the user's decision and scope |
+| Current work          | Optional bounded `docs/project-context.md`; never durable authority        |
+| Historical decisions  | Existing decision records or Git history                                   |
+| Framework workflow    | `instructions.md` and its generated or bounded projections                 |
+
+Read relevant requirements/design sections before intake, resume, architecture, implementation or
+review. Keep proposed choices, confirmed requirements, integrated implementation, deployment and
+observed testing distinct. Exact settings belong to configuration; validated manifest projections
+may summarize them. An HTML UI reference demonstrates appearance/interaction, not implemented
+operations; keep it separate from the product specification even when both use HTML. The manifest's
+Definition, Users And Outcome and Scope orient and link requirements; System Shape indexes actual
+composition; Constraints And Decisions links current constraints and decisions; Maintenance routes
+upkeep. These sections are neither a second specification nor a session journal.
 
 Use existing links and focused discovery first. Do not require another registry, specification,
 format or parser stack. A small product may keep its entire short definition in the manifest's
@@ -1806,9 +1804,8 @@ documents discoverable there without retelling them. Every durable document unde
 README link; the temporary `docs/project-context.md` is excluded. For focused documents elsewhere,
 maintain the same discovery discipline. Checks validate coverage and links, not semantic
 duplication. Future Modules owns only the confirmed candidate and activation index, linking
-requirements rather than retelling them. Project context owns bounded temporary work, never durable
-product authority. Framework workflow stays in `instructions.md` and its bounded projections; the
-source framework retains its real active capability inventory.
+requirements rather than retelling them. The source framework retains its real active capability
+inventory.
 
 Before removing or moving substantive manifest/README content, map each requirement, exception,
 constraint and evidence qualification to surviving canonical text or an explicitly superseded
@@ -1853,36 +1850,48 @@ above.
 
 ### Documentation Currency
 
-Documentation is part of the change that makes it true. Before accepting each slice, compare changed
-behavior, commands, contracts, configuration, decisions and module ownership with their document
-owners. Update affected facts in that same slice, before handoff or dependent work; do not defer
-them to goal completion, publication or a later reminder.
+Documentation is part of the change that makes it true. After each material result and before slice
+acceptance, handoff or handover, compare the diff and accepted decisions with affected owners under
+[Documentation Ownership](#documentation-ownership): which statements became false or incomplete,
+which tasks/blockers/prerequisites are resolved, which owners and derived consumers must change
+together, and which evidence still applies to which state? Update them in that same slice before
+dependent work. Do not silently rewrite an unmet requirement to match implementation.
 
-| Changed fact                                                          | Canonical owner to reconcile                                                    |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Setup, use, operation or upgrade commands                             | README or the established operations guide                                      |
-| Integrated modules, roots, contracts, dependencies or evidence limits | `docs/project.md`                                                               |
-| Accepted requirements, decisions or acceptance criteria               | Existing requirements/design owner                                              |
-| Workflow, delegation or maintenance boundaries                        | `instructions.md` and affected bootstrap, role, skill and generated projections |
-| Current progress, blocker or next authorized action                   | Existing bounded `docs/project-context.md`, only when its lifecycle applies     |
+The writer updates assigned owners and returns exact corrections for protected or unassigned
+documents. The primary integrates them before acceptance. A brief conversation handoff names the
+owners and evidence basis, or gives the diff-based reason documented facts remain unchanged. An
+internal refactor preserving documented behavior can need no documentation edit, date change or
+separate record. Read-only reviewers report drift without editing. No new register or receipt.
 
-The writer names the affected owners and updates them within its write set. A delegated writer
-returns exact factual corrections for protected or unassigned documents to the primary. The primary
-integrates those corrections before accepting the slice. A brief conversation handoff names updated
-owners, or explains why the changed behavior leaves documented facts unchanged. No new tracking
-file, receipt or copied specification is required. Read-only reviewers report drift without editing.
+Evidence claims identify the checked revision or content basis (including relevant uncommitted
+changes), environment/toolchain or target, actual commands/cases and material limits. Link existing
+results where available; do not copy logs into the manifest. Earlier success remains historical
+unless unchanged relevant inputs and tools justify reuse. Record an approval once at its relevant
+decision/operations owner with authorized scope, conditions and originating user decision; reconcile
+pending summaries when that decision changes. Approval, implementation and verification are
+separate.
 
-At task completion, review the active document inventory against the final diff and accumulated
-owner decisions; inspect affected documents and their consumers, not every unchanged document in
-full again. Broaden only for a concrete contradiction or missing owner. Preserve local links, unique
-stable anchors, one descriptive top-level heading and a non-skipping heading hierarchy. A passing
-structure check does not prove semantic currency, completeness or agent compliance.
+At completion and framework updates, consolidate the affected inventory against the integrated diff
+and owner decisions. At completed-goal housekeeping, review the active document inventory more
+broadly: conflicting status, completed current tasks, duplicate contracts, stale commands/links,
+history obscuring current state, and unbound evidence/approvals. Existing scheduled housekeeping
+checks deterministic structure and projections; findings trigger a bounded owner review, not repair
+authority. Broaden a semantic review only for an identified contradiction or missing owner. Time
+alone does not make a document stale and unchanged content needs no artificial date refresh.
 
-Replace stale content in place. Add a document only for a distinct audience and maintenance need;
-keep requirements and rationale needed for safe operation at one canonical owner. Update README
-discovery when documents move. Give critical-document edits the separate preservation review below.
-Close documentation work when current facts and consumers agree; do not add cosmetic rewrites,
-status history or new prose merely to demonstrate activity.
+Replace superseded current context instead of appending corrections. On recovery, compare old tasks,
+approval interpretations, blockers and reserve estimates with current source, evidence and user
+authority before making decisions. Missing evidence is unknown, not success or a confirmed blocker.
+Condense completed history to current state, still-relevant decisions and scoped evidence; preserve
+safety, authorization, licensing and operational constraints. Use existing Git/decision or required
+archival records for retained detail, never a new repair journal.
+
+Close when affected owners and generated consumers agree, resolved current tasks are removed,
+remaining uncertainty is explicit and focused checks pass. Preserve discovery links, stable unique
+anchors and heading structure; critical-document edits also need the preservation review below.
+Structure, link and marker checks do not establish semantic currency or agent compliance: compare
+material claims with source, requirements and scoped evidence. No cosmetic expansion after
+acceptance.
 
 ### Context Economy And Canonical Owners
 
@@ -1903,11 +1912,11 @@ Repository skills use progressive disclosure: their name and description make se
 while the full `SKILL.md` workflow is read only when relevant. Do not preload every skill into entry
 documents or duplicate a skill's procedure in general policy. Larger model context windows improve
 headroom but never justify repeated directives, stale prose, or indiscriminate document growth;
-attention and retrieval quality remain finite. `docs:check`, completed-goal documentation review,
-and repository housekeeping enforce the bootstrap byte budget, one meaningful top-level title,
-non-skipping unique headings, valid local references, and canonical-owner separation. These bounds
-never authorize hiding portable policy, roles, skills, hooks, managed files, exclusions, or upgrade
-actions.
+attention and retrieval quality remain finite. `docs:check` and repository housekeeping enforce the
+bootstrap byte budget, heading/link structure, manifest projections and optional work-state shape;
+`context:check` also validates that marker. Completed-goal review assesses semantic owner
+separation. These bounds never authorize hiding portable policy, roles, skills, hooks, managed
+files, exclusions, or upgrade actions.
 
 Treat the durable project manifest (`docs/project.md`) as critical documentation. Treat
 `instructions.md` and every other workflow authority, bootstrap, security/trust policy, operations
@@ -2601,15 +2610,30 @@ publication gate and pre-push path, including unchanged evidence reuse, semantic
 and useful failure output. Preserve declared tool selectors and verification controls across those
 boundaries; verification must not install prerequisites or silently discard a real toolchain change.
 
-Run the smallest useful focused command while iterating; this controls execution cost, not the
-preferred breadth of newly added durable tests. `pnpm verify:changed -- --print-plan` exposes the
-adaptive current-delta decision without executing it; the plan reports targeted or full mode,
-full-relevant and unknown paths, uncovered paths, focused command owners, the exact admission
-reason, and whether the successful basis can advance. After every completed slice, repeat bounded
-review, repair, and affected focused verification until no relevant finding remains, then perform
-the fresh audit required above. When its selected checks fit the accepted scope, invoke
-`pnpm verify` once on the actual target-`main` state only after the final goal audit and cleanup are
-clean. Both entries use the same admission owner; a previous failure cannot bypass it.
+### Verification Selection And Runtime
+
+Use `pnpm verify:changed -- --print-plan` before affected integration checks. The single registry,
+`.codex/verification.json`, binds contracts and consumers; explicit `coveredBy` groups run
+separately for a narrow delta and once inside their complete owner. Preserve runtime flags and
+actual case coverage. Shared safety boundaries, dependencies, verification controls and unknown
+consumers retain broad coverage; a filename alone is not evidence. Review and audit each stable
+slice proportionately.
+
+After failure, use `pnpm verify:changed -- --check <key>` first; native Node checks also accept
+`--test-name-pattern <pattern>`. Reproduction never advances acceptance. Before repeating an
+expensive complete run answer: which relevant uncertainty can only this run resolve? Reuse
+successful evidence only for unchanged relevant source, tests, dependencies, controls and tools. Run
+`pnpm verify` on the stable integrated state after final audit; publication and hooks consume its
+valid evidence.
+
+The runner reports the active key and elapsed time. Set `diagnosticAfterMs` from measured duration
+and check type; the unmeasured default is a five-minute diagnosis checkpoint. Exceeding it stops new
+checks and fails acceptance pending diagnosis. Only explicitly `cancellable` local checks may be
+terminated through their owned supervisor; external mutations and ambiguous processes must reach a
+safe boundary. Measure the dominant steps before repair; more progress messages or a larger timeout
+alone do not resolve an overrun. Keep the same meaningful success and failure cases.
+
+### Verification And Publication Gates
 
 Framework publication and private runtime sanitation are separate boundaries. After framework
 changes, clear completed source process artifacts through the reset owner's publication mode. The

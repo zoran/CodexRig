@@ -1,7 +1,7 @@
 # Project Manifest
 
-This is the always-read, concise source of truth for the framework that exists in this repository.
-It records integrated capabilities and current operating facts, not workflow policy or a roadmap.
+This is the current-state index for the framework; read relevant sections through `context:read`. It
+records integrated capabilities and current operating facts, not workflow policy or a roadmap.
 
 Agent workflow authority: `instructions.md`. Optional project context cannot override this manifest.
 
@@ -16,9 +16,9 @@ upgradeable product repositories while deliberately defining no child product or
 - Problem and desired outcome: provide inspectable project policy, deterministic setup, bounded
   orchestration, durable context recovery, modular delivery, child updates, and risk-based
   verification without imposing an application architecture before a product is defined.
-- Success evidence: the framework doctor, project-generation lifecycle, managed-upgrade lifecycle,
-  portable-source contracts, focused capability verifiers, and repository verification pass on the
-  exact reviewed source state.
+- Acceptance criteria: framework doctor, generation/update lifecycles, portable contracts and
+  affected verification pass on the reviewed source state. These criteria are not a current test
+  result; verification evidence binds actual source, tools, environment and executed checks.
 
 ## Scope
 
@@ -125,20 +125,19 @@ upgradeable product repositories while deliberately defining no child product or
 - Responsibility: Owns durable work-state validation, preloaded Stop continuation, portable context
   contracts, and private critical-budget handover creation, discovery, full receipt and exact-file
   acknowledgement. A semantic work-state revision can trigger continuation once per session;
-  subsequent user turns do not re-arm unchanged state. The response requires current task-scope
-  validation, capacity reassessment and documentation currency before further work; it cannot infer
-  user intent from a marker. Releasing the loop guard is distinct from task completion; guidance
-  directs the primary to continue unfinished authorized work. Malformed context reports an evidence
-  limit without forcing a repair task.
+  subsequent user turns do not re-arm unchanged state. Shared receipt/continuation guidance requires
+  comparing historical tasks, blockers, approvals and test claims with current source and authority;
+  a marker establishes neither intent nor semantic truth. Releasing the loop guard is not
+  completion.
 - Runtime and technology: Node.js ESM and built-ins on the framework's mise-pinned toolchain.
-- Public contract: `context:map`, bounded Markdown/HTML `context:read`, byte-based `context:check`
-  (also part of documentation verification), `handover:create`, `handover:receive`,
-  `handover:acknowledge`, exported portable context validators, and the preloaded Stop lifecycle.
-  Receipt requires an active canonical session distinct from the sealing session and the exact
-  accepted repository-bound artifact; acknowledgement removes only unchanged received bytes, not
-  native conversation history. Receipt supplies current capacity guidance separately from the
-  integrity-bound historical prompt, including older artifacts. It does not measure native quota or
-  validate the prior capacity decision.
+- Public contract: `context:map`, bounded Markdown/HTML `context:read`, `context:check` for
+  instruction bytes and optional work-state structure (also checked by `docs:check`),
+  `handover:create`, `handover:receive`, `handover:acknowledge`, exported portable context
+  validators, and the preloaded Stop lifecycle. Receipt requires an active canonical session
+  distinct from the sealing session and the exact accepted repository-bound artifact;
+  acknowledgement removes only unchanged received bytes, not native conversation history. Current
+  evidence/capacity guidance travels outside the integrity-bound historical prompt, including older
+  artifacts; receipt neither measures quota nor validates old decisions.
 - Private internals: Work-marker validation, bounded continuation loop state, private prompt binding
   and digest checks, and required portable-policy declarations. The context contract verifies that
   portable Git ignore rules keep `docs/project-context.md` private while explicit recovery reads
@@ -226,12 +225,12 @@ upgradeable product repositories while deliberately defining no child product or
 #### Documentation Contracts
 
 - Root: `scripts/docs`
-- Responsibility: Enforces document scope, current-state manifest ownership, the separate deferred
-  module inventory, delivery-inventory projection, and project-document reconciliation requirements.
-  Optional manifest links identify requirements and distinct UI-reference artifacts, with contained
-  file and static Markdown/HTML anchor checks. README discovery validates links to all active
-  durable Markdown/HTML documents under `docs/`; these checks do not certify prose meaning or
-  duplication.
+- Responsibility: Enforces document scope, unique current-state manifest sections, module inventory,
+  unimplemented-module separation and delivery projections. Requirements/UI-reference declarations
+  and README discovery validate contained files and static Markdown/HTML anchors. `docs:check`
+  includes the optional private work marker through its context owner. These structural checks
+  cannot certify prose currency; [Documentation Currency](../instructions.md#documentation-currency)
+  owns that review.
 - Runtime and technology: Node.js ESM with deterministic Markdown and static HTML reference
   inspection.
 - Public contract: `docs:check`, manifest and delivery-projection parsers, document classification,
@@ -242,7 +241,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Owned data and migrations: No mutable data; validates tracked documentation.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/filesystem`, `scripts/repository`.
-- Focused verifier: `node --test scripts/docs/document-scope.test.mjs`
+- Focused verifier:
+  `node --test scripts/docs/document-scope.test.mjs scripts/docs/project-manifest-contract.test.mjs`
 - Steward: Documentation contract maintainer.
 
 #### Framework Lifecycle
@@ -303,30 +303,15 @@ upgradeable product repositories while deliberately defining no child product or
 #### Goal Lifecycle
 
 - Root: `scripts/goals`
-- Responsibility: Reconciles bounded repository housekeeping after completed goals and proves that a
-  goal is clean, published on central `main`, and covered by exact-current successful evidence
-  before a new goal begins. The primary consumes the read-only Worktree Settlement trigger after
-  every completed slice and keeps a goal open until all no-longer-needed goal-owned worktrees,
-  branches, session/recovery claims, and cleanup artifacts reach an explicit terminal disposition;
-  preservation alone is safety, not completion. Its consolidated health pass also checks delivery,
-  manifest/module, white-label, localization, Identity and Access, tenancy, physical-surface,
-  source/declaration-header, stack, dependency, secret, model, and framework drift. Apply mode also
-  accepts Git-less roots, clears proven-dead worktree writer leases, restores missing or invalid
-  recovery from the exact active-phase lease during normal release or stale cleanup, and retains any
-  valid latest marker; a current process identity observed outside its bound PID namespace or
-  otherwise mechanically indeterminate remains an ownership-confirmation blocker. It preserves
-  existing directories with broken Git links until their ownership is explicitly confirmed and
-  removes only registrations whose missing paths remain held by exact process-bound non-directory
-  reservations across the native prune while process-bound Git locks protect every non-missing
-  linked sibling and every actual unfinished worktree. A shared process-bound transaction in the Git
-  common directory records every reserved path and preservation reason before prune, preserving
-  discovery after registration removal. Only unchanged current-contract cleanup artifacts with a
-  proven-dead exact owner are recovered after a crash. Reset treats missing or unobservable Linux
-  procfs and permission-obscured descriptor state for an exact-root-bound process as indeterminate
-  rather than inactive. After source release reconciliation, apply delegates offline frozen
-  reproduction of the unchanged lockfile to the dependency owner. A repeat repairs stale pnpm
-  installation metadata even when all version mirrors already agree; generated-project apply and
-  read-only checks do not install dependencies.
+- Responsibility: Composes bounded housekeeping and proves clean publication with exact-current
+  evidence before `goal:new`. Its health pass covers delivery, documentation, product boundaries,
+  source headers, stack, dependencies, secrets, model policy and framework drift. The
+  [closure contract](../instructions.md#completed-goal-closure-and-repository-housekeeping) owns
+  settlement and semantic documentation review. Worktree/process recovery delegates to Repository
+  Boundaries, preserving live, ambiguous and broken-directory state until its owner resolves it.
+  Source apply reconciles release metadata and delegates offline frozen lockfile reproduction to the
+  dependency owner, including stale installation recovery. Generated-project apply and read-only
+  checks do not install dependencies.
 - Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
 - Public contract: `repo:housekeeping`, `goal:new` and `project:publish`. Explicit publication
   verifies, commits and pushes all reviewed non-ignored changes on the current branch to its
@@ -398,7 +383,8 @@ upgradeable product repositories while deliberately defining no child product or
   missing proof and competing worktree writers fail closed.
 - Private internals: Repository inventory, process-identity, session-lifecycle, isolated Git,
   launcher/writer liveness aggregation, per-root recovery classification, and Git/Git-less traversal
-  detail. The session lease accepts only current schema 6 with namespace-bound coordinator,
+  detail. Consumed delegation cancellation is read-only; owned supervisor cancellation waits for
+  safe readiness. The session lease accepts only schema 6 with namespace-bound coordinator,
   supervisor, and exact Codex process identities. Lease mutation authenticates the exact controller
   caller, terminal child proof becomes a durable `completed` transition before release, and a
   crashed child-PID handoff, corrupt state, or any other mechanically indeterminate state fails
@@ -534,9 +520,9 @@ upgradeable product repositories while deliberately defining no child product or
 - Runtime and technology: Node.js ESM orchestration plus bounded Bash verifier adapters.
 - Public contract: `verify`, `verify:changed`, `verify:pre-push`, `verify:external`, `docs:check`,
   `auth:check`, `localization:check`, `tenancy:check`, and `format*` commands.
-- Private internals: Risk profiles, command admission, schema-three evidence records, immutable
-  delivery manifests, session locks, scanners, and stack-specific check selection. Captured checks
-  normalize terminal presentation while retaining semantic controls in their runtime identity.
+- Private internals: One check registry with explicit complete owners (`coveredBy`), reproduction
+  without acceptance, measured diagnosis limits and owned local cancellation; schema-three evidence
+  binds source, runtime, Git basis and delivery artifacts without a second cache or test selector.
 - Owned data and migrations: One replace-in-place evidence record and verification lock under
   ignored `.codex/runtime/`; no product data or migrations.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
@@ -564,7 +550,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.9.0`.
+- Framework version: `6.10.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

@@ -14,6 +14,9 @@ function commandSignature(command) {
     command.phase,
     command.artifactOwners ?? [],
     command.coveredTestPaths ?? [],
+    command.coveredBy ?? null,
+    command.diagnosticAfterMs ?? null,
+    command.cancellable ?? false,
   ]);
 }
 
@@ -59,6 +62,11 @@ export function consolidateFocusedTestOwners({ commands, ownersByPath }) {
     .map((command) => ({ command, paths: unfilteredTestPaths(command) }));
   const replacements = new Map();
   for (const command of selected) {
+    const parent = selected.find((entry) => entry.key === command.coveredBy);
+    if (parent && parent.phase === command.phase) {
+      replacements.set(command.key, parent.key);
+      continue;
+    }
     if (
       !command.key.startsWith("focused-test:") ||
       command.args.length !== 3 ||
@@ -94,6 +102,20 @@ export function selectCommands(available, keys) {
 export function directVerifierCommands(available, relativePath) {
   return [...available.values()].filter(
     (command) => command.args?.[0] === relativePath && !isForbiddenFocusedOwner(command),
+  );
+}
+
+/** Explicit runner coverage, not a similarly named consumer, can replace a bare test invocation. */
+export function commandCoversTest(command, testPath) {
+  if (
+    command.args.some((arg) => /^--test-(?:name-pattern|skip-pattern|only|shard)(?:=|$)/u.test(arg))
+  )
+    return false;
+  return (
+    (command.coveredTestPaths ?? []).includes(testPath) ||
+    (command.executable === process.execPath &&
+      command.args.includes(testPath) &&
+      (command.args.includes("--test") || command.args[0] === testPath))
   );
 }
 

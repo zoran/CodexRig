@@ -10,6 +10,7 @@ import {
   readContextDocument,
 } from "../docs/document-context.mjs";
 import { contextBudgets, inspectContextBudget } from "./context-budget.mjs";
+import { projectWorkContextFindings } from "./project-work-state.mjs";
 
 export function repositoryContextMap(root = toolingRoot) {
   const manifest = readRepositoryFile(root, "docs/project.md");
@@ -44,6 +45,9 @@ export function contextCommand(args, root = toolingRoot) {
     if (argv.some((arg) => arg !== "--json") || argv.length > 1)
       throw new Error("Usage: context:check [--json]");
     const report = inspectContextBudget(root);
+    report.findings.push(...projectWorkContextFindings(root));
+    report.evidence +=
+      " Work-state validation is structural; it does not establish semantic currency.";
     return {
       failed: report.findings.length > 0,
       output: argv.length

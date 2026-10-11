@@ -126,6 +126,32 @@ test("one repository verification session serializes complete workflows", async 
   next.release();
 });
 
+test("cancelling a consumed delegation preserves the durable owner record", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "verification-cancel-once-"));
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  const owner = acquireRuntimeLifecycleLock({ root, operation: "verification" });
+  try {
+    const delegation = createRuntimeLifecycleDelegation({
+      root,
+      owner,
+      operation: "verification",
+      role: "verification-worker",
+    });
+    assert.equal(cancelRuntimeLifecycleDelegation({ root, owner, token: delegation.token }), true);
+    const ownerPath = inspectRuntimeLifecycleLock({ root }).path;
+    const before = lstatSync(ownerPath, { bigint: true });
+    const bytes = readFileSync(ownerPath);
+    assert.equal(cancelRuntimeLifecycleDelegation({ root, owner, token: delegation.token }), false);
+    const after = lstatSync(ownerPath, { bigint: true });
+    for (const key of ["dev", "ino", "size", "mtimeNs", "ctimeNs"])
+      assert.equal(after[key], before[key], key);
+    assert.deepEqual(readFileSync(ownerPath), bytes);
+    assert.equal(inspectRuntimeLifecycleLock({ root }).status, "active");
+  } finally {
+    releaseRuntimeLifecycleLock({ root, owner });
+  }
+});
+
 test("--hold preserves stdin and resolves commands through the sanitized PATH", (t) => {
   const repositoryRoot = mkdtempSync(path.join(os.tmpdir(), "verification-held-command-"));
   t.after(() => rmSync(repositoryRoot, { force: true, recursive: true }));

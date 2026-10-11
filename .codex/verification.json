@@ -500,6 +500,23 @@
       ],
       "phase": "preflight",
       "reason": "portable startup must reject unavailable releases and incomplete foreign-platform locks before publication"
+    },
+    {
+      "key": "verification-executor-regressions",
+      "label": "verification executor regressions",
+      "executable": "$node",
+      "args": [
+        "--test",
+        "--test-reporter=dot",
+        "scripts/verify/verification-executor.test.mjs"
+      ],
+      "artifactOwners": [],
+      "coveredTestPaths": [],
+      "coveredBy": "verification-orchestration-regressions",
+      "diagnosticAfterMs": 60000,
+      "cancellable": true,
+      "reason": "Own executor scheduling, output, failure and cancellation contracts; the measured suite takes less than 15 seconds, with a 60-second diagnosis limit.",
+      "phase": "preflight"
     }
   ],
   "testConsumers": {
@@ -561,6 +578,7 @@
     "scripts/repository/runtime-lifecycle-process.mjs": [
       "scripts/deps/dependency-policy.test.mjs",
       "scripts/setup/startup-state.test.mjs",
+      "scripts/verify/verification-executor.test.mjs",
       "scripts/verify/verification-session-lock.test.mjs"
     ],
     "scripts/repository/runtime-lifecycle-schema.mjs": [
@@ -1231,6 +1249,12 @@
     ],
     "scripts/framework/framework-upgrade-runtime.mjs": [
       "framework-regressions"
+    ],
+    "scripts/verify/verification-executor.mjs": [
+      "verification-executor-regressions"
+    ],
+    "scripts/verify/verification-executor.test.mjs": [
+      "verification-executor-regressions"
     ]
   },
   "ownedCategories": {

@@ -42,10 +42,47 @@ export function verificationCommand({
   };
 }
 export function completeVerificationCommands() {
-  return readVerificationConfiguration(root).commands;
+  return readVerificationConfiguration(root).commands.filter((command) => !command.coveredBy);
 }
 
 export function buildPlan(options, dependencies = {}) {
+  if (options.check) {
+    const command = readVerificationConfiguration(root).commands.find(
+      (entry) => entry.key === options.check,
+    );
+    if (!command || isForbiddenFocusedOwner(command))
+      throw new Error(`Unknown or recursive verification check: ${options.check}.`);
+    if (
+      options.testNamePattern &&
+      (command.executable !== process.execPath || !command.args.includes("--test"))
+    )
+      throw new Error("Test-name reproduction requires a native Node test command.");
+    return {
+      options,
+      classifiedPaths: [],
+      gitAvailable: true,
+      workspaceCommands: [],
+      readOnlyCommands: [
+        {
+          ...command,
+          args: options.testNamePattern
+            ? [`--test-name-pattern=${options.testNamePattern}`, ...command.args]
+            : command.args,
+        },
+      ],
+      verificationScope: "reproduction only; no acceptance evidence",
+      admission: {
+        mode: "reproduction",
+        canAdvanceSuccessfulBasis: false,
+        focusedCommandOwners: [],
+        fullRelevantPaths: [],
+        uncoveredFullRelevantPaths: [],
+        unknownPaths: [],
+        reason:
+          "explicit registered check reproduction; final integration coverage remains required",
+      },
+    };
+  }
   const gitAvailable = dependencies.gitAvailable ?? insideGitWorktree();
   const injectedPaths = dependencies.changedPaths !== undefined;
   const changed = dependencies.changedScope
@@ -87,7 +124,7 @@ export function buildPlan(options, dependencies = {}) {
     dependencies.workspaceManifests ?? (needsWorkspace ? discoverWorkspaceManifests() : []);
   const focused = buildFocusedVerification({
     classifiedPaths,
-    completeCommands,
+    completeCommands: [...readVerificationConfiguration(root).commands, ...deliveryCommands],
     repositoryRoot: dependencies.repositoryRoot ?? root,
     verifyOnlyRootManifest: dependencies.verifyOnlyRootManifest === true,
     workspaceManifests,

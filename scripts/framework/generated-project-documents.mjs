@@ -46,7 +46,10 @@ export function currentProjectInstructions(sourceRoot) {
     ["Repository Efficiency And Effectiveness", "<!-- current-repository-efficiency-policy -->"],
     ["Task Scope And Completion", "<!-- current-task-scope-policy -->"],
     ["Maintenance Scope And Verification", "<!-- current-maintenance-scope-policy -->"],
+    ["Long-Session Course Checks", "<!-- current-course-check-policy -->"],
+    ["Verification Selection And Runtime", "<!-- current-verification-runtime-policy -->"],
     ["Documentation Currency", "<!-- current-documentation-currency-policy -->"],
+    ["Documentation Ownership", "<!-- current-documentation-ownership-policy -->"],
     ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
   ]) {
@@ -244,9 +247,9 @@ after sessions exit.
 
 Verification reuses successful evidence for unchanged source and the same effective toolchain.
 Use \`pnpm verify:changed -- --print-plan\` to inspect the selected checks and admission reason.
-Captured checks normalize terminal colors and presentation; changing terminals alone does not rerun
-the product suite. Changed tools, verification controls or uncovered source require new evidence.
-Use the project wrapper above to keep the selected toolchain consistent.
+After failure, \`pnpm verify:changed -- --check <key>\` reproduces one check without recording
+acceptance; native Node checks also accept \`--test-name-pattern <pattern>\`. Changed relevant source,
+tests, dependencies, controls or tools invalidate evidence. Use the project wrapper consistently.
 
 Persistent public tool settings belong in the project-private Mise configuration at
 \`.auth/project-tools/config/mise/config.toml\`. The normal project wrapper loads them before

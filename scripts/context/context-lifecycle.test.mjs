@@ -128,6 +128,14 @@ test("preloaded Stop lifecycle preserves continuation and terminal handover", as
   assert.equal(activeOutput.decision, "block");
   assert.match(activeOutput.reason, /Continue only this project’s already-authorized outcome/u);
   assert.match(activeOutput.reason, /Reassess current capacity under Capacity Admission/u);
+  assert.match(
+    activeOutput.reason,
+    /historical tasks, blockers, approval interpretations and test claims/u,
+  );
+  assert.match(
+    activeOutput.reason,
+    /Missing evidence is unknown, not success or a confirmed blocker/u,
+  );
   assert.match(activeOutput.reason, /historical reserve estimates.*prove no current exhaustion/u);
 
   const now = Date.now();
@@ -444,7 +452,11 @@ test("handover receipt and acknowledgement consume only the exact unchanged late
   writeRuntimeSessionLease(project, new Date(now - 1_000).toISOString());
   writeWorkingContext(
     project,
-    workState(),
+    workState({
+      status: "blocked",
+      nextAction: null,
+      blocker: { kind: "external", reason: "Obsolete outage" },
+    }),
     `${criticalDrainBody}\nHistorical estimate: Root21 plus safety5; 26% remaining was all reserved.\n`,
   );
   const sealed = createCriticalBudgetHandover({ root: project, now: () => now });
@@ -456,11 +468,25 @@ test("handover receipt and acknowledgement consume only the exact unchanged late
   assert.equal(typeof handoverLifecycle.acknowledgeCriticalBudgetHandover, "function");
   assert.throws(() => handoverLifecycle.receiveCriticalBudgetHandover(options), /later.*session/u);
   writeRuntimeSessionLease(project, new Date(now + 1_000).toISOString());
+  writeWorkingContext(
+    project,
+    workState({ revision: 2 }),
+    "# Work\nOutage resolved in current source/evidence.\n",
+  );
   const received = handoverLifecycle.receiveCriticalBudgetHandover(options);
   assert.equal(received.content, before);
   assert.equal(received.sha256, createHash("sha256").update(before).digest("hex"));
   assert.match(received.resumeBoundary, /Historical reserve estimates are not binding/u);
   assert.match(received.resumeBoundary, /current.*Capacity Admission And Monitoring/u);
+  assert.match(
+    received.resumeBoundary,
+    /historical tasks, blockers, approval interpretations and test claims/u,
+  );
+  assert.match(
+    received.resumeBoundary,
+    /Missing evidence is unknown, not success or a confirmed blocker/u,
+  );
+  assert.match(received.content, /Obsolete outage/u);
   assert.match(received.content, /Root21 plus safety5; 26% remaining/u);
   assert.equal(readFileSync(target, "utf8"), before);
   const acknowledgement = { ...options, expectedSha256: received.sha256 };

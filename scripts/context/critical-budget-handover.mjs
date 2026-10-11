@@ -19,7 +19,7 @@ import {
 } from "../filesystem/owned-path-safety.mjs";
 import { inspectRuntimeSessionLease } from "../repository/runtime-session-lease.mjs";
 import { findSecretMatches } from "../security/secret-patterns.mjs";
-import { readProjectWorkContext } from "./project-work-state.mjs";
+import { readProjectWorkContext, workContextResumeBoundary } from "./project-work-state.mjs";
 
 export const criticalHandoverDirectory = "tmp/codexrig-handovers";
 export const criticalHandoverMaxAgeMilliseconds = 72 * 60 * 60 * 1_000;
@@ -415,7 +415,7 @@ export function receiveCriticalBudgetHandover({
       relativePath,
       content: snapshot.content,
       sha256: sha256(snapshot.content),
-      resumeBoundary: capacityResumeBoundary,
+      resumeBoundary: `${workContextResumeBoundary} ${capacityResumeBoundary}`,
     }),
   );
 }

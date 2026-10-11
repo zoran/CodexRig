@@ -393,3 +393,29 @@ test("importing adaptive CLI is side-effect free", () => {
   assert.equal(result.stdout, "");
   assert.equal(result.stderr, "");
 });
+
+test("one-check reproduction cannot establish acceptance or request a broad fallback", () => {
+  const options = parseArgs([
+    "--check",
+    "verification-executor-regressions",
+    "--test-name-pattern",
+    "failed preflight",
+  ]);
+  const plan = buildPlan(options, { basis: { trusted: false } });
+  assert.equal(plan.admission.mode, "reproduction");
+  assert.equal(plan.admission.canAdvanceSuccessfulBasis, false);
+  assert.equal(plan.readOnlyCommands.length, 1);
+  assert.equal(plan.readOnlyCommands[0].args[0], "--test-name-pattern=failed preflight");
+  for (const args of [
+    ["--mode", "full"],
+    ["--basis-only"],
+    ["--path", "unknown", "--print-plan"],
+    ["--force-full"],
+  ])
+    assert.throws(
+      () => parseArgs(["--check", "verification-executor-regressions", ...args]),
+      /reproduction only/u,
+    );
+  assert.throws(() => parseArgs(["--test-name-pattern", "case"]), /requires --check/u);
+  assert.throws(() => buildPlan(parseArgs(["--check", "absent"])), /Unknown/u);
+});

@@ -21,10 +21,11 @@ This skill owns recovery of the authorized workstream, not a second session or t
    worktree. Never search private native transcripts as a repository index.
 2. Locate owners through the manifest, exact searches, direct matched-source reads and real
    consumers under [Context And Skills](../../../instructions.md#context-and-skills). Compare
-   completed evidence with actual partial work, migrations, dead paths and remaining acceptance
-   gaps. Follow [Documentation Ownership](../../../instructions.md#documentation-ownership): read
-   existing specifications and separate UI references before intake; preserve their decisions and
-   approvals without copying requirements into the manifest, README or temporary context.
+   historical tasks, blockers, approval interpretations and test claims with current source,
+   evidence and user authority; missing evidence is unknown, not success or a confirmed blocker.
+   Follow [Documentation Ownership](../../../instructions.md#documentation-ownership): read existing
+   specifications and separate UI references before intake; preserve their decisions and approvals
+   without copying requirements into the manifest, README or temporary context.
 3. Apply [Task Scope And Completion](../../../instructions.md#task-scope-and-completion). Select
    only unfinished work matching the current request and still-applicable authority. Maintenance
    does not revive a product roadmap; preserve unrelated context without following its next action.

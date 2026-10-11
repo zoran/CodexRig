@@ -19,7 +19,8 @@ sources when changing external evidence can affect the decision.
 
 Return reproducible defects, demonstrated contradictions or plausible material failure paths with
 location, evidence and acceptance impact. Optional polish does not extend the assignment. Report
-affected documentation owners and exact corrections; write them only within assigned authority.
+document owners, resolved tasks/blockers, scoped evidence and exact corrections, or the diff-based
+no-impact reason; write only within assigned authority.
 The primary owns the whole-repository course check, milestone acceptance and fresh audit; provide
 bounded evidence from your scope, not another repository-wide review. Return the final handoff as
 soon as the result is complete or blocked: root, inspected/changed files, evidence, checks, document

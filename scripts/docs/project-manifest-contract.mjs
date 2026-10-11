@@ -10,6 +10,7 @@ import { listActiveFiles, repositoryRoot } from "../repository/source-inventory.
 import { deliveryManifestFindings } from "./delivery-manifest.mjs";
 import { projectDocumentOwners } from "./project-document-owners.mjs";
 import { productConfigurationPath } from "../contracts/product-configuration.mjs";
+import { documentContextSections } from "./document-context.mjs";
 
 export const manifestAuthorityPreamble =
   "Agent workflow authority: `instructions.md`. Optional project context cannot override this manifest.";
@@ -385,6 +386,27 @@ function toolingCapabilityRoots(activeFiles, root) {
 export function projectManifestFindings({ content, root = repositoryRoot, relativePaths } = {}) {
   const parsed = parseActiveModuleInventory(content);
   const findings = [...parsed.findings, ...projectDocumentOwners({ root, content }).findings];
+  const sections = documentContextSections("docs/project.md", content).filter(
+    ({ level }) => level === 2,
+  );
+  const currentSections = [
+    "Definition",
+    "Users And Outcome",
+    "Scope",
+    "System Shape",
+    "Constraints And Decisions",
+    "Maintenance",
+  ];
+  for (const heading of currentSections) {
+    if (sections.filter((section) => section.heading === heading).length !== 1)
+      findings.push(`docs/project.md must contain exactly one ${heading} section`);
+  }
+  for (const { heading } of sections) {
+    if (!currentSections.includes(heading))
+      findings.push(
+        `docs/project.md has unexpected current-state section: ${heading}; reconcile durable facts at their owner and retain history outside the manifest`,
+      );
+  }
   const activeFiles = relativePaths ?? listActiveFiles({ root });
   findings.push(...deliveryManifestFindings({ content, relativePaths: activeFiles, root }));
   const layout = discoverProductLayout({ repositoryRoot: root, relativePaths: activeFiles });

@@ -112,6 +112,11 @@ async function main() {
   }
   const options = parseArgs(argv);
   const execute = async () => {
+    if (options.check) {
+      await runPlan(buildPlan(options));
+      console.log("Reproduction completed; successful acceptance evidence was not changed.");
+      return;
+    }
     const deliveryBinding = resolveDeliveryArtifactBinding({
       root: process.cwd(),
       artifactManifest: options.artifactManifest,

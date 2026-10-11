@@ -29,6 +29,7 @@ const delegatedTokenVariable = "CODEXRIG_LIFECYCLE_DELEGATION_TOKEN";
 const delegatedOperationVariable = "CODEXRIG_LIFECYCLE_DELEGATION_OPERATION";
 const delegatedRoleVariable = "CODEXRIG_LIFECYCLE_DELEGATION_ROLE";
 const delegatedRootVariable = "CODEXRIG_LIFECYCLE_DELEGATION_ROOT";
+const supervisorStops = new WeakMap();
 const privateVariables = [
   supervisorTokenVariable,
   supervisorOperationVariable,
@@ -199,19 +200,40 @@ export function spawnRuntimeLifecycleCommand({
         supervisor: delegations.supervisor,
         witness: delegations.witness,
       }),
-      stdio,
+      stdio: [...stdio, "ipc"],
     });
   } catch (error) {
     cancelUnusedDelegations(repositoryRoot, lifecycleCapability, delegations);
     throw error;
   }
+  let ready = false;
+  let requestedSignal;
+  supervisorStops.set(child, (signal) => {
+    requestedSignal ??= signal;
+    if (ready && child.exitCode === null && child.signalCode === null) child.kill(requestedSignal);
+  });
+  child.on("message", (message) => {
+    if (message?.type !== "lifecycle-supervisor-ready" || ready) return;
+    ready = true;
+    if (requestedSignal) supervisorStops.get(child)?.(requestedSignal);
+  });
   child.once("error", () =>
     cancelUnusedDelegations(repositoryRoot, lifecycleCapability, delegations),
   );
   child.once("close", (_status, signal) => {
+    supervisorStops.delete(child);
     if (!signal) cancelUnusedDelegations(repositoryRoot, lifecycleCapability, delegations);
   });
   return child;
+}
+
+/** Queues cancellation until the owned supervisor can reap its registered command safely. */
+export function requestRuntimeLifecycleCommandStop(child, signal = "SIGTERM") {
+  if (!["SIGTERM", "SIGINT", "SIGHUP"].includes(signal) || !supervisorStops.has(child))
+    throw new Error(
+      "Cancellation requires a live owned lifecycle supervisor and a graceful signal.",
+    );
+  supervisorStops.get(child)(signal);
 }
 
 /** Runs a synchronous command through the same durable supervisor and inherited guard. */
@@ -355,6 +377,15 @@ async function supervise(command, args) {
       };
       handlers.set(signal, handler);
       process.on(signal, handler);
+    }
+    // Coordinator death closes IPC. Readiness is advisory; a lost notification must never
+    // strand the registered command or prevent the supervisor's durable cleanup.
+    if (process.connected) {
+      try {
+        process.send({ type: "lifecycle-supervisor-ready" }, () => {});
+      } catch {
+        /* The coordinator may disconnect between the connected check and send. */
+      }
     }
     const result = await new Promise((resolve, reject) => {
       child.once("error", reject);

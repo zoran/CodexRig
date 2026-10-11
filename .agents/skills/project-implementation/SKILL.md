@@ -99,11 +99,12 @@ Editorial changes need no implementation-mirroring test. Distinguish source, fix
 native and real-target evidence.
 
 Apply [Documentation Currency](../../../instructions.md#documentation-currency) before slice
-handoff: update affected owners within the write set and give the primary exact corrections for
-protected documents. The primary integrates them before acceptance. Use `$system-coherence` for a
-non-trivial slice and `$task-quality` at the acceptance boundary; specialist reviews apply only to
-changed risks. Reuse their evidence in one primary review and fresh audit, including the canonical
-whole-repository effectiveness, efficiency and quality assessment.
+handoff: reconcile changed claims, resolved tasks/blockers and scoped evidence at assigned owners;
+give the primary exact protected-document corrections or the diff-based no-impact reason. The
+primary integrates them before acceptance. Use `$system-coherence` for a non-trivial slice and
+`$task-quality` at the acceptance boundary; specialist reviews apply only to changed risks. Reuse
+their evidence in one primary review and fresh audit, including the canonical whole-repository
+effectiveness, efficiency and quality assessment.
 
 Apply
 [Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification)

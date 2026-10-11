@@ -4,6 +4,12 @@ import { parseJsonFile, toolingRoot } from "../filesystem/repository-files.mjs";
 
 export const verificationConfigurationPath = ".codex/verification.json";
 
+function nodeTestRuntime(args) {
+  return args.filter(
+    (arg) => !arg.endsWith(".test.mjs") && !/^--test-(?:reporter|concurrency)=/u.test(arg),
+  );
+}
+
 /** This is executable project policy; native permissions still govern each selected command. */
 export function readVerificationConfiguration(root = toolingRoot) {
   const value = parseJsonFile(root, verificationConfigurationPath, "Verification configuration");
@@ -53,6 +59,39 @@ export function readVerificationConfiguration(root = toolingRoot) {
       throw new Error("Invalid or duplicate verification command.");
     keys.add(command.key);
     if (command.executable === "$node") command.executable = process.execPath;
+    if (
+      (command.diagnosticAfterMs !== undefined &&
+        (!Number.isSafeInteger(command.diagnosticAfterMs) ||
+          command.diagnosticAfterMs < 1_000 ||
+          command.diagnosticAfterMs > 3_600_000)) ||
+      (command.cancellable !== undefined && typeof command.cancellable !== "boolean")
+    )
+      throw new Error(`Invalid verification execution limit: ${command.key}.`);
+  }
+  for (const command of value.commands) {
+    if (command.coveredBy === undefined) continue;
+    const parent = value.commands.find((entry) => entry.key === command.coveredBy);
+    const tests = command.args.filter((argument) => argument.endsWith(".test.mjs"));
+    const parentTests = new Set([...(parent?.args ?? []), ...(parent?.coveredTestPaths ?? [])]);
+    if (
+      !parent ||
+      parent === command ||
+      parent.coveredBy !== undefined ||
+      command.executable !== process.execPath ||
+      !command.args.includes("--test") ||
+      !tests.length ||
+      tests.some((file) => !parentTests.has(file)) ||
+      (parent.executable === process.execPath &&
+        parent.args.includes("--test") &&
+        JSON.stringify(nodeTestRuntime(command.args)) !==
+          JSON.stringify(nodeTestRuntime(parent.args))) ||
+      [command, parent].some((entry) =>
+        entry.args.some((arg) =>
+          /^--test-(?:name-pattern|skip-pattern|only|shard)(?:=|$)/u.test(arg),
+        ),
+      )
+    )
+      throw new Error(`Invalid complete verification owner: ${command.key}.`);
   }
   for (const field of ["testConsumers", "exactConsumers", "ownedCategories"]) {
     if (!value[field] || typeof value[field] !== "object" || Array.isArray(value[field]))

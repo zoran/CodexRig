@@ -19,7 +19,7 @@ export function initialProjectManifest({
 }) {
   return `# Project Manifest
 
-This is the always-read technical current-state index. Keep a short definition and discovery links
+This is the technical current-state index; read its relevant sections. Keep definition and discovery links
 here; detailed requirements and intended architecture stay at their established project-owned source.
 
 ${manifestAuthorityPreamble}

@@ -6,6 +6,7 @@ import { root } from "./adaptive-state.mjs";
 import {
   changedTestPath,
   commandsByKey,
+  commandCoversTest,
   consolidateFocusedTestOwners,
   dedupeCommands,
   directVerifierCommands,
@@ -54,7 +55,10 @@ function entryRouting({
     exactCommands.forEach((command) => ownerKeys.add(command.key));
     hasExactOwner = true;
   }
-  if (testPath) {
+  if (
+    testPath &&
+    ![...exactCommands, ...directOwners].some((command) => commandCoversTest(command, testPath))
+  ) {
     const command = focusedTestCommand(testPath, entry.path);
     commands.push(command);
     ownerKeys.add(command.key);
@@ -71,6 +75,16 @@ function entryRouting({
   }
   for (const consumerTest of explicitTestConsumerRegistry.get(entry.path) ?? []) {
     if (!existsSync(path.join(repositoryRoot, ...consumerTest.split("/")))) continue;
+    const registered = selectCommands(
+      available,
+      exactConsumerRegistry.get(consumerTest) ?? [],
+    ).filter((command) => commandCoversTest(command, consumerTest));
+    if (registered.length) {
+      commands.push(...registered);
+      registered.forEach((command) => ownerKeys.add(command.key));
+      hasExactOwner = true;
+      continue;
+    }
     const command = focusedTestCommand(consumerTest, entry.path);
     commands.push(command);
     ownerKeys.add(command.key);

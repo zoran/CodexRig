@@ -130,10 +130,10 @@ pnpm framework:publish --message "<commit message>"  # authorized publication, i
 
 Verification reuses successful evidence for unchanged source and the same effective toolchain.
 `verify:changed -- --print-plan` reports the selected checks and the reason before executing them.
-Captured checks use a consistent terminal presentation, so color settings or switching terminals do
-not trigger another product suite. Changes to verification controls, tools or uncovered source still
-require the corresponding evidence. Use the project wrapper from a host shell so the selected
-toolchain also remains consistent.
+After failure, `pnpm verify:changed -- --check <key>` reproduces one registered check without
+recording acceptance; native Node checks also accept `--test-name-pattern <pattern>`. The runner
+reports each active check and its duration. Changed relevant source, tests, dependencies, controls
+or tools invalidate evidence. Use the project wrapper to keep the toolchain consistent.
 
 The handover command requires a current critical-capacity decision under
 [Capacity Admission And Monitoring](instructions.md#capacity-admission-and-monitoring); historical
@@ -253,10 +253,10 @@ its required order, preservation boundaries and source-version reconciliation.
 ## Documentation Context Economy
 
 Use `pnpm context:map` for navigation, `pnpm context:read -- instructions.md --outline` for section
-discovery, and `pnpm context:check` to detect automatic instruction growth. Large reference
-documents stay intact; select relevant sections instead of loading them all. The byte budgets are
-repository guardrails, not native model limits or proof of quality. They complement outcome-based
-review. The design follows
+discovery, and `pnpm context:check` for instruction bounds and work-marker structure. Large
+reference documents stay intact; select relevant sections instead of loading them all. The byte
+budgets are repository guardrails, not native model limits or proof of quality. They complement
+outcome-based review. The design follows
 [OpenAI context guidance](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)
 and [progressive skill disclosure](https://learn.chatgpt.com/docs/build-skills). The
 [repository-context study, revision 2](https://arxiv.org/html/2602.11988v2) found no general success

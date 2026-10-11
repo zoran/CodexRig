@@ -11,6 +11,12 @@ import {
 export const projectContextRelativePath = "docs/project-context.md";
 export const projectContextMaxBytes = 65_536;
 
+/** Current guidance travels outside historical snapshots; validation never proves their truth. */
+export const workContextResumeBoundary =
+  "Reconcile historical tasks, blockers, approval interpretations and test claims with current source, " +
+  "evidence and user authority under Documentation Currency in instructions.md. Replace superseded " +
+  "current context. Missing evidence is unknown, not success or a confirmed blocker.";
+
 const markerMaxBytes = 4_096;
 const workStatePattern = /<!-- codexrig-work-state\r?\n([\s\S]*?)\r?\n-->/gu;
 const unsafePromptCharacters = /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u;
@@ -126,5 +132,15 @@ export function readProjectWorkContext(root, { testHooks } = {}) {
     return Object.freeze({ content, state });
   } finally {
     closeOwnedDirectoryBinding(directory);
+  }
+}
+
+/** Checks the existing optional marker without creating a task or evaluating its prose. */
+export function projectWorkContextFindings(root) {
+  try {
+    readProjectWorkContext(root);
+    return [];
+  } catch (error) {
+    return [`${projectContextRelativePath}: ${error.message}`];
   }
 }

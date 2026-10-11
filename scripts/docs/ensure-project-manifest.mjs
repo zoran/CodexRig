@@ -23,14 +23,6 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const manifestPath = path.join(root, ...projectManifestPath.split("/"));
 const futureModulesFile = path.join(root, ...futureModulesPath.split("/"));
 const checkOnly = process.argv.includes("--check");
-const leanSections = [
-  "Definition",
-  "Users And Outcome",
-  "Scope",
-  "System Shape",
-  "Constraints And Decisions",
-  "Maintenance",
-];
 const deliveryPath = path.join(root, ...deliveryConfigurationPath.split("/"));
 const defaultDeliveryProjection = renderDeliveryManifestProjection({
   configuration: existsSync(deliveryPath)
@@ -39,10 +31,6 @@ const defaultDeliveryProjection = renderDeliveryManifestProjection({
 });
 
 const defaultManifest = initialProjectManifest({ deliveryProjection: defaultDeliveryProjection });
-
-function hasSections(content, sections) {
-  return sections.every((section) => content.includes(`## ${section}`));
-}
 
 if (!existsSync(manifestPath)) {
   if (checkOnly) {
@@ -73,9 +61,6 @@ const failures = [];
 if (!current.startsWith("# Project Manifest\n")) {
   failures.push("docs/project.md must start with # Project Manifest");
 }
-if (!hasSections(current, leanSections)) {
-  failures.push("docs/project.md must use the current concise manifest sections");
-}
 failures.push(...projectManifestFindings({ content: current, root }));
 const futureModulesContent = readFileSync(futureModulesFile, "utf8");
 failures.push(...futureModulesDocumentFindings(futureModulesContent));
@@ -85,4 +70,6 @@ if (failures.length > 0) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
-console.log("Project Manifest is current.");
+console.log(
+  "Project Manifest structure and repository projections passed; prose currency is not assessed.",
+);

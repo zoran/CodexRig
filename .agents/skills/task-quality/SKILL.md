@@ -65,9 +65,10 @@ report limits and preserve requirements. Static byte checks do not establish mod
 ## Audit And Settle
 
 1. Check [Documentation Currency](../../../instructions.md#documentation-currency) from the slice
-   handoffs: integrate outstanding corrections at protected owners before acceptance. Reconcile
-   source/declaration headers, dead paths and bounded work context before auditing. Recheck the
-   request, plan, manifest, owners/consumers, residual risks and evidence. Apply
+   handoffs: reconcile current claims, resolved tasks/blockers, approval scope and evidence basis;
+   integrate outstanding protected-owner corrections before acceptance, or substantiate no impact.
+   Reconcile source/declaration headers, dead paths and bounded work context before auditing.
+   Recheck the request, plan, manifest, owners/consumers, residual risks and evidence. Apply
    [Documentation Ownership](../../../instructions.md#documentation-ownership): preserve unique
    requirements, stable links and evidence limits at their established owners; do not treat
    structural checks as semantic preservation proof. Check README discovery for both existing and

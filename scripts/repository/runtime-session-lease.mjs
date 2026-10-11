@@ -430,6 +430,11 @@ export function createRuntimeLifecycleDelegation({
 
 export function cancelRuntimeLifecycleDelegation({ root = toolingRoot, owner, token } = {}) {
   const record = capabilityRecord(root, owner);
+  const snapshot = inspectRuntimeLifecycleLock({ root: record.root });
+  if (snapshot.owner?.nonce !== record.nonce)
+    throw new Error("Codex runtime lifecycle capability changed before cancellation.");
+  // Consumed tokens cannot be reissued; stable absence needs no durable write or mutex.
+  if (!snapshot.owner.delegations.some((entry) => entry.token === token)) return false;
   let removed = false;
   replaceLifecycleOwner(record.root, record.nonce, (current) => {
     const next = current.delegations.filter((entry) => entry.token !== token);

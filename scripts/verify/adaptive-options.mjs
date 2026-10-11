@@ -13,6 +13,8 @@ Options:
   --target-environment <target>      Delivery evidence target: dev, staging, or prod. Default: dev.
   --artifact-manifest <path>         Required for staging/prod; the verifier hashes its bound files.
   --print-plan                       Print selected checks without running them.
+  --check <key>                      Reproduce one registered check; never records acceptance.
+  --test-name-pattern <pattern>       With --check, filter a native Node test command.
   --path <path>                      Simulate a changed path for plan inspection.
   --basis-only                       Refresh only a content-identical committed Git basis.
   --force-full                       Explicitly request otherwise-uncovered full coverage.
@@ -30,6 +32,8 @@ export function parseArgs(argv) {
     forceFull: false,
     forceReason: "",
     printPlan: false,
+    check: "",
+    testNamePattern: "",
     simulatedPaths: [],
   };
 
@@ -47,6 +51,18 @@ export function parseArgs(argv) {
     }
     if (arg === "--print-plan") {
       options.printPlan = true;
+    } else if (arg === "--check") {
+      options.check = argv[++index] ?? "";
+      if (!/^[a-z][a-z0-9-]*$/u.test(options.check))
+        throw new Error("--check requires a registered command key.");
+    } else if (arg === "--test-name-pattern") {
+      options.testNamePattern = argv[++index] ?? "";
+      if (
+        !options.testNamePattern ||
+        /[\0\r\n]/u.test(options.testNamePattern) ||
+        options.testNamePattern.length > 500
+      )
+        throw new Error("Invalid test name pattern.");
     } else if (arg === "--basis-only") {
       options.basisOnly = true;
     } else if (arg === "--force-full") {
@@ -112,6 +128,21 @@ export function parseArgs(argv) {
     );
   }
   options.simulatedPaths = unique(options.simulatedPaths.map(normalizePath).filter(Boolean));
+  if (options.testNamePattern && !options.check)
+    throw new Error("--test-name-pattern requires --check.");
+  if (
+    options.check &&
+    (options.mode !== "repo" ||
+      options.forceFull ||
+      options.forceReason ||
+      options.basisOnly ||
+      options.simulatedPaths.length ||
+      options.targetEnvironment !== "dev" ||
+      options.artifactManifest)
+  )
+    throw new Error(
+      "--check is reproduction only; it cannot establish or refresh acceptance evidence.",
+    );
   if (options.simulatedPaths.length > 0 && !options.printPlan) {
     throw new Error("--path requires --print-plan and cannot execute verification commands.");
   }

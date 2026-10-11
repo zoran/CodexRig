@@ -34,22 +34,13 @@ function moduleEntry(name, root, dependencies = "None.") {
 }
 
 function manifest(inventory, { sourceFramework = false } = {}) {
-  return `# Project Manifest
-
-## System Shape
-
-${renderDeliveryManifestProjection({
-  ...(sourceFramework
-    ? { sourceFramework: true }
-    : { configuration: JSON.parse(initialDeliveryConfiguration()) }),
-})}
-
-### Active Module Inventory
-
-${inventory}
-
-## Maintenance
-`;
+  return initialProjectManifest({
+    deliveryProjection: renderDeliveryManifestProjection({
+      ...(sourceFramework
+        ? { sourceFramework: true }
+        : { configuration: JSON.parse(initialDeliveryConfiguration()) }),
+    }),
+  }).replace("No active product modules.", inventory);
 }
 
 function futureCandidate(name) {
@@ -115,6 +106,26 @@ test("initialized current and future inventories are explicit and valid", (t) =>
     futureModulesDocumentFindings(missingIntentBoundary).join("\n"),
     /idea-intent clarification rule/,
   );
+});
+
+test("manifest sections reject duplicate current owners and appended session history", (t) => {
+  const root = fixture(t);
+  const current = manifest("No active product modules.");
+  const findings = (content) => projectManifestFindings({ root, content, relativePaths: [] });
+  assert.deepEqual(findings(current), []);
+  assert.match(
+    findings(current + "\n## Session History\n" + "Repaired a test.\n".repeat(100)).join("\n"),
+    /unexpected current-state section: Session History/u,
+  );
+  assert.match(
+    findings(current + "\n## Definition\nA conflicting product.\n").join("\n"),
+    /exactly one Definition section/u,
+  );
+  assert.match(
+    findings(current.replace("## Scope", "## Scope notes")).join("\n"),
+    /exactly one Scope section/u,
+  );
+  assert.deepEqual(findings(current + "\n```md\n## Session History\n```\n"), []);
 });
 
 test("implemented files require exactly one real current module owner", (t) => {
@@ -262,8 +273,8 @@ Inspection product. No runtime is implemented.
 
 `;
   const current = manifest("No active product modules.").replace(
-    "## System Shape",
-    definition + "## System Shape",
+    /## Definition[\s\S]*?(?=## Users And Outcome)/u,
+    definition,
   );
   assert.deepEqual(projectDocumentOwners({ root, content: current }).entries, [
     { concern: "Requirements owner", path: "docs/specification.html", fragment: "requirements" },
