@@ -362,6 +362,7 @@ test("a runtime namespace cutover excludes installed and destination writers thr
   for (const file of [
     "scripts/repository/runtime-session-lease.mjs",
     "scripts/repository/runtime-lifecycle-mutex.mjs",
+    "scripts/repository/runtime-owned-state.mjs",
   ]) {
     const text = readFileSync(path.join(data.targetRoot, file), "utf8").replaceAll(
       "project-lifecycle",

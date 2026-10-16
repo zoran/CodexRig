@@ -216,7 +216,7 @@ test("missing successful basis is a concrete full admission rather than a cache-
 });
 
 test("cache and profile misses alone cannot broaden a fully owned delta", () => {
-  const plan = buildPlan(parseArgs(["--mode", "full"]), {
+  const plan = buildPlan(parseArgs(["--mode", "repo"]), {
     basis: { reason: "", trusted: true },
     cacheMiss: true,
     changedPaths: ["src/product.ts"],
@@ -243,7 +243,7 @@ test("cache and profile misses alone cannot broaden a fully owned delta", () => 
 
 test("a deleted test path routes to surviving orchestration owners", () => {
   const removedPath = "scripts/verify/removed-owner.test.mjs";
-  const plan = buildPlan(parseArgs(["--mode", "full"]), {
+  const plan = buildPlan(parseArgs(["--mode", "repo"]), {
     basis: { reason: "", trusted: true },
     changedPaths: [removedPath],
     gitAvailable: true,
@@ -263,7 +263,7 @@ test("a deleted test path routes to surviving orchestration owners", () => {
     true,
   );
 
-  const removedManifest = buildPlan(parseArgs(["--mode", "full"]), {
+  const removedManifest = buildPlan(parseArgs(["--mode", "repo"]), {
     basis: { reason: "", trusted: true },
     changedPaths: ["packages/removed/package.json"],
     gitAvailable: true,
@@ -325,7 +325,7 @@ test("an exact-current dirty Git basis does not rerun its already covered paths"
   );
 });
 
-test("unclassified exact fingerprint drift fails closed to a full plan", () => {
+test("unclassified drift defers full coverage to the publication entry", () => {
   const inputs = {
     broadFingerprint: "broad",
     exactFingerprint: "changed-exact",
@@ -355,11 +355,12 @@ test("unclassified exact fingerprint drift fails closed to a full plan", () => {
     productLayout,
     workspaceManifests: [],
   });
-  assert.equal(plan.admission.mode, "full");
+  assert.equal(plan.admission.mode, "targeted");
+  assert.equal(plan.readOnlyCommands.length, 0);
   assert.match(plan.admission.reason, /changed-path classification is incomplete/u);
 });
 
-test("print plan exposes admission paths, owners, reason, and basis advancement", () => {
+test("print plan exposes admission paths, owners and reason", () => {
   const plan = buildPlan(parseArgs(["--print-plan", "--path", "docs/project.md"]), {
     basis: { reason: "", trusted: true },
     gitAvailable: true,
@@ -380,7 +381,6 @@ test("print plan exposes admission paths, owners, reason, and basis advancement"
   assert.match(text, /Unknown paths: none/u);
   assert.match(text, /Uncovered full-relevant paths: none/u);
   assert.match(text, /Focused command owners:/u);
-  assert.match(text, /Successful basis can advance: yes/u);
 });
 
 test("importing adaptive CLI is side-effect free", () => {
@@ -403,7 +403,6 @@ test("one-check reproduction cannot establish acceptance or request a broad fall
   ]);
   const plan = buildPlan(options, { basis: { trusted: false } });
   assert.equal(plan.admission.mode, "reproduction");
-  assert.equal(plan.admission.canAdvanceSuccessfulBasis, false);
   assert.equal(plan.readOnlyCommands.length, 1);
   assert.equal(plan.readOnlyCommands[0].args[0], "--test-name-pattern=failed preflight");
   for (const args of [

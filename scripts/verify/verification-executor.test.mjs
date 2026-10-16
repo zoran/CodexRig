@@ -1,6 +1,7 @@
 /** Verifies verification executor behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { once } from "node:events";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -24,7 +25,6 @@ function privateKeyBoundary(kind, phase) {
 function plan(commands) {
   return {
     admission: {
-      canAdvanceSuccessfulBasis: false,
       focusedCommandOwners: [],
       fullRelevantPaths: [],
       mode: "targeted",
@@ -39,6 +39,121 @@ function plan(commands) {
     workspaceCommands: [],
   };
 }
+
+test("each real verification command removes its scratch after success, failure and abrupt exit", async (t) => {
+  const repositoryRoot = mkdtempSync(path.join(os.tmpdir(), "verification-scratch-"));
+  t.after(() => rmSync(repositoryRoot, { force: true, recursive: true }));
+  const record = path.join(repositoryRoot, "recovery.json");
+  const directories = new Set();
+  for (const outcome of ["success", "failure", "killed"]) {
+    const command = {
+      key: outcome,
+      label: outcome,
+      phase: "preflight",
+      executable: process.execPath,
+      args: [
+        "--input-type=module",
+        "--eval",
+        `
+        import { writeFileSync } from "node:fs";
+        import os from "node:os";
+        import path from "node:path";
+        const scratch = os.tmpdir();
+        writeFileSync(path.join(scratch, "unfinished-output"), Buffer.alloc(1024));
+        writeFileSync(${JSON.stringify(record)}, JSON.stringify({scratch, executable: process.execPath, outcome: ${JSON.stringify(outcome)}}));
+        ${outcome === "killed" ? 'process.kill(process.pid, "SIGKILL");' : `process.exit(${outcome === "failure" ? 17 : 0});`}
+      `,
+      ],
+    };
+    const execution = runLockedPlan(plan([command]), repositoryRoot);
+    if (outcome === "success") await execution;
+    else await assert.rejects(execution, /checks failed/u);
+    const observed = JSON.parse(readFileSync(record, "utf8"));
+    assert.equal(observed.executable, process.execPath, "use the installed runtime directly");
+    assert.equal(observed.outcome, outcome, "durable recovery evidence remains available");
+    assert.equal(existsSync(path.join(observed.scratch, "unfinished-output")), false);
+    assert.equal(existsSync(observed.scratch), false);
+    assert.equal(directories.has(observed.scratch), false, "each command owns its own lifetime");
+    directories.add(observed.scratch);
+  }
+});
+
+test("retained scratch reports a warning without replacing the actual check result", async (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "verification-retained-scratch-"));
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args.join(" "));
+  t.after(() => (console.warn = originalWarn));
+  for (const status of [0, 17]) {
+    const record = path.join(root, `record-${status}.json`);
+    const ready = path.join(root, `ready-${status}`);
+    // An independently owned observer holds only the fixture payload, not a lifecycle guard.
+    const observer = spawn(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        `
+      import { closeSync, existsSync, openSync, readFileSync, writeFileSync } from 'node:fs';
+      import path from 'node:path';
+      import { once } from 'node:events';
+      const deadline = Date.now() + 5000;
+      while (!existsSync(${JSON.stringify(record)})) {
+        if (Date.now() > deadline) process.exit(71);
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+      const scratch = JSON.parse(readFileSync(${JSON.stringify(record)}, 'utf8')).scratch;
+      const descriptor = openSync(path.join(scratch, 'payload'), 'r');
+      writeFileSync(${JSON.stringify(ready)}, 'ready');
+      process.stdin.resume();
+      await once(process.stdin, 'end');
+      closeSync(descriptor);
+    `,
+      ],
+      { stdio: ["pipe", "ignore", "pipe"] },
+    );
+    const closed = once(observer, "close");
+    let errors = "";
+    observer.stderr.on("data", (chunk) => (errors += chunk));
+    try {
+      const command = {
+        key: `retained-${status}`,
+        label: `retained-${status}`,
+        phase: "preflight",
+        executable: process.execPath,
+        args: [
+          "--input-type=module",
+          "--eval",
+          `
+          import { existsSync, writeFileSync } from 'node:fs';
+          import os from 'node:os';
+          import path from 'node:path';
+          const scratch = os.tmpdir();
+          writeFileSync(path.join(scratch, 'payload'), 'retained');
+          writeFileSync(${JSON.stringify(record)}, JSON.stringify({ scratch }));
+          const deadline = Date.now() + 5000;
+          while (!existsSync(${JSON.stringify(ready)})) {
+            if (Date.now() > deadline) process.exit(72);
+            await new Promise(resolve => setTimeout(resolve, 5));
+          }
+          process.exit(${status});
+        `,
+        ],
+      };
+      const execution = runLockedPlan(plan([command]), root);
+      if (status === 0) await execution;
+      else await assert.rejects(execution, /Preflight verification checks failed: retained-17/u);
+      const { scratch } = JSON.parse(readFileSync(record, "utf8"));
+      assert.equal(readFileSync(path.join(scratch, "payload"), "utf8"), "retained");
+    } finally {
+      observer.stdin.end();
+      assert.deepEqual(await closed, [0, null], errors);
+    }
+  }
+  assert.equal(warnings.length, 2);
+  assert.ok(warnings.every((message) => /retained for housekeeping/u.test(message)));
+});
 
 function artifactCommand({
   artifactOwner,
@@ -217,7 +332,6 @@ test("verification plan metadata and commands cross the single-line terminal bou
     const { printPlan } = await import(${JSON.stringify(executorUrl)});
     printPlan({
       admission: {
-        canAdvanceSuccessfulBasis: false,
         coveredBroadRisks: [{ riskId: "risk\\nforged", path: "src/\\u001b[31mowned.ts" }],
         focusedCommandOwners: [{ ownerKeys: ["owner\\nforged"], path: "src/\\u001b[31mowned.ts" }],
         fullRelevantPaths: ["src/\\u001b[31mowned.ts"],
@@ -335,7 +449,6 @@ function markerCommand(markerFile, marker, phase, exitCode = 0) {
 function executionPlan(readOnlyCommands, workspaceCommands) {
   return {
     admission: {
-      canAdvanceSuccessfulBasis: false,
       focusedCommandOwners: [],
       fullRelevantPaths: [],
       mode: "full",
@@ -409,43 +522,56 @@ test("a failed command does not schedule the remaining same-phase suffix", async
 });
 
 test("a failure is reported while a same-phase peer is still running", async (t) => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "verification-early-failure-"));
-  t.after(() => rmSync(root, { force: true, recursive: true }));
-  const reported = path.join(root, "reported");
-  const originalLog = console.log;
-  console.log = (...args) => {
-    if (String(args[0]).startsWith("[verification:failed] early-failure "))
-      writeFileSync(reported, "reported");
-    originalLog(...args);
-  };
-  try {
-    const peer = {
-      ...markerCommand(path.join(root, "order"), "waiting-peer", "preflight"),
-      args: [
-        "--input-type=module",
-        "--eval",
-        `
+  for (const failure of ["exit", "cleanup"]) {
+    const root = mkdtempSync(path.join(os.tmpdir(), "verification-early-failure-"));
+    t.after(() => rmSync(root, { force: true, recursive: true }));
+    const reported = path.join(root, "reported");
+    const originalLog = console.log;
+    console.log = (...args) => {
+      if (String(args[0]).startsWith("[verification:failed] early-failure "))
+        writeFileSync(reported, "reported");
+      originalLog(...args);
+    };
+    try {
+      const failedCommand = markerCommand(
+        path.join(root, "order"),
+        "early-failure",
+        "preflight",
+        1,
+      );
+      if (failure === "cleanup") {
+        // Refuse linked-Git scratch cleanup without releasing the lock ahead of an admitted peer.
+        failedCommand.args = [
+          "--input-type=module",
+          "--eval",
+          `import { writeFileSync } from 'node:fs';
+        import os from 'node:os';
+        import path from 'node:path';
+        writeFileSync(path.join(os.tmpdir(), '.git'), 'gitdir: fixture\\n');`,
+        ];
+      }
+      const peer = {
+        ...markerCommand(path.join(root, "order"), "waiting-peer", "preflight"),
+        args: [
+          "--input-type=module",
+          "--eval",
+          `
         import { existsSync } from 'node:fs';
         const deadline = Date.now() + 5000;
         while (!existsSync(${JSON.stringify(reported)})) {
           if (Date.now() > deadline) process.exit(71);
           await new Promise(resolve => setTimeout(resolve, 10));
         }`,
-      ],
-    };
-    await assert.rejects(
-      runLockedPlan(
-        executionPlan(
-          [markerCommand(path.join(root, "order"), "early-failure", "preflight", 1), peer],
-          [],
-        ),
-        root,
-      ),
-      /^Error: Preflight verification checks failed: early-failure$/u,
-    );
-    assert.ok(existsSync(reported));
-  } finally {
-    console.log = originalLog;
+        ],
+      };
+      await assert.rejects(
+        runLockedPlan(executionPlan([failedCommand, peer], []), root),
+        /^Error: Preflight verification checks failed: early-failure$/u,
+      );
+      assert.ok(existsSync(reported));
+    } finally {
+      console.log = originalLog;
+    }
   }
 });
 
@@ -571,7 +697,7 @@ test("captured verifier output crosses the shared terminal-sanitization boundary
       reason: "terminal-boundary fixture",
     };
     const plan = {
-      admission: { canAdvanceSuccessfulBasis: false, focusedCommandOwners: [], fullRelevantPaths: [], mode: "full", reason: "fixture", uncoveredFullRelevantPaths: [], unknownPaths: [] },
+      admission: { focusedCommandOwners: [], fullRelevantPaths: [], mode: "full", reason: "fixture", uncoveredFullRelevantPaths: [], unknownPaths: [] },
       classifiedPaths: [], gitAvailable: true,
       options: { mode: "full", printPlan: false, simulatedPaths: [] },
       readOnlyCommands: [], verificationScope: "complete", workspaceCommands: [command],
@@ -625,7 +751,7 @@ test("truncated verifier output drops an incomplete credential line on both stre
       phase: "delivery", reason: "truncation fixture",
     };
     const plan = {
-      admission: { canAdvanceSuccessfulBasis: false, focusedCommandOwners: [], fullRelevantPaths: [], mode: "full", reason: "fixture", uncoveredFullRelevantPaths: [], unknownPaths: [] },
+      admission: { focusedCommandOwners: [], fullRelevantPaths: [], mode: "full", reason: "fixture", uncoveredFullRelevantPaths: [], unknownPaths: [] },
       classifiedPaths: [], gitAvailable: true,
       options: { mode: "full", printPlan: false, simulatedPaths: [] },
       readOnlyCommands: [], verificationScope: "complete", workspaceCommands: [command],

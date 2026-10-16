@@ -64,7 +64,10 @@ refresh or unrelated defect investigation follows from this assignment. Apply
    require the applicable repair authority. Inspect patch/SDK constraints when changing their
    framework consumers; preserve dependency manifests, patches and the lockfile. Use
    `$dependency-maintenance` for separately authorized dependency work. Installing current startup
-   tooling does not authorize running its compatible dependency refresh on the target.
+   tooling does not authorize running its compatible dependency refresh on the target. When frozen
+   preparation is needed, invoke `maintain-toolchain.mjs --locked` separately; keep the normal
+   launcher's `--startup` invocation. Never implement this task's limited maintenance scope by
+   disabling subsequent startup updates.
 5. For each divergent existing file, prepare an ephemeral JSON array of decisions from the preview:
    retain `path`, `currentHash`, `currentMode`, `desiredHash`, `desiredMode`; replace `kind` with
    `action` (`source`, `keep`, `replace` or explicitly reviewed `remove`) and a concrete `reason`. A
@@ -122,13 +125,15 @@ refresh or unrelated defect investigation follows from this assignment. Apply
    need for each target integration check before running it. Exercise startup/maintenance changes in
    isolated fixtures or a disposable generated project when the target command would exceed update
    scope. Do not run the target's compatible refresh or broad product verification merely to
-   complete this update. Preserve product-specific toolchains, secondary runtimes, dependency
-   patches and grouped tests; inspect assembled plans for duplicate execution as well as lost
-   coverage. Remove obsolete context dependencies only after tracing all consumers. Classify
-   unrelated findings without repairing them, and never weaken a check to obtain a green result.
-   Distinguish fixture, frozen-install and actual target evidence; a normal launcher run requires
-   authority for its side effects. Report an unexecuted gate or required restart, and do not call an
-   unverified target start-ready.
+   complete this update. Use the portable `scripts/setup/codex-launcher.test.mjs` to exercise the
+   actual launcher invocation and failure propagation without running maintenance. Reconcile its
+   generation selection and normal verification routing with the launcher. Preserve product-specific
+   toolchains, secondary runtimes, dependency patches and grouped tests; inspect assembled plans for
+   duplicate execution as well as lost coverage. Remove obsolete context dependencies only after
+   tracing all consumers. Classify unrelated findings without repairing them, and never weaken a
+   check to obtain a green result. Distinguish fixture, frozen-install and actual target evidence; a
+   normal launcher run requires authority for its side effects. Report an unexecuted gate or
+   required restart, and do not call an unverified target start-ready.
 9. Run a fresh current-output preview. Every remaining difference needs an explained intentional
    product adaptation; no unexplained old workflow, hidden compatibility branch or retired consumer
    may remain. Reuse the bounded findings in the handoff, not an installation receipt or a second

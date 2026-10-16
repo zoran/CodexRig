@@ -11,3 +11,5 @@ pnpmfile: []
 # mise-pinned Node.js runtime.
 strictPeerDependencies: true
 engineStrict: true
+# Keep installed package graphs in the user store; declarations and project links stay here.
+virtualStoreType: global

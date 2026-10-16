@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { after, test } from "node:test";
+import { after, before, test } from "node:test";
 import {
   cleanupTemporaryRoots,
   root,
@@ -38,7 +38,16 @@ import {
 } from "./startup-codex-process.mjs";
 import { startupControllerFailureMessage } from "./startup-session-controller.mjs";
 
-after(cleanupTemporaryRoots);
+const inheritedStorage = process.env.PROJECT_TOOL_STORAGE_HOME;
+// Managed temporary roots may be under the real user's home; model a separate fixture home.
+before(() => {
+  process.env.PROJECT_TOOL_STORAGE_HOME = temporaryRoot("session-controller-storage-");
+});
+after(() => {
+  if (inheritedStorage === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
+  else process.env.PROJECT_TOOL_STORAGE_HOME = inheritedStorage;
+  cleanupTemporaryRoots();
+});
 
 const projectIntelligenceArguments = Object.freeze([
   "-c",
@@ -178,7 +187,8 @@ function controllerFixture() {
       "const resume=resumeIndex!==-1;",
       'const sessionId=behavior==="different-selection"?"01a07777-5678-7abc-8def-0123456789ab":"01a09999-5678-7abc-8def-0123456789ab";',
       'for(const key of ["CODEXRIG_STARTUP_CONTROL_POLICY","CODEXRIG_STARTUP_NONCE","CODEXRIG_STARTUP_RESUME_SESSION_ID","CODEXRIG_STARTUP_SESSION_SOURCE"]){if(process.env[key]!==undefined)process.exit(85);}',
-      'appendFileSync(fixtureControl.capture,JSON.stringify({args,home:process.env.CODEX_HOME,resume,sessionId,shell:process.env.SHELL})+"\\n");',
+      'const temporary=require("node:os").tmpdir();writeFileSync(path.join(temporary,"session-fixture"),Buffer.alloc(1024*1024));',
+      'appendFileSync(fixtureControl.capture,JSON.stringify({args,home:process.env.CODEX_HOME,resume,sessionId,shell:process.env.SHELL,temporary})+"\\n");',
       'function waitForCodexBinding(){const leasePath=path.join(root,".codex/runtime/codexrig-session.json");const wait=new Int32Array(new SharedArrayBuffer(4));const deadline=Date.now()+5000;for(;;){const lease=JSON.parse(readFileSync(leasePath,"utf8"));if(lease.codexProcess?.pid===process.pid)return;if(Date.now()>deadline)process.exit(93);Atomics.wait(wait,0,0,5);}}',
       'if(resume&&behavior==="resume-mutate-fail"){waitForCodexBinding();writeFileSync(path.join(root,"scripts/setup/startup-attestation.mjs"),maliciousSource);process.exit(42);}',
       'if(resume&&behavior==="resume-runtime-config-fail"){writeFileSync(path.join(root,"config.toml"),"notify=[\\"sh\\",\\"-c\\",\\"run-project-code\\"]\\n",{encoding:"utf8",mode:0o600});process.exit(42);}',
@@ -347,6 +357,12 @@ test("controller binds canonical YOLO controls and the project-local Codex home"
     ...sessionControlHookConfigArguments(),
   ]);
   assert.equal(call.home, fixture.project);
+  assert.ok(call.temporary.startsWith(path.join(fixture.project, ".auth/project-tools/tmp/run-")));
+  assert.equal(
+    existsSync(call.temporary),
+    false,
+    "terminal session reclaims its actual temporary fixture",
+  );
   assert.equal(
     call.shell,
     resolveStartupHookShell({

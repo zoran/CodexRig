@@ -9,7 +9,7 @@ import {
   currentVerificationEvidenceInputs,
   readSuccessfulVerificationBasis,
   recordSuccessfulFullEvidence,
-  refreshExactAttestationAfterPreflight,
+  refreshCommittedVerificationEvidence,
   validateExactCurrentEvidence,
   verificationEvidenceCachePath,
 } from "./verification-evidence.mjs";
@@ -116,30 +116,18 @@ export function record(root, evidencePlan = broadPlan) {
   }
 }
 
-export function refresh(root, expectedInputs = inputs(root), options = {}) {
+export function refresh(root, expectedInputs = inputs(root)) {
   const basis = readSuccessfulVerificationBasis({ broadPlan, root });
   const expectedGitBasis = captureVerificationGitBasis({ repositoryRoot: root });
-  const paths = options.paths ?? expectedGitBasis.dirtyPaths;
-  const ownerKey = options.ownerKey ?? broadPlan[0].key;
   const lock = acquireVerificationSessionLock({ repositoryRoot: root });
   try {
-    return refreshExactAttestationAfterPreflight({
+    return refreshCommittedVerificationEvidence({
       root,
       broadPlan,
-      coverage: {
-        basisChanged: options.basisChanged ?? true,
-        broadRisks: options.broadRisks ?? [],
-        complete: true,
-        focusedCommandOwners:
-          options.focusedCommandOwners ??
-          paths.map((changedPath) => ({ ownerKeys: [ownerKey], path: changedPath })),
-        paths,
-      },
       expectedBasisToken: basis.token,
       expectedGitBasis,
       expectedInputs,
       runtimeIdentity,
-      successfulCommandKeys: options.successfulCommandKeys ?? [ownerKey],
     });
   } finally {
     lock.release();

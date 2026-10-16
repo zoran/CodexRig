@@ -6,6 +6,11 @@ import {
   requestRuntimeLifecycleCommandStop,
 } from "../repository/runtime-lifecycle-process.mjs";
 import { currentRuntimeLifecycleCapability } from "../repository/runtime-session-lease.mjs";
+import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
+import {
+  createProjectTemporaryScope,
+  temporaryEnvironment,
+} from "../repository/project-temporary-storage.mjs";
 import {
   formatContextError,
   sanitizeCommandForTerminal,
@@ -63,9 +68,6 @@ export function printPlan(plan) {
   console.log(`Admission mode: ${safeField(plan.admission.mode)}`);
   console.log(`Verification scope: ${safeField(plan.verificationScope)}`);
   console.log(`Admission reason: ${safeField(plan.admission.reason)}`);
-  console.log(
-    `Successful basis can advance: ${plan.admission.canAdvanceSuccessfulBasis ? "yes" : "no"}`,
-  );
 
   const phases = commandsByExecutionPhase(plan);
   const commands = executionPhaseOrder.flatMap((phase) => phases.get(phase));
@@ -128,7 +130,7 @@ export function printPlan(plan) {
   console.log("\nSelected checks:");
   for (const command of commands) {
     console.log(`- Would run [${command.phase}]: ${safePrintableCommand(command)}`);
-    console.log(`  Key: ${safeField(command.key)}`);
+    console.log(`  Key: ${safeField(command.acceptanceKey ?? command.key)}`);
     console.log(`  Reason: ${safeField(command.reason)}`);
   }
 }
@@ -175,6 +177,27 @@ function boundedOutputCollector() {
   };
 }
 
+async function withVerificationTemporaryStorage(repositoryRoot, action) {
+  const locations = prepareProjectToolDirectories(repositoryRoot);
+  const temporary = createProjectTemporaryScope({
+    root: repositoryRoot,
+    parent: locations.temporary,
+  });
+  try {
+    return await action(
+      temporaryEnvironment(
+        verificationChildEnvironment(process.env, repositoryRoot),
+        temporary.directory,
+      ),
+    );
+  } finally {
+    if (!temporary.release())
+      console.warn(
+        "Verification temporary storage still has active or unobservable consumers; retained for housekeeping.",
+      );
+  }
+}
+
 export async function runHeldVerificationCommand({ command, commandArgs, repositoryRoot }) {
   const environment = verificationChildEnvironment(process.env, repositoryRoot);
   const resolvedCommand = resolveVerificationExecutable(command, {
@@ -188,31 +211,33 @@ export async function runHeldVerificationCommand({ command, commandArgs, reposit
   if (!lifecycleCapability) {
     throw new Error("Held verification command requires the repository verification capability.");
   }
-  return await withVerificationSignalForwarding(
-    () =>
-      new Promise((resolve, reject) => {
-        const child = spawnRuntimeLifecycleCommand({
-          args: commandArgs,
-          command: resolvedCommand,
-          lifecycleCapability,
-          options: {
-            cwd: repositoryRoot,
-            env: environment,
-            stdio: ["inherit", "inherit", "inherit"],
-          },
-          repositoryRoot,
-          role: "verification-supervisor",
-        });
-        activeVerificationSupervisors.add(child);
-        child.once("error", (error) => {
-          activeVerificationSupervisors.delete(child);
-          reject(error);
-        });
-        child.once("close", (status) => {
-          activeVerificationSupervisors.delete(child);
-          resolve(status ?? 1);
-        });
-      }),
+  return await withVerificationTemporaryStorage(repositoryRoot, (temporaryEnvironment) =>
+    withVerificationSignalForwarding(
+      () =>
+        new Promise((resolve, reject) => {
+          const child = spawnRuntimeLifecycleCommand({
+            args: commandArgs,
+            command: resolvedCommand,
+            lifecycleCapability,
+            options: {
+              cwd: repositoryRoot,
+              env: temporaryEnvironment,
+              stdio: ["inherit", "inherit", "inherit"],
+            },
+            repositoryRoot,
+            role: "verification-supervisor",
+          });
+          activeVerificationSupervisors.add(child);
+          child.once("error", (error) => {
+            activeVerificationSupervisors.delete(child);
+            reject(error);
+          });
+          child.once("close", (status) => {
+            activeVerificationSupervisors.delete(child);
+            resolve(status ?? 1);
+          });
+        }),
+    ),
   );
 }
 
@@ -250,61 +275,68 @@ function verificationLifecycleCapability(repositoryRoot) {
 }
 
 function runCommand(command, repositoryRoot, requireDiagnosis) {
-  return new Promise((resolve) => {
-    const startedAt = performance.now();
-    console.log(`[verification:start] ${safeField(command.key)} (${command.phase})`);
-    const child = spawnRuntimeLifecycleCommand({
-      args: command.args,
-      command: command.executable,
-      lifecycleCapability: verificationLifecycleCapability(repositoryRoot),
-      options: {
-        cwd: repositoryRoot,
-        env: verificationChildEnvironment(process.env, repositoryRoot),
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-      repositoryRoot,
-      role: "verification-supervisor",
-    });
-    activeVerificationSupervisors.add(child);
-    const stdout = boundedOutputCollector();
-    const stderr = boundedOutputCollector();
-    let settled = false;
-    let diagnosticRequired = false;
-    // Five minutes is the conservative diagnosis checkpoint for unmeasured project commands,
-    // not permission to kill them. Measured owners can declare a tighter execution contract.
-    const diagnosticAfterMs = command.diagnosticAfterMs ?? 300_000;
-    const timer = setTimeout(() => {
-      diagnosticRequired = true;
-      requireDiagnosis();
-      console.error(
-        `[verification:diagnose] ${safeField(command.key)} exceeded ${diagnosticAfterMs}ms; ` +
-          `stop scheduling checks and investigate this active command before repeating it. ` +
-          (command.cancellable === true
-            ? "Cancelling the owned local check."
-            : "Awaiting safe completion; no external operation is interrupted."),
-      );
-      if (command.cancellable === true) requestRuntimeLifecycleCommandStop(child);
-    }, diagnosticAfterMs);
-    timer.unref();
-    const finish = (result) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      activeVerificationSupervisors.delete(child);
-      resolve({
-        ...result,
-        diagnosticRequired,
-        elapsedMs: Math.round(performance.now() - startedAt),
-        command,
-        stderr: stderr.buffer(),
-        stdout: stdout.buffer(),
-      });
-    };
-    child.stdout?.on("data", (chunk) => stdout.add(chunk));
-    child.stderr?.on("data", (chunk) => stderr.add(chunk));
-    child.on("error", (error) => finish({ status: null, error }));
-    child.on("close", (status, signal) => finish({ status, signal, error: null }));
-  });
+  verificationLifecycleCapability(repositoryRoot);
+  return withVerificationTemporaryStorage(
+    repositoryRoot,
+    (environment) =>
+      new Promise((resolve) => {
+        const startedAt = performance.now();
+        console.log(
+          `[verification:start] ${safeField(command.acceptanceKey ?? command.key)} (${command.phase})${command.testFile ? ` ${safeField(command.testFile)}` : ""}`,
+        );
+        const child = spawnRuntimeLifecycleCommand({
+          args: command.args,
+          command: command.executable,
+          lifecycleCapability: verificationLifecycleCapability(repositoryRoot),
+          options: {
+            cwd: repositoryRoot,
+            env: environment,
+            stdio: ["ignore", "pipe", "pipe"],
+          },
+          repositoryRoot,
+          role: "verification-supervisor",
+        });
+        activeVerificationSupervisors.add(child);
+        const stdout = boundedOutputCollector();
+        const stderr = boundedOutputCollector();
+        let settled = false;
+        let diagnosticRequired = false;
+        // Five minutes is the conservative diagnosis checkpoint for unmeasured project commands,
+        // not permission to kill them. Measured owners can declare a tighter execution contract.
+        const diagnosticAfterMs = command.diagnosticAfterMs ?? 300_000;
+        const timer = setTimeout(() => {
+          diagnosticRequired = true;
+          requireDiagnosis();
+          console.error(
+            `[verification:diagnose] ${safeField(command.key)} exceeded ${diagnosticAfterMs}ms; ` +
+              `stop scheduling checks and investigate this active command before repeating it. ` +
+              (command.cancellable === true
+                ? "Cancelling the owned local check."
+                : "Awaiting safe completion; no external operation is interrupted."),
+          );
+          if (command.cancellable === true) requestRuntimeLifecycleCommandStop(child);
+        }, diagnosticAfterMs);
+        timer.unref();
+        const finish = (result) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          activeVerificationSupervisors.delete(child);
+          resolve({
+            ...result,
+            diagnosticRequired,
+            elapsedMs: Math.round(performance.now() - startedAt),
+            command,
+            stderr: stderr.buffer(),
+            stdout: stdout.buffer(),
+          });
+        };
+        child.stdout?.on("data", (chunk) => stdout.add(chunk));
+        child.stderr?.on("data", (chunk) => stderr.add(chunk));
+        child.on("error", (error) => finish({ status: null, error }));
+        child.on("close", (status, signal) => finish({ status, signal, error: null }));
+      }),
+  );
 }
 
 function writeBuffer(stream, buffer) {
@@ -318,7 +350,9 @@ function writeBuffer(stream, buffer) {
 function printResult(result) {
   const status =
     result.error || result.status !== 0 || result.diagnosticRequired ? "failed" : "passed";
-  console.log(`[verification:${status}] ${safeField(result.command.key)} ${result.elapsedMs}ms`);
+  console.log(
+    `[verification:${status}] ${safeField(result.command.acceptanceKey ?? result.command.key)} ${result.elapsedMs}ms`,
+  );
   console.log(`\n[${safeField(result.command.label)}] ${safePrintableCommand(result.command)}`);
   writeBuffer(process.stdout, result.stdout);
   writeBuffer(process.stderr, result.stderr);
@@ -332,7 +366,10 @@ function parallelLimit() {
 }
 
 function artifactOwnerSet(command) {
-  return new Set(command.artifactOwners ?? []);
+  return new Set([
+    ...(command.artifactOwners ?? []),
+    ...(command.serialGroup ? [`serial-test-suite:${command.serialGroup}`] : []),
+  ]);
 }
 
 function artifactShards(commands) {
@@ -365,7 +402,7 @@ function artifactShards(commands) {
   return [...groups.values()].sort((left, right) => left[0] - right[0]);
 }
 
-async function runArtifactSafeCommands(commands, failurePrefix, repositoryRoot) {
+async function runArtifactSafeCommands(commands, failurePrefix, repositoryRoot, onResult) {
   if (commands.length === 0) return [];
   const results = new Array(commands.length);
   const shards = artifactShards(commands);
@@ -376,23 +413,40 @@ async function runArtifactSafeCommands(commands, failurePrefix, repositoryRoot) 
       const shard = shards[nextShard++];
       for (const index of shard) {
         if (phaseFailed) break;
-        results[index] = await runCommand(commands[index], repositoryRoot, () => {
-          phaseFailed = true;
-        });
+        const startedAt = performance.now();
+        try {
+          results[index] = await runCommand(commands[index], repositoryRoot, () => {
+            phaseFailed = true;
+          });
+        } catch (error) {
+          results[index] = {
+            command: commands[index],
+            elapsedMs: Math.round(performance.now() - startedAt),
+            error,
+            status: null,
+          };
+        }
         printResult(results[index]);
         if (
           results[index].error ||
           results[index].status !== 0 ||
           results[index].diagnosticRequired
-        ) {
+        )
           phaseFailed = true;
-          break;
-        }
+        await onResult?.(results[index]);
       }
     }
   };
-  const workers = Array.from({ length: Math.min(parallelLimit(), shards.length) }, () => worker());
-  await Promise.all(workers);
+  const workers = Array.from({ length: Math.min(parallelLimit(), shards.length) }, () =>
+    worker().catch((error) => {
+      phaseFailed = true;
+      throw error;
+    }),
+  );
+  // Exceptional setup, cleanup or result handling must drain already admitted peers before unlock.
+  const outcomes = await Promise.allSettled(workers);
+  const rejected = outcomes.find((outcome) => outcome.status === "rejected");
+  if (rejected) throw rejected.reason;
 
   const failures = [];
   for (const result of results) {
@@ -406,7 +460,7 @@ async function runArtifactSafeCommands(commands, failurePrefix, repositoryRoot) 
   return results.map((result) => result.command.key);
 }
 
-export async function runPlan(plan, { repositoryRoot = root } = {}) {
+export async function runPlan(plan, { repositoryRoot = root, onResult } = {}) {
   printPlan(plan);
   if (plan.options.printPlan) return Object.freeze({ successfulCommandKeys: Object.freeze([]) });
 
@@ -418,6 +472,7 @@ export async function runPlan(plan, { repositoryRoot = root } = {}) {
         phases.get("preflight"),
         "Preflight verification checks failed",
         repositoryRoot,
+        onResult,
       )),
     );
     successful.push(
@@ -425,6 +480,7 @@ export async function runPlan(plan, { repositoryRoot = root } = {}) {
         phases.get("broad"),
         "Broad regression checks failed",
         repositoryRoot,
+        onResult,
       )),
     );
     successful.push(
@@ -432,6 +488,7 @@ export async function runPlan(plan, { repositoryRoot = root } = {}) {
         phases.get("workspace-build"),
         "Workspace build failed",
         repositoryRoot,
+        onResult,
       )),
     );
     successful.push(
@@ -439,6 +496,7 @@ export async function runPlan(plan, { repositoryRoot = root } = {}) {
         phases.get("workspace-test"),
         "Workspace test failed",
         repositoryRoot,
+        onResult,
       )),
     );
     successful.push(
@@ -446,6 +504,7 @@ export async function runPlan(plan, { repositoryRoot = root } = {}) {
         phases.get("delivery"),
         "Target delivery verification failed",
         repositoryRoot,
+        onResult,
       )),
     );
     return successful;

@@ -39,6 +39,14 @@ import { trustedPnpmCommand } from "./trusted-pnpm-command.mjs";
 import { inspectRuntimeLifecycleLock } from "../repository/runtime-session-lease.mjs";
 
 const transactionRoots = [];
+const originalToolStorage = process.env.PROJECT_TOOL_STORAGE_HOME;
+const fixtureToolStorage = mkdtempSync(path.join(os.tmpdir(), "dependency-user-tools-"));
+transactionRoots.push(fixtureToolStorage);
+process.env.PROJECT_TOOL_STORAGE_HOME = fixtureToolStorage;
+after(() => {
+  if (originalToolStorage === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
+  else process.env.PROJECT_TOOL_STORAGE_HOME = originalToolStorage;
+});
 const sourceToolchain = readFileSync(
   path.resolve(import.meta.dirname, "..", "..", ".codex", "toolchain.json"),
   "utf8",

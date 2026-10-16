@@ -27,7 +27,6 @@ import { assertIndependentProjectOutput } from "../../scripts/framework/project-
 import {
   prepareProjectToolDirectories,
   projectToolEnvironment,
-  projectToolPaths,
 } from "../repository/project-tool-environment.mjs";
 import {
   projectManagedToolLayout,
@@ -51,26 +50,12 @@ function run(root, args, executable = process.execPath, timeout = 30_000) {
   });
 }
 function seedPublicPackageCache(target) {
-  const source = projectToolPaths(root);
-  const destination = prepareProjectToolDirectories(target);
-  // Only immutable public package bytes and registry metadata seed offline fixtures. Never copy
-  // account configuration, native state, home directories or a host package cache.
-  for (const kind of ["data", "cache"]) {
-    const from = path.join(source[kind], "pnpm");
-    assert.ok(existsSync(from), "Run the source's canonical dependency installation before tests.");
-    cpSync(from, path.join(destination[kind], "pnpm"), { recursive: true });
-  }
-  // A generated doctor must inspect its own tools, not borrow the test parent's PATH. Seed only
-  // the already verified immutable distributions; no native account or session data is copied.
+  prepareProjectToolDirectories(target);
   const sourceTools = projectManagedToolLayout(root);
   const targetTools = projectManagedToolLayout(target);
   verifyProjectToolBundle(root, sourceTools.codex);
-  mkdirSync(path.dirname(targetTools.codex.directory), { recursive: true, mode: 0o700 });
-  cpSync(sourceTools.codex.directory, targetTools.codex.directory, { recursive: true });
-  mkdirSync(path.dirname(targetTools.pnpm.executable), { recursive: true, mode: 0o700 });
-  cpSync(path.dirname(sourceTools.pnpm.executable), path.dirname(targetTools.pnpm.executable), {
-    recursive: true,
-  });
+  assert.equal(sourceTools.codex.executable, targetTools.codex.executable);
+  assert.equal(sourceTools.pnpm.executable, targetTools.pnpm.executable);
 }
 function generate(source, name, extra = []) {
   const parent = temporaryRoot("independent-product-");
@@ -89,6 +74,54 @@ function generate(source, name, extra = []) {
   return path.join(parent, "product/code");
 }
 after(cleanupTemporaryRoots);
+
+test("generated sibling launchers reuse user tools and package graphs with isolated accounts", (t) => {
+  // pnpm intentionally uses a disposable local graph in CI; exercise the developer contract here.
+  const previousCi = process.env.CI;
+  process.env.CI = "false";
+  t.after(() => {
+    if (previousCi === undefined) delete process.env.CI;
+    else process.env.CI = previousCi;
+  });
+  const source = isolatedTrackedFrameworkSource("shared-tools-source-");
+  const observed = [];
+  for (const name of ["Shared Tools First", "Shared Tools Second"]) {
+    const generated = generate(source, name);
+    for (const [name, tool] of Object.entries(projectManagedToolLayout(generated)))
+      assert.ok(existsSync(tool.executable), `Missing prepared ${name}: ${tool.executable}`);
+    const install = run(generated, [
+      "scripts/setup/project-command.mjs",
+      "pnpm",
+      "install",
+      "--offline",
+      "--frozen-lockfile",
+      "--ignore-scripts",
+      "--ignore-pnpmfile",
+    ]);
+    assert.equal(install.status, 0, install.stdout + install.stderr);
+    const probe = run(generated, [
+      "scripts/setup/project-command.mjs",
+      "node",
+      "--input-type=module",
+      "-e",
+      'import {realpathSync} from "node:fs"; console.log(JSON.stringify({node:process.execPath,package:realpathSync("node_modules/prettier"),playwright:process.env.PLAYWRIGHT_BROWSERS_PATH,puppeteer:process.env.PUPPETEER_CACHE_DIR,accountHome:process.env.HOME}));',
+    ]);
+    assert.equal(probe.status, 0, probe.stdout + probe.stderr);
+    observed.push(JSON.parse(probe.stdout));
+    assert.equal(existsSync(path.join(generated, ".auth/project-tools/tools")), false);
+    assert.equal(existsSync(path.join(generated, ".auth/project-tools/data/mise")), false);
+    assert.ok(!observed.at(-1).package.startsWith(`${generated}${path.sep}`));
+    for (const name of ["playwright", "puppeteer"]) {
+      assert.ok(path.isAbsolute(observed.at(-1)[name]));
+      assert.ok(!observed.at(-1)[name].startsWith(`${generated}${path.sep}`));
+    }
+  }
+  assert.equal(observed[0].node, observed[1].node);
+  assert.equal(observed[0].package, observed[1].package);
+  assert.equal(observed[0].playwright, observed[1].playwright);
+  assert.equal(observed[0].puppeteer, observed[1].puppeteer);
+  assert.notEqual(observed[0].accountHome, observed[1].accountHome);
+});
 
 test("empty generation excludes source capabilities, private markers and new unselected files", () => {
   const primaryBefore = gitState(root);
@@ -162,15 +195,18 @@ test("empty generation excludes source capabilities, private markers and new uns
     selected.commands.flatMap((command) => command.args).filter((arg) => arg.endsWith(".test.mjs")),
     [
       "scripts/setup/runtime-safety.test.mjs",
+      "scripts/setup/repository-storage.test.mjs",
       "scripts/goals/project-publication.test.mjs",
       "scripts/repository/global-git-credential.test.mjs",
       "scripts/goals/publication-command.test.mjs",
       "scripts/goals/project-publication-integration.test.mjs",
       "scripts/repository/git-publication-identity.test.mjs",
       "scripts/repository/publication-session.test.mjs",
+      "scripts/setup/codex-launcher.test.mjs",
       "scripts/contracts/mise-toolchain-configuration.test.mjs",
       "scripts/deps/toolchain-releases.test.mjs",
       "scripts/deps/toolchain-maintenance.test.mjs",
+      "scripts/deps/tool-storage-housekeeping.test.mjs",
     ],
   );
   for (const file of [".github/workflows/ci.yml", ".gitlab-ci.yml"])
@@ -179,6 +215,12 @@ test("empty generation excludes source capabilities, private markers and new uns
       /canar|next-node|compatibility:|schedule|framework:/iu,
     );
   assertGeneratedTransferParityContract(source, generated);
+  const storageAdmission = run(generated, [
+    "--test",
+    "--test-name-pattern=startup admits 7.6 GiB",
+    "scripts/setup/repository-storage.test.mjs",
+  ]);
+  assert.equal(storageAdmission.status, 0, storageAdmission.stdout + storageAdmission.stderr);
   write(
     source,
     "scripts/context/session-stop-lifecycle.mjs",
@@ -219,8 +261,9 @@ test("generated tools and selected checks operate after the source checkout beco
   );
   assert.equal(installed.status, 0, installed.stdout + installed.stderr);
   // This exercises the complete generated suite, including portable publication regressions.
-  // Keep a bounded suite allowance distinct from an individual command's 30-second limit.
-  const verified = run(generated, ["verify"], "pnpm", 120_000);
+  // Publication integration alone takes about 140 seconds; include preflight and remaining checks.
+  // This bounded nested-suite allowance does not change any individual verifier's limit.
+  const verified = run(generated, ["verify"], "pnpm", 240_000);
   assert.equal(
     verified.status,
     0,

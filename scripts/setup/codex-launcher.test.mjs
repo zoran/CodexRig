@@ -1,26 +1,24 @@
 /** Verifies update-before-admission and the native-picker launcher's closed shell boundary. */
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import {
   chmodSync,
   copyFileSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import { after, test } from "node:test";
-import {
-  cleanupTemporaryRoots,
-  root,
-  run,
-  temporaryRoot,
-} from "./setup-regression-test-helpers.mjs";
+import { test } from "node:test";
+import { toolingRoot as root } from "../filesystem/repository-files.mjs";
 
-after(cleanupTemporaryRoots);
-
-test("launcher maintains before admission, fails closed, and admits only native picker controls", () => {
-  const project = temporaryRoot("codex launcher with spaces ");
+test("launcher maintains before admission, fails closed, and admits only native picker controls", (t) => {
+  const project = mkdtempSync(path.join(os.tmpdir(), "codex launcher with spaces "));
+  t.after(() => rmSync(project, { recursive: true, force: true }));
   const bin = path.join(project, "bin");
   const setup = path.join(project, "scripts/setup");
   mkdirSync(bin);
@@ -112,9 +110,14 @@ test("launcher maintains before admission, fails closed, and admits only native 
   }
   function invoke(args = [], extra = {}) {
     writeFileSync(capture, "");
-    return run("bash", [launcher, ...args], {
+    return spawnSync("bash", [launcher, ...args], {
       cwd: project,
+      encoding: "utf8",
+      input: "",
+      stdio: "pipe",
+      timeout: 30_000,
       env: {
+        ...process.env,
         PATH: `${bin}:/usr/bin:/bin`,
         CAPTURE_PATH: capture,
         FAKE_CODEX_EXECUTABLE: codex,
@@ -190,6 +193,8 @@ test("launcher maintains before admission, fails closed, and admits only native 
   }
 
   for (const args of [
+    ["--locked"],
+    ["--startup"],
     ["--cd", "/tmp/another-project"],
     ["--cd=/tmp/another-project"],
     ["-C/tmp/another-project"],

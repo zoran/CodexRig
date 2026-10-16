@@ -261,12 +261,23 @@ not apply a review simply because a keyword appears. Keep findings and evidence 
 
 ## Dependency Installation And Freshness
 
-Prepare project-local tools and compatible dependencies with
+Prepare project-pinned tools in user storage and compatible dependencies with
 `node scripts/deps/maintain-toolchain.mjs`, then run `bash scripts/setup/run-project.sh pnpm setup`.
-The compatible installer owns range/pin/peer/engine policy, archive integrity, transaction and
-rollback. A frozen install proves reproducibility, not registry freshness. CI uses reviewed stable
-pins, frozen inputs, disabled install scripts/pnpmfile and verified archives. Report offline or
-registry uncertainty honestly; do not substitute unverified success or automatic source repairs.
+Normal `start-codex.sh` invokes `maintain-toolchain.mjs --startup` to discover new releases before
+session admission. Preserve that invocation; `--locked` is separate reproducible preparation and CI,
+and deliberately skips release discovery. The portable launcher regression checks the actual shell
+entry during affected development checks and publication. The compatible installer owns
+range/pin/peer/engine policy, archive integrity, transaction and rollback. Keep manifests, lockfiles
+and pins in Git; installed payloads use the shared user storage owner and pnpm global virtual store.
+Account configuration stays project-private. The installer reuses verified legacy bundles without
+downloading them again, preserves manifests and lockfiles, and holds the shared lifecycle lock
+through pin publication and cleanup. `--locked` reproduces declared pins and the existing lockfile
+when relocating installed state. Its online stage prepares the final destination's required rebuild
+before offline reproduction. The [storage owner](#temporary-data-and-storage-housekeeping) owns
+capacity admission before staging and gates retirement on references and quiescence. A frozen
+install proves reproducibility, not registry freshness. CI uses reviewed stable pins, frozen inputs,
+disabled install scripts/pnpmfile and verified archives. Report offline or registry uncertainty
+honestly; do not substitute unverified success or automatic source repairs.
 
 ## Infrastructure As Code
 
@@ -280,12 +291,13 @@ priority; run isolated verification beside or afterward. Dev is latest-wins. Sta
 explicit selection and their scoped credentials, immutable artifact/configuration, migration and
 rollback evidence, serialized promotion and health checks. `pnpm verify` does not deploy.
 
+### Deployment And Qualification Failure Recovery
+
+<!-- current-delivery-failure-policy -->
+
 ## Test Strategy
 
-Use proportionate owner and consumer evidence. Extend realistic lifecycle scenarios for material
-regressions; avoid tests that merely mirror wording. Retained runtime changes need negative trust
-and recovery evidence. Distinguish static, simulated, rendered and native/account-backed evidence.
-Configuration and hook outputs do not prove model obedience.
+<!-- current-test-strategy-policy -->
 
 ## Verification
 
@@ -308,7 +320,10 @@ boundaries; verification must not install prerequisites or silently discard a re
 
 Explicitly authorized publication and deployment may run directly from the owning Codex session. Use
 the README's `project:publish` command to verify, commit and push the current branch to its
-configured upstream. Drain owned agents and background writers first. The publisher proves the
+configured upstream. Drain owned agents and background writers first. The publisher establishes the
+complete integrated verification basis once, reusing matching individual results from manual
+verification and earlier attempts. Pre-push consumes that evidence while retaining its security and
+pushed-object checks. Independent CI and deployment gates remain required. The publisher proves the
 calling canonical session through its exact live lease and observable Linux process ancestry;
 competing or unverified active writers remain blockers. Where this proof is unavailable, publish
 from the terminal after sessions exit. Preserve native history, project credentials, branch
@@ -322,10 +337,15 @@ Apply [Maintenance Scope And Verification](#maintenance-scope-and-verification) 
 below. Finish authorized code, documentation, cleanup and reviews. Settle every no-longer-needed
 owned worktree and coordination claim through its owner. Preserve ambiguous directories and active
 runtime; never manually delete `.codex/runtime/` or a worktree directory. Run
-`bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply`, audit current truth and
-verify the stable state. Commit/push only with authority and the actual integration policy;
-`goal:new` checks clean, verified publication on central main. An unrelated tooling finding does not
-reactivate completed product work or impose another cleanup task.
+`bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply`, audit current truth, reuse
+valid evidence and fill only affected gaps. Complete verification belongs to publication, not each
+review or handoff. Commit/push only with authority and the actual integration policy; `goal:new`
+checks clean, verified publication on central main. An unrelated tooling finding does not reactivate
+completed product work or impose another cleanup task.
+
+## Temporary Data And Storage Housekeeping
+
+<!-- current-temporary-storage-policy -->
 
 ## Subagent Orchestration And Integration Authority
 

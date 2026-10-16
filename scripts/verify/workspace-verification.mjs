@@ -191,6 +191,43 @@ function lifecyclePhase(scriptName, mode) {
   return scriptName === "build" ? "workspace-build" : "workspace-test";
 }
 
+function workspaceTestCommands(owners, command, scriptName) {
+  if (!scriptName.startsWith("test")) return undefined;
+  const byName = new Map(owners.filter((owner) => owner.name).map((owner) => [owner.name, owner]));
+  const ordered = [];
+  const visiting = new Set();
+  const complete = new Set();
+  function visit(owner) {
+    if (complete.has(owner)) return true;
+    if (visiting.has(owner)) return false;
+    visiting.add(owner);
+    for (const name of internalDependencyNames(owner)) {
+      const dependency = byName.get(name);
+      if (dependency && !visit(dependency)) return false;
+    }
+    visiting.delete(owner);
+    complete.add(owner);
+    ordered.push(owner);
+    return true;
+  }
+  // Cyclic graphs keep pnpm's original grouped execution contract.
+  if (!owners.every(visit)) return undefined;
+  return ordered.map((owner) => ({
+    ...command,
+    args: [
+      "--recursive",
+      ...(owner.directory === "." ? ["--include-workspace-root"] : []),
+      "--filter",
+      owner.directory === "." ? "." : `./${owner.directory}`,
+      "--if-present",
+      "run",
+      scriptName,
+    ],
+    artifactOwners: [`workspace:${owner.directory}`],
+    workspaceDirectories: [owner.directory],
+  }));
+}
+
 export function workspaceLifecycleCommands(
   manifests = discoverWorkspaceManifests(),
   { mode = "full" } = {},
@@ -217,7 +254,7 @@ export function workspaceLifecycleCommands(
       }
       return ["--filter", selector];
     });
-    commands.push({
+    const command = {
       key: `workspace:${scriptName}`,
       label: `project lifecycle ${scriptName}`,
       executable: "pnpm",
@@ -232,8 +269,13 @@ export function workspaceLifecycleCommands(
         scriptName,
       ],
       artifactOwners: owners.map((manifest) => `workspace:${manifest.directory}`).sort(),
+      workspaceDirectories: owners.map((manifest) => manifest.directory).sort(),
       reason: `${owners.length} selected project(s) expose ${scriptName}; exact workspace filters avoid non-owners and recursive aggregators`,
       phase: lifecyclePhase(scriptName, mode),
+    };
+    commands.push({
+      ...command,
+      workspaceTestCommands: workspaceTestCommands(owners, command, scriptName),
     });
   }
   return commands;

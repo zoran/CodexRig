@@ -1,14 +1,6 @@
 #!/usr/bin/env node
 /** Maintains the startup toolchain, compatible dependencies, and CI pins through repository-owned transactions. */
-import {
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
@@ -23,10 +15,13 @@ import { toolingRoot, serializeCanonicalJson } from "../filesystem/repository-fi
 import { verifyInputRecords } from "../deps/dependency-inputs.mjs";
 import { stageDependencyInstallationInputs } from "../deps/install-compatible.mjs";
 import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
+import { prepareUserToolDirectories, userToolPaths } from "../repository/user-tool-storage.mjs";
+import { runStorageHousekeeping } from "../repository/repository-storage.mjs";
 import {
-  installProjectBootstrapTools,
-  retireReplacedProjectTools,
-} from "./project-tool-installation.mjs";
+  createProjectTemporaryScope,
+  temporaryEnvironment,
+} from "../repository/project-temporary-storage.mjs";
+import { installProjectBootstrapTools } from "./project-tool-installation.mjs";
 import { assertInstalledProjectTools } from "./project-runtime-admission.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
 import {
@@ -92,9 +87,12 @@ function assertCandidateLock(stage, candidate) {
     throw new Error(`Candidate toolchain lock is invalid: ${findings.join("; ")}.`);
 }
 
-function commandRunner(root, capability) {
+function commandRunner(root, capability, temporaryDirectory) {
   return (command, args, { cwd = root, delegation, env = {} } = {}) => {
-    const environment = { ...pnpmHooksDisabledEnvironment(process.env, root), ...env };
+    const environment = {
+      ...temporaryEnvironment(pnpmHooksDisabledEnvironment(process.env, root), temporaryDirectory),
+      ...env,
+    };
     // Private parent controls must not become apparent authority for unrelated staged commands.
     for (const key of Object.keys(environment))
       if (key.startsWith("CODEXRIG_LIFECYCLE_DELEGATION_")) delete environment[key];
@@ -117,7 +115,7 @@ function commandRunner(root, capability) {
     });
     if (result.error || result.status !== 0)
       throw new Error(
-        `${command} ${args[0]} failed: ${result.error?.message || result.stderr || result.stdout || result.status}`,
+        `${path.basename(command)} ${args[0]} failed: ${result.error?.message || result.stderr || result.stdout || result.status}`,
       );
     return result.stdout.trim();
   };
@@ -170,6 +168,7 @@ export async function maintainToolchain({
   spawnGit,
   runCommand,
   installBootstrapTools = installProjectBootstrapTools,
+  prepareStorage = runStorageHousekeeping,
   admitProjectTools = assertInstalledProjectTools,
   onInventory = () => {},
   onProgress = () => {},
@@ -194,7 +193,7 @@ export async function maintainToolchain({
     signal,
     timeout: lifecycleWaitTimeoutMilliseconds,
   });
-  let stage;
+  let temporary, installationOwner, installationRoot;
   try {
     assertMaintenanceInventory(inspectRepositoryWorktrees({ root }), { startup });
     const settlement = reconcileRepositoryWorktreeState({
@@ -204,12 +203,22 @@ export async function maintainToolchain({
     });
     assertMaintenanceInventory(settlement.inventory, { startup });
     if (settlement.blockingFindings.length) throw new Error(settlement.blockingFindings.join("; "));
+    const storage = userToolPaths();
+    prepareStorage({
+      root,
+      apply: true,
+      storagePaths: [storage.lifecycle, storage.miseCache, storage.pnpmStore, storage.pnpmCache],
+    });
     recoverInterruptedHousekeepingWrites(root);
     const inputs = toolchainMaintenanceInputs(root);
     const current = readToolchainConfiguration(root);
     const locations = prepareProjectToolDirectories(root);
-    stage = mkdtempSync(path.join(locations.temporary, "toolchain-"));
-    chmodSync(stage, 0o700);
+    temporary = createProjectTemporaryScope({
+      root,
+      parent: locations.temporary,
+      protectedPaths: settlement.inventory.worktrees.map((worktree) => worktree.path),
+    });
+    const stage = temporary.directory;
     const dependencyInputs = stageDependencyInstallationInputs({
       projectRoot: root,
       stageRoot: stage,
@@ -224,7 +233,7 @@ export async function maintainToolchain({
         ]),
       ),
     };
-    const run = runCommand ?? commandRunner(root, capability);
+    const run = runCommand ?? commandRunner(root, capability, stage);
     onProgress(
       locked
         ? "Reproducing reviewed tool pins and the existing dependency lockfile."
@@ -249,7 +258,18 @@ export async function maintainToolchain({
         throw new Error(`Candidate ${provider} CI contract is invalid: ${violations.join(", ")}.`);
     }
     verifyInputRecords(root, allInputs);
-    const bootstrap = await installBootstrapTools({ root, matrix: candidate, run, fetchImpl });
+    installationRoot = prepareUserToolDirectories().lifecycle;
+    installationOwner = acquireRuntimeLifecycleLock({
+      root: installationRoot,
+      operation: "toolchain-maintenance",
+    });
+    const bootstrap = await installBootstrapTools({
+      root,
+      matrix: candidate,
+      run,
+      fetchImpl,
+      installationOwner,
+    });
     for (const relativePath of toolchainConfigurationPaths)
       stageWrite(stage, relativePath, projected[relativePath]);
     const packageJson = JSON.parse(readFileSync(path.join(stage, "package.json"), "utf8"));
@@ -326,12 +346,31 @@ export async function maintainToolchain({
         );
       },
     });
-    if (startup)
-      retireReplacedProjectTools({ root, previousMatrix: current, owner: capability, run });
+    if (startup) {
+      const { reconcileToolStorage } = await import("./tool-storage-housekeeping.mjs");
+      const storage = reconcileToolStorage({
+        root,
+        apply: true,
+        owner: capability,
+        installationOwner,
+      });
+      for (const reason of storage.deferred) onProgress(`Tool storage retained: ${reason}.`);
+    }
     return { changedPaths: writes.map((entry) => entry.relativePath), matrix: candidate };
   } finally {
-    if (stage) rmSync(stage, { recursive: true, force: true });
-    releaseRuntimeLifecycleLock({ root, owner: capability });
+    try {
+      if (temporary && !temporary.release())
+        console.warn(
+          "Toolchain temporary storage retained for remaining consumers; housekeeping will reconcile it.",
+        );
+    } finally {
+      try {
+        if (installationOwner)
+          releaseRuntimeLifecycleLock({ root: installationRoot, owner: installationOwner });
+      } finally {
+        releaseRuntimeLifecycleLock({ root, owner: capability });
+      }
+    }
   }
 }
 

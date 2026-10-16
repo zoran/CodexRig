@@ -100,12 +100,13 @@ test("startup waits for a live verification without stealing its lock or startin
   let waited = false;
   try {
     await assert.rejects(
-      maintainToolchain({ root }),
+      maintainToolchain({ prepareStorage: () => {}, root }),
       (error) =>
         error.code === runtimeLifecycleBusyErrorCode && error.lifecycle.status === "active",
     );
     await assert.rejects(
       maintainToolchain({
+        prepareStorage: () => {},
         root,
         startup: true,
         onLifecycleWait: async (message) => {
@@ -135,6 +136,7 @@ test("startup rechecks session ownership after waiting for verification", async 
   try {
     await assert.rejects(
       maintainToolchain({
+        prepareStorage: () => {},
         root,
         startup: true,
         onLifecycleWait: async () => {
@@ -164,6 +166,7 @@ for (const interruptedBy of ["timeout", "abort"]) {
     try {
       await assert.rejects(
         maintainToolchain({
+          prepareStorage: () => {},
           root,
           startup: true,
           lifecycleWaitTimeoutMilliseconds: 250,
@@ -198,6 +201,7 @@ test("uncertain lifecycle ownership fails closed without waiting or changing pri
   assert.equal(inspectRuntimeLifecycleLock({ root }).status, "unknown");
   await assert.rejects(
     maintainToolchain({
+      prepareStorage: () => {},
       root,
       startup: true,
       onLifecycleWait: () => {
@@ -216,6 +220,7 @@ test("ordinary maintenance and reentrant startup remain fail-fast", async (t) =>
     for (const startup of [false, true]) {
       await assert.rejects(
         maintainToolchain({
+          prepareStorage: () => {},
           root,
           startup,
           onLifecycleWait: () => {
@@ -247,6 +252,7 @@ for (const mutationAt of ["before-install", "after-dependencies"]) {
     const calls = [];
     await assert.rejects(
       maintainToolchain({
+        prepareStorage: () => {},
         root,
         locked: true,
         fetchImpl: async () => {

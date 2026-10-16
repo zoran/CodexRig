@@ -73,7 +73,6 @@ export function buildPlan(options, dependencies = {}) {
       verificationScope: "reproduction only; no acceptance evidence",
       admission: {
         mode: "reproduction",
-        canAdvanceSuccessfulBasis: false,
         focusedCommandOwners: [],
         fullRelevantPaths: [],
         uncoveredFullRelevantPaths: [],
@@ -106,7 +105,9 @@ export function buildPlan(options, dependencies = {}) {
   const classificationOptions = { productLayout };
   const classifiedPaths = changed.paths.map((filePath) => ({
     path: filePath,
-    categories: classifyPath(filePath, classificationOptions),
+    categories: dependencies.editorialPaths?.has(filePath)
+      ? ["editorial source change"]
+      : classifyPath(filePath, classificationOptions),
   }));
   const basis =
     dependencies.basis ??
@@ -117,8 +118,7 @@ export function buildPlan(options, dependencies = {}) {
     ? [dependencies.deliveryBinding.verificationCommand]
     : [];
   const completeCommands = [...completeVerificationCommands(), ...deliveryCommands];
-  // Admission can become full for an unknown path or incomplete Git basis. Discover all real
-  // workspace lifecycles before that decision, so conservative admission cannot omit product tests.
+  // Publication covers all real workspace lifecycles; development selects their affected owners.
   const needsWorkspace = options.mode !== "pre-push";
   const workspaceManifests =
     dependencies.workspaceManifests ?? (needsWorkspace ? discoverWorkspaceManifests() : []);
@@ -135,7 +135,6 @@ export function buildPlan(options, dependencies = {}) {
   const admission =
     options.mode === "pre-push"
       ? {
-          canAdvanceSuccessfulBasis: false,
           focusedCommandOwners: [],
           fullRelevantPaths: [],
           mode: "targeted",
@@ -145,6 +144,7 @@ export function buildPlan(options, dependencies = {}) {
           unknownReasons: [],
         }
       : decideVerificationAdmission({
+          entryMode: options.mode,
           basis,
           broadOnlyRisks: dependencies.broadOnlyRisks ?? [],
           changed,

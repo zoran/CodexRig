@@ -92,6 +92,8 @@ export function fullVerificationEvidenceRecord(inputs, gitBasis, now = new Date(
   const current = stateFrom(inputs, gitBasis, now);
   return signedRecord({
     current,
+    checks: [],
+    observedFiles: inputs.sourceFiles,
     foundation: {
       fingerprint: current.fingerprint,
       gitBasis: current.gitBasis,
@@ -99,7 +101,7 @@ export function fullVerificationEvidenceRecord(inputs, gitBasis, now = new Date(
     },
     kind: evidenceKind,
     recordedAt: now,
-    schemaVersion: 3,
+    schemaVersion: 4,
     transitionCount: 0,
   });
 }
@@ -113,8 +115,28 @@ export function refreshedVerificationEvidenceRecord(
   return signedRecord({
     ...unsignedRecord(record),
     current: stateFrom(inputs, gitBasis, now),
+    observedFiles: inputs.sourceFiles,
     recordedAt: now,
     transitionCount: record.transitionCount + 1,
+  });
+}
+
+/** A partial run updates the same record without claiming publication acceptance. */
+export function checkpointVerificationEvidenceRecord(record, checks, sourceFiles) {
+  const now = new Date().toISOString();
+  return signedRecord({
+    ...(record
+      ? unsignedRecord(record)
+      : {
+          current: null,
+          foundation: null,
+          kind: evidenceKind,
+          schemaVersion: 4,
+          transitionCount: 0,
+        }),
+    checks,
+    observedFiles: sourceFiles,
+    recordedAt: now,
   });
 }
 
@@ -122,6 +144,8 @@ export function validateVerificationEvidenceRecord(record) {
   if (
     !exactKeys(record, [
       "current",
+      "checks",
+      "observedFiles",
       "foundation",
       "kind",
       "recordDigest",
@@ -130,19 +154,44 @@ export function validateVerificationEvidenceRecord(record) {
       "transitionCount",
     ]) ||
     record.kind !== evidenceKind ||
-    record.schemaVersion !== 3 ||
+    record.schemaVersion !== 4 ||
     !validDigest(record.recordDigest) ||
     !validTimestamp(record.recordedAt) ||
     !Number.isSafeInteger(record.transitionCount) ||
     record.transitionCount < 0 ||
-    !exactKeys(record.foundation, ["fingerprint", "gitBasis", "recordedAt"]) ||
-    !validDigest(record.foundation.fingerprint) ||
-    !validTimestamp(record.foundation.recordedAt)
+    !Array.isArray(record.checks) ||
+    record.checks.length > 2000 ||
+    record.checks.some(
+      (item, index) =>
+        !exactKeys(item, ["key", "fingerprint"]) ||
+        !/^[a-z0-9][a-z0-9:_-]*$/u.test(item.key) ||
+        !validDigest(item.fingerprint) ||
+        record.checks.findIndex((entry) => entry.key === item.key) !== index,
+    ) ||
+    !Array.isArray(record.observedFiles) ||
+    record.observedFiles.length > 50000 ||
+    record.observedFiles.some(
+      (item, index) =>
+        !exactKeys(item, ["path", "fingerprint", "semanticFingerprint"]) ||
+        typeof item.path !== "string" ||
+        !item.path ||
+        /[\0\r\n]/u.test(item.path) ||
+        !validDigest(item.fingerprint) ||
+        !validDigest(item.semanticFingerprint) ||
+        (index > 0 && record.observedFiles[index - 1].path >= item.path),
+    ) ||
+    (record.current === null) !== (record.foundation === null) ||
+    (record.foundation !== null &&
+      (!exactKeys(record.foundation, ["fingerprint", "gitBasis", "recordedAt"]) ||
+        !validDigest(record.foundation.fingerprint) ||
+        !validTimestamp(record.foundation.recordedAt)))
   ) {
     throw new Error("Verification evidence cache entry has an invalid schema.");
   }
-  normalizedVerificationGitBasis(record.foundation.gitBasis);
-  validateState(record.current);
+  if (record.current !== null) {
+    normalizedVerificationGitBasis(record.foundation.gitBasis);
+    validateState(record.current);
+  }
   if (digest(canonicalJson(unsignedRecord(record))) !== record.recordDigest) {
     throw new Error("Verification evidence record digest does not match its content.");
   }

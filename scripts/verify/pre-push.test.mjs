@@ -193,9 +193,14 @@ test("the installed hook cannot be skipped through BASH_ENV", () => {
   mkdirSync(path.join(repository, "scripts", "verify"), { recursive: true });
   for (const relativePath of [
     "scripts/git-hooks/pre-push",
+    "scripts/contracts/portable-toml.mjs",
+    "scripts/contracts/semver-contract.mjs",
     "scripts/repository/git-runtime-isolation.mjs",
+    "scripts/repository/project-temporary-storage.mjs",
     "scripts/repository/project-tool-environment.mjs",
+    "scripts/repository/runtime-process-identity.mjs",
     "scripts/repository/source-inventory-policy.mjs",
+    "scripts/repository/user-tool-storage.mjs",
     "scripts/filesystem/repository-files.mjs",
     "scripts/filesystem/owned-file-operations.mjs",
     "scripts/filesystem/owned-path-safety.mjs",

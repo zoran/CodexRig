@@ -2,7 +2,15 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -21,6 +29,14 @@ import {
 import { toolingRoot, serializeCanonicalJson } from "../filesystem/repository-files.mjs";
 import { applyHousekeepingWrites } from "../repository/repository-housekeeping-transaction.mjs";
 import { inspectRuntimeLifecycleLock } from "../repository/runtime-session-lease.mjs";
+import {
+  acquireRuntimeLifecycleLock,
+  createRuntimeLifecycleDelegation,
+  cancelRuntimeLifecycleDelegation,
+  releaseRuntimeLifecycleLock,
+} from "../repository/runtime-session-lease.mjs";
+import { prepareUserToolDirectories } from "../repository/user-tool-storage.mjs";
+import { regenerationRuntimeHash, stageRegenerationRuntime } from "./framework-upgrade-runtime.mjs";
 import { assertMaintenanceInventory, maintainToolchain } from "../deps/maintain-toolchain.mjs";
 import {
   latestCompatibleVersion,
@@ -37,6 +53,46 @@ import {
 } from "../deps/toolchain-maintenance-inputs.mjs";
 
 const matrix = readToolchainConfiguration();
+test("framework and generated children exclude concurrent shared installation mutations", async (t) => {
+  const storage = mkdtempSync(path.join(os.tmpdir(), "shared-lifecycle-"));
+  const previous = process.env.PROJECT_TOOL_STORAGE_HOME;
+  process.env.PROJECT_TOOL_STORAGE_HOME = storage;
+  t.after(() => {
+    if (previous === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
+    else process.env.PROJECT_TOOL_STORAGE_HOME = previous;
+    rmSync(storage, { recursive: true, force: true });
+  });
+  const root = prepareUserToolDirectories().lifecycle;
+  const projected = await stageRegenerationRuntime(
+    toolingRoot,
+    regenerationRuntimeHash(toolingRoot),
+  );
+  t.after(projected.cleanup);
+  const owner = acquireRuntimeLifecycleLock({ root, operation: "toolchain-maintenance" });
+  try {
+    assert.throws(() => {
+      const unexpected = projected.lifecycle.acquireRuntimeLifecycleLock({
+        root,
+        operation: "toolchain-maintenance",
+      });
+      projected.lifecycle.releaseRuntimeLifecycleLock({ root, owner: unexpected });
+    }, /active|busy/u);
+  } finally {
+    releaseRuntimeLifecycleLock({ root, owner });
+  }
+  const child = projected.lifecycle.acquireRuntimeLifecycleLock({
+    root,
+    operation: "toolchain-maintenance",
+  });
+  try {
+    assert.throws(
+      () => acquireRuntimeLifecycleLock({ root, operation: "toolchain-maintenance" }),
+      /active|busy/u,
+    );
+  } finally {
+    projected.lifecycle.releaseRuntimeLifecycleLock({ root, owner: child });
+  }
+});
 test("raw mise executables require the official digest and a fixed outer byte bound", async () => {
   const bytes = Buffer.from("verified raw executable fixture");
   const digest = createHash("sha256").update(bytes).digest("hex");
@@ -59,9 +115,18 @@ function write(root, name, content) {
   mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
   writeFileSync(path.join(root, name), content);
 }
+const originalToolStorage = process.env.PROJECT_TOOL_STORAGE_HOME;
 function fixture(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), "toolchain-test-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
+  const previousStorage = originalToolStorage;
+  const storage = mkdtempSync(path.join(os.tmpdir(), "isolated-user-tools-"));
+  process.env.PROJECT_TOOL_STORAGE_HOME = storage;
+  t.after(() => {
+    if (previousStorage === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
+    else process.env.PROJECT_TOOL_STORAGE_HOME = previousStorage;
+    rmSync(storage, { recursive: true, force: true });
+  });
   for (const name of toolchainConfigurationPaths)
     write(root, name, readFileSync(path.join(toolingRoot, name), "utf8"));
   write(
@@ -439,6 +504,7 @@ for (const failure of ["network", "peer", "reproduce", "concurrent", "pending", 
       return "";
     };
     const operation = maintainToolchain({
+      prepareStorage: () => {},
       root,
       fetchImpl:
         failure === "network"
@@ -494,6 +560,7 @@ test("locked maintenance neither resolves newer releases nor refreshes the depen
   );
   const calls = [];
   const result = await maintainToolchain({
+    prepareStorage: () => {},
     root,
     locked: true,
     fetchImpl: async () => {
@@ -609,9 +676,37 @@ test("disposable compatibility preparation preserves dependencies and passes the
     fetchImpl: registry(),
     installBootstrapTools: async ({ matrix: candidate }) => {
       const layout = projectManagedToolLayout(root, candidate);
+      // This mocked installer must also satisfy the real post-install housekeeping inventory.
+      const shared = prepareUserToolDirectories();
+      const reference = path.join(shared.miseTrackedConfigs, "fixture");
+      if (!existsSync(reference)) symlinkSync(path.join(root, ".codex/mise.toml"), reference);
+      const installs = path.join(shared.miseData, "installs");
+      const inventory = Object.fromEntries(
+        ["node", "pnpm"].map((name) => {
+          const version = candidate.stable[name].version;
+          const installPath = path.join(installs, name, version);
+          mkdirSync(path.dirname(layout[name].executable), { recursive: true, mode: 0o700 });
+          writeFileSync(layout[name].executable, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+          return [
+            name,
+            [
+              {
+                installed: true,
+                requested_version: version,
+                install_path: installPath,
+                source: { path: path.join(root, ".codex/mise.toml") },
+              },
+            ],
+          ];
+        }),
+      );
       for (const tool of [layout.mise, layout.codex]) {
         mkdirSync(path.dirname(tool.executable), { recursive: true, mode: 0o700 });
-        writeFileSync(tool.executable, "fixture executable", { mode: 0o755 });
+        const executable =
+          tool.name === "mise"
+            ? `#!${process.execPath}\nif (process.argv[2] === 'ls') console.log(${JSON.stringify(JSON.stringify(inventory))});\n`
+            : "#!/bin/sh\nexit 0\n";
+        writeFileSync(tool.executable, executable, { mode: 0o755 });
         sealProjectToolBundle(root, tool.directory, tool);
       }
       return { mise: layout.mise.executable, codex: layout.codex.executable };
@@ -656,4 +751,32 @@ test("disposable compatibility preparation preserves dependencies and passes the
   );
   assert.equal(inspectRuntimeLifecycleLock({ root }).status, "absent");
   assert.deepEqual(readToolchainConfiguration(), matrix);
+});
+
+test("public Git scratch is preserved while the maintenance owner has pending consumers", async (t) => {
+  const root = fixture(t);
+  const owner = acquireRuntimeLifecycleLock({ root, operation: "toolchain-maintenance" });
+  let token, directory;
+  try {
+    await assert.rejects(
+      refreshGithubActions(`uses: actions/checkout@${"a".repeat(40)} # v4.0.0\n`, {
+        root,
+        spawnGit: (command, args, options) => {
+          directory = options.cwd;
+          token = createRuntimeLifecycleDelegation({
+            root,
+            owner,
+            operation: "toolchain-maintenance",
+            role: "release-git",
+          }).token;
+          return { pid: 1, status: null, signal: "SIGTERM", stdout: "", stderr: "" };
+        },
+      }),
+      /pending|active|quiescen|delegation|descendant/iu,
+    );
+    assert.equal(existsSync(directory), true, "Unsettled work retains its actual scratch");
+  } finally {
+    if (token) cancelRuntimeLifecycleDelegation({ root, owner, token });
+    releaseRuntimeLifecycleLock({ root, owner });
+  }
 });

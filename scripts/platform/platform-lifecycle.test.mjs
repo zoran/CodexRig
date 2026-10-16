@@ -26,10 +26,11 @@ import {
 import { detectGitProvider, parseGitRemoteUrl } from "./git-provider.mjs";
 import { gitlabApprovalRuleName } from "./gitlab-platform.mjs";
 import { platformApiRequest } from "./platform-api.mjs";
-import { platformConfigurationState } from "./platform-configuration-state.mjs";
 import {
   approvalSettings,
   gitlabHarness,
+  githubDetection,
+  gitlabDetection,
   protectedBranch,
   response,
 } from "./platform-lifecycle-harness.mjs";
@@ -80,29 +81,6 @@ async function configurePlatform(options) {
     );
   }
   return configureActualPlatform(options);
-}
-
-function githubDetection() {
-  return {
-    hostname: "github.com",
-    integrationBranch: "main",
-    provider: "github",
-    remoteName: "origin",
-    slug: "owner/project",
-    source: "git-remote",
-  };
-}
-
-function gitlabDetection(overrides = {}) {
-  return {
-    hostname: "gitlab.com",
-    integrationBranch: "main",
-    provider: "gitlab",
-    remoteName: "origin",
-    slug: "group/project",
-    source: "git-remote",
-    ...overrides,
-  };
 }
 
 test("remote parsing accepts standard, credentialed, SSH, and nested GitLab identities", () => {
@@ -204,20 +182,54 @@ test("platform configuration refuses an unowned host before I/O", async () => {
   assert.equal(calls, 0);
 });
 
-test("platform configuration state serializes remote mutations and resumes after release", () => {
-  const root = temporaryRoot();
-  const plan = {
-    provider: "github",
-    repository: "owner/project",
-    operations: ["reconcile ruleset"],
-  };
-  const first = platformConfigurationState(root, plan);
-  assert.equal(first.begin().resumed, false);
-  const second = platformConfigurationState(root, plan);
-  assert.throws(() => second.begin(), /another platform configuration is active/i);
-  first.release();
-  assert.equal(second.begin().resumed, true);
-  second.release();
+// Inventory determines mutation identity; it must be serialized with the mutation itself.
+test("platform configuration locks before reading the original remote state", async () => {
+  for (const detected of [githubDetection(), gitlabDetection()]) {
+    const root = temporaryRoot();
+    let entered,
+      release,
+      competingReads = 0;
+    const started = new Promise((resolve) => {
+      entered = resolve;
+    });
+    const blocked = new Promise((resolve) => {
+      release = resolve;
+    });
+    const first = assert.rejects(
+      configurePlatform({
+        apply: true,
+        contract,
+        detected,
+        root,
+        fetchImpl: async () => {
+          entered();
+          await blocked;
+          return response(503);
+        },
+      }),
+      /HTTP 503/u,
+    );
+    await started;
+    try {
+      await assert.rejects(
+        configurePlatform({
+          apply: true,
+          contract,
+          detected,
+          root,
+          fetchImpl: async () => {
+            competingReads++;
+            return response(503);
+          },
+        }),
+        /another platform configuration is active/iu,
+      );
+      assert.equal(competingReads, 0, "no stale pre-lock inventory may escape admission");
+    } finally {
+      release();
+      await first;
+    }
+  }
 });
 
 test("platform API bounds streamed responses before buffering the full body", async () => {
@@ -247,6 +259,57 @@ test("platform API bounds streamed responses before buffering the full body", as
   );
   assert.equal(reads, 2);
   assert.equal(canceled, true);
+});
+
+// HTTP status alone cannot establish whether a mutating request took effect.
+test("platform API distinguishes local contracts, transient reads and uncertain mutations", async () => {
+  const circular = {};
+  circular.self = circular;
+  for (const [method, body, status, kind, stage, outcome, responseFailure] of [
+    ["POST", circular, 0, "contract", "admission", "not-started"],
+    ["GET", undefined, 503, "service", "headers", "read-only"],
+    ["POST", {}, 503, "service", "headers", "unknown"],
+    ["PUT", {}, 0, "transport", "headers", "unknown"],
+    ["PUT", {}, 200, "transport", "body", "unknown", "text"],
+    ["PUT", {}, 200, "transport", "body", "unknown", "stream"],
+    ["PUT", {}, 200, "contract", "body", "unknown", "json"],
+  ]) {
+    let calls = 0;
+    await assert.rejects(
+      platformApiRequest(
+        async () => {
+          calls++;
+          if (!status) throw new Error("sensitive transport detail");
+          if (responseFailure) {
+            const failRead = async () => {
+              throw new Error("sensitive transport detail");
+            };
+            return {
+              ...response(status),
+              body:
+                responseFailure === "stream"
+                  ? { getReader: () => ({ read: failRead }) }
+                  : undefined,
+              text: responseFailure === "json" ? async () => "invalid JSON" : failRead,
+            };
+          }
+          return response(status);
+        },
+        "https://api.github.com/repos/owner/project/rulesets",
+        { provider: "github", token: "test-token", method, body },
+      ),
+      (error) => {
+        assert.deepEqual(
+          [error.method, error.failureKind, error.requestStage, error.operationOutcome],
+          [method, kind, stage, outcome],
+        );
+        assert.equal(error.message.includes("test-token"), false);
+        assert.equal(error.message.includes("sensitive transport detail"), false);
+        return true;
+      },
+    );
+    assert.equal(calls, stage === "admission" ? 0 : 1, "no automatic request replay");
+  }
 });
 
 test("GitHub previews without I/O and applies a verified owned ruleset", async () => {
@@ -336,39 +399,67 @@ test("GitHub preferred serialization falls back and verifies the reduced policy"
   assert.equal(applied.warnings.length, 1);
 });
 
-test("GitHub retains recovery state after failed read-back and resumes safely", async () => {
-  const root = temporaryRoot();
-  const payload = githubRulesetPayload(contract);
-  await assert.rejects(
-    configurePlatform({
-      apply: true,
-      contract,
-      detected: githubDetection(),
-      root,
-      fetchImpl: async (url, options) => {
-        if (url.includes("?")) return response(200, []);
-        if (options.method === "POST") return response(201, { id: 7 });
-        return response(200, { id: 7, name: "wrong" });
-      },
-    }),
-    /read-back/,
-  );
-  const statePath = path.join(root, ".project-state", "platform-configuration.json");
-  assert.equal(existsSync(statePath), true);
-  assert.equal(readFileSync(statePath, "utf8").includes("test-token"), false);
-  const resumed = await configurePlatform({
-    apply: true,
-    contract,
-    detected: githubDetection(),
-    root,
-    fetchImpl: async (url, options) => {
-      if (url.includes("?")) return response(200, [{ id: 7, name: payload.name }]);
-      if (options.method === "PUT") return response(200, { id: 7 });
-      return response(200, { id: 7, ...payload });
-    },
-  });
-  assert.equal(resumed.resumed, true);
-  assert.equal(existsSync(statePath), false);
+// A provider may apply the write even when its response is lost or reports a service failure.
+test("GitHub recovers an uncertain mutation by validating original state before another write", async () => {
+  for (const failure of ["service", "transport", "contract", "fallback"]) {
+    const root = temporaryRoot();
+    const payload = githubRulesetPayload(contract, {
+      includeSerialization: failure !== "fallback",
+    });
+    const initialWrites = failure === "fallback" ? 2 : 1;
+    let original = null,
+      fail = true,
+      writes = 0;
+    const fetchImpl = async (url, options) => {
+      if (url.includes("?")) return response(200, original ? [{ id: 7, name: original.name }] : []);
+      if (options.method !== "GET") {
+        writes++;
+        const requested = JSON.parse(options.body);
+        if (failure === "fallback" && requested.rules.some((rule) => rule.type === "merge_queue"))
+          return response(422);
+        original = { id: 7, ...requested };
+        if (fail && ["service", "fallback"].includes(failure)) return response(503);
+        if (fail && failure === "transport") throw new Error("connection closed after apply");
+        return response(201, { id: 7 });
+      }
+      return response(200, fail ? { id: 7, name: "wrong" } : original);
+    };
+    const options = { apply: true, contract, detected: githubDetection(), root, fetchImpl };
+    await assert.rejects(configurePlatform(options), /HTTP 503|could not be completed|read-back/u);
+    assert.equal(writes, initialWrites, "failure is surfaced without an automatic mutation retry");
+    const statePath = path.join(root, ".project-state", "platform-configuration.json");
+    assert.equal(existsSync(statePath), true);
+    assert.equal(readFileSync(statePath, "utf8").includes("test-token"), false);
+    fail = false;
+    if (failure === "service") {
+      // Existing schema-1 journals predate dispatch checkpoints. Their empty operation list must
+      // also preserve an uncertain write instead of authorizing another creation after an upgrade.
+      const pending = JSON.parse(readFileSync(statePath, "utf8"));
+      pending.completed = [];
+      writeFileSync(statePath, JSON.stringify(pending));
+      await assert.rejects(
+        configurePlatform({
+          ...options,
+          fetchImpl: (url, request) =>
+            url.includes("?") ? response(200, []) : fetchImpl(url, request),
+        }),
+        /creation outcome is unknown/u,
+      );
+      assert.equal(writes, 1, "an empty inventory cannot prove an uncertain create was rejected");
+    }
+    if (failure === "contract")
+      original.rules = original.rules.filter((rule) => rule.type !== "required_status_checks");
+    const resumed = await configurePlatform(options);
+    assert.equal(resumed.resumed, true);
+    assert.equal(
+      writes,
+      failure === "contract" ? 2 : initialWrites,
+      "the complete validator reuses matching state and repairs an actually missing CI rule",
+    );
+    assert.equal(existsSync(statePath), false, "recovery cleanup follows verified state");
+    assert.deepEqual(original, { id: 7, ...payload });
+    assert.equal(resumed.warnings.length, failure === "fallback" ? 1 : 0);
+  }
 });
 
 test("GitLab validates approval capability before making any change", async () => {

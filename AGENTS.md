@@ -42,6 +42,9 @@ resume. Every extra action needs an acceptance benefit or material risk. Keep on
 contract and migrate owners/consumers together. Use relevant skills and one writer per surface.
 Read-only requests stay read-only. Continue accepted implementation to its real completion without
 routine approval pauses; commit, push, deployment and credential use retain their authority gates.
+Use targeted development checks; reviews, audits, handoffs and resume reuse valid results. Bundle
+complete verification once on the finished integrated state before push through the existing
+publisher and evidence store, under [Verification](instructions.md#verification).
 
 Apply [Documentation Currency](instructions.md#documentation-currency) in each slice: update
 affected canonical owners with the change and integrate agents' documentation corrections before

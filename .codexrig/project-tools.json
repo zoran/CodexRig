@@ -91,7 +91,9 @@
       "scripts/deps/toolchain-releases.test.mjs",
       "scripts/deps/trusted-pnpm-command.mjs",
       "scripts/deps/update.mjs",
-      "scripts/deps/verify-pnpm-execution-policy.mjs"
+      "scripts/deps/verify-pnpm-execution-policy.mjs",
+      "scripts/deps/tool-storage-housekeeping.mjs",
+      "scripts/deps/tool-storage-housekeeping.test.mjs"
     ],
     "docs": [
       "scripts/docs/delivery-manifest.mjs",
@@ -160,6 +162,9 @@
       "scripts/repository/worktree-recovery-output.mjs",
       "scripts/repository/worktree-recovery.mjs",
       "scripts/repository/project-tool-environment.mjs",
+      "scripts/repository/user-tool-storage.mjs",
+      "scripts/repository/project-temporary-storage.mjs",
+      "scripts/repository/repository-storage.mjs",
       "scripts/repository/project-tool-executables.mjs",
       "scripts/repository/global-git-credential.mjs",
       "scripts/repository/global-git-credential.test.mjs",
@@ -170,6 +175,7 @@
     "security": ["scripts/security/secret-patterns.mjs"],
     "setup": [
       "scripts/setup/check-prereqs.sh",
+      "scripts/setup/codex-launcher.test.mjs",
       "scripts/setup/install-git-hooks.sh",
       "scripts/setup/runtime-safety.test.mjs",
       "scripts/setup/session-control-hook-command.mjs",
@@ -189,7 +195,8 @@
       "scripts/setup/install-git-hooks.mjs",
       "scripts/setup/resolve-git-hooks-path.mjs",
       "scripts/setup/project-command.mjs",
-      "scripts/setup/run-project.sh"
+      "scripts/setup/run-project.sh",
+      "scripts/setup/repository-storage.test.mjs"
     ],
     "stack": ["scripts/stack/stack-detector.mjs"],
     "terminal": ["scripts/terminal/terminal-output.mjs", "scripts/terminal/publication-output.mjs"],
@@ -249,7 +256,9 @@
       "scripts/verify/pre-push-policy.mjs",
       "scripts/verify/pre-push-steps.sh",
       "scripts/verify/git-remote-identity.mjs",
-      "scripts/verify/pushed-object-scan.mjs"
+      "scripts/verify/pushed-object-scan.mjs",
+      "scripts/verify/verification-check-inputs.mjs",
+      "scripts/verify/verification-source-inputs.mjs"
     ],
     "web": [
       "scripts/web/sitemap-files.mjs",
@@ -298,6 +307,7 @@
   "verificationCommands": [
     "syntax-lint",
     "docs",
+    "context-policy",
     "delivery-environments",
     "scripts",
     "repository-smoke",

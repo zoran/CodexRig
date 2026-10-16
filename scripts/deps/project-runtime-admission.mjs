@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs";
 import path from "node:path";
 import { validateMinimalMiseTools } from "../contracts/mise-toolchain-configuration.mjs";
 import { readRepositoryFile } from "../filesystem/repository-files.mjs";
-import { projectToolPaths } from "../repository/project-tool-environment.mjs";
+import { userToolPaths, assertUserToolParents } from "../repository/user-tool-storage.mjs";
 import { spawnSyncWithBoundedIo } from "../repository/runtime-process-io.mjs";
 
 /** Mise can warn and continue after failed resolution even with --locked; require actual installs. */
@@ -37,7 +37,7 @@ export function assertInstalledProjectTools({
   }
   const missing = () => {
     throw new Error(
-      "Project runtimes are missing or outside their locked local installation; run canonical maintenance. Host fallback is forbidden.",
+      "Project runtimes are missing or outside their locked user installation; run canonical maintenance. Host fallback is forbidden.",
     );
   };
   if (
@@ -55,7 +55,7 @@ export function assertInstalledProjectTools({
       new Set(entries.map((entry) => entry?.requested_version)).size !== pins.length
     )
       missing();
-    const parent = path.join(projectToolPaths(root).data, "mise", "installs", tool);
+    const parent = path.join(userToolPaths(environment).miseData, "installs", tool);
     for (const pin of pins) {
       const entry = entries.find((entry) => entry?.requested_version === pin);
       if (
@@ -68,6 +68,10 @@ export function assertInstalledProjectTools({
       )
         missing();
       try {
+        assertUserToolParents(
+          userToolPaths(environment).root,
+          path.join(entry.install_path, "entry"),
+        );
         if (realpathSync.native(entry.install_path) !== entry.install_path) missing();
       } catch {
         missing();

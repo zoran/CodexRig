@@ -1,4 +1,4 @@
-/** Owns private project tool layouts and the integrity of installed native bootstrap bundles. */
+/** Owns project-pinned user tool layouts and the integrity of installed native bootstrap bundles. */
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
@@ -8,7 +8,7 @@ import {
   atomicWriteOwnedFile,
   readOptionalOwnedFile,
 } from "../filesystem/owned-file-operations.mjs";
-import { projectToolPaths } from "./project-tool-environment.mjs";
+import { userToolPaths, assertUserToolParents } from "./user-tool-storage.mjs";
 import {
   captureStableRepositoryFileIdentity,
   scanStableRepositoryFile,
@@ -35,12 +35,13 @@ export function projectManagedToolLayout(
   root,
   matrix = readToolchainConfiguration(root),
   {
+    environment = process.env,
     platform = process.platform,
     arch = process.arch,
     libc = platform === "linux" ? linuxLibc() : null,
   } = {},
 ) {
-  const p = projectToolPaths(root);
+  const p = userToolPaths(environment);
   const target = `${platform}-${arch}`;
   const nativeTriple = nativeCodexTriples[target];
   if (!nativeTriple || (platform === "linux" && !["glibc", "musl"].includes(libc)))
@@ -51,6 +52,7 @@ export function projectManagedToolLayout(
     const directory = path.join(p.tools, name, version, distribution);
     return {
       directory,
+      storageRoot: p.root,
       executable: path.join(directory, executable),
       integrity,
       name,
@@ -58,7 +60,7 @@ export function projectManagedToolLayout(
       source,
     };
   };
-  const installs = path.join(p.data, "mise", "installs");
+  const installs = path.join(p.miseData, "installs");
   return {
     mise: bundle(
       "mise",
@@ -93,26 +95,6 @@ export function projectManagedToolLayout(
     },
     pnpm: { executable: path.join(installs, "pnpm", matrix.stable.pnpm.version, `pnpm${suffix}`) },
   };
-}
-
-function privateToolParents(root, target) {
-  const p = projectToolPaths(root);
-  const relative = path.relative(root, target);
-  if (!relative || relative.startsWith("..") || path.isAbsolute(relative))
-    throw new Error("Managed tool must remain inside its project.");
-  let cursor = root;
-  for (const segment of relative.split(path.sep).slice(0, -1)) {
-    cursor = path.join(cursor, segment);
-    const stats = lstatSync(cursor);
-    if (
-      !stats.isDirectory() ||
-      stats.isSymbolicLink() ||
-      (typeof process.getuid === "function" && stats.uid !== process.getuid())
-    )
-      throw new Error("Managed tool parents must be real developer-owned directories.");
-    if ((cursor === path.join(root, ".auth") || cursor === p.state) && (stats.mode & 0o077) !== 0)
-      throw new Error("Managed tools require private project account storage.");
-  }
 }
 
 function bundleFiles(root, directory) {
@@ -160,6 +142,7 @@ function bundleFiles(root, directory) {
 
 /** Called only by the lifecycle-owned installer after checking the complete public archive. */
 export function sealProjectToolBundle(root, directory, tool) {
+  root = tool.storageRoot ?? root;
   const value = {
     schemaVersion: 1,
     name: tool.name,
@@ -178,7 +161,8 @@ export function sealProjectToolBundle(root, directory, tool) {
 
 /** Verifies the whole native resource tree, including code-mode hosts and bundled shell resources. */
 export function verifyProjectToolBundle(root, tool) {
-  privateToolParents(root, tool.executable);
+  root = tool.storageRoot ?? root;
+  assertUserToolParents(root, tool.executable);
   const receipt = readOptionalOwnedFile(
     root,
     path.join(tool.directory, receiptName),
@@ -212,9 +196,9 @@ export function verifyProjectToolBundle(root, tool) {
 
 /** Admits only exact current managed paths; arbitrary project PATH entries remain untrusted. */
 export function isProjectManagedExecutable(root, executable) {
-  const p = projectToolPaths(root);
+  const p = userToolPaths();
   if (
-    ![p.tools, path.join(p.data, "mise", "installs")].some((directory) =>
+    ![p.tools, path.join(p.miseData, "installs")].some((directory) =>
       executable.startsWith(`${directory}${path.sep}`),
     )
   )
@@ -225,7 +209,7 @@ export function isProjectManagedExecutable(root, executable) {
     if (!existsSync(tool.executable)) continue;
     const resolved = realpathSync.native(tool.executable);
     if (resolved !== executable) continue;
-    privateToolParents(root, tool.executable);
+    assertUserToolParents(p.root, tool.executable);
     if (name === "mise" || name === "codex") verifyProjectToolBundle(root, tool);
     else if (resolved !== tool.executable)
       throw new Error("Mise-managed runtime must use its real locked installation path.");

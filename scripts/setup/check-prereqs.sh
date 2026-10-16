@@ -65,7 +65,7 @@ else
 fi
 
 if ((check_codex)) && ! command -v codex >/dev/null 2>&1; then
-  optional_missing+=("codex (private project installation)")
+  optional_missing+=("codex (verified user installation)")
 fi
 
 if ((
@@ -81,7 +81,7 @@ if (("${#runtime_issues[@]}" > 0)); then
   cat >&2 <<'EOF'
 Project runtimes are missing, mismatched, or inactive. This check is read-only.
 
-Prepare the project-local tools and dependencies through their maintenance owner:
+Prepare the project-pinned tools in user storage and dependencies through their maintenance owner:
   node scripts/deps/maintain-toolchain.mjs
 
 Run commands inside the repository environment:
@@ -101,7 +101,7 @@ if (("${#missing_system[@]}" > 0)); then
   cat >&2 <<'EOF'
 Missing required system tools.
 
-The launcher owns project-local Mise and Codex installations. Shared system binaries are
+The launcher owns pinned Mise and Codex installations in user storage. Shared system binaries are
 read-only bootstrap; these package commands are suggestions for the human host owner:
 
   Debian/Ubuntu: sudo apt-get install -y git ripgrep shellcheck

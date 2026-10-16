@@ -1,4 +1,4 @@
-# Owns project-local stable tools and disposable source compatibility pipelines.
+# Owns project-pinned stable tools in runner user storage and disposable source compatibility pipelines.
 workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -9,7 +9,7 @@ stages: [verify, compatibility]
 variables:
   GIT_DEPTH: "0"
 default:
-  image: node:24.21.0-bookworm
+  image: node:24.22.0-bookworm
   interruptible: true
 verify:
   stage: verify

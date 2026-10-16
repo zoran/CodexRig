@@ -20,13 +20,23 @@ import {
   currentVerificationEvidenceInputs,
   readSuccessfulVerificationBasis,
   recordSuccessfulFullEvidence,
-  refreshExactAttestationAfterPreflight,
+  refreshCommittedVerificationEvidence,
   validateExactCurrentEvidence,
+  readVerificationCheckpoint,
+  recordVerificationCheckpoint,
 } from "./verification-evidence.mjs";
+import { readVerificationConfiguration } from "./verification-configuration.mjs";
+import { discoverProductLayout } from "../repository/product-roots.mjs";
+import {
+  verificationCheckFingerprints,
+  pendingVerificationPlan,
+  successfulVerificationCommands,
+} from "./verification-check-inputs.mjs";
 import {
   captureVerificationGitBasis,
   changedPathsSinceVerificationBasis,
   rootManifestChangeIsVerifyOnly,
+  initialVerificationSourceFiles,
 } from "./verification-git-basis.mjs";
 import { omitAlreadyCoveredPaths } from "./verification-admission.mjs";
 import { resolveDeliveryArtifactBinding } from "./delivery-artifact.mjs";
@@ -42,13 +52,27 @@ export function broadEvidencePlan(plan) {
         command.phase,
       ),
     )
-    .map(({ args, artifactOwners = [], executable, key, phase }) => ({
-      args,
-      artifactOwners,
-      executable,
-      key,
-      phase,
-    }));
+    .map(
+      ({
+        args,
+        artifactOwners = [],
+        executable,
+        key,
+        phase,
+        diagnosticAfterMs,
+        cancellable,
+        coveredTestPaths,
+      }) => ({
+        args,
+        artifactOwners,
+        executable,
+        key,
+        phase,
+        diagnosticAfterMs,
+        cancellable,
+        coveredTestPaths,
+      }),
+    );
 }
 
 export function buildRiskBoundPlan(options, planDependencies, expectedInputs, riskResolver) {
@@ -154,6 +178,21 @@ async function main() {
       deliveryEnvironment: options.targetEnvironment,
       artifactManifest: options.artifactManifest,
     });
+    const checkpoint = readVerificationCheckpoint();
+    const previousFiles = new Map(checkpoint.sourceFiles.map((file) => [file.path, file]));
+    for (const file of initialVerificationSourceFiles(
+      discoveredScope.paths.filter((file) => !previousFiles.has(file)),
+    ))
+      previousFiles.set(file.path, file);
+    const editorialPaths = new Set(
+      expectedInputs.sourceFiles
+        .filter(
+          (file) =>
+            previousFiles.get(file.path)?.semanticFingerprint === file.semanticFingerprint &&
+            previousFiles.get(file.path)?.fingerprint !== file.fingerprint,
+        )
+        .map((file) => file.path),
+    );
     const changedScope = omitAlreadyCoveredPaths({
       basis,
       changedScope: discoveredScope,
@@ -171,12 +210,9 @@ async function main() {
         }),
       workspaceManifests,
       deliveryBinding,
+      editorialPaths,
     };
     const plan = buildRiskBoundPlan(options, planDependencies, expectedInputs);
-    if (options.printPlan) {
-      await runPlan(plan);
-      return;
-    }
     if (
       options.basisOnly &&
       (plan.admission.mode !== "targeted" ||
@@ -194,9 +230,81 @@ async function main() {
       );
     }
     const expectedGitBasis = changedScope.basis ?? captureVerificationGitBasis();
-    const execution = options.basisOnly
-      ? Object.freeze({ successfulCommandKeys: Object.freeze([]) })
-      : await runPlan(plan);
+    if (options.basisOnly) {
+      const refresh = refreshCommittedVerificationEvidence({
+        broadPlan: evidencePlan,
+        expectedBasisToken: basis.token,
+        expectedGitBasis,
+        expectedInputs,
+        deliveryEnvironment: options.targetEnvironment,
+        artifactManifest: options.artifactManifest,
+      });
+      if (!refresh.refreshed) throw new Error(refresh.reason);
+      console.log("Complete verification evidence bound to the current committed Git state.");
+      return;
+    }
+    const selectedCommands = [...plan.readOnlyCommands, ...plan.workspaceCommands];
+    const completeCommands = [
+      ...completeVerificationCommands(),
+      ...workspaceLifecycleCommands(workspaceManifests),
+      ...(deliveryBinding.verificationCommand ? [deliveryBinding.verificationCommand] : []),
+    ];
+    // Keep complete workspace units as well as the selected subset, so development cannot discard
+    // an unaffected package's still-valid receipt from the shared evidence record.
+    const commands = [...completeCommands, ...selectedCommands];
+    const fingerprints = verificationCheckFingerprints({
+      commands,
+      inputs: expectedInputs,
+      configuration: readVerificationConfiguration(),
+      repositoryRoot: process.cwd(),
+      workspaceManifests,
+      productLayout: discoverProductLayout({
+        repositoryRoot: process.cwd(),
+        relativePaths: expectedInputs.sourceFiles.map((file) => file.path),
+      }),
+    });
+    const checks = new Map(
+      checkpoint.checks
+        .filter((check) => fingerprints.get(check.key) === check.fingerprint)
+        .map((check) => [check.key, check]),
+    );
+    const pending = pendingVerificationPlan(
+      plan,
+      fingerprints,
+      options.forceFull ? [] : [...checks.values()],
+    );
+    if (options.printPlan) {
+      await runPlan(options.simulatedPaths.length ? plan : pending);
+      return;
+    }
+    let failure;
+    try {
+      await runPlan(pending, {
+        onResult(result) {
+          const key = result.command.key;
+          if (result.status === 0 && !result.error && !result.diagnosticRequired)
+            checks.set(key, { key, fingerprint: fingerprints.get(key) });
+          else checks.delete(key);
+        },
+      });
+    } catch (error) {
+      failure = error;
+    }
+    recordVerificationCheckpoint({
+      checks: [...checks.values()].sort((a, b) => a.key.localeCompare(b.key)),
+      expectedInputs,
+      expectedGitBasis,
+      broadPlan: evidencePlan,
+      deliveryEnvironment: options.targetEnvironment,
+      artifactManifest: options.artifactManifest,
+      failed: Boolean(failure),
+    });
+    if (failure) throw failure;
+    const execution = {
+      successfulCommandKeys: successfulVerificationCommands(selectedCommands, fingerprints, [
+        ...checks.values(),
+      ]),
+    };
     if (plan.admission.mode === "full") {
       recordSuccessfulFullEvidence({
         broadPlan: evidencePlan,
@@ -209,32 +317,9 @@ async function main() {
       console.log("Successful full verification basis recorded.");
       return;
     }
-    if (!plan.admission.canAdvanceSuccessfulBasis) {
-      console.log("Successful verification basis already covers the current source and Git state.");
-      return;
-    }
-    const refresh = refreshExactAttestationAfterPreflight({
-      broadPlan: evidencePlan,
-      coverage: {
-        basisChanged: plan.changed.basisChanged === true,
-        broadRisks: plan.admission.coveredBroadRisks,
-        complete: true,
-        focusedCommandOwners: plan.admission.focusedCommandOwners,
-        paths: plan.changed.paths,
-      },
-      expectedBasisToken: basis.token,
-      expectedGitBasis,
-      expectedInputs,
-      deliveryEnvironment: options.targetEnvironment,
-      artifactManifest: options.artifactManifest,
-      successfulCommandKeys: execution.successfulCommandKeys,
-    });
     console.log(
-      refresh.refreshed
-        ? "Successful verification basis advanced through complete focused delta coverage."
-        : `Successful verification basis was not advanced: ${sanitizeMultilineForTerminal(sanitizeForTerminal(refresh.reason), process.cwd())}.`,
+      "Development results retained; complete acceptance belongs to publication verification.",
     );
-    if (!refresh.refreshed) process.exitCode = 1;
   };
   if (options.mode === "pre-push" || options.printPlan) {
     await execute();

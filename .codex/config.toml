@@ -16,11 +16,11 @@ work and continue safe work. Old state grants no task. Apply Maintenance Scope A
 startup, dependencies, checks and cleanup. Framework updates end at acceptance; publication and
 product work retain authority gates.
 
-Apply Planning Entry Gate: before implementation, state whether a plan is needed. For features or
-extensive, complex or risky work, create a visible plan with the native plan tool or in commentary
-when unavailable; review to clean and audit afresh before edits/delegation. Update it at material
-boundaries and resume. Additional work needs an unfinished
-acceptance condition or concrete material risk. Reuse valid evidence; no optional optimization loop.
+Apply Planning Entry Gate before implementation: state whether a plan is needed; publish a native or
+commentary plan for features or extensive, complex or risky work. Review and audit before edits or
+delegation; reconcile at boundaries and resume. Additional work needs unfinished acceptance or
+material risk. Verification owns targeted development, evidence reuse and one complete pre-push gate.
+Reviews, audits, handoffs and resume do not trigger test repetition.
 Keep exactly one current internal contract per concern and migrate its owners/consumers together.
 Apply Documentation Currency per slice: reconcile owners, agent handoffs and generated policy.
 Run pnpm context:check for instruction/context changes. The primary owns the

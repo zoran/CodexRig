@@ -127,6 +127,7 @@ test("a registered contract group stays focused and runs once inside its complet
     false,
   );
   const broad = route([source, "unclassified-new-boundary"], {
+    entryMode: "full",
     basis: { trusted: false, reason: "no accepted foundation" },
   });
   const broadKeys = broad.readOnlyCommands.map((command) => command.key);
@@ -223,14 +224,14 @@ test("Identity and Access changes select the auth and API trust-boundary owners"
   assert.equal(plan.admission.mode, "targeted");
 });
 
-test("unowned and unknown full-relevant paths receive exact fail-closed admission reasons", () => {
+test("unowned and unknown development paths retain concrete pending publication reasons", () => {
   const unowned = route(["src/unowned.ts"]);
-  assert.equal(unowned.admission.mode, "full");
+  assert.equal(unowned.admission.mode, "targeted");
   assert.deepEqual(unowned.admission.uncoveredFullRelevantPaths, ["src/unowned.ts"]);
   assert.match(unowned.admission.reason, /src\/unowned\.ts/u);
 
   const unknown = route(["unexpected/new-surface.bin"]);
-  assert.equal(unknown.admission.mode, "full");
+  assert.equal(unknown.admission.mode, "targeted");
   assert.deepEqual(unknown.admission.unknownPaths, ["unexpected/new-surface.bin"]);
   assert.match(unknown.admission.reason, /unknown changed paths/u);
 });
@@ -271,7 +272,6 @@ test("native Codex home deltas retain an exclusion owner when source policy chan
   assert.equal(plan.admission.mode, "targeted");
   assert.deepEqual(plan.admission.fullRelevantPaths, [".gitignore"]);
   assert.deepEqual(plan.admission.unknownPaths, []);
-  assert.equal(plan.admission.canAdvanceSuccessfulBasis, true);
   for (const relativePath of nativePaths) {
     assert.deepEqual(owners.get(relativePath), ["codex-config"], relativePath);
   }
@@ -327,9 +327,27 @@ test("portable policy text exposes the checks that own its successful evidence",
   const owners = new Map(
     plan.admission.focusedCommandOwners.map((entry) => [entry.path, entry.ownerKeys]),
   );
-  assert.deepEqual(owners.get(".agents/skills/ui-ux-review/SKILL.md"), ["docs", "skills"]);
+  assert.deepEqual(owners.get(".agents/skills/ui-ux-review/SKILL.md"), [
+    "delivery-environments",
+    "docs",
+    "language",
+    "path-hygiene",
+    "secrets",
+    "skills",
+  ]);
   assert.deepEqual(owners.get(".codex/config.toml"), ["codex-config"]);
-  assert.deepEqual(owners.get("instructions.md"), ["docs"]);
+  assert.deepEqual(owners.get("instructions.md"), [
+    "context-policy",
+    "delivery-environments",
+    "docs",
+    "language",
+    "path-hygiene",
+    "secrets",
+  ]);
+  assert.equal(
+    plan.readOnlyCommands.some((command) => command.args.includes("--test")),
+    false,
+  );
 });
 
 test("verify-only root manifest changes use orchestration owners without product aggregates", () => {
@@ -406,6 +424,33 @@ test("ordinary package manifests use their exact whole-manifest owner", (t) => {
 });
 
 test("direct verifier and support files route exact smallest consumers", () => {
+  // Platform repairs used to select every framework suite. The shipped lifecycle scenario must
+  // run once in publication and be the only test consumer for each platform execution owner.
+  const platformSuite = "scripts/platform/platform-lifecycle.test.mjs";
+  for (const owner of [
+    "configure-platform",
+    "platform-api",
+    "platform-configuration-state",
+    "github-platform",
+    "gitlab-platform",
+  ]) {
+    const platform = route([`scripts/platform/${owner}.mjs`]);
+    assert.equal(platform.admission.mode, "targeted");
+    assert.deepEqual(
+      platform.readOnlyCommands.flatMap((command) =>
+        command.args.filter((arg) => arg.endsWith(".test.mjs")),
+      ),
+      [platformSuite],
+      owner,
+    );
+  }
+  assert.equal(
+    completeVerificationCommands()
+      .flatMap((command) => command.args)
+      .filter((arg) => arg === platformSuite).length,
+    1,
+  );
+
   const verifier = route(["scripts/verify/api-security.mjs"]);
   const verifierArgs = verifier.readOnlyCommands.flatMap((command) => command.args);
   assert.equal(verifier.admission.mode, "targeted");
@@ -747,6 +792,7 @@ test("an executable index file retains upstream dependency coverage", (t) => {
 test("a static surface scan cannot claim missing product infrastructure test ownership", () => {
   const changed = "infra/gcp/foundation-policy.mjs";
   const plan = route([changed], { workspaceManifests: [] });
-  assert.equal(plan.verificationScope, "full");
+  assert.equal(plan.verificationScope, "targeted");
+  assert.match(plan.admission.reason, /publication coverage pending/u);
   assert.ok(plan.admission.uncoveredFullRelevantPaths.includes(changed));
 });

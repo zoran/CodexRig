@@ -1,7 +1,6 @@
 /** Owns repository-bound session leases and the single cross-mutation lifecycle capability. */
 import { randomUUID } from "node:crypto";
-import { closeSync, constants, fstatSync, lstatSync, openSync, realpathSync } from "node:fs";
-import path from "node:path";
+import { closeSync, realpathSync } from "node:fs";
 import process from "node:process";
 import {
   toolingRoot,
@@ -13,9 +12,7 @@ import {
   atomicReplaceOwnedFile,
   closeOwnedDirectoryBinding,
   createExclusiveOwnedFile,
-  ownedDirectoryChildPath,
   removeStableOwnedFile,
-  validateOwnedDirectoryBinding,
 } from "../filesystem/owned-path-safety.mjs";
 import {
   captureProcessIdentity,
@@ -35,8 +32,11 @@ import {
   closeRuntimeFile,
   ensureRuntimeDirectory,
   openRuntimeDirectory,
+  openRuntimeLifecycleGuard,
   repositoryRuntimeRootIdentity,
   runtimeFile,
+  runtimeLifecycleFileName,
+  runtimeLifecycleGuardName,
 } from "./runtime-owned-state.mjs";
 import {
   activateRuntimeSessionLeaseState,
@@ -58,14 +58,28 @@ export {
 } from "./runtime-session-state.mjs";
 export const runtimeLifecycleLockName = "codexrig-lifecycle.lock";
 export { runtimeLifecycleBusyErrorCode } from "./runtime-lifecycle-schema.mjs";
-export const runtimeLifecycleGuardName = "codexrig-lifecycle.guard";
+export { runtimeLifecycleGuardName } from "./runtime-owned-state.mjs";
 export const runtimeLifecycleLockPath = `${repositoryCodexRuntimeDirectory}/${runtimeLifecycleLockName}`;
-const runtimeLifecycleGuardPath = `${repositoryCodexRuntimeDirectory}/${runtimeLifecycleGuardName}`;
 const lifecycleCapabilities = new Map();
 export { repositoryRuntimeRootIdentity } from "./runtime-owned-state.mjs";
-function readRuntimeLifecycleLock(root) {
-  const target = resolveRepositoryPath(root, runtimeLifecycleLockPath);
-  const file = runtimeFile(root, runtimeLifecycleLockName, "Codex runtime lifecycle lock", 128_000);
+function readRuntimeLifecycleLock(root, updateLocked = false) {
+  const target = resolveRepositoryPath(
+    root,
+    `${repositoryCodexRuntimeDirectory}/${runtimeLifecycleFileName(root, runtimeLifecycleLockName)}`,
+  );
+  if (!updateLocked) {
+    const directory = openRuntimeDirectory(root, "Codex runtime lifecycle lock parent");
+    if (!directory) return { path: target, status: "absent" };
+    closeOwnedDirectoryBinding(directory);
+    // Atomic owner replacement must not race the strict, identity-bound snapshot reader.
+    return withRuntimeLifecycleUpdateMutex(root, () => readRuntimeLifecycleLock(root, true));
+  }
+  const file = runtimeFile(
+    root,
+    runtimeLifecycleFileName(root, runtimeLifecycleLockName),
+    "Codex runtime lifecycle lock",
+    128_000,
+  );
   if (file.status === "absent") {
     closeRuntimeFile(file);
     return { path: target, status: "absent" };
@@ -92,7 +106,12 @@ function readRuntimeLifecycleLock(root) {
 }
 
 function readRuntimeLifecycleGuard(root) {
-  return runtimeFile(root, runtimeLifecycleGuardName, "Codex runtime lifecycle guard", 4_096);
+  return runtimeFile(
+    root,
+    runtimeLifecycleFileName(root, runtimeLifecycleGuardName),
+    "Codex runtime lifecycle guard",
+    4_096,
+  );
 }
 
 function removeRuntimeLifecycleGuard(root, owner) {
@@ -115,7 +134,7 @@ function removeRuntimeLifecycleGuard(root, owner) {
     }
     removeStableOwnedFile(
       guard.directory,
-      runtimeLifecycleGuardName,
+      runtimeLifecycleFileName(root, runtimeLifecycleGuardName),
       guard.snapshot.stats,
       "Codex runtime lifecycle guard",
     );
@@ -154,7 +173,7 @@ function unlinkStableRuntimeLifecycleLock(root, expected, { testHooks } = {}) {
     testHooks?.beforeLifecycleLockRemove?.({ current });
     removeStableOwnedFile(
       current.directory,
-      runtimeLifecycleLockName,
+      runtimeLifecycleFileName(root, runtimeLifecycleLockName),
       current.stats,
       "Codex runtime lifecycle lock",
     );
@@ -165,7 +184,7 @@ function unlinkStableRuntimeLifecycleLock(root, expected, { testHooks } = {}) {
 
 function replaceLifecycleOwner(root, nonce, change, { testHooks } = {}) {
   return withRuntimeLifecycleUpdateMutex(root, () => {
-    const current = readRuntimeLifecycleLock(root);
+    const current = readRuntimeLifecycleLock(root, true);
     try {
       if (current.status === "absent" || current.owner.nonce !== nonce) {
         throw new Error("Codex runtime lifecycle capability changed before update.");
@@ -177,7 +196,7 @@ function replaceLifecycleOwner(root, nonce, change, { testHooks } = {}) {
       testHooks?.beforeLifecycleOwnerReplace?.({ current, next });
       atomicReplaceOwnedFile(
         current.directory,
-        runtimeLifecycleLockName,
+        runtimeLifecycleFileName(root, runtimeLifecycleLockName),
         serializeCanonicalJson(next),
         "Codex runtime lifecycle lock",
         { mode: 0o600 },
@@ -187,36 +206,6 @@ function replaceLifecycleOwner(root, nonce, change, { testHooks } = {}) {
       closeRuntimeFile(current);
     }
   });
-}
-
-function openRuntimeLifecycleGuard(root, expected) {
-  const directory = openRuntimeDirectory(root, "Codex runtime lifecycle guard parent");
-  if (!directory) throw new Error("Codex runtime lifecycle guard parent disappeared.");
-  try {
-    const target = ownedDirectoryChildPath(
-      directory,
-      runtimeLifecycleGuardName,
-      "Codex runtime lifecycle guard",
-    );
-    const before = lstatSync(target);
-    if (
-      !before.isFile() ||
-      before.isSymbolicLink() ||
-      !sameLifecycleGuardIdentity(before, expected)
-    ) {
-      throw new Error("Codex runtime lifecycle guard is unsafe.");
-    }
-    const descriptor = openSync(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-    const opened = fstatSync(descriptor);
-    validateOwnedDirectoryBinding(directory, "Codex runtime lifecycle guard parent");
-    if (!sameLifecycleGuardIdentity(opened, expected) || !opened.isFile()) {
-      closeSync(descriptor);
-      throw new Error("Codex runtime lifecycle guard changed while opening.");
-    }
-    return descriptor;
-  } finally {
-    closeOwnedDirectoryBinding(directory);
-  }
 }
 
 function capabilityHandle(record) {
@@ -323,14 +312,14 @@ export function acquireRuntimeLifecycleLock({
       testHooks?.beforeLifecycleLockCreate?.({ directory, owner });
       createExclusiveOwnedFile(
         directory,
-        runtimeLifecycleLockName,
+        runtimeLifecycleFileName(root, runtimeLifecycleLockName),
         serializeCanonicalJson(owner),
         "Codex runtime lifecycle lock",
       );
       lockCreated = true;
       const guardStats = createExclusiveOwnedFile(
         directory,
-        runtimeLifecycleGuardName,
+        runtimeLifecycleFileName(root, runtimeLifecycleGuardName),
         `${owner.nonce}\n`,
         "Codex runtime lifecycle guard",
       );
@@ -433,7 +422,7 @@ export function cancelRuntimeLifecycleDelegation({ root = toolingRoot, owner, to
   const snapshot = inspectRuntimeLifecycleLock({ root: record.root });
   if (snapshot.owner?.nonce !== record.nonce)
     throw new Error("Codex runtime lifecycle capability changed before cancellation.");
-  // Consumed tokens cannot be reissued; stable absence needs no durable write or mutex.
+  // Consumed tokens cannot be reissued; their stable absence needs no owner-record rewrite.
   if (!snapshot.owner.delegations.some((entry) => entry.token === token)) return false;
   let removed = false;
   replaceLifecycleOwner(record.root, record.nonce, (current) => {

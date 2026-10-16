@@ -61,12 +61,14 @@ function copyGoalGateRuntime(repository) {
     "scripts/filesystem/repository-files.mjs",
     "scripts/verify/verification-configuration.mjs",
     "scripts/contracts/delivery-configuration.mjs",
+    "scripts/contracts/portable-toml.mjs",
     "scripts/contracts/semver-contract.mjs",
     "scripts/filesystem/owned-file-operations.mjs",
     "scripts/filesystem/owned-path-safety.mjs",
     "scripts/goals/goal-publication-precondition.mjs",
     "scripts/repository/git-runtime-isolation.mjs",
     "scripts/repository/project-tool-environment.mjs",
+    "scripts/repository/project-temporary-storage.mjs",
     "scripts/repository/pnpm-workspace-manifests.mjs",
     "scripts/repository/product-roots.mjs",
     "scripts/repository/runtime-lifecycle-mutex.mjs",
@@ -81,6 +83,7 @@ function copyGoalGateRuntime(repository) {
     "scripts/repository/source-inventory.mjs",
     "scripts/repository/source-inventory-policy.mjs",
     "scripts/repository/stable-file-snapshot.mjs",
+    "scripts/repository/user-tool-storage.mjs",
     "scripts/security/secret-patterns.mjs",
     "scripts/terminal/terminal-output.mjs",
     "scripts/verify/adaptive.mjs",
@@ -92,6 +95,7 @@ function copyGoalGateRuntime(repository) {
     "scripts/verify/verification-admission.mjs",
     "scripts/verify/verification-admission-decision.mjs",
     "scripts/verify/verification-admission-registry.mjs",
+    "scripts/verify/verification-check-inputs.mjs",
     "scripts/verify/verification-evidence-error.mjs",
     "scripts/verify/verification-evidence-store.mjs",
     "scripts/verify/verification-evidence.mjs",
@@ -102,6 +106,7 @@ function copyGoalGateRuntime(repository) {
     "scripts/verify/verification-risk-profile.mjs",
     "scripts/verify/verification-runtime-identity.mjs",
     "scripts/verify/verification-session-lock.mjs",
+    "scripts/verify/verification-source-inputs.mjs",
     "scripts/verify/workspace-verification.mjs",
   ];
   for (const relativePath of runtimeFiles) {
@@ -113,6 +118,7 @@ function copyGoalGateRuntime(repository) {
 
 function recordFixtureEvidence(repository) {
   const runnerUrl = pathToFileURL(path.join(repository, "scripts/verify/adaptive-runner.mjs")).href;
+  const adaptiveUrl = pathToFileURL(path.join(repository, "scripts/verify/adaptive.mjs")).href;
   const evidenceUrl = pathToFileURL(
     path.join(repository, "scripts/verify/verification-evidence.mjs"),
   ).href;
@@ -124,6 +130,7 @@ function recordFixtureEvidence(repository) {
   ).href;
   const source = `
     const { buildPlan } = await import(${JSON.stringify(runnerUrl)});
+    const { broadEvidencePlan } = await import(${JSON.stringify(adaptiveUrl)});
     const {
       currentVerificationEvidenceInputs,
       recordSuccessfulFullEvidence,
@@ -131,10 +138,7 @@ function recordFixtureEvidence(repository) {
     const { captureVerificationGitBasis } = await import(${JSON.stringify(basisUrl)});
     const { acquireVerificationSessionLock } = await import(${JSON.stringify(lockUrl)});
     const plan = buildPlan({ mode: "full", printPlan: false, simulatedPaths: [] });
-    const broadPlan = [...plan.readOnlyCommands, ...plan.workspaceCommands]
-      .map(({ args, artifactOwners = [], executable, key, phase }) => ({
-        args, artifactOwners, executable, key, phase
-      }));
+    const broadPlan = broadEvidencePlan(plan);
     const expectedInputs = currentVerificationEvidenceInputs({ broadPlan });
     const expectedGitBasis = captureVerificationGitBasis({ repositoryRoot: ${JSON.stringify(repository)} });
     const lock = acquireVerificationSessionLock({ repositoryRoot: ${JSON.stringify(repository)} });

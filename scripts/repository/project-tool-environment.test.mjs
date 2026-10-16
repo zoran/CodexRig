@@ -22,6 +22,7 @@ import {
   projectToolPaths,
 } from "./project-tool-environment.mjs";
 import { runProjectCommand } from "../setup/project-command.mjs";
+import { prepareUserToolDirectories } from "./user-tool-storage.mjs";
 import { listActiveFiles } from "./source-inventory.mjs";
 import {
   isPrivateRepositoryStatePath,
@@ -40,6 +41,87 @@ function fixture(t) {
   }
   return roots;
 }
+
+test("sibling projects share installed tools and package payloads but isolate accounts", (t) => {
+  const [host, first, second] = fixture(t);
+  const inherited = { ...process.env, PROJECT_TOOL_STORAGE_HOME: host };
+  const a = projectToolEnvironment({ root: first, inherited });
+  const b = projectToolEnvironment({ root: second, inherited });
+  for (const key of [
+    "MISE_DATA_DIR",
+    "MISE_CACHE_DIR",
+    "PNPM_CONFIG_STORE_DIR",
+    "NPM_CONFIG_CACHE",
+  ]) {
+    assert.equal(a[key], b[key], `${key} must not duplicate reusable payloads per repository`);
+    assert.ok(a[key].startsWith(`${host}${path.sep}`));
+  }
+  assert.notEqual(a.HOME, b.HOME);
+  assert.notEqual(a.GH_CONFIG_DIR, b.GH_CONFIG_DIR);
+  assert.notEqual(a.NPM_CONFIG_USERCONFIG, b.NPM_CONFIG_USERCONFIG);
+  assert.equal(
+    projectToolEnvironment({ root: first, inherited: a }).MISE_DATA_DIR,
+    a.MISE_DATA_DIR,
+  );
+});
+
+test("real project commands reuse browser payload paths while reclaiming separate run profiles", async (t) => {
+  const [host, first, second] = fixture(t);
+  const previous = process.env.PROJECT_TOOL_STORAGE_HOME;
+  process.env.PROJECT_TOOL_STORAGE_HOME = host;
+  t.after(() => {
+    if (previous === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
+    else process.env.PROJECT_TOOL_STORAGE_HOME = previous;
+  });
+  const observations = [];
+  for (const root of [first, second, first]) {
+    const program = `
+      const assert = require('node:assert/strict');
+      const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+      const payloads = ['PLAYWRIGHT_BROWSERS_PATH', 'PUPPETEER_CACHE_DIR'].map(key => {
+        const directory = process.env[key];
+        assert.ok(directory?.startsWith(${JSON.stringify(`${host}${path.sep}`)}), key);
+        const payload = path.join(directory, 'fixture-browser');
+        fs.mkdirSync(directory, {recursive:true});
+        if (!fs.existsSync(payload)) fs.writeFileSync(payload, 'single-installation', {flag:'wx'});
+        return {directory, inode:fs.statSync(payload).ino};
+      });
+      const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'browser-profile-'));
+      fs.writeFileSync(path.join(profile, 'cookies'), 'private-run-state');
+      fs.writeFileSync(path.join(os.homedir(), 'browser-observation.json'), JSON.stringify({payloads,profile,home:os.homedir()}));
+    `;
+    assert.equal(
+      await runProjectCommand({
+        root,
+        command: process.execPath,
+        args: ["-e", program],
+        miseExecutable: "mise",
+      }),
+      0,
+    );
+    const observed = JSON.parse(
+      readFileSync(path.join(projectToolPaths(root).home, "browser-observation.json"), "utf8"),
+    );
+    assert.equal(existsSync(observed.profile), false, "terminal command must reclaim its profile");
+    observations.push(observed);
+  }
+  for (const observed of observations.slice(1))
+    assert.deepEqual(observed.payloads, observations[0].payloads);
+  assert.equal(new Set(observations.map((value) => value.profile)).size, 3);
+  assert.notEqual(observations[0].home, observations[1].home);
+});
+
+test("shared installations refuse linked and foreign-writable user storage", (t) => {
+  const [host, first] = fixture(t);
+  const inherited = { PROJECT_TOOL_STORAGE_HOME: host };
+  symlinkSync(first, path.join(host, ".local"));
+  assert.throws(() => prepareUserToolDirectories(inherited));
+  assert.equal(existsSync(path.join(first, "share")), false);
+  rmSync(path.join(host, ".local"));
+  const storage = prepareUserToolDirectories(inherited);
+  chmodSync(storage.miseData, 0o777);
+  assert.throws(() => prepareUserToolDirectories(inherited), /foreign write access/u);
+});
 
 test("semantic verifier controls survive repeated project boundaries without importing secrets", (t) => {
   const [, root] = fixture(t);
@@ -215,6 +297,75 @@ test("an unnamed tool and its child receive only their own home and no ambient a
   }
   assert.equal(readFileSync(path.join(host, "account"), "utf8"), "host-account-sentinel");
   assert.notEqual(projectToolPaths(first).home, projectToolPaths(second).home);
+});
+
+// A shared permanent TMPDIR retained fixtures after failed or interrupted commands. Exercise the
+// real launcher and a descendant environment boundary, keeping durable accounts outside scratch.
+test("project commands isolate temporary data and reclaim it after success or failure", async (t) => {
+  const [, root] = fixture(t);
+  const environmentModule = new URL("./project-tool-environment.mjs", import.meta.url).href;
+  const runtimeModule = new URL("../verify/verification-runtime-identity.mjs", import.meta.url)
+    .href;
+  const observedPaths = [];
+  const observedIdentities = [];
+  for (const status of [0, 9]) {
+    const program = `
+      const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+      const temporary = os.tmpdir();
+      fs.writeFileSync(path.join(temporary, 'large-fixture'), Buffer.alloc(1024 * 1024));
+      import(${JSON.stringify(environmentModule)}).then(async ({ projectToolEnvironment }) => {
+        const child = projectToolEnvironment({ root: process.cwd() });
+        if (process.platform !== 'win32') {
+          const { createServer } = await import('node:net');
+          // Exercise the execution-path overhead independently of the outer test fixture's depth.
+          const socket = path.relative(process.cwd(), path.join(temporary, 'native-browser-ipc-xxxxxxxxxxxxxxxxxxxxxxxx.sock'));
+          const server = createServer();
+          await new Promise((resolve, reject) => { server.once('error', reject); server.listen(socket, resolve); });
+          await new Promise(resolve => server.close(resolve));
+        }
+        const { normalizedVerificationRuntimeIdentity } = await import(${JSON.stringify(runtimeModule)});
+        const runtimeIdentity = normalizedVerificationRuntimeIdentity(undefined, { cwd: process.cwd() });
+        fs.writeFileSync(path.join(os.homedir(), 'observation.json'), JSON.stringify({
+          temporary, childTemporary: child.TMPDIR, miseTemporary: process.env.MISE_TMP_DIR,
+          runtimeIdentity,
+        }));
+        process.exit(${status});
+      });
+    `;
+    assert.equal(
+      await runProjectCommand({
+        root,
+        command: process.execPath,
+        args: ["-e", program],
+        miseExecutable: "mise",
+      }),
+      status,
+    );
+    const locations = projectToolPaths(root);
+    const observed = JSON.parse(
+      readFileSync(path.join(locations.home, "observation.json"), "utf8"),
+    );
+    assert.notEqual(
+      observed.temporary,
+      locations.temporary,
+      "each operation owns its temporary area",
+    );
+    assert.equal(
+      observed.childTemporary,
+      observed.temporary,
+      "nested tool boundaries preserve ownership",
+    );
+    assert.equal(observed.miseTemporary, observed.temporary);
+    assert.equal(existsSync(observed.temporary), false, "terminal commands leave no fixture tree");
+    observedPaths.push(observed.temporary);
+    observedIdentities.push(observed.runtimeIdentity);
+  }
+  assert.notEqual(observedPaths[0], observedPaths[1]);
+  assert.deepEqual(
+    observedIdentities[0],
+    observedIdentities[1],
+    "scratch allocation does not invalidate reusable verification evidence",
+  );
 });
 
 test("private state cannot follow a host symlink or reuse publicly accessible storage", (t) => {

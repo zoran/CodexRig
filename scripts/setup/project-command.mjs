@@ -18,6 +18,10 @@ import {
   verifyProjectToolBundle,
 } from "../repository/project-tool-executables.mjs";
 import { formatContextError } from "../terminal/terminal-output.mjs";
+import {
+  createProjectTemporaryScope,
+  temporaryEnvironment,
+} from "../repository/project-temporary-storage.mjs";
 
 /** Inventories before creating private state and forwards signals only to the child it spawned. */
 export async function runProjectCommand({
@@ -42,12 +46,12 @@ export async function runProjectCommand({
   );
   if (!inventory.complete || unsafe)
     throw new Error("Project command refused unsafe repository/worktree ownership.");
-  prepareProjectToolDirectories(root);
+  const locations = prepareProjectToolDirectories(root);
   const environment = projectToolEnvironment({ root, inherited });
   // The injectable executable is for an explicit programmatic bootstrap/test owner. The public
   // command always uses the integrity-checked project installation, including Mise self-updates.
   if (!miseExecutable) {
-    const layout = projectManagedToolLayout(root);
+    const layout = projectManagedToolLayout(root, undefined, { environment });
     miseExecutable = verifyProjectToolBundle(root, layout.mise);
     verifyProjectToolBundle(root, layout.codex);
     environment.PATH = [
@@ -58,32 +62,52 @@ export async function runProjectCommand({
   }
   if (existsSync(path.join(root, ".codex", "toolchain.json")))
     assertInstalledProjectTools({ root, miseExecutable, environment });
-  return await new Promise((resolve, reject) => {
-    const child = spawn(miseExecutable, ["exec", "--locked", "--", command, ...args], {
-      cwd: root,
-      env: environment,
-      stdio: "inherit",
-    });
-    const handlers = new Map();
-    const cleanup = () => {
-      for (const [signal, handler] of handlers) process.off(signal, handler);
-    };
-    for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
-      const handler = () => {
-        if (child.pid && child.exitCode === null && child.signalCode === null) child.kill(signal);
-      };
-      handlers.set(signal, handler);
-      process.on(signal, handler);
-    }
-    child.once("error", (error) => {
-      cleanup();
-      reject(error);
-    });
-    child.once("exit", (code, signal) => {
-      cleanup();
-      resolve(signal ? 128 + (os.constants.signals[signal] ?? 0) : (code ?? 1));
-    });
+  const temporary = createProjectTemporaryScope({
+    root,
+    parent: locations.temporary,
+    protectedPaths: inventory.worktrees.map((worktree) => worktree.path),
   });
+  let status;
+  try {
+    status = await new Promise((resolve, reject) => {
+      const child = spawn(miseExecutable, ["exec", "--locked", "--", command, ...args], {
+        cwd: root,
+        env: temporaryEnvironment(environment, temporary.directory),
+        stdio: "inherit",
+      });
+      const handlers = new Map();
+      const cleanup = () => {
+        for (const [signal, handler] of handlers) process.off(signal, handler);
+      };
+      for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+        const handler = () => {
+          if (child.pid && child.exitCode === null && child.signalCode === null) child.kill(signal);
+        };
+        handlers.set(signal, handler);
+        process.on(signal, handler);
+      }
+      child.once("error", (error) => {
+        cleanup();
+        reject(error);
+      });
+      child.once("close", (code, signal) => {
+        cleanup();
+        resolve(signal ? 128 + (os.constants.signals[signal] ?? 0) : (code ?? 1));
+      });
+    });
+    return status;
+  } finally {
+    try {
+      if (!temporary.release())
+        console.warn(
+          "Project temporary storage retained for active or unobservable consumers; housekeeping will reconcile it.",
+        );
+    } catch (error) {
+      const message = `Project temporary cleanup retained state: ${formatContextError(error, root)}`;
+      if (status === 0) throw new Error(message, { cause: error });
+      console.error(message);
+    }
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

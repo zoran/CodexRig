@@ -37,8 +37,10 @@ upgradeable product repositories while deliberately defining no child product or
   skills, policy, and scripts guide resumed or new work; generated projects receive the portable
   surface with independently owned local tool configuration; verification selects evidence from
   current repository risk and delivery identity.
-- Durable state: tracked source, configuration, contracts, documentation, tests, and lockfiles.
-  `.codex/runtime/` and `.project-state/` are disposable local state.
+- Durable source: tracked configuration, contracts, documentation, code, tests and lockfiles.
+  Ignored `.codex/runtime/` and `.project-state/` hold owner-managed coordination, verification and
+  operation recovery. Their owners determine retention; pending recovery and valid evidence are not
+  generic scratch. Accounts remain private; reusable installations use the shared user tool store.
 - Delivery state: no product deployment is integrated in this neutral source.
 - Product delivery state is maintained by the bounded inventory below; no deploy operation is part
   of repository housekeeping.
@@ -197,20 +199,32 @@ upgradeable product repositories while deliberately defining no child product or
   allowed by tracked ranges, pins, engines, peers, and supply-chain policy. Also reproduces an
   existing lockfile offline for source housekeeping and toolchain maintenance, and stages complete
   workspace inputs without changing their policy. Staged installation resolves and fills the final
-  project's private pnpm store. Existing installations bound to a former host store are rebuilt
-  through pnpm while preserving the lockfile. Failures retain bounded, sanitized pnpm diagnostics.
-  Canonical startup invokes the same owner's compatible project-local toolchain and reviewed stable
-  CI maintenance. Native pnpm release selection probes every supported platform archive over public
+  user's shared pnpm store. Existing repository-local package installations are rebuilt through pnpm
+  while preserving the lockfile. Failures retain bounded, sanitized pnpm diagnostics. Canonical
+  startup invokes the same owner's compatible project-pinned toolchain and reviewed stable CI
+  maintenance. Native pnpm release selection probes every supported platform archive over public
   HTTPS and retains the current complete release when newer releases lack artifacts; unavailable
   metadata remains a startup error. The shared toolchain contract validates staged lockfiles before
   installation and publication as well as during repository verification. Mise versions/checksums
   come from its official public distribution; action pins come from isolated native Git tags with
   commit verification for newer releases, avoiding GitHub REST quotas and credentials. Official Mise
-  binaries, complete Codex platform bundles and their integrity records remain under ignored
-  `.auth/project-tools`; host executables are never updated. Successful, quiescent canonical startup
-  retires verified replaced bundles and lets Mise prune unused runtimes. Stable CI uses the same
-  maintenance owner with `--locked`, skipping release refresh and reproducing frozen dependencies
-  before entering the common command wrapper.
+  binaries, complete Codex platform bundles and their integrity records use
+  `~/.local/share/project-tools/tools`; Mise runtimes and pnpm payloads also use this user storage
+  owner. Shared native installation uses the existing lifecycle lock at the shared root; per-project
+  credentials remain isolated. pnpm's global virtual store deduplicates dependency graphs, with
+  project links/metadata only. Verified legacy native bundles can migrate without downloads;
+  successful quiescent startup retires their legacy copies. `tool-storage-housekeeping.mjs` composes
+  native Mise/pnpm/npm collectors at startup and housekeeping, without installation or tests. Shared
+  runtime/bundle collection uses Mise's existing public pin registry across projects; package GC
+  uses pnpm's registry. Primary/secondary pins, live executables/libraries, accounts and installed
+  projects' offline inputs are retained. The shared lifecycle lock covers staged installation
+  through pin publication and cleanup. Known legacy cache/data permissions are normalized only under
+  verified private parents through the filesystem owner. Old active runtimes and unmarked product
+  state remain with their migration owner. Stable CI uses the same maintenance owner with
+  `--locked`, skipping release refresh and reproducing frozen dependencies before entering the
+  common command wrapper. Toolchain, dependency, native-tool and public-release staging use the
+  shared execution-scoped temporary owner, including recovery after interruption; account state and
+  retained tool pins stay outside disposable staging.
 - Runtime and technology: Node.js ESM orchestrating the pnpm and mise toolchain.
 - Public contract: `deps:install`, `deps:report`, and `deps:update*` commands; the
   lifecycle-delegated `install-compatible.mjs --reproduce-locked` and `--reproduce-toolchain`
@@ -221,7 +235,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/filesystem`, `scripts/repository`,
   `scripts/terminal`.
-- Focused verifier: `node --test scripts/deps/dependency-policy.test.mjs`
+- Focused verifier:
+  `node --test scripts/deps/dependency-policy.test.mjs scripts/deps/tool-storage-housekeeping.test.mjs`
 - Steward: Dependency capability maintainer.
 
 #### Documentation Contracts
@@ -278,8 +293,11 @@ upgradeable product repositories while deliberately defining no child product or
   `.codexrig/project-tools.json`; products have no installation receipt or source release identity.
   The same generation owner emits sibling trees and archives from explicit selection and templates.
   It projects the canonical maintenance scope boundary into child instructions; generated agent
-  entry points and verification guidance route command selection through that policy. Portable
-  configuration validation requires the primary's reference to it.
+  entry points and verification guidance route command selection through that policy. Canonical
+  verification, test strategy, failure recovery, storage and documentation policies are projected by
+  the same generator. Its focused consumers are the staged policy validator and independent
+  project-initialization tests. Portable configuration validation requires the primary's reference
+  to the maintenance scope boundary.
 - Tenant isolation: Not applicable; no product data plane.
 - Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/deps`, `scripts/docs`,
   `scripts/filesystem`, `scripts/goals`, `scripts/platform`, `scripts/repository`, `scripts/setup`,
@@ -339,13 +357,21 @@ upgradeable product repositories while deliberately defining no child product or
 
 - Root: `scripts/platform`
 - Responsibility: Detects GitHub or GitLab and previews or reconciles equivalent protected-branch,
-  review, CI, and merge-serialization policy with provider read-back.
+  review, CI, and merge-serialization policy with provider read-back. Serializes original-state
+  inventory with its dependent mutations; GitHub recovery validates an already-applied ruleset
+  before another write and blocks a second creation when the first outcome remains unknown. The
+  existing journal also preserves an observed optional merge-queue capability rejection through
+  recovery.
 - Runtime and technology: Node.js ESM using credential-free contract parsing and HTTPS adapters.
 - Public contract: `platform:detect` and `platform:configure`; authenticated apply reads the private
   `.auth/git-platform.json` profile bound to the selected provider, host and repository.
 - Private internals: Provider API clients, pagination, host allowlists, and reconciliation state.
-- Owned data and migrations: Disposable local reconciliation state; remote changes occur only on an
-  explicit primary-owned apply.
+  Safe API errors distinguish local admission, response headers and body failures, plus read-only,
+  not-started or unknown operation outcomes. Service failures remain failures without automatic
+  retry.
+- Owned data and migrations: Private pending-operation journal and owned lock. Recovery state is
+  retained until provider read-back succeeds; remote changes require an explicit primary-owned
+  apply.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/filesystem`, `scripts/repository`,
   `scripts/terminal`.
@@ -361,22 +387,45 @@ upgradeable product repositories while deliberately defining no child product or
   preservation of broken worktree links, the shared crash-recoverable prune transaction, path
   reservations and preservation locks, stable snapshots, delivery-environment evidence discovery,
   and transfer-source validation. Owns the clean repository tool environment with private
-  home/configuration/data/cache directories and no inherited account variables. Account state is
-  excluded before source discovery and kept separate from ephemeral native-runtime reset. Owns the
-  Git HTTPS credential-store binding to the private project home, with repository-path matching and
-  owner-only storage checks. Its shared GitHub/GitLab adapter tries existing global Git helpers and
-  the matching CLI login for configured provider hosts when a project credential is missing; global
-  store/erase and automatic login are excluded. The same adapter owns a private, operation-bound
-  rejection context so publication can skip rejected candidates and make bounded noninteractive
-  retries. Its publication identity resolver fills only missing public Git name/email metadata from
-  native global configuration without includes, validates both identities, and returns only
-  commit-scoped author/committer pins. Other tool accounts remain project-local. The common
+  home/configuration and unknown mutable data, with no inherited account variables. Its
+  `user-tool-storage.mjs` owner separates shared versioned installations and npm/pnpm/Mise caches
+  under the OS user's `project-tools` directories. Only Mise's native public configuration
+  references are shared for collection, including exact native and `npm:pnpm` pins without
+  executable configuration; stricter project execution admission remains separate. Account, trust
+  and encrypted environment state remain project-private. Preparation hardens known legacy private
+  Mise directories before reference migration without weakening shared-storage admission.
+  Playwright/Puppeteer browser-distribution paths also bind shared user caches; profiles, cookies
+  and recovery state remain private. Their native browser managers own version retention. The
+  neutral storage protocol is unchanged by child projection, including the existing lifecycle lock,
+  guard and update mutex. Legacy source-specific shared locks are preserved for recovery by their
+  original owner. Credentials and mutable device state never enter that shared installation home.
+  Account state is excluded before source discovery and kept separate from ephemeral native-runtime
+  reset. Its storage owner checks the repository, shared installation and package-cache filesystems
+  before toolchain staging/downloads. A fixed 2 GiB available minimum governs admission; percentages
+  are informational. Native Docker build-cache collection targets 3 GiB only below the minimum.
+  Unresolved capacity remains a blocking failure; product data, images, volumes and accounts stay.
+  Owns the Git HTTPS credential-store binding to the private project home, with repository-path
+  matching and owner-only storage checks. Its shared GitHub/GitLab adapter tries existing global Git
+  helpers and the matching CLI login for configured provider hosts when a project credential is
+  missing; global store/erase and automatic login are excluded. The same adapter owns a private,
+  operation-bound rejection context so publication can skip rejected candidates and make bounded
+  noninteractive retries. Its publication identity resolver fills only missing public Git name/email
+  metadata from native global configuration without includes, validates both identities, and returns
+  only commit-scoped author/committer pins. Other tool accounts remain project-local. The common
   environment preserves the declared verification controls through launcher, publication and
   pre-push; private Mise configuration provides persistent public tool defaults. Owns the shared
-  crash-recoverable file batch used by housekeeping and startup maintenance, including synchronous
-  install finalization and rollback. Per-root inconsistencies remain visible without discarding
-  other safe inventory; orphan recovery corruption is advisory unless writer ownership is also
-  unsafe.
+  execution-scoped temporary lifecycle used by project commands and canonical sessions and
+  individual verifier commands. Exact repository/directory/process identity and remaining-consumer
+  checks gate terminal cleanup and interrupted-run recovery; release discovery also retains scratch
+  while the existing lifecycle owner has pending or live consumers; only admitted ephemeral paths
+  normalize out of verification identity. Its storage inventory includes `.auth/` and tool
+  subdirectories, scratch, native history/cache and operation recovery sizes, without reading
+  accounts or deleting unowned/durable state. Runtime-use inspection can include executables and
+  mapped libraries even without an open file descriptor. Existing housekeeping composes this owner,
+  including the bounded `--storage-only` entry. Owns the shared crash-recoverable file batch used by
+  housekeeping and startup maintenance, including synchronous install finalization and rollback.
+  Per-root inconsistencies remain visible without discarding other safe inventory; orphan recovery
+  corruption is advisory unless writer ownership is also unsafe.
 - Runtime and technology: Node.js ESM over filesystem and isolated Git process boundaries.
 - Public contract: `worktree:status` with current/unfinished/settled human markers plus exported
   inventory, path-policy, Product Root, worktree-recovery, runtime-lease/session-recovery,
@@ -401,7 +450,7 @@ upgradeable product repositories while deliberately defining no child product or
   keyed fingerprints in private project temporary storage and are removed when the bound Git
   operation exits. No product data.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
-- Allowed dependencies: `scripts/contracts`, `scripts/filesystem`.
+- Allowed dependencies: `scripts/contracts`, `scripts/filesystem`, `scripts/terminal`.
 - Focused verifier:
   `node --test scripts/repository/source-inventory.test.mjs scripts/repository/worktree-recovery.test.mjs scripts/setup/startup-state.test.mjs scripts/context/context-lifecycle.test.mjs scripts/repository/global-git-credential.test.mjs scripts/repository/git-publication-identity.test.mjs`
 - Steward: Repository boundary maintainer.
@@ -427,8 +476,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Root: `scripts/setup`
 - Responsibility: Inventories worktrees, waits up to ten minutes for confirmed active lifecycle
   operations with owner diagnostics and rechecks session ownership, then invokes compatible
-  tool/package/CI maintenance before admission, then opens the native resume picker with
-  repository-root CODEX_HOME and explicit working directory. It reserves the checkout before
+  tool/package/CI maintenance with `--startup` before admission, then opens the native resume picker
+  with repository-root CODEX_HOME and explicit working directory. It reserves the checkout before
   selection and binds the selected session only at authenticated SessionStart, preloads every
   lifecycle module, accepts bounded non-executable Codex model/reasoning and voice preferences
   beneath tracked project policy, rejects executable or unknown ignored runtime configuration,
@@ -455,11 +504,16 @@ upgradeable product repositories while deliberately defining no child product or
   `project:run` inventories repository ownership before preparing private tool state and executing
   the requested command through `mise exec --locked` in the common repository environment; it grants
   no authentication, publication or deployment authority. Mise pins and locks are explicitly loaded
-  from `.codex/`, outside host-shell ancestor discovery. Interactive Codex resume explicitly selects
-  embedded mode with `--no-daemon`, preserving its session-only hooks and controls.
-  `startup.displayName` in `.codex/tooling.json` owns the launcher's ASCII identity; generation sets
-  the supplied project name. A bounded terminal-only reveal precedes five progress phases, with
-  static output for logs, CI, dumb terminals and `NO_COLOR`.
+  from `.codex/`, outside host-shell ancestor discovery. Shared-tool directories and aliases require
+  managed admission before they can enter the executable search path as host paths. Interactive
+  Codex resume explicitly selects embedded mode with `--no-daemon`, preserving its session-only
+  hooks and controls. `startup.displayName` in `.codex/tooling.json` owns the launcher's ASCII
+  identity; generation sets the supplied project name. A bounded terminal-only reveal precedes five
+  progress phases, with static output for logs, CI, dumb terminals and `NO_COLOR`. The portable
+  launcher regression ships to children, belongs to toolchain admission, and runs once for launcher
+  changes or complete publication coverage. It exercises the shell invocation and blocks
+  substituting frozen `--locked` preparation for release discovery. Source generation tests execute
+  this same child test against both the correct launcher and that failing mutation.
 - Runtime and technology: Node.js ESM and Bash on the mise-pinned framework toolchain.
 - Public contract: `codex:start`, `codex:validate`, `setup`, `hooks:install`, and `project:export`.
 - Private internals: Atomic native-picker reservation and authenticated selected-session binding,
@@ -523,8 +577,17 @@ upgradeable product repositories while deliberately defining no child product or
 - Public contract: `verify`, `verify:changed`, `verify:pre-push`, `verify:external`, `docs:check`,
   `auth:check`, `localization:check`, `tenancy:check`, and `format*` commands.
 - Private internals: One check registry with explicit complete owners (`coveredBy`), reproduction
-  without acceptance, measured diagnosis limits and owned local cancellation; schema-three evidence
-  binds source, runtime, Git basis and delivery artifacts without a second cache or test selector.
+  without acceptance, measured diagnosis limits and owned local cancellation. Development never
+  escalates automatically to publication coverage. Schema-four evidence retains independent
+  successful check inputs through failures; native isolated test files and acyclic workspace test
+  packages reuse coverage within suites while preserving dependency order. Exceptional failures
+  drain admitted peer commands before releasing lifecycle ownership; owner snapshots use the same
+  update mutex as owner replacement without relaxing file-identity checks. Conservative scratch
+  retention is reported without replacing the check result; unsafe cleanup still fails. Only
+  publication verification establishes complete acceptance; commit refresh binds identical content.
+  The same registry binds source consumers, runtime, Git basis and delivery artifacts. Parser-proven
+  editorial source changes and documentation use lightweight checks. Publisher and pre-push share
+  this single record; no second cache or test selector exists.
 - Owned data and migrations: One replace-in-place evidence record and verification lock under
   ignored `.codex/runtime/`; no product data or migrations.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
@@ -552,7 +615,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.12.0`.
+- Framework version: `6.13.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

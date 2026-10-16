@@ -47,8 +47,11 @@ export function currentProjectInstructions(sourceRoot) {
     ["Task Scope And Completion", "<!-- current-task-scope-policy -->"],
     ["Planning, Goals, Slices, Review Loops, And Audits", "<!-- current-planning-policy -->"],
     ["Maintenance Scope And Verification", "<!-- current-maintenance-scope-policy -->"],
+    ["Temporary Data And Storage Housekeeping", "<!-- current-temporary-storage-policy -->"],
     ["Long-Session Course Checks", "<!-- current-course-check-policy -->"],
     ["Verification Selection And Runtime", "<!-- current-verification-runtime-policy -->"],
+    ["Test Strategy", "<!-- current-test-strategy-policy -->"],
+    ["Deployment And Qualification Failure Recovery", "<!-- current-delivery-failure-policy -->"],
     ["Documentation Currency", "<!-- current-documentation-currency-policy -->"],
     ["Documentation Ownership", "<!-- current-documentation-ownership-policy -->"],
     ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
@@ -115,14 +118,16 @@ delegation. Review and audit it under [Planning](instructions.md#plan-content-an
 continue authorized work. Reconcile the current plan at material changes, slice boundaries and resume. Use
 goals where useful, native Goals only with explicit request or delegated need-based authority.
 Repair at the actual owner, keep one current contract and one writer per surface, preserve user
-changes, and use relevant skills. After a slice, run focused evidence, system-coherence review to no
+changes, and use relevant skills. After a slice, reuse valid evidence, fill only affected gaps, and perform system-coherence review to no
 relevant findings, a fresh audit and Worktree Settlement. The primary owns the whole-project assessment; children return assigned evidence.
 Every extra iteration needs an unfinished acceptance condition or concrete material risk. Every audit follows
 [Repository Efficiency And Effectiveness](instructions.md#repository-efficiency-and-effectiveness).
 Run \`pnpm context:check\` for instruction/context changes and preserve full requirements through
 bounded reads. Apply the Long-Session Course Checks in instructions.md.
 Stable tools and product checks are declared in \`.codex/verification.json\`; select evidence under
-the maintenance scope boundary without weakening publication gates. Tool failures are bounded
+the maintenance scope boundary without weakening publication gates. Development uses targeted
+checks; reviews, audits, handoffs and resume do not repeat valid evidence. Bundle complete coverage
+once before push through the publisher and existing evidence store. Tool failures are bounded
 findings, not a new maintenance campaign.
 
 Portable startup requests on-request approval and network-disabled workspace-write. Explicit Dev
@@ -174,6 +179,11 @@ bash scripts/setup/start-codex.sh
 Use \`--yolo\` only for an explicitly authorized Dev session; use \`--no-alt-screen\` when needed.
 Enter prompts after native session selection. Restart through the launcher after runtime-tool changes.
 
+The launcher invokes \`maintain-toolchain.mjs --startup\` to discover new releases before admission.
+Use \`--locked\` separately for frozen preparation or CI; replacing the launcher call with it disables
+updates. \`node --test scripts/setup/codex-launcher.test.mjs\` checks the actual launcher invocation
+without refreshing tools or dependencies and is included in affected checks and publication.
+
 If a verification or another lifecycle operation is still running, startup waits up to ten minutes
 and reports its operation, coordinator PID and start time. Ctrl-C cancels only the waiting startup.
 After release, startup checks session ownership again before maintenance. Uncertain ownership still
@@ -219,11 +229,19 @@ Follow the tool/account isolation policy before any authenticated use.
 Platform-policy apply reads the private \`.auth/git-platform.json\` file with exact fields
 \`schemaVersion\` (1), \`provider\`, \`hostname\`, \`repository\` (remote slug), and \`token\`;
 it never inherits a host token. Keep this file and its parent private and outside source control.
+The configurator locks original-state reads and dependent mutations together. Mutation failures
+retain their request stage and recovery state; an uncertain GitHub creation is inspected before another write.
+See [failure recovery](instructions.md#deployment-and-qualification-failure-recovery) before retrying.
 Use \`pnpm tooling:doctor\` for local tool diagnosis, \`pnpm worktree:status -- --json\` for session
-inventory, \`pnpm verify:changed -- --print-plan\` for selected evidence and \`pnpm verify\` for final
-verification. \`pnpm repo:housekeeping -- --apply\` reconciles local repository facts. Apply
+inventory and \`pnpm verify:changed -- --print-plan\` for development evidence. The publisher bundles
+\`pnpm verify\` once before push on the finished integrated state.
+\`pnpm repo:housekeeping -- --apply\` reconciles local repository facts. Apply
 [Maintenance Scope And Verification](instructions.md#maintenance-scope-and-verification) before
 these commands; inspect their side effects and selected checks against the accepted task.
+Use \`bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --storage-only\` for disk growth;
+see [Tool Storage And Accounts](#tool-storage-and-accounts) for locations and cleanup.
+Unmarked scratch, mutable devices and recovery records require their real owner's reconciliation.
+See [temporary storage](instructions.md#temporary-data-and-storage-housekeeping).
 Publication and deployment require their own explicit authority.
 
 ## Publish Source Changes
@@ -248,11 +266,52 @@ deployments can follow directly using project commands and existing project cred
 the project's environment approvals. If process ancestry cannot be proven, publish from the terminal
 after sessions exit.
 
-Verification reuses successful evidence for unchanged source and the same effective toolchain.
-Use \`pnpm verify:changed -- --print-plan\` to inspect the selected checks and admission reason.
-After failure, \`pnpm verify:changed -- --check <key>\` reproduces one check without recording
+## Verification
+
+Development never starts the complete suite because a test or plan was added or a full basis is
+missing. Verification retains successful individual checks after failure and reuses them for
+unchanged relevant source, commands, dependencies and execution conditions. Manual verification,
+publisher retries and pre-push share one evidence store. Reviews, audits, handoffs and resume are
+not test triggers. Documentation and parser-proven comment/format changes use lightweight checks.
+Use \`pnpm verify:changed -- --print-plan\` to inspect the selected checks and admission reason
+without executing checks.
+For an unresolved failure, \`pnpm verify:changed -- --check <key>\` reproduces one check without recording
 acceptance; native Node checks also accept \`--test-name-pattern <pattern>\`. Changed relevant source,
 tests, dependencies, controls or tools invalidate evidence. Use the project wrapper consistently.
+
+## Tool Storage And Accounts
+
+Manifests, lockfiles, exact tool pins and checksums stay in the repository. Installed runtimes,
+native tool bundles and pnpm package graphs use the OS user's \`~/.local/share/project-tools/\`;
+reusable download caches use \`~/.cache/project-tools/\`. The project retains package resolution links
+and metadata. \`PROJECT_TOOL_STORAGE_HOME\` relocates only tool storage. Accounts remain isolated
+under \`.auth/project-tools/\`. Mise's native references are shared while trust/account
+state stays private.
+
+\`repo:housekeeping -- --storage-only\` reports allocated bytes, including \`.auth/\` and tool
+subdirectories, without reading credentials or running product tests. Add \`--apply\` to reclaim
+abandoned managed scratch and invoke the native tool/package/cache collectors. Canonical startup
+uses the same collectors. Registered projects' pins, package graphs and running runtimes are retained;
+verified legacy installations retire through the dependency owner after session/runtime quiescence.
+Tracked private Mise configurations retain shared runtime versions without being read or evaluated
+by another project's collector. Independent package, cache and scratch collectors continue.
+
+For storage migration with unchanged versions and lockfiles, use
+\`node scripts/deps/maintain-toolchain.mjs --locked\`. Its online stage prepares the final
+destination's required rebuild before reproducing the same graph offline.
+
+Before staging or downloads, maintenance checks for at least 2 GiB available on each affected
+repository, installation and package-cache filesystem. Percentages are informational. Below the
+minimum, one native Docker build-cache collection targets 3 GiB; reaching the 2 GiB minimum admits
+work even if the additional cleanup target is not reached. Account and recovery data stay protected.
+
+Load tests invoke installed Node/Python/SDK and browser paths directly, including replicas. Per-command
+scratch is removed after completion or recovered after interruption. Resume retains compact checkpoints
+and runtime references, not tool copies.
+The environment sets \`PLAYWRIGHT_BROWSERS_PATH\` and \`PUPPETEER_CACHE_DIR\` to shared user caches.
+Profiles and account state stay private. Browser managers own version retirement; housekeeping never
+downloads browsers or guesses which versions a project needs.
+Unmarked scratch and emulator state require their existing owner's reconciliation.
 
 Persistent public tool settings belong in the project-private Mise configuration at
 \`.auth/project-tools/config/mise/config.toml\`. The normal project wrapper loads them before
@@ -306,6 +365,14 @@ credentials belong only in this root's ignored CODEX_HOME; leases and recovery s
 \`.codex/runtime/\`. Generation transfers none of them. The controller proves exactly two trusted
 session-only hooks before binding a writer. A native side conversation neither reads work context
 nor renews the persistent session's startup proof. See [Project Instructions](../instructions.md).
+
+External tool accounts use the project's private \`.auth/project-tools/\`; reusable tool, package
+and browser payloads use the admitted user tool store. See
+[tool/account isolation](../instructions.md#repository-local-tool-and-account-isolation) and
+[storage housekeeping](../instructions.md#temporary-data-and-storage-housekeeping). Active runtime,
+accounts and pending operation recovery are not disposable scratch.
+The [verification policy](../instructions.md#verification-selection-and-runtime) uses one result
+store for targeted development and complete publication coverage; resume adds no test trigger.
 
 ## Recovery And Authority
 

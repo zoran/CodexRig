@@ -1,4 +1,4 @@
-# Owns source verification and disposable compatibility experiments with project-local tools.
+# Owns source verification and disposable compatibility experiments with project-pinned tools in runner user storage.
 name: CI
 on:
   pull_request:
@@ -14,7 +14,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    container: node:24.21.0-bookworm
+    container: node:24.22.0-bookworm
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -35,7 +35,7 @@ jobs:
   compatibility-matrix:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    container: node:24.21.0-bookworm
+    container: node:24.22.0-bookworm
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
@@ -51,7 +51,7 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     needs: compatibility-matrix
     runs-on: ubuntu-latest
-    container: node:24.21.0-bookworm
+    container: node:24.22.0-bookworm
     timeout-minutes: 30
     continue-on-error: ${{ matrix.experimental }}
     strategy:

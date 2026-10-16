@@ -188,9 +188,12 @@ export function platformConfigurationState(root, plan) {
   const digest = stateDigest(plan);
   let owner = null;
   return {
-    begin() {
-      if (owner) throw new Error("Platform configuration state is already active.");
+    acquire() {
+      if (owner) throw new Error("Platform configuration lock is already active.");
       owner = acquireLock(root);
+    },
+    begin() {
+      if (!owner) throw new Error("Platform configuration inventory requires its owned lock.");
       try {
         const target = statePath(root);
         if (existsSync(target)) {

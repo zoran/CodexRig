@@ -25,7 +25,7 @@ import { failVerificationEvidence as fail } from "./verification-evidence-error.
 import { validateVerificationEvidenceRecord } from "./verification-evidence-record.mjs";
 
 const evidenceRelativePath = `${repositoryCodexRuntimeCacheDirectory}/project-verification/evidence.json`;
-const maximumEvidenceBytes = 1024 * 1024;
+const maximumEvidenceBytes = 16 * 1024 * 1024;
 
 export function verificationEvidenceCachePath(root) {
   return path.join(path.resolve(root), ...evidenceRelativePath.split("/"));

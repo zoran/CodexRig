@@ -447,7 +447,11 @@ export function validateRemovalTree(
   expectedType,
   label,
   ownerDevice,
-  { allowSymlinkEntries = false, mountPointReader = currentMountPoints } = {},
+  {
+    allowSymlinkEntries = false,
+    allowHardlinkEntries = false,
+    mountPointReader = currentMountPoints,
+  } = {},
 ) {
   const rootStats = safeArtifactStats(rootPath, expectedType, label);
   if (ownerDevice !== undefined && rootStats.dev !== ownerDevice) {
@@ -479,7 +483,7 @@ export function validateRemovalTree(
       if (stats.isDirectory()) pending.push(entryPath);
       else if (!stats.isFile()) {
         throw new Error(`Owned path safety refused special content in ${label}.`);
-      } else if (stats.nlink !== 1) {
+      } else if (stats.nlink !== 1 && !allowHardlinkEntries) {
         throw new Error(`Owned path safety refused hardlinked content in ${label}.`);
       }
     }
@@ -534,6 +538,7 @@ function restoreClaim(claimPath, originalPath) {
 
 export function claimAndRemove({
   allowSymlinkEntries = false,
+  allowHardlinkEntries = false,
   artifactPath,
   expectedIdentity,
   expectedType,
@@ -566,6 +571,7 @@ export function claimAndRemove({
     });
     const removalTreeOptions = {
       allowSymlinkEntries,
+      allowHardlinkEntries,
       ...(mountPointReader ? { mountPointReader } : {}),
     };
     const initialStats = validateRemovalTree(

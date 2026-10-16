@@ -10,6 +10,13 @@ import { formatContextError, sanitizeMultilineForTerminal } from "../terminal/te
 import { verificationChildEnvironment } from "../verify/verification-runtime-identity.mjs";
 import { acquireVerificationSessionLock } from "../verify/verification-session-lock.mjs";
 import { reconcileRepositoryWorktreeState } from "../repository/worktree-recovery.mjs";
+import { inspectRepositoryWorktrees } from "../repository/worktree-recovery.mjs";
+import { reconcileToolStorage } from "../deps/tool-storage-housekeeping.mjs";
+import {
+  runStorageHousekeeping,
+  reconcileRepositoryStorage,
+  repositoryStorageSummary,
+} from "../repository/repository-storage.mjs";
 import {
   applyHousekeepingWrites,
   housekeepingStateDirectory,
@@ -21,7 +28,7 @@ const repositoryRoot = path.resolve(scriptDirectory, "..", "..");
 
 function parseArgs(argv) {
   const argumentsWithoutDelimiter = argv.filter((argument) => argument !== "--");
-  const allowed = new Set(["--apply", "--check", "--online", "--help", "-h"]);
+  const allowed = new Set(["--apply", "--check", "--online", "--storage-only", "--help", "-h"]);
   const unknown = argumentsWithoutDelimiter.find((argument) => !allowed.has(argument));
   if (unknown) throw new Error(`Unknown repository housekeeping option: ${unknown}`);
   if (
@@ -34,15 +41,17 @@ function parseArgs(argv) {
     apply: argumentsWithoutDelimiter.includes("--apply"),
     help: argumentsWithoutDelimiter.some((argument) => argument === "--help" || argument === "-h"),
     online: argumentsWithoutDelimiter.includes("--online"),
+    storageOnly: argumentsWithoutDelimiter.includes("--storage-only"),
   };
 }
 
 function usage() {
-  return `Usage: pnpm repo:housekeeping [-- --check|--apply] [--online]
+  return `Usage: pnpm repo:housekeeping [-- --check|--apply] [--online] [--storage-only]
 
   --check   Read-only drift and repository-health check. This is the default.
   --apply   Reconcile unambiguous delivery inventory, manifest projection, and formatting, then check.
   --online  Also check registry/tool freshness without changing dependency version lines.
+  --storage-only  Inspect storage or reclaim abandoned scratch, native cache garbage and replaced installations; no formatting, installation or product checks.
 `;
 }
 
@@ -100,13 +109,40 @@ function failFromPlan(plan) {
   );
 }
 
-export async function runRepositoryHousekeeping(options, { reconcileOwnedState } = {}) {
+export async function runRepositoryHousekeeping(
+  options,
+  { reconcileOwnedState, root = repositoryRoot } = {},
+) {
   if (options.help) {
     console.log(usage());
     return;
   }
-  const lock = acquireVerificationSessionLock({ repositoryRoot });
+  const storage = (owner) => {
+    const inventory = inspectRepositoryWorktrees({ root });
+    if (!inventory.complete)
+      throw new Error("Storage cleanup requires a complete worktree inventory.");
+    const tools = reconcileToolStorage({ root, apply: options.apply, owner });
+    for (const action of tools.actions) console.log(`Tool storage: ${action}.`);
+    for (const reason of tools.deferred) console.log(`Tool storage retained: ${reason}.`);
+    const report = reconcileRepositoryStorage({
+      root,
+      apply: options.apply,
+      protectedPaths: inventory.worktrees.map((worktree) => worktree.path),
+    });
+    console.log(repositoryStorageSummary(report));
+    if (report.reviewRequired)
+      throw new Error(
+        "Repository storage requires owner reconciliation; retained data was not deleted.",
+      );
+    return { ...report, tools };
+  };
+  if (options.storageOnly && !options.apply) return storage();
+  if (!options.storageOnly && !options.apply) runStorageHousekeeping({ root });
+  const lock = acquireVerificationSessionLock({ repositoryRoot: root });
   try {
+    if (options.storageOnly) return storage(lock.lifecycleCapability);
+    if (root !== repositoryRoot)
+      throw new Error("Full housekeeping must run from its owning repository entry point.");
     const interruptedState = path.join(repositoryRoot, housekeepingStateDirectory);
     if (!options.apply && lstatSync(interruptedState, { throwIfNoEntry: false })) {
       throw new Error(
@@ -124,6 +160,8 @@ export async function runRepositoryHousekeeping(options, { reconcileOwnedState }
       );
     }
     failFromPlan(worktreePlan);
+    storage(lock.lifecycleCapability);
+    if (options.apply) runStorageHousekeeping({ root, apply: true });
     if (options.apply) recoverInterruptedHousekeepingWrites(repositoryRoot);
     if (reconcileOwnedState)
       await reconcileOwnedState({
@@ -141,6 +179,7 @@ export async function runRepositoryHousekeeping(options, { reconcileOwnedState }
     failFromPlan(plan);
     if (options.apply) runNode("scripts/verify/format-project.mjs", ["--write"]);
     runRepositoryHealthChecks({ online: options.online });
+    runStorageHousekeeping({ root });
     console.log(
       `Repository housekeeping passed in ${options.apply ? "apply" : "check"} mode; no deployment or external environment was changed.`,
     );

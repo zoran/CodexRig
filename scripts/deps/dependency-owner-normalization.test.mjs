@@ -25,6 +25,7 @@ import {
   selectDependencyEntries,
 } from "./update.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
+import { userToolPaths } from "../repository/user-tool-storage.mjs";
 
 const temporaryRoots = [];
 
@@ -159,7 +160,7 @@ test("dependency subprocesses receive an allowlisted environment without ambient
   assert.equal(environment.NODE_OPTIONS, undefined);
   assert.equal(environment.NPM_CONFIG_FILTER, undefined);
   assert.equal(environment.PNPM_CONFIG_FILTER, undefined);
-  assert.ok(environment.PNPM_HOME.startsWith(`${toolingRoot}/.auth/`));
+  assert.equal(environment.PNPM_HOME, userToolPaths().pnpmHome);
   assert.ok(environment.HOME.startsWith(`${toolingRoot}/.auth/`));
   assert.equal(environment.NODE_AUTH_TOKEN, undefined);
   assert.equal(environment.PATH, "/safe/bin");

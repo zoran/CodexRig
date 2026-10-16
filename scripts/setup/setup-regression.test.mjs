@@ -471,7 +471,13 @@ test("embedded lifecycle clients fail closed without executing a repository path
   }
 });
 
-test("startup attestation binds the complete preloaded controller closure", () => {
+test("startup attestation binds the complete preloaded controller closure", (t) => {
+  const inheritedStorage = process.env.PROJECT_TOOL_STORAGE_HOME;
+  process.env.PROJECT_TOOL_STORAGE_HOME = temporaryRoot("startup-executable-closure-storage-");
+  t.after(() => {
+    if (inheritedStorage === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
+    else process.env.PROJECT_TOOL_STORAGE_HOME = inheritedStorage;
+  });
   const fixture = temporaryRoot("startup-executable-closure-");
   for (const relativePath of startupAttestedInputPaths(root)) {
     const source = path.join(root, ...relativePath.split("/"));
@@ -828,8 +834,13 @@ test("hook installation is managed and never overwrites an unrelated hook", () =
   copyFileSync(path.join(root, "scripts/repository/git-runtime-isolation.mjs"), gitIsolation);
   copyFileSync(path.join(root, "scripts/repository/runtime-process-io.mjs"), processIo);
   for (const relative of [
+    "scripts/contracts/portable-toml.mjs",
+    "scripts/contracts/semver-contract.mjs",
+    "scripts/repository/project-temporary-storage.mjs",
     "scripts/repository/project-tool-environment.mjs",
+    "scripts/repository/runtime-process-identity.mjs",
     "scripts/repository/source-inventory-policy.mjs",
+    "scripts/repository/user-tool-storage.mjs",
     "scripts/filesystem/repository-files.mjs",
     "scripts/filesystem/owned-file-operations.mjs",
     "scripts/filesystem/owned-path-safety.mjs",

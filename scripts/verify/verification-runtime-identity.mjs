@@ -5,7 +5,11 @@ import { accessSync, constants, lstatSync, realpathSync, statSync } from "node:f
 import path from "node:path";
 import process from "node:process";
 import { toolingRoot } from "../filesystem/repository-files.mjs";
-import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
+import {
+  projectToolEnvironment,
+  projectToolPaths,
+} from "../repository/project-tool-environment.mjs";
+import { temporaryEnvironmentIdentity } from "../repository/project-temporary-storage.mjs";
 
 const identityKeys = Object.freeze([
   "arch",
@@ -79,7 +83,8 @@ function commandVersionDigest(command, args, cwd, executable, environment, envir
   return versionDigest;
 }
 
-function environmentDigest(environment) {
+function environmentDigest(environment, root) {
+  environment = temporaryEnvironmentIdentity(root, projectToolPaths(root).temporary, environment);
   const hash = createHash("sha256").update("verification-environment-v1\0");
   for (const key of Object.keys(environment)
     .filter((key) => !["PATH", "PATHEXT"].includes(key.toUpperCase()))
@@ -154,7 +159,7 @@ export function normalizedVerificationRuntimeIdentity(runtimeIdentity, { cwd } =
   const childEnvironment = runtimeIdentity
     ? null
     : verificationChildEnvironment(process.env, runtimeCwd);
-  const environment = runtimeIdentity ? null : environmentDigest(childEnvironment);
+  const environment = runtimeIdentity ? null : environmentDigest(childEnvironment, runtimeCwd);
   const executables = runtimeIdentity ? null : executableSnapshot(runtimeCwd, childEnvironment);
   const value =
     runtimeIdentity ??

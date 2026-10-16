@@ -11,6 +11,7 @@ import { toolingRoot } from "../filesystem/repository-files.mjs";
 import {
   prepareProjectToolDirectories,
   projectToolEnvironment,
+  projectToolPaths,
 } from "../repository/project-tool-environment.mjs";
 import {
   inspectRuntimeSessionLease,
@@ -38,6 +39,10 @@ import {
 } from "./startup-runtime-executables.mjs";
 import { validateRuntimeCodexConfig } from "./validate-codex-config.mjs";
 import { sessionStartSuccess } from "./startup-session-context.mjs";
+import {
+  createProjectTemporaryScope,
+  temporaryEnvironment,
+} from "../repository/project-temporary-storage.mjs";
 
 const modulePath = fileURLToPath(import.meta.url);
 const sessionControlTokenPattern = /^[A-Za-z0-9_-]{40,128}$/u;
@@ -481,7 +486,7 @@ export async function runStartupSessionController({
   });
   process.env.PATH = runtimeBinding.searchPath;
   const runtimeExecutables = runtimeBinding.executables;
-  const baseEnvironment = baseCodexEnvironment(root, runtimeBinding.hookShell);
+  let baseEnvironment = baseCodexEnvironment(root, runtimeBinding.hookShell);
   const expectedBasis = startupAttestationBasis({
     root,
     controlPolicy: options.controlPolicy,
@@ -494,7 +499,14 @@ export async function runStartupSessionController({
   });
   let server = null;
   let releaseLease = true;
+  let temporary;
   try {
+    temporary = createProjectTemporaryScope({
+      root,
+      parent: projectToolPaths(root).temporary,
+      purpose: "session",
+    });
+    baseEnvironment = temporaryEnvironment(baseEnvironment, temporary.directory);
     validateRuntimeCodexConfig(root);
     await verifyTrustedSessionControlHooks({
       codexExecutable: options.codexExecutable,
@@ -544,7 +556,13 @@ export async function runStartupSessionController({
     throw error;
   } finally {
     if (server) await closeServer(server);
-    if (releaseLease) releaseRuntimeSessionLease({ root, pid: process.pid });
+    if (releaseLease) {
+      releaseRuntimeSessionLease({ root, pid: process.pid });
+      if (temporary && !temporary.release())
+        console.warn(
+          "Session temporary data retained for active or unobservable consumers; housekeeping will reconcile it.",
+        );
+    }
   }
 }
 

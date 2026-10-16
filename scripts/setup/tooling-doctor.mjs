@@ -33,7 +33,7 @@ function pushFinding(collection, code, message) {
 function toolVersion(root, name, args, label, errors, environment) {
   let executable;
   try {
-    const layout = projectManagedToolLayout(root);
+    const layout = projectManagedToolLayout(root, undefined, { environment });
     executable =
       name === "codex"
         ? verifyProjectToolBundle(root, layout.codex)

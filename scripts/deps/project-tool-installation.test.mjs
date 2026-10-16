@@ -36,9 +36,18 @@ import {
   retireReplacedProjectTools,
 } from "./project-tool-installation.mjs";
 
+const originalToolStorage = process.env.PROJECT_TOOL_STORAGE_HOME;
 function fixture(t, { link = false } = {}) {
   const root = mkdtempSync(path.join(os.tmpdir(), "project-tool-install-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
+  const previousStorage = originalToolStorage;
+  const storage = mkdtempSync(path.join(os.tmpdir(), "isolated-user-tools-"));
+  process.env.PROJECT_TOOL_STORAGE_HOME = storage;
+  t.after(() => {
+    if (previousStorage === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
+    else process.env.PROJECT_TOOL_STORAGE_HOME = previousStorage;
+    rmSync(storage, { recursive: true, force: true });
+  });
   const p = prepareProjectToolDirectories(root);
   const matrix = structuredClone(readToolchainConfiguration());
   const layout = projectManagedToolLayout(root, matrix);
@@ -129,6 +138,20 @@ test("native bundles retain resources, reuse verified versions and reject change
     result,
   );
   assert.equal(f.calls.length, before);
+  const sibling = path.join(f.root, "sibling");
+  mkdirSync(sibling);
+  assert.deepEqual(
+    await install({
+      ...f,
+      root: sibling,
+      fetchImpl: () => {
+        throw new Error("duplicate sibling download");
+      },
+    }),
+    result,
+  );
+  assert.equal(existsSync(path.join(f.root, ".auth/project-tools/tools")), false);
+  assert.equal(existsSync(path.join(sibling, ".auth/project-tools/tools")), false);
   const unmanaged = path.join(f.root, "project-binary");
   writeFileSync(unmanaged, "#!/bin/sh\nexit 0\n");
   chmodSync(unmanaged, 0o755);
@@ -137,6 +160,34 @@ test("native bundles retain resources, reuse verified versions and reject change
   assert.throws(() => verifyProjectToolBundle(f.root, layout.codex), /installation changed/u);
   await assert.rejects(install(f), /installation changed/u);
   assert.ok(existsSync(result.codex));
+});
+
+test("verified legacy bundles migrate without network and retain their source until quiescence", async (t) => {
+  const f = fixture(t);
+  const first = await install(f);
+  const layout = projectManagedToolLayout(f.root);
+  for (const tool of [layout.mise, layout.codex]) {
+    const legacy = path.join(
+      f.root,
+      ".auth/project-tools/tools",
+      tool.name,
+      tool.version,
+      path.basename(tool.directory),
+    );
+    cpSync(tool.directory, legacy, { recursive: true });
+    rmSync(tool.directory, { recursive: true });
+  }
+  assert.deepEqual(
+    await install({
+      ...f,
+      fetchImpl: () => {
+        throw new Error("legacy migration must not download");
+      },
+    }),
+    first,
+  );
+  assert.ok(existsSync(path.join(f.root, ".auth/project-tools/tools")));
+  assert.equal(verifyProjectToolBundle(f.root, layout.codex), first.codex);
 });
 
 test("corrupt bytes and linked archives fail before an executable is published", async (t) => {
@@ -154,7 +205,7 @@ test("corrupt bytes and linked archives fail before an executable is published",
   assert.ok(linked.calls.every(([, option]) => option !== "-xzf"));
 });
 
-test("quiescent retirement removes verified replaced tools and preserves account state", async (t) => {
+test("quiescent retirement preserves shared pins and removes only verified legacy copies", async (t) => {
   const f = fixture(t);
   await install(f);
   const previousMatrix = structuredClone(f.matrix);
@@ -163,17 +214,25 @@ test("quiescent retirement removes verified replaced tools and preserves account
   const current = projectManagedToolLayout(f.root).mise;
   cpSync(current.directory, oldTool.directory, { recursive: true });
   sealProjectToolBundle(f.root, oldTool.directory, oldTool);
+  const legacyDirectory = path.join(
+    f.root,
+    ".auth/project-tools/tools/mise",
+    current.version,
+    path.basename(current.directory),
+  );
+  cpSync(current.directory, legacyDirectory, { recursive: true });
   const account = path.join(f.root, ".auth", "preserved-account");
   writeFileSync(account, "account sentinel", { mode: 0o600 });
   assert.throws(() => retireReplacedProjectTools({ ...f, previousMatrix }), /lifecycle owner/u);
   const owner = acquireRuntimeLifecycleLock({ root: f.root, operation: "toolchain-maintenance" });
   try {
     const retired = retireReplacedProjectTools({ ...f, previousMatrix, owner });
-    assert.deepEqual(retired, [oldTool.directory]);
-    assert.equal(existsSync(oldTool.directory), false);
+    assert.deepEqual(retired, [legacyDirectory]);
+    assert.equal(existsSync(oldTool.directory), true);
+    assert.equal(existsSync(legacyDirectory), false);
     assert.equal(verifyProjectToolBundle(f.root, current), current.executable);
     assert.equal(readFileSync(account, "utf8"), "account sentinel");
-    assert.ok(f.calls.some((call) => call.includes("--tools") && call.includes("--yes")));
+    assert.ok(f.calls.every((call) => !call.includes("prune")));
   } finally {
     releaseRuntimeLifecycleLock({ root: f.root, owner });
   }
@@ -199,7 +258,7 @@ test("current distributions cover Linux libc variants, Apple Silicon and Windows
     );
     assert.ok(layout.codex.executable.includes(`${path.sep}${triple}${path.sep}`));
     assert.equal(layout.codex.executable.endsWith(".exe"), platform === "win32");
-    assert.equal(path.relative(root, layout.mise.directory).startsWith(".auth"), true);
+    assert.equal(path.relative(root, layout.mise.directory).startsWith(".."), true);
   }
   assert.throws(
     () => projectManagedToolLayout(root, matrix, { platform: "darwin", arch: "x64" }),

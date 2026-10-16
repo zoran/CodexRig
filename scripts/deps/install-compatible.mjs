@@ -1,6 +1,8 @@
 /** Owns install compatible behavior for the dependency and toolchain maintenance boundary. */
+import { userToolPaths, prepareUserToolDirectories } from "../repository/user-tool-storage.mjs";
 import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
-import { chmodSync, existsSync, lstatSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { createProjectTemporaryScope } from "../repository/project-temporary-storage.mjs";
 import {
   prepareProjectToolDirectories,
   projectToolPaths,
@@ -190,10 +192,9 @@ function commandFailure(result, label, projectRoot) {
 }
 
 function installationStoreArgs(options, projectRoot, lifecycleCapability) {
-  if (!options.installationRoot)
-    return ["--store-dir", path.join(projectToolPaths(projectRoot).data, "pnpm", "store")];
-  // Resolve with the candidate pnpm, but in the final root: the default store is filesystem-local,
-  // and a configured relative store is relative to that root, not to either temporary stage.
+  if (!options.installationRoot) return ["--store-dir", prepareUserToolDirectories().pnpmStore];
+  // Resolve with the candidate pnpm in the final root. The admitted user store must remain
+  // identical across staging, final installation and subsequent offline publication.
   const result = runPnpm(
     options.spawnPnpm ?? spawnSync,
     ["store", "path"],
@@ -207,24 +208,26 @@ function installationStoreArgs(options, projectRoot, lifecycleCapability) {
   const storeDirectory = String(result.stdout ?? "").trim();
   if (!path.isAbsolute(storeDirectory) || /[\0\r\n]/u.test(storeDirectory))
     throw new DependencyTransactionError("Installation store path must be one absolute path.");
-  const localStore = path.join(projectToolPaths(options.installationRoot).data, "pnpm", "store");
+  const localStore = userToolPaths().pnpmStore;
   if (storeDirectory !== localStore && !storeDirectory.startsWith(`${localStore}${path.sep}`))
     throw new DependencyTransactionError(
-      "Installation store path must belong to the project tool state.",
+      "Installation store path must belong to the user package store.",
     );
   return ["--store-dir", storeDirectory];
 }
 
-function installationRepairArgs(projectRoot, environmentRoot = projectRoot) {
-  if (!existsSync(path.join(projectRoot, "node_modules"))) return [];
-  const modules = lstatSync(path.join(projectRoot, "node_modules"));
+function installationRepairArgs(projectRoot, installationRoot = projectRoot) {
+  // Online staging must populate the content needed by the final destination's repair. Reusing
+  // an existing global graph alone can leave its evicted archives missing for offline --force.
+  if (!existsSync(path.join(installationRoot, "node_modules"))) return [];
+  const modules = lstatSync(path.join(installationRoot, "node_modules"));
   if (!modules.isDirectory() || modules.isSymbolicLink())
     throw new DependencyTransactionError(
       "Dependency installation requires a real project node_modules directory.",
     );
-  const metadata = readOptionalFile(projectRoot, "node_modules/.modules.yaml");
-  const localStore = path.join(projectToolPaths(environmentRoot).data, "pnpm", "store");
-  // pnpm owns its installation metadata. Recognize a current local binding; ask pnpm itself to
+  const metadata = readOptionalFile(installationRoot, "node_modules/.modules.yaml");
+  const localStore = userToolPaths().pnpmStore;
+  // pnpm owns its installation metadata. Recognize a current user-store binding; ask pnpm itself to
   // rebuild everything else instead of maintaining readers for historical installation formats.
   try {
     const value = JSON.parse(metadata.content);
@@ -358,14 +361,12 @@ export function installLatestCompatibleDependencies(options = {}) {
     const original = readOptionalFile(projectRoot, "pnpm-lock.yaml");
     const lockfilePath = safeRepositoryPath(projectRoot, "pnpm-lock.yaml");
     const lockfileMode = lstatSync(lockfilePath).mode & 0o777;
-    const stageRoot = mkdtempSync(
-      path.join(
-        options.temporaryParent ??
-          prepareProjectToolDirectories(options.installationRoot ?? projectRoot).temporary,
-        "deps-compatible-",
-      ),
-    );
-    chmodSync(stageRoot, 0o700);
+    const environmentRoot = options.installationRoot ?? projectRoot;
+    const temporary = createProjectTemporaryScope({
+      root: environmentRoot,
+      parent: prepareProjectToolDirectories(environmentRoot).temporary,
+    });
+    const stageRoot = temporary.directory;
 
     try {
       copyDependencyStage(projectRoot, stageRoot, inputs);
@@ -444,7 +445,10 @@ export function installLatestCompatibleDependencies(options = {}) {
         manifestCount: manifests.length,
       };
     } finally {
-      rmSync(stageRoot, { recursive: true, force: true });
+      if (!temporary.release())
+        console.warn(
+          "Dependency temporary storage retained for remaining consumers; housekeeping will reconcile it.",
+        );
     }
   });
 }

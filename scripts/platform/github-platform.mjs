@@ -8,6 +8,9 @@ import {
 
 export const githubRulesetName = "CodexRig main protection";
 
+/** Distinguishes a verified policy mismatch from an unavailable provider read-back. */
+class GithubRulesetMismatch extends Error {}
+
 export function githubRulesetPayload(contract, { includeSerialization = true } = {}) {
   const { ci, integrationBranch, protection } = contract.platform;
   const rules = [
@@ -63,7 +66,7 @@ export function githubRulesetPayload(contract, { includeSerialization = true } =
 function assertExpectedSubset(actual, expected, label) {
   if (Array.isArray(expected)) {
     if (!Array.isArray(actual) || actual.length !== expected.length) {
-      throw new Error(`GitHub ruleset read-back differs at ${label}.`);
+      throw new GithubRulesetMismatch(`GitHub ruleset read-back differs at ${label}.`);
     }
     expected.forEach((value, index) =>
       assertExpectedSubset(actual[index], value, `${label}[${index}]`),
@@ -72,38 +75,41 @@ function assertExpectedSubset(actual, expected, label) {
   }
   if (expected && typeof expected === "object") {
     if (!actual || typeof actual !== "object" || Array.isArray(actual)) {
-      throw new Error(`GitHub ruleset read-back differs at ${label}.`);
+      throw new GithubRulesetMismatch(`GitHub ruleset read-back differs at ${label}.`);
     }
     for (const [key, value] of Object.entries(expected)) {
       assertExpectedSubset(actual[key], value, `${label}.${key}`);
     }
     return;
   }
-  if (actual !== expected) throw new Error(`GitHub ruleset read-back differs at ${label}.`);
+  if (actual !== expected)
+    throw new GithubRulesetMismatch(`GitHub ruleset read-back differs at ${label}.`);
 }
 
 function verifyGithubRuleset(actual, expected) {
   for (const field of ["name", "target", "enforcement", "conditions", "bypass_actors"]) {
     assertExpectedSubset(actual?.[field], expected[field], field);
   }
-  if (!Array.isArray(actual?.rules)) throw new Error("GitHub ruleset read-back has no rules.");
+  if (!Array.isArray(actual?.rules))
+    throw new GithubRulesetMismatch("GitHub ruleset read-back has no rules.");
   const actualByType = new Map();
   for (const rule of actual.rules) {
     if (actualByType.has(rule?.type)) {
-      throw new Error(`GitHub ruleset read-back duplicates ${String(rule?.type)}.`);
+      throw new GithubRulesetMismatch(`GitHub ruleset read-back duplicates ${String(rule?.type)}.`);
     }
     actualByType.set(rule?.type, rule);
   }
   for (const expectedRule of expected.rules) {
     const actualRule = actualByType.get(expectedRule.type);
-    if (!actualRule) throw new Error(`GitHub ruleset read-back omitted ${expectedRule.type}.`);
+    if (!actualRule)
+      throw new GithubRulesetMismatch(`GitHub ruleset read-back omitted ${expectedRule.type}.`);
     assertExpectedSubset(actualRule, expectedRule, `rules.${expectedRule.type}`);
   }
   if (
     !expected.rules.some((rule) => rule.type === "merge_queue") &&
     actualByType.has("merge_queue")
   ) {
-    throw new Error("GitHub ruleset read-back retained an unwanted merge queue.");
+    throw new GithubRulesetMismatch("GitHub ruleset read-back retained an unwanted merge queue.");
   }
 }
 
@@ -122,13 +128,47 @@ export async function applyGithubPlatform({ contract, detected, token, fetchImpl
     throw new Error("GitHub owned ruleset identity is invalid.");
   }
   const state = stateStore.begin();
+  if (state.resumed && !owned) {
+    throw new Error(
+      "GitHub ruleset creation outcome is unknown; reconcile the original remote state before another create.",
+    );
+  }
   const method = owned ? "PUT" : "POST";
   const url = owned ? `${base}/rulesets/${owned.id}` : `${base}/rulesets`;
-  const requestedSerialization = contract.platform.protection.mergeSerialization !== "disabled";
-  const warnings = [];
+  const serializationUnavailable = state.completed.includes("merge queue unavailable");
+  const requestedSerialization =
+    contract.platform.protection.mergeSerialization !== "disabled" && !serializationUnavailable;
+  const serializationWarning =
+    "GitHub merge queue was unavailable; branch, review, and CI protection remain active.";
+  const warnings = serializationUnavailable ? [serializationWarning] : [];
   let payload = githubRulesetPayload(contract, {
     includeSerialization: requestedSerialization,
   });
+  if (state.resumed && owned) {
+    // A lost/error response does not establish whether the previous write took effect.
+    const original = await platformApiRequest(fetchImpl, `${base}/rulesets/${owned.id}`, {
+      provider: "github",
+      token,
+    });
+    let matches = true;
+    try {
+      verifyGithubRuleset(original, payload);
+    } catch (error) {
+      if (!(error instanceof GithubRulesetMismatch)) throw error;
+      matches = false;
+    }
+    if (matches) {
+      stateStore.record("ruleset verified");
+      stateStore.complete();
+      return {
+        provider: "github",
+        repository: detected.slug,
+        resumed: true,
+        updated: "verified existing ruleset",
+        warnings,
+      };
+    }
+  }
   let written;
   try {
     written = await platformApiRequest(fetchImpl, url, {
@@ -139,10 +179,12 @@ export async function applyGithubPlatform({ contract, detected, token, fetchImpl
     });
   } catch (error) {
     const mayFallback =
+      requestedSerialization &&
       error instanceof PlatformApiError &&
       [403, 404, 422].includes(error.status) &&
       contract.platform.protection.mergeSerialization === "prefer";
     if (!mayFallback) throw error;
+    stateStore.record("merge queue unavailable");
     payload = githubRulesetPayload(contract, { includeSerialization: false });
     written = await platformApiRequest(fetchImpl, url, {
       body: payload,
@@ -150,9 +192,7 @@ export async function applyGithubPlatform({ contract, detected, token, fetchImpl
       provider: "github",
       token,
     });
-    warnings.push(
-      "GitHub merge queue was unavailable; branch, review, and CI protection remain active.",
-    );
+    warnings.push(serializationWarning);
   }
   stateStore.record("ruleset written");
   const rulesetId = owned?.id ?? written?.id;

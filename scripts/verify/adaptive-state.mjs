@@ -467,6 +467,11 @@ export function classifyPath(inputPath, { productLayout } = {}) {
     categories.push("generated/cache/local-only files");
   }
   if (isActiveDocumentation(filePath)) categories.push("active documentation");
+  if (/\.(?:md|txt)$/u.test(filePath) && !categories.includes("generated/cache/local-only files")) {
+    if (isRepoLocalSkill(filePath)) categories.push("repo-local skill source");
+    if (isContextPolicy(filePath)) categories.push("context documentation");
+    return categories;
+  }
   if (isContextPolicy(filePath)) categories.push("context source-policy surface");
   if (isImageQualityPolicy(filePath)) categories.push("image quality surface");
   if (isCodexRuntimeConfig(filePath)) categories.push("project Codex config");

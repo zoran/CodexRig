@@ -8,8 +8,8 @@ imposing a product stack.
 ## Start
 
 Provide a current Node.js bootstrap, Git, Bash, ripgrep, ShellCheck and the system archive tool. The
-launcher installs reviewed Mise, Codex and locked project runtimes inside the repository; it does
-not update host installations. Run from the repository root:
+launcher installs reviewed Mise, Codex and locked project runtimes in managed user storage, with
+project-private accounts and tracked tool pins. Run from the repository root:
 
 ```bash
 bash scripts/setup/start-codex.sh
@@ -28,7 +28,11 @@ For permission boundaries, session recovery and agent inheritance, see
 [Session Start](instructions.md#session-start) and
 [Effective Permissions](instructions.md#effective-permissions-and-write-isolation).
 
-The launcher maintains compatible tools and dependencies before opening native Codex resume. See
+The launcher runs `maintain-toolchain.mjs --startup` to discover releases and maintain compatible
+tools and dependencies before opening native Codex resume. `--locked` belongs to separate frozen
+preparation and CI; replacing the launcher's call with it disables update discovery. The portable
+`node --test scripts/setup/codex-launcher.test.mjs` check exercises the actual launcher invocation
+without refreshing tools or dependencies. See
 [Dependency Installation And Freshness](instructions.md#dependency-installation-and-freshness) for
 maintenance behavior and failure handling, and
 [Startup Repository Reconstruction](instructions.md#startup-repository-reconstruction) for recovery.
@@ -52,9 +56,10 @@ bash scripts/setup/run-project.sh pnpm framework:doctor -- --online
 ```
 
 CI and reproducible setup use `node scripts/deps/maintain-toolchain.mjs --locked` to install only
-the reviewed tool pins and frozen dependency graph. CI runs in disposable containers; source-only
-compatibility experiments explicitly prepare a declared candidate in their disposable checkout. They
-retain the full verification and release checks.
+the reviewed tool pins and frozen dependency graph. For storage migration, its online stage prepares
+the final destination's required rebuild before reproducing the unchanged graph offline. CI runs in
+disposable containers; source-only compatibility experiments explicitly prepare a declared candidate
+in their disposable checkout. They retain the full verification and release checks.
 
 If startup reports an invalid or unsupported private session lease, exit every Codex session using
 this framework. Run the reset owner directly with the read-only Node bootstrap, because the normal
@@ -120,7 +125,7 @@ pnpm compatibility:matrix
 pnpm worktree:status -- --json
 bash scripts/setup/run-project.sh <command> [arguments] # project environment, then mise exec --locked
 pnpm verify:changed -- --print-plan
-pnpm verify
+pnpm verify                             # explicit complete verification; publication invokes it
 pnpm handover:create -- --critical       # terminal critical-capacity seal
 pnpm project:export -- --name "<Project Name>"
 pnpm framework:reset
@@ -128,12 +133,17 @@ pnpm framework:reset --apply
 pnpm framework:publish --message "<commit message>"  # authorized publication, including inside Codex
 ```
 
-Verification reuses successful evidence for unchanged source and the same effective toolchain.
-`verify:changed -- --print-plan` reports the selected checks and the reason before executing them.
-After failure, `pnpm verify:changed -- --check <key>` reproduces one registered check without
-recording acceptance; native Node checks also accept `--test-name-pattern <pattern>`. The runner
-reports each active check and its duration. Changed relevant source, tests, dependencies, controls
-or tools invalidate evidence. Use the project wrapper to keep the toolchain consistent.
+`verify:changed` runs development checks only; a new test, changed plan or missing complete basis
+never starts a full suite. The publisher bundles complete coverage once on the finished integrated
+state. A manual `pnpm verify`, publisher retries and pre-push reuse the same existing evidence.
+Successful individual checks survive failure and bind relevant source, commands, dependencies and
+the effective toolchain. Documentation and proven comment/format-only edits select lightweight
+checks. Reviews, audits, handoffs and resume do not trigger test repetition.
+`verify:changed -- --print-plan` reports the selected checks and the reason without executing them.
+For an unresolved failure, `pnpm verify:changed -- --check <key>` reproduces one registered check
+without recording acceptance; native Node checks also accept `--test-name-pattern <pattern>`. The
+runner reports each active check and its duration. Changed relevant source, tests, dependencies,
+controls or tools invalidate evidence. Use the project wrapper to keep the toolchain consistent.
 
 The handover command requires a current critical-capacity decision under
 [Capacity Admission And Monitoring](instructions.md#capacity-admission-and-monitoring); historical
@@ -191,15 +201,19 @@ this source repository `project:publish` is an alias for the framework publisher
 ## Project Accounts
 
 [Repository-local isolation](instructions.md#repository-local-tool-and-account-isolation) owns the
-account boundary and future tool admission. Private tool home, configuration, installations, caches
-and temporary state live under `.auth/project-tools/`; native Codex state remains in the root
-`CODEX_HOME`. These paths are excluded from Git, context, generation and transfer. Login commands
-must run through `bash scripts/setup/run-project.sh`; existing project credentials remain private.
+account boundary and future tool admission. Private account home/configuration and temporary command
+state live under `.auth/project-tools/`; native Codex state remains in the root `CODEX_HOME`.
+Reusable installations use separate user storage; see
+[Repository Housekeeping](#repository-housekeeping) for locations and retention. Private state is
+excluded from Git, context, generation and transfer. Login commands run through
+`bash scripts/setup/run-project.sh` with the project's private accounts.
 
 Persistent public tool settings belong in the project-private Mise configuration at
 `.auth/project-tools/config/mise/config.toml`. The normal project wrapper loads them before
 verification and publication. Prepare required SDKs or test runtimes once through their product
-setup owner; use defaults that preserve explicit tool selections. Verification never installs them.
+setup owner; separate shared payloads from private accounts/device state and preserve explicit tool
+selections. Verification never installs them. Installation migration and retirement use the existing
+dependency and storage owners below; login state is not part of that cleanup.
 
 Commit author names and email addresses use project Git configuration first. When a value is
 missing, publication reads only `user.name` and `user.email` from the operating-system user's
@@ -243,12 +257,54 @@ command history or source control. Git's SSH transport uses the project home's `
 `.ssh/known_hosts`, with host SSH configuration and agents disabled. Other authentication adapters
 must meet the same boundary before use.
 
+Platform-policy apply locks original-state inventory and its dependent writes together. A failed
+mutation preserves reconciliation state and reports its request stage. On an explicit retry, GitHub
+recovery validates the complete original ruleset before another write; a still-unknown creation
+blocks a duplicate create. Follow
+[failure recovery](instructions.md#deployment-and-qualification-failure-recovery); an HTTP 503 or
+lost response alone does not establish that a write failed to apply.
+
 ## Repository Housekeeping
 
 Run `bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply` for repository
 maintenance. See
 [closure and housekeeping](instructions.md#completed-goal-closure-and-repository-housekeeping) for
 its required order, preservation boundaries and source-version reconciliation.
+
+Manifests, lockfiles, tool pins and checksums stay tracked in the repository. Installed Node.js,
+pnpm, Mise runtimes and native bundles use the OS user's `~/.local/share/project-tools/`; download
+and browser caches use `~/.cache/project-tools/`. pnpm shares package graphs in user storage, with
+resolution links and metadata in `node_modules` (CI may use pnpm's disposable local layout).
+`PROJECT_TOOL_STORAGE_HOME` relocates only tool storage, never accounts.
+
+Toolchain startup and pinned maintenance require at least 2 GiB available on each filesystem used
+for the repository, shared installations and package caches before staging or downloads. Filesystem
+percentages are informational. Below that minimum, the existing storage owner collects unused local
+Docker build cache once toward 3 GiB, then measures again. Restoring the 2 GiB minimum admits work;
+the higher cleanup target is not a startup gate. Failed collection or a still insufficient reserve
+stops installation. Full housekeeping first reclaims safe managed scratch and unused tool storage.
+
+For disk growth, use `bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --storage-only`.
+It reports allocated bytes in scratch, `.auth/` and its tool subdirectories, native history/cache
+and operation state without reading credential contents or running product checks. Add `--apply` to
+recover abandoned managed scratch, collect unreferenced shared tool/package versions and expire
+native caches through their existing owners. Canonical startup runs the same tool collectors. Native
+Mise/pnpm project references preserve other projects' pins and package graphs. Shared references
+accept exact native and `npm:pnpm` pins; each project retains its own executable admission. Tracked
+private Mise configurations retain shared runtime versions without being read or evaluated by
+another project's collector. Independent package, cache and scratch collectors continue. Framework
+and generated children use the same installation lifecycle lock. Quiescence and observed runtime use
+gate retirement of replaced repository installations. Migration repairs permissive legacy
+tool-directory modes only below verified private parents. Large unmanaged scratch and unresolved
+ownership remain visible failures; the command never empties `.tmp/` or `.auth/` wholesale. The
+wrapper, verifier commands and canonical sessions clean their own temporary scopes on exit and
+recover safe abandoned scopes on later runs. Load tests invoke installed runtimes instead of copying
+Node/Python or browser distributions for each run or replica; recovery retains compact checkpoints
+and runtime references. Playwright/Puppeteer browser payloads use shared user caches via the common
+environment, while profiles and account state stay private. Browser managers own version retirement;
+housekeeping does not download browsers or guess which versions a project needs. Existing unmarked
+output and mutable device/operation data require their producer's reconciliation; see
+[temporary storage](instructions.md#temporary-data-and-storage-housekeeping).
 
 ## Documentation Context Economy
 

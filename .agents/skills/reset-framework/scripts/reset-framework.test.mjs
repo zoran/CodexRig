@@ -103,11 +103,13 @@ function currentVerificationEvidence(root) {
       },
       runtimeDigest: digest("1"),
       sourceCommit: "",
+      sourceFiles: [],
     },
     { complete: false, dirtyPaths: [], head: "" },
     "2026-08-22T00:00:00.000Z",
   );
   writeVerificationEvidence(root, record);
+  assert.deepEqual(readVerificationEvidence(root), record);
   return record;
 }
 

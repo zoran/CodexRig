@@ -9,7 +9,7 @@ function usage() {
   console.log(`Usage: node scripts/verify/adaptive.mjs [options]
 
 Options:
-  --mode <repo|full|pre-push>        Verification entry point. Default: repo.
+  --mode <repo|full|pre-push>        Development, publication, or evidence-only entry. Default: repo.
   --target-environment <target>      Delivery evidence target: dev, staging, or prod. Default: dev.
   --artifact-manifest <path>         Required for staging/prod; the verifier hashes its bound files.
   --print-plan                       Print selected checks without running them.

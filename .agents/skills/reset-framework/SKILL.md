@@ -34,7 +34,8 @@ When publication guidance is part of the requested handoff, follow the command-s
 [Verification](../../../instructions.md#verification): confirm the current package script and README
 invocation, name its commit/push effects and ownership gate, and give the combined command. If
 publication is not authorized, explain that running it is the operator's explicit publication
-choice; do not silently substitute only reset steps. The `mise` prefix selects the declared runtime.
+choice; do not silently substitute only reset steps. The project-command wrapper selects the
+declared runtime and isolated account environment.
 
 For an explicitly reset-only/local outcome or a diagnosed recovery need, use the deterministic reset
 boundary and explain why publication is outside that action:
@@ -87,10 +88,12 @@ runtime state, so generation never invokes reset or requires the source work cac
    and source residue without deleting the verified calling session. Full reset still removes
    private runtime only after sessions exit.
 6. Run the reset preview again. After applicable reviews, the publication workflow invokes adaptive
-   `pnpm verify` admission once. The publication orchestrator repeats the applicable cleanup and
-   preview after verification while retaining exact verification evidence. Source pre-push runs the
-   read-only publication baseline: live caller runtime is allowed, source residue and competing
-   writers are not.
+   `pnpm verify` admission once on the finished integrated state. Do not run a preliminary full
+   suite for reset, review or handoff. Manual verification and publisher retries reuse the same
+   successful per-check evidence, including unaffected results from a failed attempt. The
+   publication orchestrator repeats the applicable cleanup and preview after verification while
+   retaining exact verification evidence. Source pre-push runs the read-only publication baseline:
+   live caller runtime is allowed, source residue and competing writers are not.
 7. Commit or push only when the user explicitly requested those mutations. Project generation never
    performs them or clears source context. When an active Codex process owns runtime, do not delete
    open SQLite databases or WAL files from inside that process.

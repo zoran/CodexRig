@@ -98,6 +98,8 @@ export async function configurePlatform({
   const stateStore = platformConfigurationState(root, plan);
   const adapter = detected.provider === "github" ? applyGithubPlatform : applyGitlabPlatform;
   try {
+    // The inventory determines mutation identities and must share their serialization boundary.
+    stateStore.acquire();
     const result = await adapter({
       contract: validatedContract,
       detected,

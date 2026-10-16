@@ -3,6 +3,7 @@ import { existsSync, lstatSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { userToolPaths } from "../repository/user-tool-storage.mjs";
 import { isProjectManagedExecutable } from "../repository/project-tool-executables.mjs";
 
 function pathIsInside(root, candidate) {
@@ -13,16 +14,22 @@ function pathIsInside(root, candidate) {
   );
 }
 
+function ownedRuntimePath(root, candidate) {
+  return pathIsInside(root, candidate) || pathIsInside(userToolPaths().root, candidate);
+}
+
 export function canonicalRuntimeExecutable(root, requestedExecutable, label) {
   if (!path.isAbsolute(requestedExecutable)) {
     throw new Error(`${label} executable path must be absolute.`);
   }
   const canonicalRoot = realpathSync.native(root);
   if (
-    pathIsInside(canonicalRoot, path.resolve(requestedExecutable)) &&
+    ownedRuntimePath(canonicalRoot, path.resolve(requestedExecutable)) &&
     !isProjectManagedExecutable(canonicalRoot, requestedExecutable)
   ) {
-    throw new Error(`${label} executable path must remain outside the writable project root.`);
+    throw new Error(
+      `${label} executable path must remain outside the writable project root and unadmitted user-tool storage.`,
+    );
   }
   const executable = realpathSync.native(requestedExecutable);
   const stats = lstatSync(executable);
@@ -30,10 +37,12 @@ export function canonicalRuntimeExecutable(root, requestedExecutable, label) {
     throw new Error(`${label} executable must resolve to an executable regular file.`);
   }
   if (
-    pathIsInside(canonicalRoot, executable) &&
+    ownedRuntimePath(canonicalRoot, executable) &&
     !isProjectManagedExecutable(canonicalRoot, executable)
   ) {
-    throw new Error(`${label} executable must remain outside the writable project root.`);
+    throw new Error(
+      `${label} executable must remain outside the writable project root and unadmitted user-tool storage.`,
+    );
   }
   return executable;
 }
@@ -47,12 +56,14 @@ export function startupExecutableSearchPath(root, value = "") {
     if (!existsSync(resolved)) continue;
     const canonical = realpathSync.native(resolved);
     if (!lstatSync(canonical).isDirectory()) continue;
+    if (ownedRuntimePath(canonicalRoot, resolved) && resolved !== canonical) continue;
     if (
-      pathIsInside(canonicalRoot, canonical) &&
+      ownedRuntimePath(canonicalRoot, canonical) &&
       !["mise", "codex", "node", "pnpm"].some((name) => {
         const executable = path.join(canonical, name);
         return (
           existsSync(executable) &&
+          path.dirname(realpathSync.native(executable)) === canonical &&
           isProjectManagedExecutable(canonicalRoot, realpathSync.native(executable))
         );
       })

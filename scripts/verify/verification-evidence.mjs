@@ -14,7 +14,6 @@ import {
   normalizedVerificationGitBasis,
 } from "./verification-git-basis.mjs";
 import {
-  changedVerificationRisks,
   normalizedVerificationRiskFingerprints,
   verificationRiskFingerprint,
   verificationRiskForPath,
@@ -25,8 +24,10 @@ import { resolveDeliveryArtifactBinding } from "./delivery-artifact.mjs";
 import {
   fullVerificationEvidenceRecord,
   refreshedVerificationEvidenceRecord,
+  checkpointVerificationEvidenceRecord,
 } from "./verification-evidence-record.mjs";
 import { canonicalJson, digest } from "./verification-record-helpers.mjs";
+import { executableFingerprint } from "./verification-source-inputs.mjs";
 import { failVerificationEvidence as fail } from "./verification-evidence-error.mjs";
 import {
   readVerificationEvidence as readEvidence,
@@ -80,7 +81,16 @@ function normalizedBroadPlan(broadPlan) {
     if (!command || typeof command !== "object" || Array.isArray(command)) {
       fail(`Verification evidence broad command ${index + 1} is invalid.`);
     }
-    const { args, artifactOwners = [], executable, key, phase } = command;
+    const {
+      args,
+      artifactOwners = [],
+      executable,
+      key,
+      phase,
+      diagnosticAfterMs = 300000,
+      cancellable = false,
+      coveredTestPaths = [],
+    } = command;
     if (
       typeof key !== "string" ||
       !/^[a-z0-9][a-z0-9:_-]*$/.test(key) ||
@@ -89,6 +99,11 @@ function normalizedBroadPlan(broadPlan) {
       executable.length > 1_024 ||
       /[\0\r\n]/.test(executable) ||
       !allowedPlanPhases.has(phase) ||
+      !Number.isSafeInteger(diagnosticAfterMs) ||
+      diagnosticAfterMs <= 0 ||
+      typeof cancellable !== "boolean" ||
+      !Array.isArray(coveredTestPaths) ||
+      coveredTestPaths.some((file) => typeof file !== "string" || /[\0\r\n]/u.test(file)) ||
       !Array.isArray(args) ||
       args.length > 256 ||
       args.some(
@@ -114,6 +129,9 @@ function normalizedBroadPlan(broadPlan) {
       executable: executable === process.execPath ? "node" : executable,
       key,
       phase,
+      diagnosticAfterMs,
+      cancellable,
+      coveredTestPaths,
     });
   });
   const uniqueKeys = new Set();
@@ -184,6 +202,7 @@ function fingerprintFiles(root, files) {
   const exact = createHash("sha256").update("verification-exact-v1\0");
   const broad = createHash("sha256").update("verification-broad-v1\0");
   const riskFingerprints = [];
+  const sourceFiles = [];
   let rootManifestContent = "";
   let totalBytes = 0;
   for (const relativePath of files) {
@@ -206,6 +225,13 @@ function fingerprintFiles(root, files) {
     const mode = modeOf(root, relativePath, read.identity);
     const prefix = `${relativePath.length}:${relativePath}\0${mode.toString(8)}\0${read.bytes}\0`;
     exact.update(prefix).update(read.buffer).update("\0");
+    sourceFiles.push({
+      path: relativePath,
+      fingerprint: digest(`${mode}\0${digest(read.buffer)}`),
+      semanticFingerprint: digest(
+        `${mode & 0o111}\0${executableFingerprint(root, relativePath, read.buffer)}`,
+      ),
+    });
     const risk = verificationRiskForPath(relativePath);
     if (risk) {
       broad.update(prefix).update(read.buffer).update("\0");
@@ -225,6 +251,7 @@ function fingerprintFiles(root, files) {
       ),
     ),
     rootManifestContent,
+    sourceFiles,
   };
 }
 
@@ -319,6 +346,7 @@ export function readSuccessfulVerificationBasis({
 } = {}) {
   try {
     const record = readEvidence(root);
+    if (!record.current) throw new Error("Publication coverage has not yet been completed.");
     if (broadPlan !== undefined && planDigest(broadPlan) !== record.current.planDigest) {
       throw new Error("Successful verification command plan changed.");
     }
@@ -347,6 +375,58 @@ export function readSuccessfulVerificationBasis({
       trusted: false,
     });
   }
+}
+
+export function readVerificationCheckpoint({ root = defaultRoot } = {}) {
+  try {
+    const record = readEvidence(root);
+    return { checks: record.checks, sourceFiles: record.observedFiles };
+  } catch {
+    return { checks: [], sourceFiles: [] };
+  }
+}
+
+/** Persist independent successes even after failure, only for the unchanged execution snapshot. */
+export function recordVerificationCheckpoint({
+  root = defaultRoot,
+  checks,
+  expectedInputs,
+  expectedGitBasis,
+  broadPlan,
+  runtimeIdentity,
+  deliveryEnvironment = "dev",
+  artifactManifest = "",
+  failed = false,
+}) {
+  const inputs = currentVerificationEvidenceInputs({
+    root,
+    broadPlan,
+    runtimeIdentity,
+    deliveryEnvironment,
+    artifactManifest,
+  });
+  const gitBasis = captureVerificationGitBasis({ repositoryRoot: root });
+  if (!sameInputs(inputs, expectedInputs) || !sameGitBasis(gitBasis, expectedGitBasis))
+    fail(
+      "Repository, Git basis, plan, or runtime changed during verification; results were not recorded.",
+    );
+  let previous;
+  try {
+    previous = readEvidence(root);
+  } catch {
+    previous = null;
+  }
+  if (failed && previous?.current?.fingerprint === inputs.exactFingerprint) previous = null;
+  publishEvidence({
+    root,
+    record: checkpointVerificationEvidenceRecord(previous, checks, inputs.sourceFiles),
+    inputs,
+    gitBasis,
+    broadPlan,
+    runtimeIdentity,
+    deliveryEnvironment,
+    artifactManifest,
+  });
 }
 
 export function recordSuccessfulFullEvidence({
@@ -378,9 +458,14 @@ export function recordSuccessfulFullEvidence({
   if (!sameInputs(current, expectedInputs) || !sameGitBasis(gitBasis, expectedGitBasis)) {
     fail("Repository, Git basis, plan, or runtime changed during complete verification.");
   }
+  const checkpoint = readVerificationCheckpoint({ root });
   publishEvidence({
     root,
-    record: fullVerificationEvidenceRecord(current, gitBasis),
+    record: checkpointVerificationEvidenceRecord(
+      fullVerificationEvidenceRecord(current, gitBasis),
+      checkpoint.checks,
+      current.sourceFiles,
+    ),
     inputs: current,
     gitBasis,
     broadPlan,
@@ -391,7 +476,8 @@ export function recordSuccessfulFullEvidence({
   return Object.freeze({ gitBasis, recorded: true, inputs: current });
 }
 
-export function refreshExactAttestationAfterPreflight({
+/** Bind already complete evidence to its committed Git state without accepting source deltas. */
+export function refreshCommittedVerificationEvidence({
   root = defaultRoot,
   broadPlan,
   runtimeIdentity,
@@ -400,35 +486,14 @@ export function refreshExactAttestationAfterPreflight({
   expectedInputs,
   expectedGitBasis,
   expectedBasisToken,
-  successfulCommandKeys,
-  coverage,
 } = {}) {
   try {
     if (!expectedInputs || !expectedGitBasis || !expectedBasisToken) {
-      fail("Changed-path evidence refresh requires its basis and preflight snapshots.");
+      fail("Committed evidence refresh requires its complete basis and current snapshots.");
     }
-    if (
-      !coverage ||
-      coverage.complete !== true ||
-      !Array.isArray(coverage.paths) ||
-      (coverage.paths.length === 0 && coverage.basisChanged !== true) ||
-      coverage.paths.length > maximumSourceFiles ||
-      coverage.paths.some(
-        (item, index) =>
-          typeof item !== "string" ||
-          !item ||
-          /[\0\r\n]/u.test(item) ||
-          coverage.paths.indexOf(item) !== index,
-      ) ||
-      !Array.isArray(coverage.focusedCommandOwners) ||
-      !Array.isArray(coverage.broadRisks)
-    ) {
-      fail("Changed-path evidence refresh requires complete nonempty owner coverage.");
-    }
-    const successful = normalizedSuccessfulCommandKeys(successfulCommandKeys);
     const record = readEvidence(root);
-    if (currentBasisToken(record) !== expectedBasisToken) {
-      fail("Successful verification basis changed during changed-path preflight.");
+    if (!record.current || currentBasisToken(record) !== expectedBasisToken) {
+      fail("Successful verification basis changed during committed evidence refresh.");
     }
     const current = currentVerificationEvidenceInputs({
       root,
@@ -439,96 +504,16 @@ export function refreshExactAttestationAfterPreflight({
     });
     const gitBasis = captureVerificationGitBasis({ repositoryRoot: root });
     if (!sameInputs(current, expectedInputs) || !sameGitBasis(gitBasis, expectedGitBasis)) {
-      fail("Repository, Git basis, plan, or runtime changed during changed-path preflight.");
+      fail("Repository, Git basis, plan, or runtime changed during committed evidence refresh.");
     }
-    if (
-      record.current.planDigest !== current.planDigest ||
-      record.current.runtimeDigest !== current.runtimeDigest
-    ) {
-      return Object.freeze({
-        reason: "broad plan or runtime changed; recompute adaptive admission",
-        refreshed: false,
-      });
+    if (!sameInputs({ ...record.current, exactFingerprint: record.current.fingerprint }, current)) {
+      fail("Git-basis refresh cannot accept changed source, plan, runtime or delivery inputs.");
     }
-    const ownersByPath = new Map();
-    for (const owner of coverage.focusedCommandOwners) {
-      if (
-        !owner ||
-        typeof owner !== "object" ||
-        Array.isArray(owner) ||
-        Object.keys(owner).sort().join("\n") !== "ownerKeys\npath" ||
-        typeof owner.path !== "string" ||
-        !owner.path ||
-        /[\0\r\n]/u.test(owner.path) ||
-        !Array.isArray(owner.ownerKeys) ||
-        owner.ownerKeys.length === 0 ||
-        owner.ownerKeys.some(
-          (key, index) =>
-            typeof key !== "string" ||
-            !/^[a-z0-9][a-z0-9:_-]*$/u.test(key) ||
-            owner.ownerKeys.indexOf(key) !== index,
-        ) ||
-        ownersByPath.has(owner.path)
-      ) {
-        fail("Changed-path evidence contains invalid focused command ownership.");
-      }
-      ownersByPath.set(owner.path, owner.ownerKeys);
+    if (!gitBasis.complete || gitBasis.dirtyPaths.length > 0) {
+      fail("Committed evidence refresh requires a complete clean Git basis.");
     }
-    for (const changedPath of coverage.paths) {
-      const ownerKeys = ownersByPath.get(changedPath);
-      if (!ownerKeys || ownerKeys.some((key) => !successful.has(key))) {
-        return Object.freeze({
-          reason: `changed path ${changedPath} lacks successful focused owner coverage`,
-          refreshed: false,
-        });
-      }
-    }
-    const coveredRiskKeys = new Set();
-    for (const risk of coverage.broadRisks) {
-      if (
-        !risk ||
-        typeof risk !== "object" ||
-        Array.isArray(risk) ||
-        typeof risk.path !== "string" ||
-        !risk.path ||
-        typeof risk.riskId !== "string" ||
-        !/^[a-z0-9][a-z0-9-]*$/u.test(risk.riskId) ||
-        !Array.isArray(risk.ownerKeys) ||
-        risk.ownerKeys.length === 0 ||
-        risk.ownerKeys.some((key) => !successful.has(key))
-      ) {
-        fail("Changed-path evidence contains invalid named-risk coverage.");
-      }
-      coveredRiskKeys.add(`${risk.riskId}\0${risk.path}`);
-    }
-    const uncoveredRisk = changedVerificationRisks(
-      record.current.riskFingerprints,
-      current.riskFingerprints,
-    ).find((risk) => !coveredRiskKeys.has(`${risk.riskId}\0${risk.path}`));
-    if (uncoveredRisk) {
-      return Object.freeze({
-        reason: `named broad risk ${uncoveredRisk.riskId} at ${uncoveredRisk.path} lacks focused coverage`,
-        refreshed: false,
-      });
-    }
-    if (
-      record.current.fingerprint === current.exactFingerprint &&
-      sameGitBasis(record.current.gitBasis, gitBasis)
-    ) {
+    if (sameGitBasis(record.current.gitBasis, gitBasis)) {
       return Object.freeze({ alreadyCurrent: true, inputs: current, refreshed: true });
-    }
-    if (
-      coverage.paths.length === 0 &&
-      (record.current.fingerprint !== current.exactFingerprint ||
-        record.current.broadFingerprint !== current.broadFingerprint ||
-        record.current.planDigest !== current.planDigest ||
-        record.current.runtimeDigest !== current.runtimeDigest ||
-        canonicalJson(record.current.riskFingerprints) !== canonicalJson(current.riskFingerprints))
-    ) {
-      return Object.freeze({
-        reason: "basis-only advancement cannot cover changed repository or runtime inputs",
-        refreshed: false,
-      });
     }
     publishEvidence({
       root,
@@ -554,6 +539,10 @@ export function validateExactCurrentEvidence({
   artifactManifest = "",
 } = {}) {
   const record = readEvidence(root);
+  if (!record.current)
+    fail(
+      "Verification evidence has partial results only; run publication verification before push.",
+    );
   const current = currentVerificationEvidenceInputs({
     root,
     broadPlan,

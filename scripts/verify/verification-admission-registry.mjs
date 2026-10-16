@@ -15,6 +15,7 @@ export function categoryConsumerKeys(categories) {
   const add = (...values) => values.forEach((value) => keys.add(value));
   if (has("active documentation"))
     add("docs", "delivery-environments", "secrets", "language", "path-hygiene");
+  if (has("context documentation")) add("context-policy");
   if (has("script catalog")) add("scripts");
   if (has("context source-policy surface") || has("context workflow")) {
     add("syntax-lint", "scripts", "context-regressions", "patterns");

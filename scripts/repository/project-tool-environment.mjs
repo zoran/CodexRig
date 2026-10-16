@@ -5,6 +5,8 @@ import path from "node:path";
 import process from "node:process";
 import { ensureOwnedDirectoryChain } from "../filesystem/owned-file-operations.mjs";
 import { projectAccountStateDirectory } from "./source-inventory-policy.mjs";
+import { inheritedProjectTemporaryDirectory } from "./project-temporary-storage.mjs";
+import { userToolPaths, prepareMiseTracking } from "./user-tool-storage.mjs";
 
 export const projectToolStateDirectory = `${projectAccountStateDirectory}/project-tools`;
 
@@ -55,7 +57,6 @@ export function projectToolPaths(root) {
     persistent: path.join(state, "state"),
     runtime: path.join(state, "run"),
     temporary: path.join(state, "tmp"),
-    tools: path.join(state, "tools"),
   });
 }
 
@@ -81,6 +82,7 @@ export function prepareProjectToolDirectories(root) {
       throw new Error("Project tool storage must be private and owned by the current developer.");
   }
   assertGitCredentialStore(locations);
+  prepareMiseTracking(root);
   // Umask is process state, not an environment variable. Installers and their descendants
   // must not inherit a host's group/other write allowance; retain stricter caller restrictions.
   process.umask(process.umask() | 0o022);
@@ -115,6 +117,8 @@ function assertGitCredentialStore(locations) {
  */
 export function projectToolEnvironment({ root, inherited = process.env } = {}) {
   const p = projectToolPaths(root);
+  const shared = userToolPaths(inherited);
+  const temporary = inheritedProjectTemporaryDirectory(p.root, p.temporary, inherited);
   const credentialStore = path.join(p.home, ".git-credentials");
   const environment = {};
   for (const [key, value] of Object.entries(inherited)) {
@@ -130,6 +134,7 @@ export function projectToolEnvironment({ root, inherited = process.env } = {}) {
   }
   return {
     ...environment,
+    PROJECT_TOOL_STORAGE_HOME: shared.root,
     HOME: p.home,
     USERPROFILE: p.home,
     APPDATA: p.config,
@@ -139,9 +144,9 @@ export function projectToolEnvironment({ root, inherited = process.env } = {}) {
     XDG_CACHE_HOME: p.cache,
     XDG_STATE_HOME: p.persistent,
     XDG_RUNTIME_DIR: p.runtime,
-    TMPDIR: p.temporary,
-    TMP: p.temporary,
-    TEMP: p.temporary,
+    TMPDIR: temporary,
+    TMP: temporary,
+    TEMP: temporary,
     CODEX_HOME: p.root,
     CLOUDSDK_CONFIG: path.join(p.config, "gcloud"),
     GOOGLE_APPLICATION_CREDENTIALS: path.join(
@@ -213,18 +218,23 @@ export function projectToolEnvironment({ root, inherited = process.env } = {}) {
     MISE_AUTO_UPDATE: "false",
     MISE_NOT_FOUND_SYSTEM_FALLBACK: "false",
     MISE_TRUSTED_CONFIG_PATHS: path.join(p.root, ".codex/mise.toml"),
-    MISE_TMP_DIR: p.temporary,
-    MISE_DATA_DIR: path.join(p.data, "mise"),
-    MISE_CACHE_DIR: path.join(p.cache, "mise"),
+    MISE_TMP_DIR: temporary,
+    MISE_DATA_DIR: shared.miseData,
+    MISE_CACHE_DIR: shared.miseCache,
     MISE_STATE_DIR: path.join(p.state, "mise"),
     NPM_CONFIG_USERCONFIG: path.join(p.config, "npm", "npmrc"),
     NPM_CONFIG_GLOBALCONFIG: path.join(p.config, "npm", "global-npmrc"),
-    NPM_CONFIG_PREFIX: path.join(p.data, "npm"),
-    NPM_CONFIG_CACHE: path.join(p.cache, "npm"),
+    NPM_CONFIG_PREFIX: shared.npmPrefix,
+    NPM_CONFIG_CACHE: shared.npmCache,
     NPM_CONFIG_IGNORE_PNPMFILE: "true",
     PNPM_CONFIG_IGNORE_PNPMFILE: "true",
-    PNPM_CONFIG_STORE_DIR: path.join(p.data, "pnpm", "store"),
-    PNPM_HOME: path.join(p.data, "pnpm"),
+    PNPM_CONFIG_STORE_DIR: shared.pnpmStore,
+    PNPM_CONFIG_CACHE_DIR: shared.pnpmCache,
+    PNPM_HOME: shared.pnpmHome,
+    // Browser distributions are reusable code. Profiles, cookies and downloads remain private
+    // run data; never set userDataDir or a browser account home to these shared directories.
+    PLAYWRIGHT_BROWSERS_PATH: shared.playwrightBrowsers,
+    PUPPETEER_CACHE_DIR: shared.puppeteerCache,
     GRADLE_USER_HOME: path.join(p.data, "gradle"),
     ANDROID_USER_HOME: path.join(p.data, "android"),
     ADB_VENDOR_KEYS: path.join(p.config, "android", "adbkey"),

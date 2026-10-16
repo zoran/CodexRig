@@ -14,7 +14,7 @@ import {
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { after, test } from "node:test";
+import { after, before, test } from "node:test";
 import { pathToFileURL } from "node:url";
 import { serializeCanonicalJson, sha256 } from "../filesystem/repository-files.mjs";
 import {
@@ -57,8 +57,16 @@ import {
 const repositoryRoot = path.resolve(import.meta.dirname, "..", "..");
 const temporaryRoots = [];
 const definitelyStalePid = 2_147_483_647;
+const inheritedStorage = process.env.PROJECT_TOOL_STORAGE_HOME;
+
+// Keep external executable fixtures outside the simulated user's managed tool storage.
+before(() => {
+  process.env.PROJECT_TOOL_STORAGE_HOME = temporaryRoot("codexrig-lifecycle-storage-");
+});
 
 after(() => {
+  if (inheritedStorage === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
+  else process.env.PROJECT_TOOL_STORAGE_HOME = inheritedStorage;
   for (const root of temporaryRoots) rmSync(root, { force: true, recursive: true });
 });
 

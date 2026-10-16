@@ -8,7 +8,6 @@ import {
   VerificationEvidenceError,
   readSuccessfulVerificationBasis,
   recordSuccessfulFullEvidence,
-  refreshExactAttestationAfterPreflight,
   verificationEvidenceCachePath,
 } from "./verification-evidence.mjs";
 import { omitAlreadyCoveredPaths } from "./verification-admission.mjs";
@@ -56,29 +55,18 @@ test("full evidence requires every command in the admitted broad plan to succeed
   }
 });
 
-test("focused owner coverage advances exact-current evidence without another broad run", () => {
-  const root = fixture();
-  record(root);
-  const initial = validate(root).record;
-  writeFileSync(path.join(root, "docs/project.md"), "# Focused documentation change\n", "utf8");
-  const result = refresh(root);
-  assert.equal(result.refreshed, true, result.reason);
-  const current = validate(root).record;
-  assert.equal(current.transitionCount, 1);
-  assert.deepEqual(current.foundation, initial.foundation);
-  assert.notEqual(current.current.fingerprint, initial.current.fingerprint);
-});
-
-test("an unrelated successful command cannot cover a changed path", () => {
-  const root = fixture();
-  record(root);
-  writeFileSync(path.join(root, "docs/project.md"), "# Needs its owner\n", "utf8");
-  const result = refresh(root, inputs(root), {
-    successfulCommandKeys: [broadPlan[1].key],
-  });
-  assert.equal(result.refreshed, false);
-  assert.match(result.reason, /lacks successful focused owner coverage/u);
-  assert.throws(() => validate(root), VerificationEvidenceError);
+test("Git-basis refresh cannot accept documentation or verifier source deltas", () => {
+  for (const relativePath of ["docs/project.md", "scripts/verify/adaptive.mjs"]) {
+    const root = fixture();
+    record(root);
+    const initial = readFileSync(verificationEvidenceCachePath(root));
+    writeFileSync(path.join(root, relativePath), "// Unverified changed content\n", "utf8");
+    const result = refresh(root);
+    assert.equal(result.refreshed, false);
+    assert.match(result.reason, /cannot accept changed source, plan, runtime or delivery inputs/u);
+    assert.deepEqual(readFileSync(verificationEvidenceCachePath(root)), initial);
+    assert.throws(() => validate(root), VerificationEvidenceError);
+  }
 });
 
 test("committing attested dirty content advances only the Git basis without verifier coverage", () => {
@@ -120,70 +108,8 @@ test("committing attested dirty content advances only the Git basis without veri
     }).paths,
     ["docs/project.md", "unexpected/unattested-path"],
   );
-  const result = refresh(root, expectedInputs, {
-    basisChanged: true,
-    focusedCommandOwners: [],
-    paths: [],
-    successfulCommandKeys: [],
-  });
+  const result = refresh(root, expectedInputs);
   assert.equal(result.refreshed, true, result.reason);
-  assert.equal(validate(root).valid, true);
-});
-
-test("changed repository state cannot advance without complete path ownership", () => {
-  const root = fixture();
-  record(root);
-  writeFileSync(path.join(root, "docs/project.md"), "# Uncovered\n", "utf8");
-  const expectedInputs = inputs(root);
-  const expectedGitBasis = captureVerificationGitBasis({ repositoryRoot: root });
-  const basis = readSuccessfulVerificationBasis({ broadPlan, root });
-  const lock = acquireVerificationSessionLock({ repositoryRoot: root });
-  try {
-    const result = refreshExactAttestationAfterPreflight({
-      root,
-      broadPlan,
-      coverage: {
-        basisChanged: true,
-        broadRisks: [],
-        complete: true,
-        focusedCommandOwners: [],
-        paths: expectedGitBasis.dirtyPaths,
-      },
-      expectedBasisToken: basis.token,
-      expectedGitBasis,
-      expectedInputs,
-      runtimeIdentity,
-      successfulCommandKeys: [],
-    });
-    assert.equal(result.refreshed, false);
-    assert.match(result.reason, /lacks successful focused owner coverage/u);
-  } finally {
-    lock.release();
-  }
-});
-
-test("named broad-risk changes require their successful focused owner", () => {
-  const root = fixture();
-  record(root);
-  writeFileSync(
-    path.join(root, "scripts/verify/adaptive.mjs"),
-    "export const changedAdmission = true;\n",
-    "utf8",
-  );
-  const uncovered = refresh(root);
-  assert.equal(uncovered.refreshed, false);
-  assert.match(uncovered.reason, /named broad risk adaptive-entrypoint/u);
-
-  const covered = refresh(root, inputs(root), {
-    broadRisks: [
-      {
-        ownerKeys: [broadPlan[0].key],
-        path: "scripts/verify/adaptive.mjs",
-        riskId: "adaptive-entrypoint",
-      },
-    ],
-  });
-  assert.equal(covered.refreshed, true, covered.reason);
   assert.equal(validate(root).valid, true);
 });
 
@@ -209,6 +135,15 @@ test("broad plan and tool-runtime drift invalidate successful evidence", () => {
     () => validate(root, { runtimeIdentity: { ...runtimeIdentity, node: "fixture-node-next" } }),
     (error) =>
       error instanceof VerificationEvidenceError && error.findings.includes("tool runtime changed"),
+  );
+  assert.throws(
+    () =>
+      validate(root, {
+        broadPlan: broadPlan.map((command) => ({ ...command, diagnosticAfterMs: 1000 })),
+      }),
+    (error) =>
+      error instanceof VerificationEvidenceError &&
+      error.findings.includes("broad command plan changed"),
   );
 });
 

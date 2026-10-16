@@ -78,6 +78,10 @@ that successfully sealed a terminal critical handover may never receive it or ac
 
 ## Continue And Close Truthfully
 
+Resume reconstructs source and evidence; it is not a reason to repeat tests. Reuse unchanged
+successful checks through the existing verification store and rerun only affected inputs or an
+unresolved finding. Missing complete publication coverage does not start a development full run.
+
 Use `$project-implementation` for the recovered implementation and `$task-quality` at its real
 acceptance boundary. Recovery is not completion; unresolved integration, ownership, publication or
 policy-required post-exit cleanup remains an explicit blocker; do not infer an extra cleanup task.

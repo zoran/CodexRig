@@ -167,6 +167,7 @@ export function inspectLinuxOpenRepositoryPaths({
   root,
   matchesPath,
   excludePids = [process.pid],
+  includeRuntimePaths = false,
   procRoot = "/proc",
   testHooks = {},
 }) {
@@ -179,6 +180,15 @@ export function inspectLinuxOpenRepositoryPaths({
   const readDirectory = testHooks.readDirectory ?? readdirSync;
   const readLink = testHooks.readLink ?? readlinkSync;
   const readStats = testHooks.readStats ?? statSync;
+  const readText = testHooks.readText ?? ((file) => readFileSync(file, "utf8"));
+  const matchesTarget = (target) => {
+    target = target.replace(/ \(deleted\)$/u, "");
+    return (
+      path.isAbsolute(target) &&
+      pathIsInside(root, target) &&
+      matchesPath(path.relative(root, target).split(path.sep).join("/"))
+    );
+  };
   const processIsBoundToRoot = (processPath) => {
     try {
       return pathIsInside(
@@ -205,6 +215,30 @@ export function inspectLinuxOpenRepositoryPaths({
     try {
       if (typeof process.getuid === "function" && readStats(processPath).uid !== process.getuid()) {
         continue;
+      }
+      if (includeRuntimePaths) {
+        // Executables and mapped libraries need not have an open descriptor. In particular a
+        // running Node/Python must keep its installation even after startup closed the binary.
+        for (const name of ["cwd", "exe"])
+          if (matchesTarget(readLink(path.join(processPath, name))))
+            return Object.freeze({ observationComplete, status: "active" });
+        const maps = readText(path.join(processPath, "maps"));
+        if (maps.length > 4 * 1024 * 1024) {
+          observationComplete = false;
+          continue;
+        }
+        for (const line of maps.split("\n")) {
+          const target = /^\S+(?:\s+\S+){4}\s+(.*)$/u.exec(line)?.[1];
+          if (
+            target &&
+            matchesTarget(
+              target.replace(/\\([0-7]{3})/gu, (_, value) =>
+                String.fromCharCode(parseInt(value, 8)),
+              ),
+            )
+          )
+            return Object.freeze({ observationComplete, status: "active" });
+        }
       }
       for (const descriptor of readDirectory(path.join(processPath, "fd"))) {
         let target;

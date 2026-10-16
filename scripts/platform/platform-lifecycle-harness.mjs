@@ -160,3 +160,26 @@ export function gitlabHarness({
     },
   };
 }
+
+export function githubDetection() {
+  return {
+    hostname: "github.com",
+    integrationBranch: "main",
+    provider: "github",
+    remoteName: "origin",
+    slug: "owner/project",
+    source: "git-remote",
+  };
+}
+
+export function gitlabDetection(overrides = {}) {
+  return {
+    hostname: "gitlab.com",
+    integrationBranch: "main",
+    provider: "gitlab",
+    remoteName: "origin",
+    slug: "group/project",
+    source: "git-remote",
+    ...overrides,
+  };
+}

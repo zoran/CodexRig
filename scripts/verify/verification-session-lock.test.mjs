@@ -152,6 +152,30 @@ test("cancelling a consumed delegation preserves the durable owner record", (t) 
   }
 });
 
+test("lifecycle inspection preserves absent state and rejects hardlinked owner records", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "verification-inspection-safety-"));
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  assert.equal(inspectRuntimeLifecycleLock({ root }).status, "absent");
+  assert.equal(existsSync(path.join(root, ".codex")), false);
+  const owner = acquireRuntimeLifecycleLock({ root, operation: "verification" });
+  const target = inspectRuntimeLifecycleLock({ root }).path;
+  const alias = path.join(root, "owner-alias");
+  const bytes = readFileSync(target);
+  try {
+    linkSync(target, alias);
+    assert.throws(
+      () => inspectRuntimeLifecycleLock({ root }),
+      /refused hardlinked Codex runtime lifecycle lock/u,
+    );
+    assert.deepEqual(readFileSync(target), bytes);
+    assert.equal(lstatSync(target).nlink, 2);
+    assert.equal(existsSync(path.join(root, ".codex/runtime/codexrig-lifecycle.update")), false);
+  } finally {
+    rmSync(alias, { force: true });
+    releaseRuntimeLifecycleLock({ root, owner });
+  }
+});
+
 test("--hold preserves stdin and resolves commands through the sanitized PATH", (t) => {
   const repositoryRoot = mkdtempSync(path.join(os.tmpdir(), "verification-held-command-"));
   t.after(() => rmSync(repositoryRoot, { force: true, recursive: true }));
@@ -397,57 +421,66 @@ test(
   },
 );
 
-test("a live atomic publisher keeps competing lifecycle transitions outside its mutex", async (t) => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "verification-mutex-contenders-"));
-  const runtime = path.join(root, ".codex", "runtime");
-  mkdirSync(runtime, { mode: 0o700, recursive: true });
-  const publisher = await pauseMutexPublication(t, root, "after-link");
-  const mutexUrl = new URL("../repository/runtime-lifecycle-mutex.mjs", import.meta.url).href;
-  const contender = spawn(
-    process.execPath,
-    [
-      "--input-type=module",
-      "--eval",
-      `
+for (const contenderMode of ["transition", "inspection"]) {
+  test(`a live atomic publisher keeps a competing lifecycle ${contenderMode} outside its mutex`, async (t) => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "verification-mutex-contenders-"));
+    const runtime = path.join(root, ".codex", "runtime");
+    mkdirSync(runtime, { mode: 0o700, recursive: true });
+    const publisher = await pauseMutexPublication(t, root, "after-link");
+    const mutexUrl = new URL("../repository/runtime-lifecycle-mutex.mjs", import.meta.url).href;
+    const lifecycleUrl = new URL("../repository/runtime-session-lease.mjs", import.meta.url).href;
+    const contender = spawn(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        `
     import { writeFileSync } from "node:fs";
     const { withRuntimeLifecycleUpdateMutex } = await import(${JSON.stringify(mutexUrl)});
+    const { inspectRuntimeLifecycleLock } = await import(${JSON.stringify(lifecycleUrl)});
     const originalWait = Atomics.wait;
     let observed = false;
     Atomics.wait = (...args) => {
       if (!observed) { observed = true; writeFileSync(1, "waiting\\n"); }
       return originalWait(...args);
     };
-    withRuntimeLifecycleUpdateMutex(${JSON.stringify(root)}, () => writeFileSync(1, "entered\\n"));
+    if (${JSON.stringify(contenderMode)} === "inspection") {
+      inspectRuntimeLifecycleLock({ root: ${JSON.stringify(root)} });
+      writeFileSync(1, "entered\\n");
+    } else {
+      withRuntimeLifecycleUpdateMutex(${JSON.stringify(root)}, () => writeFileSync(1, "entered\\n"));
+    }
   `,
-    ],
-    { cwd: root, stdio: ["ignore", "pipe", "pipe"] },
-  );
-  const contenderClosed = once(contender, "close");
-  let output = "";
-  let errors = "";
-  contender.stdout.on("data", (chunk) => (output += chunk));
-  contender.stderr.on("data", (chunk) => (errors += chunk));
-  t.after(async () => {
-    if (contender.exitCode === null && contender.signalCode === null) contender.kill("SIGKILL");
-    await contenderClosed;
-    rmSync(root, { force: true, recursive: true });
+      ],
+      { cwd: root, stdio: ["ignore", "pipe", "pipe"] },
+    );
+    const contenderClosed = once(contender, "close");
+    let output = "";
+    let errors = "";
+    contender.stdout.on("data", (chunk) => (output += chunk));
+    contender.stderr.on("data", (chunk) => (errors += chunk));
+    t.after(async () => {
+      if (contender.exitCode === null && contender.signalCode === null) contender.kill("SIGKILL");
+      await contenderClosed;
+      rmSync(root, { force: true, recursive: true });
+    });
+    await waitForLifecycle(() => output.includes("waiting\n"), "live publisher contention");
+    assert.equal(output.includes("entered\n"), false);
+    const target = path.join(runtime, "codexrig-lifecycle.update");
+    assert.equal(lstatSync(target).nlink, 2);
+    const record = JSON.parse(readFileSync(target, "utf8"));
+    assert.equal(record.identity.pid, publisher.child.pid);
+    assert.equal(
+      lstatSync(path.join(runtime, `.codexrig-lifecycle.update.${record.nonce}.tmp`)).nlink,
+      2,
+    );
+    publisher.child.stdin.end("x");
+    assert.deepEqual(await publisher.closed, [0, null], publisher.errors());
+    assert.deepEqual(await contenderClosed, [0, null], errors);
+    assert.equal(output, "waiting\nentered\n");
+    assert.equal(existsSync(target), false);
   });
-  await waitForLifecycle(() => output.includes("waiting\n"), "live publisher contention");
-  assert.equal(output.includes("entered\n"), false);
-  const target = path.join(runtime, "codexrig-lifecycle.update");
-  assert.equal(lstatSync(target).nlink, 2);
-  const record = JSON.parse(readFileSync(target, "utf8"));
-  assert.equal(record.identity.pid, publisher.child.pid);
-  assert.equal(
-    lstatSync(path.join(runtime, `.codexrig-lifecycle.update.${record.nonce}.tmp`)).nlink,
-    2,
-  );
-  publisher.child.stdin.end("x");
-  assert.deepEqual(await publisher.closed, [0, null], publisher.errors());
-  assert.deepEqual(await contenderClosed, [0, null], errors);
-  assert.equal(output, "waiting\nentered\n");
-  assert.equal(existsSync(target), false);
-});
+}
 
 test(
   "malformed, unbound and redirected mutex publications remain blocking and unchanged",

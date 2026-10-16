@@ -61,12 +61,16 @@ export function reconcileHousekeepingVersion({ root, apply, lifecycleCapability 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2).filter((value) => value !== "--");
   if (
-    args.some((value) => !["--apply", "--check", "--online"].includes(value)) ||
+    args.some((value) => !["--apply", "--check", "--online", "--storage-only"].includes(value)) ||
     (args.includes("--apply") && args.includes("--check"))
   )
     throw new Error("Unsupported source housekeeping arguments.");
   await runRepositoryHousekeeping(
-    { apply: args.includes("--apply"), online: args.includes("--online") },
+    {
+      apply: args.includes("--apply"),
+      online: args.includes("--online"),
+      storageOnly: args.includes("--storage-only"),
+    },
     {
       reconcileOwnedState: (options) => {
         reconcileHousekeepingVersion(options);

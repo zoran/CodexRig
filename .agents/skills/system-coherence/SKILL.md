@@ -81,8 +81,9 @@ In authorized repair mode:
    when the new shape actually integrates.
 4. Follow [Current Contracts](../../../instructions.md#current-contracts-only): leave exactly one
    current interpretation, not an old internal reader or dormant bridge.
-5. Run affected owner evidence and the assembled consumer flow, then search again for superseded
-   concepts. Review material repairs to zero relevant findings before the fresh audit.
+5. Reuse valid owner and assembled-flow evidence; run checks only for changed relevant inputs or
+   unresolved findings, then search again for superseded concepts. Review material repairs to zero
+   relevant findings before the fresh audit.
 
 In read-only mode return these remedies as findings, without applying them. Dev scheduling and slice
 acceptance follow

@@ -25,7 +25,16 @@ import {
 } from "../repository/project-tool-executables.mjs";
 import { evaluateAutonomousContinuation } from "../context/session-stop-lifecycle.mjs";
 import { diagnoseTooling } from "./tooling-doctor.mjs";
+import {
+  canonicalRuntimeExecutable,
+  startupExecutableSearchPath,
+} from "./startup-runtime-executables.mjs";
 const roots = [];
+const inheritedStorage = process.env.PROJECT_TOOL_STORAGE_HOME;
+afterEach(() => {
+  if (inheritedStorage === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
+  else process.env.PROJECT_TOOL_STORAGE_HOME = inheritedStorage;
+});
 
 // A permissive host umask must not make newly installed tools writable by another user.
 // Exercise a real descendant: setting HOME or protecting only the storage root is insufficient.
@@ -77,6 +86,9 @@ test("project tool preparation contains inherited file permissions in descendant
 });
 
 function fixture() {
+  const storage = mkdtempSync(path.join(os.tmpdir(), "runtime-tool-storage-"));
+  roots.push(storage);
+  process.env.PROJECT_TOOL_STORAGE_HOME = storage;
   const root = mkdtempSync(path.join(os.tmpdir(), "project-runtime-safety-"));
   roots.push(root);
   mkdirSync(path.join(root, ".codex"));
@@ -226,4 +238,21 @@ test("invalid work state is a diagnostic and cannot manufacture a continuation t
     }),
     {},
   );
+});
+
+test("startup excludes unadmitted shared tool directories and their external aliases", () => {
+  const root = fixture();
+  const storage = process.env.PROJECT_TOOL_STORAGE_HOME;
+  const unselected = path.join(storage, "unselected");
+  mkdirSync(unselected);
+  const executable = path.join(unselected, "node");
+  writeFileSync(executable, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  const external = path.dirname(process.execPath);
+  const alias = path.join(storage, "external-alias");
+  symlinkSync(external, alias, "dir");
+  assert.equal(
+    startupExecutableSearchPath(root, [unselected, alias, external].join(path.delimiter)),
+    external,
+  );
+  assert.throws(() => canonicalRuntimeExecutable(root, executable, "Node"), /unadmitted|writable/u);
 });

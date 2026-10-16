@@ -30,7 +30,7 @@ import {
 const explicitTestConsumerRegistry = new Map(
   Object.entries(readVerificationConfiguration().testConsumers),
 );
-function entryRouting({
+export function entryRouting({
   entry,
   available,
   repositoryRoot,
@@ -38,6 +38,28 @@ function entryRouting({
   workspaceManifests,
 }) {
   const categories = effectiveCategories(entry, { verifyOnlyRootManifest });
+  if (categories.includes("active documentation") && /\.(?:md|txt)$/u.test(entry.path)) {
+    const commands = selectCommands(available, categoryConsumerKeys(categories));
+    return {
+      categories,
+      ownerKeys: commands.map((command) => command.key),
+      readOnlyCommands: commands,
+    };
+  }
+  if (categories.includes("editorial source change")) {
+    const commands = selectCommands(available, [
+      "format",
+      "syntax-lint",
+      "secrets",
+      "language",
+      "patterns",
+    ]);
+    return {
+      categories,
+      ownerKeys: commands.map((command) => command.key),
+      readOnlyCommands: commands,
+    };
+  }
   const commands = [];
   const ownerKeys = new Set();
   const testPath = changedTestPath(entry.path, repositoryRoot);
@@ -160,6 +182,7 @@ function entryRouting({
     categories,
     ownerKeys: [...ownerKeys].sort(),
     readOnlyCommands: commands,
+    workspaceDirectories: selectedWorkspaceManifests.map((manifest) => manifest.directory),
   };
 }
 

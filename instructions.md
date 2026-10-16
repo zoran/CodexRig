@@ -24,8 +24,12 @@ Except for the explicit GitHub/GitLab HTTPS fallback and publication metadata re
 account-bearing tool, CLI, SDK, plugin and subprocess must use the current repository's private
 account and mutable tool state. This applies to existing and future tools, interactive commands,
 startup, maintenance, builds, verification and delivery adapters. Named providers are illustrations,
-never the admission boundary. Shared installed executables may serve as read-only bootstrap; project
-work must not update them or write host or sibling configuration, caches, credentials or accounts.
+never the admission boundary. Reusable installations and package payloads live in the
+operating-system user's storage, selected by `scripts/repository/user-tool-storage.mjs`, not inside
+a repository. Project manifests, lockfiles, exact versions, checksums and setup rules remain tracked
+in the repository. The existing installation owners may populate immutable version directories and
+native package caches shared by this user's projects; they must not update unrelated host programs
+or write host/sibling account configuration, credentials or accounts.
 
 Use `bash scripts/setup/run-project.sh <command> [arguments]` as the external-command entry from a
 host shell; `pnpm project:run -- <command> [arguments]` is its alias inside an isolated session. The
@@ -37,16 +41,32 @@ activate project tools against host storage. Internal subprocess owners reuse th
 not wrap every nested command in another Mise process. The initial installer must establish the same
 environment before invoking Mise itself. Mise version selection or optional sandboxing alone does
 not isolate preparation or native credential stores. Use existing project account owners. Start from
-explicit safe inheritance, with repository-bound home, configuration, data, cache and temporary
-directories. Outside the explicit GitHub/GitLab exception below, do not copy host credentials,
-inherit ambient tokens or agent sockets, silently use a system keyring, follow external
-credential/configuration includes, or fall back to a host/instance identity. Keep private paths out
-of Git, context, generation and transfer; routine reset and housekeeping must preserve accounts.
-Separate current credentials from disposable caches and obsolete installations. Rebind existing
-dependency installations through their package-manager owner when their metadata still points to
-host storage. At successful quiescent startup, retire verified replaced tool bundles and let Mise
-prune unused runtimes; preserve declared secondary pins and every account. Existing project-specific
-identities and deployment approvals retain their original owners.
+explicit safe inheritance, with repository-bound home, configuration and unknown tool state. Only
+explicitly admitted non-account installation/cache paths use user storage. Mise installs and native
+bootstrap bundles use `~/.local/share/project-tools/`; npm/pnpm/Mise caches use
+`~/.cache/project-tools/`. The default home comes from the OS account, never the project-private
+`HOME`. `PROJECT_TOOL_STORAGE_HOME` may relocate this storage under another real developer-owned
+home (for example in isolated integration fixtures); it never changes account discovery. Reject
+linked or foreign-writable storage parents. The common environment also sets
+`PLAYWRIGHT_BROWSERS_PATH` and `PUPPETEER_CACHE_DIR` to separate browser-distribution caches there.
+Install and launch through the same boundary; do not replace these paths with per-run or replica
+directories. Browser profiles, cookies, downloads and persistent login state never belong in these
+shared caches. pnpm's `virtualStoreType: global` keeps package graphs outside the repository, with
+project resolution links and metadata in `node_modules`. pnpm's native CI behavior may use a
+disposable local graph; CI gates and frozen installation remain unchanged. Outside the explicit
+GitHub/GitLab exception below, do not copy host credentials, inherit ambient tokens or agent
+sockets, silently use a system keyring, follow external credential/configuration includes, or fall
+back to a host/instance identity. Keep private paths out of Git, context, generation and transfer;
+routine reset and housekeeping must preserve accounts. Separate current credentials from disposable
+caches and obsolete installations. Mise's native `tracked-configs` references are shared; project
+trust decisions, encrypted environment state and accounts remain private. Cross-project runtime
+collection admits only public, non-executing exact pins.
+[Dependency maintenance](#dependency-installation-and-freshness) owns installation migration;
+[storage housekeeping](#temporary-data-and-storage-housekeeping) owns reference checks and safe
+retirement. Do not move an entire Gradle/Android home or `.auth/` into a common home: these can
+contain credentials and mutable user data. Future SDK/cache adapters must separate reusable payloads
+from per-project account/device state. Existing identities and deployment approvals retain their
+original owners.
 
 Git HTTPS access to the GitHub and GitLab hosts declared in `.codex/tooling.json` first uses the
 private project credential store. If no credential is available, the repository's shared Git
@@ -255,47 +275,12 @@ unblocked slice that can be verified safely. Planning, review, and audit depth m
 complexity and resolve material decisions; they stay useful by focusing on product behavior, owning
 configuration, risks, and evidence rather than process prose or status artifacts.
 
-Use the verification layers deliberately:
-
-1. During implementation, run the narrow owner test or command that gives useful feedback.
-2. Use changed-path routing to cover applicable format, static analysis, documentation/content
-   policy, package or export boundaries, and focused owner, consumer, dependency, and security
-   checks. A workspace package may expose `verify:preflight` as its explicit boundary verifier;
-   routing invokes it only for the affected package owner. A package with stable owned export
-   targets may declare only those subpaths in adjacent `package.exports.json`; unrelated sibling
-   exports remain additive. A cheap defect discovered only by a broader suite is a routing defect;
-   fix that route with the owning change.
-3. Treat any nonzero broad result as diagnosis, never as permission for another complete run.
-   Preserve the result, reproduce it with the smallest responsible verifier, batch every confirmed
-   sibling fix, and recompute missing coverage and admission only at the final repaired state. When
-   a prior successful basis remains safely advanceable, run only the affected focused owners and
-   reuse it. Otherwise collect the complete fix batch before the one remaining broad run; a failure,
-   cache miss, or profile miss alone cannot admit broad work.
-4. At the publication boundary, after the coherent batch, applicable reset, and bounded reviews,
-   invoke `pnpm verify`. This is an adaptive admission entry, not an unconditional full gate. It may
-   select full coverage only for a named uncovered risk: no trusted successful basis, incomplete or
-   unknown classification, a full-relevant path without a focused owner, an explicitly broad-only
-   invariant, or a concrete owner instruction. A force request requires both `--force-full` and a
-   structured `--force-reason "owner-request: <owner-id> - <reason>"` or
-   `"uncovered-risk: <risk-id> - <reason>"`; cache bypass is forbidden.
-
-Repository-owned successful evidence binds the exact Git `HEAD`, the complete dirty/untracked set,
-the command plan, tool environment, and source fingerprints. A current delta is the union of the old
-dirty set, every committed path since the evidence `HEAD`, and the current dirty set, including
-formerly untracked paths that were later deleted. Fully classified green focused owners may advance
-that basis without rerunning an unchanged product suite. Unknown, unowned, incomplete, broad-only,
-or ambiguous coverage fails closed with an exact admission reason; a failed attempt never replaces
-the last successful basis. Before its security and pushed-object checks, pre-push may rebind a
-commit that exactly materializes already-attested dirty content to the new Git basis without running
-any verifier command. Any source, plan, runtime, risk, or unsafe Git-delta change blocks that
-basis-only path and requires normal adaptive verification. This local evidence is a workflow
-performance cache, not a cryptographic attestation or a substitute for protected remote CI and
-branch policy. A process running as the same local user can bypass any repository-owned hook; use an
-external trusted executor when adversarial publication integrity is required.
-
-Keep this mechanism bounded: one replace-in-place successful-evidence record and one verification
-session lock. Do not add per-run receipts, checkpoint chains, or verification history unless a
-measured project-specific need justifies that complexity.
+During implementation, use the narrow check that resolves the current uncertainty. Reviews, handoffs
+and resume consume valid evidence; they do not independently schedule tests. The publisher bundles
+complete coverage on the finished integrated state before push. The single contract for selection,
+reuse, invalidation and forced reruns is
+[Verification Selection And Runtime](#verification-selection-and-runtime); the existing
+[publication gates](#verification-and-publication-gates) own complete acceptance and publication.
 
 ## Task Scope And Completion
 
@@ -370,9 +355,12 @@ Exercise launcher or dependency-maintenance changes in isolated fixtures or a di
 project when their real-target path would refresh product dependencies or exceed the task. Do not
 start the target's normal maintenance launcher as an update smoke test in that case. Frozen
 dependency reproduction is appropriate only when needed for the selected update and must preserve
-the target's manifests and lockfile. Fixture or frozen-install evidence does not establish actual
-target startup. Report an unverified path and any required restart accurately; do not perform
-unrequested product maintenance to obtain a “start-ready” claim.
+the target's manifests and lockfile. Invoke `maintain-toolchain.mjs --locked` separately for that
+preparation; preserve the normal launcher's `--startup` call and its future release checks. A task's
+restricted maintenance scope never authorizes disabling ordinary startup updates. Fixture or
+frozen-install evidence does not establish actual target startup. Report an unverified path and any
+required restart accurately; do not perform unrequested product maintenance to obtain a
+“start-ready” claim.
 
 Apply this boundary before the general verification and closure sequences in these instructions,
 skills and generated guidance. Complete in-scope repairs, evidence and owned cleanup without a
@@ -742,7 +730,7 @@ runtime is preserved until a separate full reset after exit.
    lifecycle lock, preserving manifests and the lockfile. It repeats this derived-state recovery
    even when release mirrors already agree. An interrupted run whose stale installation blocks pnpm
    resumes through
-   `bash scripts/setup/run-project.sh node scripts/goals/repository-housekeeping.mjs --apply`. This
+   `bash scripts/setup/run-project.sh node scripts/framework/source-housekeeping.mjs --apply`. This
    source-only reproduction never requests registry freshness or bypasses the dependency guard.
 3. Complete [Documentation Currency](#documentation-currency) from the slice owner decisions and any
    required critical-document authority and dedicated preservation review. Repeat affected focused
@@ -769,6 +757,94 @@ an active goal. A scheduled finding reports maintenance evidence; it grants no r
 itself. CI never applies or publishes a repair. If housekeeping, publication, or `goal:new` fails,
 keep the current goal and encompassing work state open, continue safe disjoint work, and report the
 concrete authority, integration, safety, or external blocker when no such work remains.
+
+## Temporary Data And Storage Housekeeping
+
+Temporary test fixtures, probes and command intermediates belong under the inherited system
+temporary directory (`os.tmpdir()` / `TMPDIR`), with normal fixture/finally cleanup. The project
+command wrapper, each actual verifier command, canonical session controller and dependency/tool
+staging owners allocate private execution scopes under `.auth/project-tools/tmp/` (native
+shared-bundle staging uses the same owner under the user tool directory), propagate them across
+nested tool environments and remove them after terminal completion. A subsequent execution or
+existing `repo:housekeeping -- --storage-only --apply` recovers abandoned scopes only when the
+recorded repository/directory/process identities match and no consumer remains. Active,
+unobservable, malformed or rebound ownership is retained visibly. Do not direct disposable bulk
+output into persistent `.tmp/`, `tmp/`, a tool home or account state; durable handovers, required
+failure evidence and operation recovery belong at their existing owner.
+
+Load, stress and qualification runners invoke the admitted installed runtime directly
+(`process.execPath`, the configured Mise executable, or `sys.executable`); do not copy Node, Python,
+browser distributions, an SDK, a package store or an entire tool home into each run, replica or
+recovery snapshot. Isolation uses per-run working data and project-private accounts. Declare
+required runtimes once in the exact-pin tool configuration and prepare them through the existing
+installer. Preserve only the bounded diagnostic and checkpoint data required for resume at the
+existing operation/evidence owner before scratch is released; retain tool versions/digests as
+references. Packaging a runtime that is itself the delivered artifact is a separate declared build
+output with its own retention, not permission for per-test copies.
+
+Canonical startup and `repo:housekeeping -- --apply` (also `--storage-only --apply`) invoke the
+dependency owner's native collectors: `mise prune`, `mise cache prune`, `pnpm store prune` without
+force, and npm cache verification when that cache exists. The storage collectors perform no
+installation, upgrade or product tests and never purge the whole cache. Before shared cleanup, every
+extant tracked Mise config must contain only the admitted exact tool pins. Native Mise/pnpm
+references preserve all registered projects' primary/secondary pins and package graphs; the bundle
+installer uses those same references for Mise/Codex retirement. Never prune shared versions from
+only the caller's pins. Running executables, mapped libraries and indeterminate consumers retain
+their bundles. Successful installation and absent repository sessions plus runtime-consumer checks
+gate legacy retirement. Active legacy installations defer until the next quiescent startup. Private
+tool preparation and cleanup normalize permissive modes on known legacy native directories only
+inside verified private parents, through the existing identity-bound filesystem owner. Linked,
+foreign-owned or exposed parents fail admission; shared storage permissions are never silently
+repaired. Shared installer scratch uses the same execution-scope recovery. Checks and CI schedules
+stay read-only; no local cleanup daemon is added.
+
+Native Mise also tracks private environment/settings configurations. Retain shared runtime versions
+when these participate; never read or evaluate another project's private configuration, or remove
+its reference to force collection. This expected retention is reported and leaves independent
+package, cache and managed-scratch collectors available. Unrecognized references and unsafe public
+pin documents remain errors.
+
+Browser version retirement stays with the installed browser manager. Playwright's normal install
+tracks requiring packages and collects unused browser versions in the shared path; preserve that
+native GC and its references. A cache path alone is not a retention registry: do not
+indiscriminately trim Puppeteer's shared cache to the caller's version, uninstall browsers, or
+install/download them from housekeeping. Product browser setup owners must use their actual
+dependency/recovery references when retiring old copies. Transient profiles belong in execution
+scratch; a profile needed for resume stays with its private operation owner, with the browser
+version recorded separately.
+
+Repository housekeeping inventories allocated bytes in `.tmp/`, `tmp/`, `.auth/` (including tool
+temporary data, caches, installations, home/configuration and persistent/runtime state), native
+history/cache and `.project-state/`. It reads sizes and metadata, never account contents, and does
+not follow links. Incomplete scans are lower bounds; nested `.auth/` subtotals are not additive.
+Unmanaged scratch or operation-state groups exceeding 2 GiB, incomplete scratch inventories and
+unresolved managed cleanup fail the storage check and require owner reconciliation. This is a
+diagnostic budget, not permission to evict data or a filesystem quota. Large active managed scopes
+remain the execution owner's responsibility. Use `--storage-only` for this bounded check/recovery;
+it performs no installation, formatting or product tests.
+
+On an existing child, legacy unmarked files never acquire deletion authority from their age, size,
+ignored status or directory name. Reconstruct active sessions, worktrees and the producer before
+retiring them through their real owner. Preserve account credentials, installed SDKs/tools, emulator
+images/state, reusable caches, pending operations, handovers and native history until that owner
+proves they are dispensable. The collectors preserve installed projects' required offline inputs;
+historical unreferenced versions may require a later download. Product-specific Gradle/Android and
+operation-state adapters retain ownership of mutable devices, credentials and resumable state. Never
+erase `.auth/` or a shared cache to fix temporary storage. A retained oversized or ambiguous group
+is an explicit unresolved finding, not a successful cleanup. Framework generation and updates ship
+this same lifecycle; no child-specific cleanup daemon or second ledger.
+
+The existing storage owner requires 2 GiB available on each affected repository, installation and
+package-cache filesystem before toolchain downloads or dependency staging in startup and explicit
+pinned maintenance. This is a baseline reserve, not an estimate of an unbounded installation's final
+size. A low percentage alone never blocks startup or triggers collection. Below that minimum, the
+owner invokes only the local daemon's native unused-build-cache collector once toward 3 GiB. Recheck
+actual available space and filesystem identity; the 2 GiB minimum, not the additional cleanup
+target, decides admission. If that bounded recovery cannot establish the minimum, stop before
+installation and report the unresolved capacity; do not retry downloads or erase account, product or
+unowned recovery data. The same collector remains available through repository housekeeping. Full
+apply performs safe managed scratch and tool collection before the capacity check can stop later
+work. A missing scheduler is not an automatic background cleanup guarantee.
 
 ## Modular Architecture, Parallel Ownership, And Integration
 
@@ -1502,27 +1578,39 @@ validation. It is not installed in the product.
 
 Canonical `bash scripts/setup/start-codex.sh` runs the framework-owned
 `scripts/deps/maintain-toolchain.mjs --startup` boundary on every start, before native session
-selection or attestation. It inventories every same-clone worktree and safe latest-session marker
-before writes, preserves unsafe or active writers, and uses the shared lifecycle lock and repository
-maintenance transaction. It checks official stable releases for Node.js within its declared LTS
-range, pnpm within its declared range, stable Codex and mise, and SHA-pinned GitHub actions within
-their annotated major lines. Public release discovery uses Mise's official `VERSION` and
-`SHASUMS256.txt` distribution and isolated native Git tags for actions, without GitHub REST quotas
-or credentials. An unchanged action pin must still match its release tag; a newer tag must resolve
-to the advertised commit through a shallow, tree-free fetch. Git lookup state is temporary and
-project-local, without host or project Git configuration. Reviewed official Mise binaries and
-complete Codex platform bundles are installed under `.auth/project-tools/tools`; immutable version
-directories retain their native resources and are verified before execution. The toolchain owner
+selection or attestation. `--locked` deliberately skips release discovery for separate reproducible
+preparation and CI; it must not replace this launcher call. The portable launcher regression
+executes the actual shell entry and is selected for launcher changes and complete publication
+verification. It inventories every same-clone worktree and safe latest-session marker before writes,
+preserves unsafe or active writers, and uses the shared lifecycle lock and repository maintenance
+transaction. It checks official stable releases for Node.js within its declared LTS range, pnpm
+within its declared range, stable Codex and mise, and SHA-pinned GitHub actions within their
+annotated major lines. Public release discovery uses Mise's official `VERSION` and `SHASUMS256.txt`
+distribution and isolated native Git tags for actions, without GitHub REST quotas or credentials. An
+unchanged action pin must still match its release tag; a newer tag must resolve to the advertised
+commit through a shallow, tree-free fetch. Git lookup state is temporary and project-local, without
+host or project Git configuration. Reviewed official Mise binaries and complete Codex platform
+bundles are installed under `~/.local/share/project-tools/tools`; immutable version directories
+retain their native resources and are verified before execution and reuse. The toolchain owner
 selects every supported platform and owns its reviewed digest. It never runs host self-updates. Only
 a read-only Node.js bootstrap is required before maintenance. Mise installs the repository's exact
-declarative runtime pins into its private project data directory; secondary product runtimes are
-preserved. Executable tool configuration requires reconciliation.
+declarative runtime pins into the shared user Mise data directory; secondary product runtimes and
+versions required by other projects are preserved. Executable tool configuration requires
+reconciliation. Legacy repository-local package installations are rebound through pnpm while
+preserving manifests and lockfiles. The bootstrap installer verifies and copies a matching legacy
+native bundle into user storage without downloading it again. The shared lifecycle lock covers
+staged installation through pin publication and cleanup. Successful startup uses the existing
+[storage owner](#temporary-data-and-storage-housekeeping) to retire replaced installations only
+after quiescence and reference checks.
 
 Maintenance stages the complete workspace inputs and candidate toolchain, preserves the locked
 platform inventory through native mise, and resolves and installs the newest compatible dependency
 graph with strict peers/engines and disabled lifecycle scripts/hooks. The candidate pnpm resolves
-its store in the final project root and fills that same store during staging, so offline publication
-works across filesystems and relative store configurations. Failed commands retain bounded,
+the admitted user package store and fills that same store during staging, so final reproduction and
+other repositories can reuse installed payloads offline. Staging derives reconstruction flags from
+the final installation, so required archive content is populated even when a reusable global graph
+already exists. Account-bearing npm configuration remains private. pnpm owns graph sharing and
+integrity; no second dependency cache or result ledger exists. Failed commands retain bounded,
 sanitized package-manager diagnostics. Only a successful candidate and unchanged original inputs
 permit a recoverable batch of compatibility metadata, mise files, CI pins, package-manager field,
 and lockfile. Final offline reproduction must succeed; otherwise the batch rolls back, preserving
@@ -1541,7 +1629,7 @@ dependency ranges or tool/action major lines requires migration review and affec
 evidence. Session-only `/side` hooks never run maintenance.
 
 Initial `node scripts/deps/maintain-toolchain.mjs` preparation installs both tools and dependencies
-in this repository and every generated project. Use
+for this repository and every generated project, with payloads in user storage. Use
 `bash scripts/setup/run-project.sh node scripts/deps/install-compatible.mjs` for explicit
 dependency-only maintenance. Invoking the checked-in Node boundary directly avoids pnpm's pre-script
 dependency-state guard precisely while it brings `node_modules` current, without allowing a
@@ -1822,6 +1910,16 @@ alone do not need implementation-mirroring tests. Policy text checks establish r
 routing, not semantic consistency, native instruction delivery, or model obedience. Mocks prove the
 modeled boundary, not an actual host; rendered and account-backed claims require their corresponding
 observations. Never manufacture a passing substitute when that path is unavailable.
+
+For a critical internal contract, execute the shipped producer, its actual serialization or
+generated code, and the complete consumer validator in a representative local integration scenario.
+A mock must not replace the invariant being proved with unconditional success; simulate only the
+necessary external boundary. Exercise scenario-specific preconditions explicitly and include
+rejected, incomplete and mismatched results. A shared helper must not hard-code one scenario's
+cardinality or identity as a universal requirement. Keep one complete result validator at its owner
+and use it for both qualification and recovery. Retained runtime changes need negative trust and
+recovery evidence. Confirm the regression is selected by the normal development and publication
+entries; a passing test outside those paths cannot prevent a late pipeline failure.
 
 Running the smallest useful focused command during iteration still applies; execution scope does not
 dictate the granularity of durable coverage. Temporary reproduction scripts do not enter the
@@ -2218,6 +2316,28 @@ Verification evidence and artifacts are environment-bound. Dev evidence cannot s
 prod, and staging evidence cannot silently identify a different production artifact. A target change
 invalidates incompatible cached evidence. Deployment orchestration remains separate from read-only
 repository verification; `pnpm verify` never deploys.
+
+### Deployment And Qualification Failure Recovery
+
+Classify the observed failure before another attempt. A deterministic contract or validation failure
+requires repair and focused local evidence on the corrected inputs. An unchanged cloud rerun is not
+a diagnosis. A temporary service failure may justify a bounded repeat only when the actual operation
+is read-only, idempotent, or its provider contract otherwise proves safe repetition under existing
+authority. Preserve the phase, action, target, HTTP status and request stage without secrets.
+
+For a dispatched state-changing operation with an unknown result, inspect the original resource,
+operation identity/version, in-flight work and required cleanup before deciding what to repeat. An
+HTTP 503, timeout or failure while awaiting response headers does not prove that no mutation
+occurred. Keep original-state reads and their dependent writes within the same owned serialization
+boundary; validate already-applied state with the complete result validator before another mutation.
+Missing or partial inventory is not proof of rejection. Preserve recovery state until reconciliation
+and cleanup are verified. No blind deployment loops, unconditional retries or blanket timeout
+increases.
+
+Retain failed status and genuine failure notifications. Do not suppress alerts, swallow failures or
+replace an unavailable check with success. Local regression evidence proves the repaired contract;
+live qualification requires observations from the intended artifact and target. Recovery never
+weakens authentication, tenant isolation, publication or environment-approval gates.
 
 ## White-Label Product Configuration
 
@@ -2694,16 +2814,59 @@ boundaries; verification must not install prerequisites or silently discard a re
 Use `pnpm verify:changed -- --print-plan` before affected integration checks. The single registry,
 `.codex/verification.json`, binds contracts and consumers; explicit `coveredBy` groups run
 separately for a narrow delta and once inside their complete owner. Preserve runtime flags and
-actual case coverage. Shared safety boundaries, dependencies, verification controls and unknown
-consumers retain broad coverage; a filename alone is not evidence. Review and audit each stable
-slice proportionately.
+actual case coverage. `verify:changed` is the development entry: a missing complete basis, new test,
+changed plan or unknown owner never implicitly starts the full plan. Report uncovered publication
+requirements and execute only the known affected checks. `pnpm verify` owns complete publication
+coverage on the finished integrated state; the publisher invokes it after cleanup and integration.
+Shared safety boundaries, dependencies, verification controls and unknown consumers retain their
+required publication coverage. Review and audit each stable slice proportionately without making the
+checkpoint itself a test trigger.
 
-After failure, use `pnpm verify:changed -- --check <key>` first; native Node checks also accept
-`--test-name-pattern <pattern>`. Reproduction never advances acceptance. Before repeating an
-expensive complete run answer: which relevant uncertainty can only this run resolve? Reuse
-successful evidence only for unchanged relevant source, tests, dependencies, controls and tools. Run
-`pnpm verify` on the stable integrated state after final audit; publication and hooks consume its
-valid evidence.
+Changed-path routing covers applicable format, static analysis, documentation/content policy,
+package/export boundaries and focused owner, consumer, dependency and security checks. A workspace
+package may expose `verify:preflight` as its boundary verifier; routing invokes it only for that
+affected owner. A package with stable owned export targets may declare only those subpaths in
+adjacent `package.exports.json`; unrelated sibling exports remain additive. A cheap defect found
+only by a broader suite is a routing defect; fix that route with the owning change.
+
+For an unresolved failure, `pnpm verify:changed -- --check <key>` reproduces the registered check;
+native Node checks also accept `--test-name-pattern <pattern>`. Reproduction never advances
+acceptance and is unnecessary when the failure is already understood. Successful independent checks
+survive failures. Repeat only failed checks and consumers whose relevant inputs changed. The
+existing evidence store binds each result to routed source and tests, dependencies, command, runtime
+and delivery conditions; native isolated test files and independently executed workspace test
+packages can be reused within complete owners. Workspace dependency order and grouped cycle handling
+remain intact. Manual verification, publisher retries and pre-push share these results. Plan changes
+invalidate affected entries, not every successful check. No review, audit, handoff or resume
+requires a rerun without changed relevant inputs or a concrete unresolved finding.
+
+Keep one replace-in-place evidence record with current per-check input identities and the complete
+acceptance basis, plus one verification session lock. Do not add another result store, per-run
+receipts, checkpoint chains or verification history. The complete basis binds the exact Git `HEAD`,
+dirty/untracked set, command plan, tool environment and source fingerprints. Its delta includes the
+old dirty set, every committed path since that `HEAD`, and the current dirty set, including formerly
+untracked paths that were later deleted. Focused or partially successful attempts contribute results
+without advancing complete acceptance. Unknown, unowned, incomplete, broad-only or ambiguous
+coverage remains pending during development and fails closed at publication with its admission
+reason. Complete acceptance requires every declared check to have a matching successful result.
+
+Before its security and pushed-object checks, pre-push may rebind a commit that exactly materializes
+already-attested dirty content to the new Git basis without running verifier commands. Any source,
+plan, runtime, risk or unsafe Git-delta change blocks that basis-only path and requires normal
+adaptive verification. This local performance cache is not a cryptographic attestation or a
+substitute for protected remote CI and branch policy. A process running as the same user can bypass
+repository-owned hooks; adversarial publication integrity requires an external trusted executor.
+
+A forced rerun requires both `--force-full` and a structured
+`--force-reason "owner-request: <owner-id> - <reason>"` or `"uncovered-risk: <risk-id> - <reason>"`;
+cache bypass is forbidden.
+
+Documentation uses lightweight format, structure, language and security checks. Parser-proven
+comment/format-only source changes use lightweight source checks; pragmas, unknown syntax and
+unavailable parsers retain conservative source invalidation. Never infer equivalence by removing
+whitespace or comments with a regular expression. Preserve secret and pushed-object scans,
+deployment artifact/configuration bindings and independent protected CI. A local task handoff does
+not require a full publication run; bundle that gate once before push and reuse still-valid results.
 
 The runner reports the active key and elapsed time. Set `diagnosticAfterMs` from measured duration
 and check type; the unmeasured default is a five-minute diagnosis checkpoint. Exceeding it stops new
@@ -2769,12 +2932,13 @@ project environment and runtime. Do not substitute individual steps, invent a wr
 command remains unexecuted. Recommend full reset only for explicit local sanitation, export hygiene
 or diagnosed recovery, with its actual session-exit requirement.
 
-When admission identifies a real uncovered risk, the full plan covers syntax/format, tests,
-build/typecheck when present, repository contracts, secrets, dependencies, and relevant product
-surfaces. Network-volatile registry, advisory, or package-signature checks belong in
-`pnpm verify:external`, not every task gate. Successful full coverage records the initial basis;
-complete green focused delta coverage advances it. Pre-push remains read-only, reruns its security
-and pushed-object checks, and consumes exact-current successful evidence instead of repeating an
+At publication, the complete plan covers syntax/format, tests, build/typecheck when present,
+repository contracts, secrets, dependencies, and relevant product surfaces. It executes only entries
+without matching successful results. Network-volatile registry, advisory, or package-signature
+checks belong in `pnpm verify:external`, not every task gate. Development records independent
+results; only complete publication coverage establishes the acceptance basis. Pre-push may bind that
+same verified content to its committed Git state, never accept a source delta. It reruns security
+and pushed-object checks and validates exact-current successful evidence without repeating an
 unchanged product suite.
 
 A publication goal checkpoint is green only when its requested outcome is published on central

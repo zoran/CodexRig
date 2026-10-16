@@ -75,10 +75,13 @@ test("generated children receive canonical task, planning, documentation, mainte
     ["Documentation Ownership", "<!-- current-documentation-ownership-policy -->"],
     ["Documentation Currency", "<!-- current-documentation-currency-policy -->"],
     ["Maintenance Scope And Verification", "<!-- current-maintenance-scope-policy -->"],
+    ["Temporary Data And Storage Housekeeping", "<!-- current-temporary-storage-policy -->"],
     ["Long-Session Course Checks", "<!-- current-course-check-policy -->"],
     ["Verification Selection And Runtime", "<!-- current-verification-runtime-policy -->"],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
     ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
+    ["Test Strategy", "<!-- current-test-strategy-policy -->"],
+    ["Deployment And Qualification Failure Recovery", "<!-- current-delivery-failure-policy -->"],
   ]) {
     assert.equal(
       policyBody(generatedInstructions, heading),
@@ -119,6 +122,23 @@ test("generated children receive canonical task, planning, documentation, mainte
   const accepted = docs();
   assert.equal(accepted.status, 0, accepted.stderr);
   assert.match(accepted.stdout, /semantic currency requires source\/evidence review/u);
+  const storage = spawnSync(
+    process.execPath,
+    ["scripts/goals/repository-housekeeping.mjs", "--storage-only"],
+    {
+      cwd: target,
+      env: projectToolEnvironment({ root: target }),
+      encoding: "utf8",
+      timeout: 10000,
+    },
+  );
+  assert.equal(storage.status, 0, storage.stderr);
+  assert.match(storage.stdout, /Repository storage/u);
+  assert.equal(
+    existsSync(path.join(target, ".project-state")),
+    false,
+    "read-only child storage entry creates no maintenance state",
+  );
 });
 
 test("generated validators reject primary policy without the maintenance scope boundary", async () => {
@@ -180,21 +200,97 @@ test("generated validators reject primary policy that omits recovery before acco
   await assert.rejects(validateGeneratedProject(target), expected);
 });
 
-test("source validation accepts the independent output and scans final staged bytes", async () => {
+test("generated launcher verification rejects locked maintenance in the normal startup path", () => {
+  const target = stage();
+  const testPath = "scripts/setup/codex-launcher.test.mjs";
+  assert.equal(
+    existsSync(path.join(target, testPath)),
+    true,
+    "Children must receive the executable launcher regression.",
+  );
+  const verification = JSON.parse(
+    readFileSync(path.join(target, ".codex/verification.json"), "utf8"),
+  );
+  assert.deepEqual(verification.testConsumers["scripts/setup/start-codex.sh"], [testPath]);
+  assert.equal(
+    verification.commands.flatMap(({ args }) => args).filter((arg) => arg === testPath).length,
+    1,
+  );
+  prepareProjectToolDirectories(target);
+  const run = (args) =>
+    spawnSync(process.execPath, args, {
+      cwd: target,
+      env: projectToolEnvironment({ root: target }),
+      encoding: "utf8",
+      timeout: 30_000,
+    });
+  const plan = run([
+    "scripts/verify/adaptive.mjs",
+    "--mode",
+    "repo",
+    "--print-plan",
+    "--path",
+    "scripts/setup/start-codex.sh",
+  ]);
+  assert.equal(plan.status, 0, plan.stdout + plan.stderr);
+  assert.equal(
+    plan.stdout.split("\n").filter((line) => line.includes("Would run") && line.includes(testPath))
+      .length,
+    1,
+  );
+  const accepted = run(["--test", "--test-reporter=tap", testPath]);
+  assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
+  assert.match(accepted.stdout, /# tests 1\b/u);
+  const launcherPath = path.join(target, "scripts/setup/start-codex.sh");
+  const before = readFileSync(launcherPath, "utf8");
+  const broken = before.replace(
+    "maintain-toolchain.mjs --startup",
+    "maintain-toolchain.mjs --locked",
+  );
+  assert.notEqual(broken, before);
+  writeFileSync(launcherPath, broken);
+  const rejected = run(["--test", "--test-reporter=tap", testPath]);
+  assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr);
+  assert.match(rejected.stdout + rejected.stderr, /launcher maintains before admission/u);
+  assert.match(
+    rejected.stdout + rejected.stderr,
+    /89/u,
+    "The child regression must reject the observed locked-maintenance invocation.",
+  );
+  assert.match(rejected.stdout, /# fail 1\b/u);
+});
+
+test("source validation accepts the independent output and scans final staged bytes", async (t) => {
   const target = stage();
   await validateGeneratedProject(target);
+  // Executing child tests creates private tool state; keep the export/secret-scan fixture pristine.
+  const runtimeTarget = stage();
+  prepareProjectToolDirectories(runtimeTarget);
   const runtimeContracts = spawnSync(
     process.execPath,
     [
       "--test",
+      "--test-reporter=tap",
       "scripts/setup/runtime-safety.test.mjs",
       "scripts/contracts/mise-toolchain-configuration.test.mjs",
       "scripts/deps/toolchain-releases.test.mjs",
       "scripts/deps/toolchain-maintenance.test.mjs",
     ],
-    { cwd: target, encoding: "utf8", timeout: 60_000 },
+    {
+      cwd: runtimeTarget,
+      env: projectToolEnvironment({ root: runtimeTarget }),
+      encoding: "utf8",
+      timeout: 60_000,
+    },
   );
   assert.equal(runtimeContracts.status, 0, runtimeContracts.stderr || runtimeContracts.stdout);
+  assert.match(runtimeContracts.stdout, /# tests [1-9]\d*\b/u);
+  t.diagnostic(
+    runtimeContracts.stdout
+      .split("\n")
+      .filter((line) => /^# (?:tests|pass|fail|skipped) /u.test(line))
+      .join("; "),
+  );
   appendFileSync(path.join(target, "README.md"), `${["sk-", "a".repeat(24)].join("")}\n`);
   await assert.rejects(validateGeneratedProject(target), /potential secret material/i);
   const ignored = stage();

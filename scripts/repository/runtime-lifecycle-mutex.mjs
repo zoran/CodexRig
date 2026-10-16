@@ -24,13 +24,18 @@ import {
   validateOwnedDirectoryBinding,
 } from "../filesystem/owned-path-safety.mjs";
 import { captureProcessIdentity, inspectProcessIdentity } from "./runtime-process-identity.mjs";
-import { closeRuntimeFile, openRuntimeDirectory, runtimeFile } from "./runtime-owned-state.mjs";
+import {
+  closeRuntimeFile,
+  openRuntimeDirectory,
+  runtimeFile,
+  runtimeLifecycleFileName,
+} from "./runtime-owned-state.mjs";
 
-const updateMutexName = "codexrig-lifecycle.update";
+const updateMutexName = (root) => runtimeLifecycleFileName(root, "codexrig-lifecycle.update");
 const waitState = new Int32Array(new SharedArrayBuffer(4));
 
-function stagingName(owner) {
-  return `.${updateMutexName}.${owner.nonce}.tmp`;
+function stagingName(owner, root) {
+  return `.${updateMutexName(root)}.${owner.nonce}.tmp`;
 }
 
 function publicationChanged() {
@@ -42,12 +47,12 @@ function publicationChanged() {
 function publicationAlias(directory, owner, expected) {
   const target = ownedDirectoryChildPath(
     directory,
-    updateMutexName,
+    updateMutexName(directory.parentBinding.root),
     "Codex lifecycle update mutex",
   );
   const temporary = ownedDirectoryChildPath(
     directory,
-    stagingName(owner),
+    stagingName(owner, directory.parentBinding.root),
     "Codex lifecycle update mutex staging",
   );
   const current = lstatSync(target);
@@ -61,13 +66,17 @@ function publicationAlias(directory, owner, expected) {
 
 function publishMutex(directory, owner) {
   const label = "Codex lifecycle update mutex";
-  const target = ownedDirectoryChildPath(directory, updateMutexName, label);
+  const target = ownedDirectoryChildPath(
+    directory,
+    updateMutexName(directory.parentBinding.root),
+    label,
+  );
   if (lstatSync(target, { throwIfNoEntry: false })) {
     throw Object.assign(new Error("Codex lifecycle update mutex already exists."), {
       code: "EEXIST",
     });
   }
-  const temporaryName = stagingName(owner);
+  const temporaryName = stagingName(owner, directory.parentBinding.root);
   const temporary = ownedDirectoryChildPath(directory, temporaryName, label);
   let created;
   let published = false;
@@ -135,7 +144,7 @@ function validMutexOwner(value) {
 }
 
 function readMutex(root) {
-  const current = runtimeFile(root, updateMutexName, "Codex lifecycle update mutex", 4_096);
+  const current = runtimeFile(root, updateMutexName(root), "Codex lifecycle update mutex", 4_096);
   if (current.status === "absent") return current;
   let owner;
   try {
@@ -157,7 +166,7 @@ function recoverPublication(root) {
   if (!directory) return;
   let descriptor;
   try {
-    const target = ownedDirectoryChildPath(directory, updateMutexName, label);
+    const target = ownedDirectoryChildPath(directory, updateMutexName(root), label);
     const initial = lstatSync(target);
     if (initial.isFile() && initial.nlink === 1) return;
     if (
@@ -227,7 +236,7 @@ function removeStaleMutex(root, expected) {
     if (current.processStatus !== "stale") return false;
     removeStableOwnedFile(
       current.directory,
-      updateMutexName,
+      updateMutexName(root),
       current.snapshot.stats,
       "stale Codex lifecycle update mutex",
     );
@@ -304,7 +313,7 @@ function releaseMutex(mutex) {
     }
     removeStableOwnedFile(
       current.directory,
-      updateMutexName,
+      updateMutexName(mutex.root),
       current.snapshot.stats,
       "Codex lifecycle update mutex",
     );

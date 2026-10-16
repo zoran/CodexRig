@@ -87,6 +87,23 @@ expose coupling reopen the architecture decision, not a ritual permission reques
 authorized fix. Temporary probes do not become permanent infrastructure without a current owner and
 need; remove them after use.
 
+Use the inherited system temporary directory for disposable fixtures and probes, with terminal
+cleanup. Follow
+[Temporary Storage](../../../instructions.md#temporary-data-and-storage-housekeeping) for execution
+scopes, interrupted-run recovery and retained evidence; do not accumulate bulk output in persistent
+`.tmp/`, `tmp/` or private account/tool state. Load/qualification runners use admitted installed
+Node/Python/SDK and browser paths directly, including replicas. Use the shared browser payload paths
+from the common tool environment, with profiles/cookies in private scratch or their explicit
+recovery owner. Keep only mutable run data in scratch and compact checkpoints at the existing
+recovery owner; never retain a complete runtime/tool-home copy merely to resume. Test cleanup on
+failure/abrupt exit as well as success when changing a run producer, and use the native
+reference-aware collectors for reusable payloads.
+
+For deployment and qualification failures, follow
+[Failure Recovery](../../../instructions.md#deployment-and-qualification-failure-recovery).
+Reconcile the original state before repeating a mutation with an unknown outcome. Preserve failed
+status and notifications; local repair evidence does not establish live acceptance.
+
 ## Rendered UI Work
 
 For interactive surface work, read [Rendered UI Implementation](references/rendered-ui.md). Other
@@ -98,7 +115,8 @@ Apply [Test Strategy](../../../instructions.md#test-strategy): for material beha
 observe the original regression before the fix and cover it in the existing owner suite. Prefer
 realistic lifecycle evidence; justify narrow tests by a concrete boundary and proving value.
 Editorial changes need no implementation-mirroring test. Distinguish source, fixture, rendered,
-native and real-target evidence.
+native and real-target evidence. Exercise critical internal contracts with the shipped code and
+complete consumer validator; simulate external boundaries without mocking the invariant to success.
 
 Apply [Documentation Currency](../../../instructions.md#documentation-currency) before slice
 handoff: reconcile changed claims, resolved tasks/blockers and scoped evidence at assigned owners;
@@ -110,7 +128,9 @@ effectiveness, efficiency and quality assessment.
 
 Apply
 [Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification)
-before commands. Inspect `pnpm verify:changed -- --print-plan`, iterate with focused checks and
-verify the stable integrated result within scope. Preserve Dev scheduling and actual publication
-gates. Continue only unfinished accepted work; stop when its completion condition is satisfied.
-Canonical capacity, provenance, settlement and terminal-handover rules remain binding.
+before commands. Inspect `pnpm verify:changed -- --print-plan` and iterate with necessary focused
+checks. A missing complete basis or changed test plan never requests a full development run. Reuse
+successful unaffected results after repairs and handoffs; complete verification belongs once at the
+publication boundary on the integrated state. Preserve Dev scheduling and actual publication gates.
+Continue only unfinished accepted work; stop when its completion condition is satisfied. Canonical
+capacity, provenance, settlement and terminal-handover rules remain binding.

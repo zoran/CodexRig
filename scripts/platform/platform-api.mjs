@@ -1,10 +1,11 @@
 /** Owns platform api behavior for the Git provider integration boundary. */
-/** Carries a bounded provider API failure together with its HTTP status when available. */
+/** Carries a safe provider failure with status, request stage and operation outcome when available. */
 export class PlatformApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, failureKind) {
     super(message);
     this.name = "PlatformApiError";
     this.status = status;
+    if (failureKind) this.failureKind = failureKind;
   }
 }
 
@@ -42,7 +43,11 @@ async function boundedResponseText(response, provider) {
     try {
       text = await response.text();
     } catch {
-      throw new PlatformApiError(`${provider} API response could not be read.`, response.status);
+      throw new PlatformApiError(
+        `${provider} API response could not be read.`,
+        response.status,
+        "transport",
+      );
     }
     if (Buffer.byteLength(text, "utf8") > maximumResponseBytes) {
       throw new PlatformApiError(
@@ -71,7 +76,11 @@ async function boundedResponseText(response, provider) {
     }
   } catch (error) {
     if (error instanceof PlatformApiError) throw error;
-    throw new PlatformApiError(`${provider} API response could not be read.`, response.status);
+    throw new PlatformApiError(
+      `${provider} API response could not be read.`,
+      response.status,
+      "transport",
+    );
   } finally {
     try {
       reader.releaseLock?.();
@@ -87,50 +96,80 @@ export async function platformApiRequest(
   url,
   { token, provider, method = "GET", body } = {},
 ) {
-  const requestUrl = requestIdentity(url, { method, provider, token });
-  const headers = {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-    "User-Agent": "CodexRig-platform-configurator",
-  };
-  if (provider === "github") {
-    headers.Authorization = `Bearer ${token}`;
-    headers["X-GitHub-Api-Version"] = "2022-11-28";
-  } else {
-    headers["PRIVATE-TOKEN"] = token;
-  }
-  let response;
+  let requestStage = "admission";
   try {
-    response = await fetchImpl(requestUrl, {
-      body: body === undefined ? undefined : JSON.stringify(body),
-      headers,
-      method,
-      redirect: "error",
-      signal: AbortSignal.timeout(30_000),
-    });
-  } catch {
-    throw new PlatformApiError(`${provider} API request could not be completed.`, 0);
-  }
-  if (!response.ok) {
-    throw new PlatformApiError(
-      `${provider} API returned HTTP ${response.status}.`,
-      response.status,
-    );
-  }
-  if (response.status === 204) return null;
-  const declaredLength = Number(response.headers?.get?.("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > maximumResponseBytes) {
-    throw new PlatformApiError(
-      `${provider} API response exceeded the size limit.`,
-      response.status,
-    );
-  }
-  const text = await boundedResponseText(response, provider);
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new PlatformApiError(`${provider} API returned invalid JSON.`, response.status);
+    const requestUrl = requestIdentity(url, { method, provider, token });
+    let serializedBody;
+    try {
+      serializedBody = body === undefined ? undefined : JSON.stringify(body);
+    } catch {
+      throw new PlatformApiError(`${provider} API request body is not serializable.`, 0);
+    }
+    const headers = {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "User-Agent": "CodexRig-platform-configurator",
+    };
+    if (provider === "github") {
+      headers.Authorization = `Bearer ${token}`;
+      headers["X-GitHub-Api-Version"] = "2022-11-28";
+    } else {
+      headers["PRIVATE-TOKEN"] = token;
+    }
+    let response;
+    requestStage = "headers";
+    try {
+      response = await fetchImpl(requestUrl, {
+        body: serializedBody,
+        headers,
+        method,
+        redirect: "error",
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch {
+      throw new PlatformApiError(`${provider} API request could not be completed.`, 0);
+    }
+    if (!response.ok) {
+      throw new PlatformApiError(
+        `${provider} API returned HTTP ${response.status}.`,
+        response.status,
+      );
+    }
+    if (response.status === 204) return null;
+    requestStage = "body";
+    const declaredLength = Number(response.headers?.get?.("content-length"));
+    if (Number.isFinite(declaredLength) && declaredLength > maximumResponseBytes) {
+      throw new PlatformApiError(
+        `${provider} API response exceeded the size limit.`,
+        response.status,
+      );
+    }
+    const text = await boundedResponseText(response, provider);
+    if (!text) return null;
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new PlatformApiError(`${provider} API returned invalid JSON.`, response.status);
+    }
+  } catch (error) {
+    if (!(error instanceof PlatformApiError)) throw error;
+    error.method = ["DELETE", "GET", "PATCH", "POST", "PUT"].includes(method) ? method : "invalid";
+    error.requestStage = requestStage;
+    error.failureKind ??=
+      requestStage === "admission"
+        ? "contract"
+        : error.status === 0
+          ? "transport"
+          : error.status >= 500 || [408, 429].includes(error.status)
+            ? "service"
+            : error.status >= 400
+              ? "rejected"
+              : "contract";
+    // Once dispatched, an HTTP error or unreadable response cannot prove a mutation did not apply.
+    error.operationOutcome =
+      requestStage === "admission" ? "not-started" : method === "GET" ? "read-only" : "unknown";
+    error.message += ` method=${error.method}, requestStage=${requestStage}, operationOutcome=${error.operationOutcome}.`;
+    throw error;
   }
 }
 

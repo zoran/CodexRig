@@ -33,12 +33,12 @@ function rootProductLayout() {
   };
 }
 
-export function route(relativePaths, overrides = {}) {
+export function route(relativePaths, { entryMode = "repo", ...overrides } = {}) {
   return buildPlan(
     {
       forceFull: false,
       forceReason: "",
-      mode: "full",
+      mode: entryMode,
       printPlan: true,
       simulatedPaths: [],
     },

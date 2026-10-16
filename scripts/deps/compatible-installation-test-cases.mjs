@@ -1,6 +1,15 @@
 /** Owns compatible installation test cases behavior for the dependency and toolchain maintenance boundary. */
+import { userToolPaths } from "../repository/user-tool-storage.mjs";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
@@ -127,8 +136,23 @@ export function registerCompatibleInstallationTests(transactionFixture) {
     });
   }
 
-  test("native pnpm stages strict-policy packages into the final root's store for offline use", async (t) => {
+  test("native pnpm shares package graphs across repositories and reproduces them offline", async (t) => {
     const target = transactionFixture();
+    // Prove the developer layout even when this regression is executed by independent CI.
+    const previousCi = process.env.CI;
+    process.env.CI = "false";
+    t.after(() => {
+      if (previousCi === undefined) delete process.env.CI;
+      else process.env.CI = previousCi;
+    });
+    const previousStorage = process.env.PROJECT_TOOL_STORAGE_HOME;
+    const storage = path.join(target, "isolated-user-home");
+    mkdirSync(storage);
+    process.env.PROJECT_TOOL_STORAGE_HOME = storage;
+    t.after(() => {
+      if (previousStorage === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
+      else process.env.PROJECT_TOOL_STORAGE_HOME = previousStorage;
+    });
     const packageDirectory = path.join(target, "archive", "package");
     mkdirSync(packageDirectory, { recursive: true });
     const archives = {};
@@ -165,11 +189,14 @@ export function registerCompatibleInstallationTests(transactionFixture) {
       `
       const { parentPort, workerData } = require("node:worker_threads");
       const { createServer } = require("node:http");
-      let latest = "1.0.0";
-      parentPort.on("message", (version) => { latest = version; parentPort.postMessage("advanced"); });
+      let latest = "1.0.0", archiveRequests = 0;
+      parentPort.on("message", (version) => {
+        if (version === "archive-count") return parentPort.postMessage(archiveRequests);
+        latest = version; parentPort.postMessage("advanced");
+      });
       const server = createServer((request, response) => {
         const archive = workerData.archives[request.url.slice(1).replace(/\\.tgz$/, "")];
-        if (archive) return response.end(Buffer.from(archive.bytes));
+        if (archive) { archiveRequests++; return response.end(Buffer.from(archive.bytes)); }
         const versions = Object.fromEntries(Object.entries(workerData.archives)
           .filter(([version]) => version <= latest).map(([version, archive]) => [version, {
             name: "store-fixture", version, dist: {
@@ -200,6 +227,7 @@ export function registerCompatibleInstallationTests(transactionFixture) {
       path.join(target, "pnpm-workspace.yaml"),
       [
         "packages: []",
+        "virtualStoreType: global",
         "storeDir: './package store'",
         `cacheDir: ${JSON.stringify(path.join(target, "metadata cache"))}`,
         `registry: 'http://127.0.0.1:${port}'`,
@@ -226,7 +254,7 @@ export function registerCompatibleInstallationTests(transactionFixture) {
     assert.equal(initial.status, 0, initial.stderr || initial.stdout);
     registry.postMessage("1.1.0");
     await once(registry, "message");
-    rmSync(path.join(target, "metadata cache"), { recursive: true, force: true });
+    rmSync(userToolPaths().pnpmCache, { recursive: true, force: true });
     const unbound = transactionFixture();
     stageDependencyInstallationInputs({ projectRoot: target, stageRoot: unbound });
     installLatestCompatibleDependencies({ projectRoot: unbound });
@@ -234,10 +262,11 @@ export function registerCompatibleInstallationTests(transactionFixture) {
       path.join(target, "pnpm-lock.yaml"),
       readFileSync(path.join(unbound, "pnpm-lock.yaml")),
     );
-    assert.throws(
-      () => reproduceLockedDependencies({ projectRoot: target }),
-      /ERR_PNPM_NO_OFFLINE_TARBALL/u,
-    );
+    // The separately installed repository already populated the same native content store.
+    reproduceLockedDependencies({ projectRoot: target });
+    const resolved = realpathSync(path.join(target, "node_modules/store-fixture"));
+    assert.ok(resolved.startsWith(`${userToolPaths().pnpmStore}${path.sep}`));
+    assert.equal(realpathSync(path.join(unbound, "node_modules/store-fixture")), resolved);
 
     const bound = privateCandidate(target);
     stageDependencyInstallationInputs({ projectRoot: target, stageRoot: bound });
@@ -246,7 +275,6 @@ export function registerCompatibleInstallationTests(transactionFixture) {
       path.join(target, "pnpm-lock.yaml"),
       readFileSync(path.join(bound, "pnpm-lock.yaml")),
     );
-    await registry.terminate();
     const lockfile = readFileSync(path.join(target, "pnpm-lock.yaml"), "utf8");
     assert.deepEqual(reproduceLockedDependencies({ projectRoot: target }), {
       lockfileUpdated: false,
@@ -260,7 +288,29 @@ export function registerCompatibleInstallationTests(transactionFixture) {
     writeFileSync(path.join(foreign, "sentinel"), "unchanged");
     installed.storeDir = foreign;
     writeFileSync(metadataPath, JSON.stringify(installed));
+    // A global graph can survive native content-store eviction. Staging must prepare the final
+    // destination's forced migration, not merely reuse that already linked graph.
+    assert.ok(localStore.startsWith(`${storage}${path.sep}`));
+    rmSync(path.join(localStore, "files"), { recursive: true, force: true });
+    rmSync(path.join(localStore, "index"), { recursive: true, force: true });
+    assert.equal(realpathSync(path.join(unbound, "node_modules/store-fixture")), resolved);
+    registry.postMessage("archive-count");
+    const [requestsBefore] = await once(registry, "message");
+    const migration = privateCandidate(target);
+    reproduceLockedDependencies({
+      projectRoot: migration,
+      installationRoot: target,
+      offline: false,
+    });
+    registry.postMessage("archive-count");
+    const [requestsAfter] = await once(registry, "message");
+    await registry.terminate();
     reproduceLockedDependencies({ projectRoot: target });
+    assert.equal(
+      requestsAfter - requestsBefore,
+      1,
+      "online staging fetched the missing archive once",
+    );
     assert.equal(JSON.parse(readFileSync(metadataPath, "utf8")).storeDir, localStore);
     assert.equal(readFileSync(path.join(foreign, "sentinel"), "utf8"), "unchanged");
     assert.equal(readFileSync(path.join(target, "pnpm-lock.yaml"), "utf8"), lockfile);
@@ -276,10 +326,10 @@ export function registerCompatibleInstallationTests(transactionFixture) {
     );
   });
 
-  test("private toolchain staging fills only the owning project installation store", () => {
+  test("private toolchain staging uses the same user installation store", () => {
     const target = compatibleInstallFixture(transactionFixture);
     const fixture = compatibleInstallFixture(() => privateCandidate(target.root));
-    const storeDirectory = path.join(target.root, ".auth/project-tools/data/pnpm/store/v11");
+    const storeDirectory = path.join(userToolPaths().pnpmStore, "v11");
     const pnpm = compatiblePnpmFixture(fixture, { storeDirectory });
     installLatestCompatibleDependencies({
       projectRoot: fixture.root,
@@ -343,7 +393,7 @@ export function registerCompatibleInstallationTests(transactionFixture) {
     assert.deepEqual(pnpm.calls[0].args, [
       ...compatibleInstallArgs,
       "--store-dir",
-      path.join(fixture.root, ".auth/project-tools/data/pnpm/store"),
+      userToolPaths().pnpmStore,
       "--offline",
     ]);
     assert.equal(pnpm.calls[0].ignorePnpmfile, "true");
@@ -401,21 +451,13 @@ export function registerCompatibleInstallationTests(transactionFixture) {
       [
         {
           executable: "pnpm",
-          args: [
-            ...compatibleUpdateArgs,
-            "--store-dir",
-            path.join(fixture.root, ".auth/project-tools/data/pnpm/store"),
-          ],
+          args: [...compatibleUpdateArgs, "--store-dir", userToolPaths().pnpmStore],
           ignorePnpmfile: "true",
           scope: "stage",
         },
         {
           executable: "pnpm",
-          args: [
-            ...compatibleInstallArgs,
-            "--store-dir",
-            path.join(fixture.root, ".auth/project-tools/data/pnpm/store"),
-          ],
+          args: [...compatibleInstallArgs, "--store-dir", userToolPaths().pnpmStore],
           ignorePnpmfile: "true",
           scope: "project",
         },

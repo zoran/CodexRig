@@ -62,6 +62,7 @@ export function omitAlreadyCoveredPaths({
 }
 
 export function decideVerificationAdmission({
+  entryMode = "full",
   basis,
   changed,
   forceFull = false,
@@ -71,7 +72,6 @@ export function decideVerificationAdmission({
   broadOnlyRisks = [],
   coveredBroadRisks = [],
 }) {
-  const routeByPath = new Map(ownersByPath.map((entry) => [entry.path, entry]));
   const fullRelevantPaths = uniqueSorted(
     ownersByPath
       .filter((entry) => isFullRelevantPath(entry.path, { productLayout }))
@@ -82,9 +82,12 @@ export function decideVerificationAdmission({
       .filter((entry) => entry.categories.includes("unknown or incomplete change scope"))
       .map((entry) => entry.path),
   );
-  const uncoveredFullRelevantPaths = fullRelevantPaths.filter(
-    (relativePath) => (routeByPath.get(relativePath)?.ownerKeys.length ?? 0) === 0,
-  );
+  const uncoveredFullRelevantPaths = ownersByPath
+    .filter(
+      (entry) =>
+        !entry.ownerKeys.length && !entry.categories.includes("generated/cache/local-only files"),
+    )
+    .map((entry) => entry.path);
   const focusedCommandOwners = ownersByPath
     .filter((entry) => entry.ownerKeys.length > 0)
     .map((entry) => ({ ownerKeys: entry.ownerKeys, path: entry.path }));
@@ -125,14 +128,16 @@ export function decideVerificationAdmission({
   if (mode === "full" && !reason) {
     throw new Error("Full verification admission requires a concrete uncovered reason.");
   }
+  const publicationRequired = mode === "full";
+  if (entryMode === "repo" && !forceFull && publicationRequired) {
+    mode = "targeted";
+    reason = `development checks only; publication coverage pending: ${reason}`;
+  } else if (entryMode === "full" && !publicationRequired) {
+    mode = "full";
+    reason = "publication checks complete coverage; matching successful results are reused";
+  }
 
   return {
-    canAdvanceSuccessfulBasis:
-      mode === "targeted" &&
-      !changed.incomplete &&
-      (changed.paths.length > 0 || changed.basisChanged === true) &&
-      unknownPaths.length === 0 &&
-      uncoveredFullRelevantPaths.length === 0,
     coveredBroadRisks,
     focusedCommandOwners,
     fullRelevantPaths,

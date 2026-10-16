@@ -4,6 +4,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import {
   chmodSync,
+  linkSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -35,6 +36,207 @@ import {
   applyHousekeepingWrites,
   recoverInterruptedHousekeepingWrites,
 } from "../repository/repository-housekeeping-transaction.mjs";
+import { runRepositoryHousekeeping } from "./repository-housekeeping.mjs";
+import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
+import {
+  createProjectTemporaryScope,
+  reconcileProjectTemporaryStorage,
+  temporaryEnvironment,
+} from "../repository/project-temporary-storage.mjs";
+import {
+  reconcileRepositoryStorage,
+  repositoryStorageSummary,
+} from "../repository/repository-storage.mjs";
+
+// A stopped test runner never reaches its fixture finalizers. Recover the actual execution's
+// abandoned scratch without treating every ignored directory, cache, account or worktree as trash.
+test("storage housekeeping reclaims abandoned executions and preserves live, unknown and durable data", async (t) => {
+  const root = fixture(t);
+  const locations = prepareProjectToolDirectories(root);
+  const storageModule = new URL("../repository/project-temporary-storage.mjs", import.meta.url)
+    .href;
+  const program = `
+    import { createProjectTemporaryScope } from ${JSON.stringify(storageModule)};
+    import { writeFileSync } from 'node:fs';
+    import path from 'node:path';
+    const scope = createProjectTemporaryScope({ root: process.argv[1], parent: process.argv[2] });
+    writeFileSync(path.join(scope.directory, 'unfinished-fixture'), Buffer.alloc(1024 * 1024));
+    process.stdout.write(scope.directory);
+    process.exit(17);
+  `;
+  const failed = spawnSync(
+    process.execPath,
+    ["--input-type=module", "-e", program, root, locations.temporary],
+    { encoding: "utf8" },
+  );
+  assert.equal(failed.status, 17, failed.stderr);
+  const abandoned = failed.stdout;
+  assert.ok(existsSync(abandoned));
+  const live = createProjectTemporaryScope({ root, parent: locations.temporary });
+  // Creation already recovers a previous interrupted execution before new work starts.
+  assert.equal(existsSync(abandoned), false);
+  const interrupted = spawnSync(
+    process.execPath,
+    ["--input-type=module", "-e", program, root, locations.temporary],
+    { encoding: "utf8" },
+  );
+  assert.equal(interrupted.status, 17, interrupted.stderr);
+  write(root, ".tmp/old-unowned/sentinel", "retain unknown scratch");
+  write(root, ".tmp/linked-worktree/.git", "gitdir: ../outside-git-admin");
+  write(root, ".project-state/operation/pending.json", "retain recovery evidence");
+  write(root, path.relative(root, path.join(locations.config, "account")), "retain account");
+  write(root, path.relative(root, path.join(locations.data, "installed-tool")), "retain tool");
+  const observed = [];
+  const log = console.log;
+  console.log = (value) => observed.push(String(value));
+  try {
+    await assert.rejects(
+      runRepositoryHousekeeping({ storageOnly: true, apply: false }, { root }),
+      /storage requires owner reconciliation/u,
+    );
+    assert.ok(existsSync(interrupted.stdout), "check is read-only");
+    await runRepositoryHousekeeping({ storageOnly: true, apply: true }, { root }).catch((error) => {
+      throw new Error(`${error.message}\n${observed.join("\n")}`, { cause: error });
+    });
+  } finally {
+    console.log = log;
+  }
+  assert.equal(existsSync(interrupted.stdout), false);
+  for (const retained of [
+    live.directory,
+    ".tmp/old-unowned/sentinel",
+    ".tmp/linked-worktree/.git",
+    ".project-state/operation/pending.json",
+    path.join(locations.config, "account"),
+    path.join(locations.data, "installed-tool"),
+  ])
+    assert.ok(existsSync(path.resolve(root, retained)), retained);
+  assert.ok(observed.some((line) => line.includes('"removed":1')));
+  assert.ok(live.release());
+  const interruptedCleanup = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `
+    import { createProjectTemporaryScope } from ${JSON.stringify(storageModule)};
+    import { writeFileSync } from 'node:fs';
+    import path from 'node:path';
+    const scope = createProjectTemporaryScope({root:process.argv[1],parent:process.argv[2]});
+    writeFileSync(path.join(scope.directory,'payload'),Buffer.alloc(1024*1024));
+    process.stdout.write(path.dirname(scope.directory));
+    scope.release({testHooks:{afterClaim(){process.kill(process.pid,'SIGKILL');}}});
+  `,
+      root,
+      locations.temporary,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(interruptedCleanup.signal, "SIGKILL", interruptedCleanup.stderr);
+  assert.ok(
+    existsSync(path.join(interruptedCleanup.stdout, "owner.json")),
+    "bulk cleanup retains its discoverable owner until the payload is gone",
+  );
+  const recovered = reconcileRepositoryStorage({ root, apply: true });
+  assert.equal(
+    recovered.scopes.find((scope) => scope.path === path.relative(root, interruptedCleanup.stdout))
+      .status,
+    "removed",
+  );
+  assert.equal(existsSync(interruptedCleanup.stdout), false);
+  // Unknown bytes cannot be silently called clean, even though deletion is not authorized.
+  write(root, ".tmp/old-unowned/large", Buffer.alloc(2 * 1024 * 1024));
+  const pressure = reconcileRepositoryStorage({ root, scratchBudgetBytes: 1024 * 1024 });
+  assert.equal(pressure.reviewRequired, true);
+  assert.ok(pressure.groups.find((group) => group.path === ".tmp").bytes >= 2 * 1024 * 1024);
+  assert.equal(pressure.groups.find((group) => group.path === ".tmp").complete, true);
+  assert.ok(pressure.groups.find((group) => group.path === ".auth").bytes > 0);
+  const summary = repositoryStorageSummary(pressure);
+  assert.match(summary, /\.auth\/project-tools\/data:/u);
+  assert.doesNotMatch(summary, /retain account|installed-tool|pending\.json/u);
+});
+
+test("temporary recovery waits for surviving consumers and unlinks only owned scratch", async (t) => {
+  const root = fixture(t);
+  const locations = prepareProjectToolDirectories(root);
+  const storageModule = new URL("../repository/project-temporary-storage.mjs", import.meta.url)
+    .href;
+  const producer = spawn(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `
+    import { createProjectTemporaryScope } from ${JSON.stringify(storageModule)};
+    const scope = createProjectTemporaryScope({root:process.argv[1],parent:process.argv[2]});
+    process.stdout.write(scope.directory+'\\n');
+    setInterval(()=>{},1000);
+  `,
+      root,
+      locations.temporary,
+    ],
+    { cwd: root, stdio: ["ignore", "pipe", "inherit"] },
+  );
+  const owned = [producer];
+  t.after(async () => {
+    for (const child of owned) {
+      if (child.exitCode !== null || child.signalCode !== null) continue;
+      child.kill("SIGKILL");
+      await once(child, "close");
+    }
+  });
+  const [output] = await once(producer.stdout, "data");
+  const temporary = String(output).trim();
+  const consumer = spawn(
+    process.execPath,
+    ["-e", "process.stdout.write('ready');setInterval(()=>{},1000)"],
+    {
+      cwd: root,
+      env: temporaryEnvironment(process.env, temporary),
+      stdio: ["ignore", "pipe", "inherit"],
+    },
+  );
+  owned.push(consumer);
+  await once(consumer.stdout, "data");
+  producer.kill("SIGKILL");
+  await once(producer, "close");
+  const reconcile = () =>
+    reconcileProjectTemporaryStorage({ root, parent: locations.temporary, apply: true });
+  assert.equal(reconcile()[0].reason, "active consumers");
+  assert.ok(existsSync(temporary));
+  consumer.kill("SIGTERM");
+  await once(consumer, "close");
+  assert.equal(reconcile()[0].status, "removed");
+
+  const scope = createProjectTemporaryScope({ root, parent: locations.temporary });
+  const retained = path.join(locations.home, "retained-account");
+  writeFileSync(retained, "retain original bytes");
+  symlinkSync(retained, path.join(scope.directory, "link"));
+  linkSync(retained, path.join(scope.directory, "hardlink"));
+  assert.ok(
+    scope.release(),
+    "links inside disposable scratch may be unlinked without changing their targets",
+  );
+  assert.equal(readFileSync(retained, "utf8"), "retain original bytes");
+
+  const linked = createProjectTemporaryScope({ root, parent: locations.temporary });
+  writeFileSync(path.join(linked.directory, ".git"), "gitdir: outside-owned-tree");
+  assert.throws(() => linked.release(), /linked Git/u);
+  assert.ok(existsSync(linked.directory));
+
+  const tampered = createProjectTemporaryScope({ root, parent: locations.temporary });
+  const marker = path.join(tampered.directory, "..", "owner.json");
+  const record = JSON.parse(readFileSync(marker, "utf8"));
+  record.directory.inode = "0";
+  writeFileSync(marker, JSON.stringify(record));
+  const invalid = reconcile().find(
+    (scope) => scope.path === path.relative(root, path.dirname(tampered.directory)),
+  );
+  assert.equal(invalid.status, "retained");
+  assert.match(invalid.reason, /unsafe/u);
+  assert.ok(existsSync(tampered.directory));
+  assert.equal(reconcileRepositoryStorage({ root }).reviewRequired, true);
+});
 
 test("the portable housekeeping CLI handles help and rejects invalid options before mutation", () => {
   const script = fileURLToPath(new URL("./repository-housekeeping.mjs", import.meta.url));

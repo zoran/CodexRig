@@ -21,6 +21,8 @@ import {
   root,
   stagedPathsFromGit,
 } from "./adaptive-state.mjs";
+import { executableFingerprint } from "./verification-source-inputs.mjs";
+import { digest } from "./verification-record-helpers.mjs";
 
 const objectIdPattern = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const maximumBasisPaths = 20_000;
@@ -76,6 +78,34 @@ function safeBasisPath(value) {
     !normalized.split("/").some((segment) => !segment || segment === "." || segment === "..") &&
     !/[\0\r\n]/u.test(normalized)
   );
+}
+
+/** Supplies an initial editorial comparison without requiring a prior complete verification run. */
+export function initialVerificationSourceFiles(paths, { repositoryRoot = root } = {}) {
+  const reference =
+    git(repositoryRoot, ["merge-base", "HEAD", "@{upstream}"], { allowFailure: true })?.trim() ||
+    "HEAD";
+  const result = [];
+  for (const file of paths) {
+    if (!safeBasisPath(file) || !/\.(?:[cm]?js|jsx|ts|tsx|json)$/u.test(file)) continue;
+    const entry = git(repositoryRoot, ["ls-tree", "-z", reference, "--", file], {
+      allowFailure: true,
+    });
+    const match = /^(100644|100755) blob ([a-f0-9]{40,64})\t[^\0]+\0$/u.exec(entry ?? "");
+    if (!match) continue;
+    const content = git(repositoryRoot, ["cat-file", "blob", match[2]], { allowFailure: true });
+    if (content === null) continue;
+    const buffer = Buffer.from(content);
+    const mode = Number.parseInt(match[1], 8) & 0o7777;
+    result.push({
+      path: file,
+      fingerprint: digest(`${mode}\0${digest(buffer)}`),
+      semanticFingerprint: digest(
+        `${mode & 0o111}\0${executableFingerprint(repositoryRoot, file, buffer)}`,
+      ),
+    });
+  }
+  return result;
 }
 
 export function normalizedVerificationGitBasis(value) {

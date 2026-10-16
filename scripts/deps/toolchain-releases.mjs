@@ -1,15 +1,20 @@
 /** Resolves compatible stable tool and CI releases from their official distribution owners. */
 import { createHash } from "node:crypto";
-import { chmodSync, lstatSync, mkdtempSync } from "node:fs";
-import path from "node:path";
 import { toolingRoot } from "../filesystem/repository-files.mjs";
-import { removeOwnedArtifact } from "../filesystem/owned-file-operations.mjs";
 import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
+import {
+  createProjectTemporaryScope,
+  temporaryEnvironment,
+} from "../repository/project-temporary-storage.mjs";
 import {
   cleanGitEnvironment,
   isolatedGitResultCompleted,
 } from "../repository/git-runtime-isolation.mjs";
 import { spawnSyncWithBoundedIo } from "../repository/runtime-process-io.mjs";
+import {
+  currentRuntimeLifecycleCapability,
+  assertRuntimeLifecycleQuiescent,
+} from "../repository/runtime-session-lease.mjs";
 import {
   compareSemver,
   parseSemver,
@@ -304,12 +309,12 @@ export async function verifiedMiseBinaryDigest(asset, fetchImpl = globalThis.fet
 
 /** Runs public Git discovery without host/project Git configuration, credentials, hooks or checkout. */
 function withPublicGithubGit(root, spawnGit, action) {
+  const owner = currentRuntimeLifecycleCapability({ root, operation: "toolchain-maintenance" });
   const locations = prepareProjectToolDirectories(root);
-  const directory = mkdtempSync(path.join(locations.temporary, "release-refs-"));
-  chmodSync(directory, 0o700);
-  const identity = lstatSync(directory);
+  const temporary = createProjectTemporaryScope({ root, parent: locations.temporary });
+  const directory = temporary.directory;
   const environment = {
-    ...cleanGitEnvironment(process.env, root),
+    ...temporaryEnvironment(cleanGitEnvironment(process.env, root), directory),
     HOME: directory,
     USERPROFILE: directory,
     XDG_CONFIG_HOME: directory,
@@ -336,16 +341,13 @@ function withPublicGithubGit(root, spawnGit, action) {
   try {
     return action(git);
   } finally {
-    const currentIdentity = lstatSync(directory);
-    if (
-      currentIdentity.dev !== identity.dev ||
-      currentIdentity.ino !== identity.ino ||
-      !currentIdentity.isDirectory()
-    )
-      throw new Error("Public release lookup directory identity changed.");
-    removeOwnedArtifact(root, directory, "directory", "public release lookup", {
-      expectedIdentity: currentIdentity,
-    });
+    // Pending lifecycle work may still enter the directory; process inspection alone cannot
+    // establish that every admitted consumer has started and settled.
+    if (owner) assertRuntimeLifecycleQuiescent({ root, owner });
+    if (!temporary.release())
+      console.warn(
+        "Release lookup temporary storage retained for remaining consumers; housekeeping will reconcile it.",
+      );
   }
 }
 

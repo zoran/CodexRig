@@ -43,6 +43,17 @@ description:
   and reproduces offline. Failed freshness or installation stops startup; side hooks never update.
   Toolchain metadata is project-owned and independent of source release contracts. Use the same
   command without `--startup` for explicitly authorized current-slice maintenance.
+- `--locked` skips release discovery and reproduces reviewed pins for CI or scoped preparation.
+  Invoke it separately; preserve `--startup` in the normal launcher. The portable launcher
+  regression checks this executable boundary without running dependency maintenance.
+- Keep dependency declarations, lockfiles, versions and digests in the repository; installed tools
+  and package graphs use `scripts/repository/user-tool-storage.mjs` and pnpm's global virtual store.
+  Test relocation with an isolated `PROJECT_TOOL_STORAGE_HOME`. Credentials/configuration remain
+  project-private. Reuse verified immutable bundles; startup and housekeeping compose native
+  reference-aware collectors through `tool-storage-housekeeping.mjs`. Mise's native public config
+  references are shared; trust and account state remain private. Preserve all registered projects'
+  pins and running runtimes. Retire legacy copies only through the quiescent installation owner;
+  preserve unknown scratch and mutable device/account data for their actual migration owner.
 - Pre-push is read-only. Apply dependency changes before commit through an explicit maintenance
   command.
 

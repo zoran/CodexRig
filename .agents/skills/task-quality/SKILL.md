@@ -22,11 +22,17 @@ publication.
   owners/consumers and actual risks; optional improvements cannot extend acceptance. Apply
   [Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification)
   before command selection. Inspect `pnpm verify:changed -- --print-plan`; use focused checks and
-  the [Test Strategy](../../../instructions.md#test-strategy). A failing check is not broad-rerun
-  authority.
+  the [Test Strategy](../../../instructions.md#test-strategy). Reviews, audits and handoffs consume
+  valid evidence; only changed relevant inputs or an unresolved finding justify repetition. A
+  failing check retains unaffected successes and is not broad-rerun authority.
 - Distinguish source/static checks, isolated fixtures, rendered flows, actual targets and native
   model behavior. Claim only what the observed evidence proves. Missing coverage is a finding only
   with a concrete recurrence path or material-risk invariant.
+- For critical internal contracts, verify that representative local scenarios execute the shipped
+  code and complete result validator. Reject unconditional mocks of the invariant being proved.
+  Review failure classification and original-state reconciliation under
+  [Failure Recovery](../../../instructions.md#deployment-and-qualification-failure-recovery); local
+  repair evidence does not establish live deployment or qualification acceptance.
 - For infrastructure, select evidence under
   [Infrastructure As Code](../../../instructions.md#infrastructure-as-code); distinguish static
   validation and plans/previews from authorized target, idempotence, drift and recovery evidence.
@@ -84,10 +90,14 @@ report limits and preserve requirements. Static byte checks do not establish mod
    [Closure And Repository Housekeeping](../../../instructions.md#completed-goal-closure-and-repository-housekeeping)
    sequence, including orchestration housekeeping, `repo:housekeeping`, active-document currency,
    critical-document preservation review and fresh audit. Do not copy or reorder that sequence here.
-4. Run the scope-appropriate final evidence once on the stable actual integration state under
+4. Reuse valid evidence and fill only necessary gaps on the stable integration state under
    [Verification](../../../instructions.md#verification). Follow the repository’s applicable
-   cleanup, publication and `pnpm goal:new` gates; never invent additional closure work or
-   manufacture completion.
+   cleanup, publication and `pnpm goal:new` gates. The publisher bundles complete verification once
+   before push; local review or handoff does not independently trigger that suite. Never invent
+   closure work or manufacture completion. Apply
+   [Temporary Storage](../../../instructions.md#temporary-data-and-storage-housekeeping) when
+   reconciling generated residue; `repo:housekeeping -- --storage-only` includes `.auth/` sizes
+   without rerunning product tests or treating preserved accounts, caches and recovery as trash.
 5. Any later repository edit reopens affected evidence, review and audit. Follow
    [Capacity And Drain](../../../instructions.md#guarded-and-critical-drain) before new work; a
    successful critical seal ends all actions immediately.
