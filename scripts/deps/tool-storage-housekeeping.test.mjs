@@ -33,6 +33,7 @@ import {
   prepareUserToolDirectories,
   prepareMiseTracking,
   trackedToolProjects,
+  deferredMiseTrackingErrorCode,
 } from "../repository/user-tool-storage.mjs";
 import { runRepositoryHousekeeping } from "../goals/repository-housekeeping.mjs";
 import { runProjectCommand } from "../setup/project-command.mjs";
@@ -68,6 +69,28 @@ test("shared tracking accepts current native and npm package pins without admitt
       path.join(shared.miseTrackedConfigs, String(index)),
     );
   }
+  assert.deepEqual(trackedToolProjects().sort(), roots.sort());
+  for (const mode of [0o775, 0o777]) {
+    chmodSync(roots[0], mode);
+    assert.throws(
+      () => trackedToolProjects(),
+      (error) =>
+        error.code === deferredMiseTrackingErrorCode &&
+        error.message.includes(roots[0]) &&
+        /group\/other-writable/u.test(error.message),
+    );
+    assert.equal(lstatSync(roots[0]).mode & 0o777, mode, "inventory never repairs a project");
+  }
+  chmodSync(roots[0], 0o700);
+  const alias = path.join(parent, "linked-project");
+  symlinkSync(roots[0], alias, "dir");
+  const linkedReference = path.join(shared.miseTrackedConfigs, "linked-project");
+  symlinkSync(path.join(alias, ".codex/mise.toml"), linkedReference);
+  assert.throws(
+    () => trackedToolProjects(),
+    (error) => error.code === deferredMiseTrackingErrorCode && /noncanonical/u.test(error.message),
+  );
+  rmSync(linkedReference);
   assert.deepEqual(trackedToolProjects().sort(), roots.sort());
   write(
     path.join(roots[0], ".codex/mise.toml"),
@@ -342,6 +365,11 @@ test("shared cleanup rejects executable tracked configuration before deleting an
   const privateConfig = path.join(f.roots[2], ".auth/project-tools/config/mise/config.toml");
   write(privateConfig, '[env]\nADAPTER_SENTINEL = "isolated"\n');
   symlinkSync(privateConfig, path.join(f.shared.miseTrackedConfigs, "000-private-reference"));
+  chmodSync(f.roots[2], 0o775);
+  symlinkSync(
+    path.join(f.roots[2], ".codex/mise.toml"),
+    path.join(f.shared.miseTrackedConfigs, "000-unadmitted-project"),
+  );
   const unsafe = path.join(f.roots[1], ".codex/mise.toml");
   write(unsafe, '[tools]\nnode = "24.21.0"\npnpm = "11.28.0"\n[env]\nUNSAFE = "retained"\n');
   symlinkSync(unsafe, path.join(f.shared.miseTrackedConfigs, "unsafe-reference"));
@@ -446,6 +474,37 @@ test("startup composes native cleanup and migrates private pin tracking without 
     lstatSync(path.join(tracked, "dead-reference"), { throwIfNoEntry: false }),
     undefined,
   );
+  assert.equal(readFileSync(privateState, "utf8"), "preserved private state");
+  assert.deepEqual(readFileSync(path.join(root, "pnpm-lock.yaml")), before);
+
+  // A registered sibling with permissive root modes must retain shared tools, not abort an
+  // otherwise verified startup or have its permissions silently rewritten by this project.
+  const sibling = f.roots[1];
+  native(sibling, f.layout.mise.executable, ["ls", "--current", "--json"]);
+  chmodSync(sibling, 0o775);
+  const retainedRuntime = path.join(f.shared.miseData, "installs/node/18.19.0");
+  write(path.join(retainedRuntime, "bin/node"), launcher(installed.node.executable), 0o755);
+  const oldMatrix = structuredClone(matrix);
+  oldMatrix.ci.miseVersion = "2026.8.1";
+  const retainedBundle = projectManagedToolLayout(root, oldMatrix).mise;
+  write(retainedBundle.executable, "#!/bin/sh\nexit 0\n", 0o755);
+  sealProjectToolBundle(root, retainedBundle.directory, retainedBundle);
+  const progress = [];
+  const retained = await maintainToolchain({
+    prepareStorage: () => {},
+    root,
+    startup: true,
+    locked: true,
+    fetchImpl: () => {
+      throw new Error("startup storage regression must not download");
+    },
+    onProgress: (message) => progress.push(message),
+  });
+  assert.deepEqual(retained.changedPaths, []);
+  assert.ok(progress.some((message) => message.includes(sibling) && /writable/u.test(message)));
+  assert.ok(existsSync(retainedRuntime), "unadmitted project references retain all runtimes");
+  assert.ok(existsSync(retainedBundle.directory), "unadmitted references also retain bundles");
+  assert.equal(lstatSync(sibling).mode & 0o777, 0o775, "sibling permissions stay unchanged");
   assert.equal(readFileSync(privateState, "utf8"), "preserved private state");
   assert.deepEqual(readFileSync(path.join(root, "pnpm-lock.yaml")), before);
 });

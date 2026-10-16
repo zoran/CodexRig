@@ -19,7 +19,7 @@ import { parsePortableToml } from "../contracts/portable-toml.mjs";
 import { parseSemver } from "../contracts/semver-contract.mjs";
 import { claimAndRemove, ensureOwnedPrivateDirectory } from "../filesystem/owned-path-safety.mjs";
 
-export const privateMiseTrackingErrorCode = "ERR_PRIVATE_MISE_TRACKING";
+export const deferredMiseTrackingErrorCode = "ERR_DEFERRED_MISE_TRACKING";
 
 export function userToolPaths(inherited = process.env) {
   // HOME is intentionally project-private. Use the OS account, or an explicit storage-only
@@ -178,12 +178,12 @@ export function prepareMiseTracking(root, { migrate = false, inherited = process
   return true;
 }
 
-/** Admits native GC only when every extant tracked config is a non-executing exact-pin document. */
+/** Admits native GC only for a complete trusted pin inventory; deferred roots are never read. */
 export function trackedToolProjects(inherited = process.env) {
   const shared = userToolPaths(inherited);
   assertUserToolParents(shared.root, path.join(shared.miseTrackedConfigs, "entry"));
   const projects = new Set();
-  let privateConfigurationTracked = false;
+  const retentionReasons = new Set();
   const entries = readdirSync(shared.miseTrackedConfigs);
   if (entries.length > 4096) throw new Error("Mise project reference inventory exceeds its bound.");
   for (const name of entries) {
@@ -202,7 +202,7 @@ export function trackedToolProjects(inherited = process.env) {
     ) {
       // Native Mise also tracks private environment/settings files. Never read or execute those
       // through another project's collector, and do not discard references that may retain tools.
-      privateConfigurationTracked = true;
+      retentionReasons.add("private Mise configuration is tracked");
       continue;
     }
     if (
@@ -213,12 +213,18 @@ export function trackedToolProjects(inherited = process.env) {
       throw new Error("Shared tool cleanup encountered an unrecognized project configuration.");
     const root = path.dirname(path.dirname(config));
     const stats = lstatSync(root);
-    if (
-      realpathSync.native(root) !== root ||
-      (stats.mode & 0o022) !== 0 ||
-      (typeof process.getuid === "function" && stats.uid !== process.getuid())
-    )
-      throw new Error("Shared tool cleanup requires developer-owned canonical projects.");
+    const problems = [];
+    if (!stats.isDirectory() || stats.isSymbolicLink() || realpathSync.native(root) !== root)
+      problems.push("noncanonical directory");
+    if ((stats.mode & 0o022) !== 0) problems.push("group/other-writable directory");
+    if (typeof process.getuid === "function" && stats.uid !== process.getuid())
+      problems.push("directory owned by another user");
+    if (problems.length) {
+      // A shared reference cannot authorize this project to read or repair another root. Keep
+      // every shared version, but let the caller continue maintenance independent of this GC.
+      retentionReasons.add(`${JSON.stringify(root)}: ${problems.join(", ")}`);
+      continue;
+    }
     assertUserToolParents(root, config);
     if ((lstatSync(config).mode & 0o022) !== 0)
       throw new Error("Shared tool cleanup refused a foreign-writable pin document.");
@@ -226,13 +232,13 @@ export function trackedToolProjects(inherited = process.env) {
       throw new Error("Shared tool cleanup requires non-executing exact project pins.");
     projects.add(root);
   }
-  // Expected private-state retention must never conceal a malformed public reference later in
-  // the inventory. Only a fully inspected set may defer this one collector.
-  if (privateConfigurationTracked) {
+  // Retention must never conceal a malformed public reference later in the inventory. Never
+  // return a partial project set: it could authorize deleting another project's tool versions.
+  if (retentionReasons.size) {
     const error = new Error(
-      "Shared runtime collection requires retaining private Mise configuration.",
+      `Shared runtime collection deferred: ${[...retentionReasons].join("; ")}`,
     );
-    error.code = privateMiseTrackingErrorCode;
+    error.code = deferredMiseTrackingErrorCode;
     throw error;
   }
   return [...projects];

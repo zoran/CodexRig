@@ -216,15 +216,17 @@ upgradeable product repositories while deliberately defining no child product or
   successful quiescent startup retires their legacy copies. `tool-storage-housekeeping.mjs` composes
   native Mise/pnpm/npm collectors at startup and housekeeping, without installation or tests. Shared
   runtime/bundle collection uses Mise's existing public pin registry across projects; package GC
-  uses pnpm's registry. Primary/secondary pins, live executables/libraries, accounts and installed
-  projects' offline inputs are retained. The shared lifecycle lock covers staged installation
-  through pin publication and cleanup. Known legacy cache/data permissions are normalized only under
-  verified private parents through the filesystem owner. Old active runtimes and unmarked product
-  state remain with their migration owner. Stable CI uses the same maintenance owner with
-  `--locked`, skipping release refresh and reproducing frozen dependencies before entering the
-  common command wrapper. Toolchain, dependency, native-tool and public-release staging use the
-  shared execution-scoped temporary owner, including recovery after interruption; account state and
-  retained tool pins stay outside disposable staging.
+  uses pnpm's registry. Private Mise configuration or a project root that fails canonical-path,
+  ownership or write-permission admission defers shared runtime and bundle collection with a
+  diagnostic while startup and independent collectors continue. Primary/secondary pins, live
+  executables/libraries, accounts and installed projects' offline inputs are retained. The shared
+  lifecycle lock covers staged installation through pin publication and cleanup. Known legacy
+  cache/data permissions are normalized only under verified private parents through the filesystem
+  owner. Old active runtimes and unmarked product state remain with their migration owner. Stable CI
+  uses the same maintenance owner with `--locked`, skipping release refresh and reproducing frozen
+  dependencies before entering the common command wrapper. Toolchain, dependency, native-tool and
+  public-release staging use the shared execution-scoped temporary owner, including recovery after
+  interruption; account state and retained tool pins stay outside disposable staging.
 - Runtime and technology: Node.js ESM orchestrating the pnpm and mise toolchain.
 - Public contract: `deps:install`, `deps:report`, and `deps:update*` commands; the
   lifecycle-delegated `install-compatible.mjs --reproduce-locked` and `--reproduce-toolchain`
@@ -391,41 +393,44 @@ upgradeable product repositories while deliberately defining no child product or
   `user-tool-storage.mjs` owner separates shared versioned installations and npm/pnpm/Mise caches
   under the OS user's `project-tools` directories. Only Mise's native public configuration
   references are shared for collection, including exact native and `npm:pnpm` pins without
-  executable configuration; stricter project execution admission remains separate. Account, trust
-  and encrypted environment state remain project-private. Preparation hardens known legacy private
-  Mise directories before reference migration without weakening shared-storage admission.
-  Playwright/Puppeteer browser-distribution paths also bind shared user caches; profiles, cookies
-  and recovery state remain private. Their native browser managers own version retention. The
-  neutral storage protocol is unchanged by child projection, including the existing lifecycle lock,
-  guard and update mutex. Legacy source-specific shared locks are preserved for recovery by their
-  original owner. Credentials and mutable device state never enter that shared installation home.
-  Account state is excluded before source discovery and kept separate from ephemeral native-runtime
-  reset. Its storage owner checks the repository, shared installation and package-cache filesystems
-  before toolchain staging/downloads. A fixed 2 GiB available minimum governs admission; percentages
-  are informational. Native Docker build-cache collection targets 3 GiB only below the minimum.
-  Unresolved capacity remains a blocking failure; product data, images, volumes and accounts stay.
-  Owns the Git HTTPS credential-store binding to the private project home, with repository-path
-  matching and owner-only storage checks. Its shared GitHub/GitLab adapter tries existing global Git
-  helpers and the matching CLI login for configured provider hosts when a project credential is
-  missing; global store/erase and automatic login are excluded. The same adapter owns a private,
-  operation-bound rejection context so publication can skip rejected candidates and make bounded
-  noninteractive retries. Its publication identity resolver fills only missing public Git name/email
-  metadata from native global configuration without includes, validates both identities, and returns
-  only commit-scoped author/committer pins. Other tool accounts remain project-local. The common
-  environment preserves the declared verification controls through launcher, publication and
-  pre-push; private Mise configuration provides persistent public tool defaults. Owns the shared
-  execution-scoped temporary lifecycle used by project commands and canonical sessions and
-  individual verifier commands. Exact repository/directory/process identity and remaining-consumer
-  checks gate terminal cleanup and interrupted-run recovery; release discovery also retains scratch
-  while the existing lifecycle owner has pending or live consumers; only admitted ephemeral paths
-  normalize out of verification identity. Its storage inventory includes `.auth/` and tool
-  subdirectories, scratch, native history/cache and operation recovery sizes, without reading
-  accounts or deleting unowned/durable state. Runtime-use inspection can include executables and
-  mapped libraries even without an open file descriptor. Existing housekeeping composes this owner,
-  including the bounded `--storage-only` entry. Owns the shared crash-recoverable file batch used by
-  housekeeping and startup maintenance, including synchronous install finalization and rollback.
-  Per-root inconsistencies remain visible without discarding other safe inventory; orphan recovery
-  corruption is advisory unless writer ownership is also unsafe.
+  executable configuration; stricter project execution admission remains separate. An unadmitted
+  tracked project root retains all shared versions without reading its pins or changing its
+  permissions; remaining references are still checked, and no partial inventory can authorize GC.
+  Account, trust and encrypted environment state remain project-private. Preparation hardens known
+  legacy private Mise directories before reference migration without weakening shared-storage
+  admission. Playwright/Puppeteer browser-distribution paths also bind shared user caches; profiles,
+  cookies and recovery state remain private. Their native browser managers own version retention.
+  The neutral storage protocol is unchanged by child projection, including the existing lifecycle
+  lock, guard and update mutex. Legacy source-specific shared locks are preserved for recovery by
+  their original owner. Credentials and mutable device state never enter that shared installation
+  home. Account state is excluded before source discovery and kept separate from ephemeral
+  native-runtime reset. Its storage owner checks the repository, shared installation and
+  package-cache filesystems before toolchain staging/downloads. A fixed 2 GiB available minimum
+  governs admission; percentages are informational. Native Docker build-cache collection targets 3
+  GiB only below the minimum. Unresolved capacity remains a blocking failure; product data, images,
+  volumes and accounts stay. Owns the Git HTTPS credential-store binding to the private project
+  home, with repository-path matching and owner-only storage checks. Its shared GitHub/GitLab
+  adapter tries existing global Git helpers and the matching CLI login for configured provider hosts
+  when a project credential is missing; global store/erase and automatic login are excluded. The
+  same adapter owns a private, operation-bound rejection context so publication can skip rejected
+  candidates and make bounded noninteractive retries. Its publication identity resolver fills only
+  missing public Git name/email metadata from native global configuration without includes,
+  validates both identities, and returns only commit-scoped author/committer pins. Other tool
+  accounts remain project-local. The common environment preserves the declared verification controls
+  through launcher, publication and pre-push; private Mise configuration provides persistent public
+  tool defaults. Owns the shared execution-scoped temporary lifecycle used by project commands and
+  canonical sessions and individual verifier commands. Exact repository/directory/process identity
+  and remaining-consumer checks gate terminal cleanup and interrupted-run recovery; release
+  discovery also retains scratch while the existing lifecycle owner has pending or live consumers;
+  only admitted ephemeral paths normalize out of verification identity. Its storage inventory
+  includes `.auth/` and tool subdirectories, scratch, native history/cache and operation recovery
+  sizes, without reading accounts or deleting unowned/durable state. Runtime-use inspection can
+  include executables and mapped libraries even without an open file descriptor. Existing
+  housekeeping composes this owner, including the bounded `--storage-only` entry. Owns the shared
+  crash-recoverable file batch used by housekeeping and startup maintenance, including synchronous
+  install finalization and rollback. Per-root inconsistencies remain visible without discarding
+  other safe inventory; orphan recovery corruption is advisory unless writer ownership is also
+  unsafe.
 - Runtime and technology: Node.js ESM over filesystem and isolated Git process boundaries.
 - Public contract: `worktree:status` with current/unfinished/settled human markers plus exported
   inventory, path-policy, Product Root, worktree-recovery, runtime-lease/session-recovery,
@@ -617,7 +622,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.14.0`.
+- Framework version: `6.15.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

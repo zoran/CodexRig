@@ -296,18 +296,21 @@ native caches through their existing owners. Canonical startup runs the same too
 Mise/pnpm project references preserve other projects' pins and package graphs. Shared references
 accept exact native and `npm:pnpm` pins; each project retains its own executable admission. Tracked
 private Mise configurations retain shared runtime versions without being read or evaluated by
-another project's collector. Independent package, cache and scratch collectors continue. Framework
-and generated children use the same installation lifecycle lock. Quiescence and observed runtime use
-gate retirement of replaced repository installations. Migration repairs permissive legacy
-tool-directory modes only below verified private parents. Large unmanaged scratch and unresolved
-ownership remain visible failures; the command never empties `.tmp/` or `.auth/` wholesale. The
-wrapper, verifier commands and canonical sessions clean their own temporary scopes on exit and
-recover safe abandoned scopes on later runs. Load tests invoke installed runtimes instead of copying
-Node/Python or browser distributions for each run or replica; recovery retains compact checkpoints
-and runtime references. Playwright/Puppeteer browser payloads use shared user caches via the common
-environment, while profiles and account state stay private. Browser managers own version retirement;
-housekeeping does not download browsers or guess which versions a project needs. Existing unmarked
-output and mutable device/operation data require their producer's reconciliation; see
+another project's collector. A registered project root with a noncanonical path, a different owner,
+or group/other write access also retains shared runtimes and tool bundles. Startup reports the path
+and reason and continues without changing that project's permissions or references. Independent
+package, cache and scratch collectors continue. Framework and generated children use the same
+installation lifecycle lock. Quiescence and observed runtime use gate retirement of replaced
+repository installations. Migration repairs permissive legacy tool-directory modes only below
+verified private parents. Large unmanaged scratch and unresolved ownership remain visible failures;
+the command never empties `.tmp/` or `.auth/` wholesale. The wrapper, verifier commands and
+canonical sessions clean their own temporary scopes on exit and recover safe abandoned scopes on
+later runs. Load tests invoke installed runtimes instead of copying Node/Python or browser
+distributions for each run or replica; recovery retains compact checkpoints and runtime references.
+Playwright/Puppeteer browser payloads use shared user caches via the common environment, while
+profiles and account state stay private. Browser managers own version retirement; housekeeping does
+not download browsers or guess which versions a project needs. Existing unmarked output and mutable
+device/operation data require their producer's reconciliation; see
 [temporary storage](instructions.md#temporary-data-and-storage-housekeeping).
 
 ## Documentation Context Economy

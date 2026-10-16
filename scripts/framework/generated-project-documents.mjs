@@ -294,7 +294,10 @@ abandoned managed scratch and invoke the native tool/package/cache collectors. C
 uses the same collectors. Registered projects' pins, package graphs and running runtimes are retained;
 verified legacy installations retire through the dependency owner after session/runtime quiescence.
 Tracked private Mise configurations retain shared runtime versions without being read or evaluated
-by another project's collector. Independent package, cache and scratch collectors continue.
+by another project's collector. A registered project root with a noncanonical path, a different owner,
+or group/other write access also retains shared runtimes and tool bundles. Startup reports the path
+and reason and continues without changing that project's permissions or references. Independent
+package, cache and scratch collectors continue.
 
 For storage migration with unchanged versions and lockfiles, use
 \`node scripts/deps/maintain-toolchain.mjs --locked\`. Its online stage prepares the final

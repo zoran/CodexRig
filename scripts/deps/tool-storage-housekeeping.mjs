@@ -17,7 +17,7 @@ import {
   assertUserToolParents,
   prepareMiseTracking,
   trackedToolProjects,
-  privateMiseTrackingErrorCode,
+  deferredMiseTrackingErrorCode,
 } from "../repository/user-tool-storage.mjs";
 import { inspectRepositoryWorktrees } from "../repository/worktree-recovery.mjs";
 import { inspectLinuxOpenRepositoryPaths } from "../repository/runtime-process-identity.mjs";
@@ -30,7 +30,7 @@ import {
 } from "../repository/runtime-session-lease.mjs";
 import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycle-process.mjs";
 import { assertTrustedPnpmConfiguration } from "../repository/pnpm-workspace-manifests.mjs";
-import { formatContextError } from "../terminal/terminal-output.mjs";
+import { formatContextError, sanitizeForTerminal } from "../terminal/terminal-output.mjs";
 import { assertInstalledProjectTools } from "./project-runtime-admission.mjs";
 import {
   retireReplacedProjectTools,
@@ -129,9 +129,11 @@ export function reconcileToolStorage({
       try {
         projects = trackedToolProjects();
       } catch (error) {
-        if (error.code !== privateMiseTrackingErrorCode) throw error;
+        if (error.code !== deferredMiseTrackingErrorCode) throw error;
+        // This typed diagnostic contains only public project paths and fixed admission reasons,
+        // not native output or configuration contents. Keep the actionable path visible.
         report.deferred.push(
-          "shared runtime versions: private Mise configuration is tracked; its versions and account state are retained",
+          `${sanitizeForTerminal(error.message)}; shared runtime versions, tool bundles and account state are retained`,
         );
       }
       if (projects) {

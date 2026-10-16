@@ -800,9 +800,13 @@ stay read-only; no local cleanup daemon is added.
 
 Native Mise also tracks private environment/settings configurations. Retain shared runtime versions
 when these participate; never read or evaluate another project's private configuration, or remove
-its reference to force collection. This expected retention is reported and leaves independent
-package, cache and managed-scratch collectors available. Unrecognized references and unsafe public
-pin documents remain errors.
+its reference to force collection. A tracked project root that is noncanonical, owned by another
+user, or group/other-writable also defers shared runtime and bundle collection; report its path and
+the failed admission condition without reading its pins, changing its permissions or removing its
+reference. Retention does not abort an otherwise verified startup. Continue inspecting the remaining
+references before reporting deferral, and never collect from a partial project inventory.
+Independent package, cache and managed-scratch collectors remain available. Unrecognized references
+and unsafe public pin documents inside admitted project roots remain errors.
 
 Browser version retirement stays with the installed browser manager. Playwright's normal install
 tracks requiring packages and collects unused browser versions in the shared path; preserve that
