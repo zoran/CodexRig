@@ -509,7 +509,9 @@ upgradeable product repositories while deliberately defining no child product or
   Codex resume explicitly selects embedded mode with `--no-daemon`, preserving its session-only
   hooks and controls. `startup.displayName` in `.codex/tooling.json` owns the launcher's ASCII
   identity; generation sets the supplied project name. A bounded terminal-only reveal precedes five
-  progress phases, with static output for logs, CI, dumb terminals and `NO_COLOR`. The portable
+  progress phases, with static output for logs, CI, dumb terminals and `NO_COLOR`. Canonical startup
+  omits routine pnpm release-selection and healthy-storage notices while retaining progress, storage
+  pressure, recovery and failures; direct maintenance keeps the diagnostic details. The portable
   launcher regression ships to children, belongs to toolchain admission, and runs once for launcher
   changes or complete publication coverage. It exercises the shell invocation and blocks
   substituting frozen `--locked` preparation for release discovery. Source generation tests execute
@@ -615,7 +617,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.13.0`.
+- Framework version: `6.14.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

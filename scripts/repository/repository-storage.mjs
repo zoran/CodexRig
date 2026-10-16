@@ -255,9 +255,10 @@ function describe(capacity) {
  * Check is observational. Apply prunes only on pressure, on the same filesystem, through the
  * local daemon's native build-cache GC. No images, volumes, files, accounts or worktrees are deleted.
  * The native GC target includes reserved blocks so root-visible free space cannot hide low bavail.
+ * Startup omits healthy-capacity reports while pressure and recovery remain visible.
  */
 export function runStorageHousekeeping(
-  { root, apply = false, storagePaths = [] },
+  { root, apply = false, reportHealthy = true, storagePaths = [] },
   { readCapacity = readFilesystemCapacity, docker = runLocalDocker, log = console.log } = {},
 ) {
   const filesystems = new Map();
@@ -265,7 +266,8 @@ export function runStorageHousekeeping(
     const capacity = readCapacity(location);
     if (!filesystems.has(capacity.device)) {
       filesystems.set(capacity.device, { path: location, before: capacity, after: capacity });
-      log(`Repository storage (${location}): ${describe(capacity)}; minimum 2.0 GiB.`);
+      if (reportHealthy || capacity.availableBytes < minimumAvailableBytes)
+        log(`Repository storage (${location}): ${describe(capacity)}; minimum 2.0 GiB.`);
     }
   }
   const observations = [...filesystems.values()];

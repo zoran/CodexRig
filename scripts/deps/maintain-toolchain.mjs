@@ -207,6 +207,7 @@ export async function maintainToolchain({
     prepareStorage({
       root,
       apply: true,
+      reportHealthy: !startup,
       storagePaths: [storage.lifecycle, storage.miseCache, storage.pnpmStore, storage.pnpmCache],
     });
     recoverInterruptedHousekeepingWrites(root);
@@ -242,7 +243,10 @@ export async function maintainToolchain({
     const candidate =
       locked && candidateResolver === resolveToolchainReleases
         ? current
-        : await candidateResolver(current, { fetchImpl, onProgress: onReleaseNotice });
+        : await candidateResolver(current, {
+            fetchImpl,
+            onProgress: startup ? () => {} : onReleaseNotice,
+          });
     const projected = projectToolchainConfiguration(inputs.contents, current, candidate);
     if (!locked)
       projected[".github/workflows/ci.yml"] = await refreshGithubActions(
@@ -394,10 +398,7 @@ async function main() {
       if (startup) startupStatus(`${++phase}/5`, message);
       else console.log(message);
     },
-    onReleaseNotice: (message) => {
-      if (startup) startupStatus("pnpm", message);
-      else console.log(message);
-    },
+    onReleaseNotice: (message) => console.log(message),
     onLifecycleWait: (message) => startupStatus("wait", message),
   });
   const completed = `Toolchain ready; ${result.changedPaths.length} project input(s) updated.`;

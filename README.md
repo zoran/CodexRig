@@ -37,6 +37,10 @@ without refreshing tools or dependencies. See
 maintenance behavior and failure handling, and
 [Startup Repository Reconstruction](instructions.md#startup-repository-reconstruction) for recovery.
 
+Startup omits routine notices about skipped pnpm releases and sufficient free storage. Progress,
+storage pressure, recovery and failures remain visible. Direct toolchain maintenance without
+`--startup` retains those diagnostic details.
+
 If a verification or another lifecycle operation is still running, startup waits up to ten minutes
 and reports its operation, coordinator PID and start time. Ctrl-C cancels only the waiting startup.
 After release, startup checks session ownership again before maintenance. Uncertain ownership still
