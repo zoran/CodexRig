@@ -184,10 +184,12 @@ Use \`--locked\` separately for frozen preparation or CI; replacing the launcher
 updates. \`node --test scripts/setup/codex-launcher.test.mjs\` checks the actual launcher invocation
 without refreshing tools or dependencies and is included in affected checks and publication.
 
-If a verification or another lifecycle operation is still running, startup waits up to ten minutes
-and reports its operation, coordinator PID and start time. Ctrl-C cancels only the waiting startup.
-After release, startup checks session ownership again before maintenance. Uncertain ownership still
-blocks startup; never remove a live lock or terminate an unrelated process to bypass it.
+If verification or another lifecycle operation is still running, startup waits at both the project
+and shared-tool installation boundaries, for up to ten minutes per boundary. It reports which
+boundary is busy, the operation, coordinator PID and start time. Ctrl-C cancels only the waiting
+startup. After waiting, startup rechecks session ownership and staged source inputs before
+installation. A timeout preserves the running owner; uncertain ownership still blocks startup.
+Never remove a live lock or terminate an unrelated process to bypass it.
 
 If startup reports an invalid or unsupported private session lease, exit all sessions using this
 project. Its maintenance/update owner must reconstruct the installed runtime and restore the current

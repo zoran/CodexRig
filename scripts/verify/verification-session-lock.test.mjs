@@ -35,6 +35,7 @@ import {
   inspectRuntimeLifecycleLock,
   registerRuntimeLifecycleDescendant,
   releaseRuntimeLifecycleLock,
+  runtimeLifecycleBusyErrorCode,
 } from "../repository/runtime-session-lease.mjs";
 
 async function waitForLifecycle(predicate, label, timeoutMilliseconds = 5_000) {
@@ -150,6 +151,74 @@ test("cancelling a consumed delegation preserves the durable owner record", (t) 
   } finally {
     releaseRuntimeLifecycleLock({ root, owner });
   }
+});
+
+// Two starters may observe no owner before either publishes. The loser must see typed
+// contention, not a raw EEXIST or a partially written owner that bypasses startup waiting.
+test("simultaneous lifecycle admission publishes one owner and classifies the contender", async (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "lifecycle-admission-race-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const ready = path.join(root, "contender-ready");
+  const resultPath = path.join(root, "contender-result");
+  const module = new URL("../repository/runtime-session-lease.mjs", import.meta.url).href;
+  let child, closed, owner, outcome;
+  try {
+    try {
+      owner = acquireRuntimeLifecycleLock({
+        root,
+        operation: "toolchain-maintenance",
+        testHooks: {
+          beforeLifecycleLockCreate() {
+            child = spawn(
+              process.execPath,
+              [
+                "--input-type=module",
+                "-e",
+                `
+              import { writeFileSync } from "node:fs";
+              import { acquireRuntimeLifecycleLock, releaseRuntimeLifecycleLock } from ${JSON.stringify(module)};
+              const root = process.argv[1];
+              let owner;
+              process.on("message", () => {
+                if (owner) releaseRuntimeLifecycleLock({root, owner});
+                process.disconnect();
+              });
+              writeFileSync(process.argv[2], "ready");
+              let outcome;
+              try {
+                owner = acquireRuntimeLifecycleLock({root, operation:"toolchain-maintenance"});
+                outcome = "acquired";
+              } catch (error) { outcome = error.code ?? error.message; }
+              writeFileSync(process.argv[3], outcome);
+            `,
+                root,
+                ready,
+                resultPath,
+              ],
+              { stdio: ["ignore", "ignore", "pipe", "ipc"] },
+            );
+            closed = once(child, "exit");
+            const deadline = Date.now() + 5_000;
+            const wait = new Int32Array(new SharedArrayBuffer(4));
+            while (!existsSync(ready) && Date.now() < deadline) Atomics.wait(wait, 0, 0, 10);
+            assert.ok(existsSync(ready), "contender must reach admission");
+            Atomics.wait(wait, 0, 0, 100);
+          },
+        },
+      });
+      outcome = "acquired";
+    } catch (error) {
+      outcome = error.code ?? error.message;
+    }
+    await waitForLifecycle(() => existsSync(resultPath), "contender admission");
+    const outcomes = [outcome, readFileSync(resultPath, "utf8")];
+    assert.deepEqual(outcomes.sort(), [runtimeLifecycleBusyErrorCode, "acquired"].sort());
+  } finally {
+    if (owner) releaseRuntimeLifecycleLock({ root, owner });
+    if (child?.connected) child.send("release");
+    if (closed) await closed;
+  }
+  assert.equal(inspectRuntimeLifecycleLock({ root }).status, "absent");
 });
 
 test("lifecycle inspection preserves absent state and rejects hardlinked owner records", (t) => {

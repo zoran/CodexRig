@@ -21,6 +21,7 @@ import {
 } from "./runtime-process-identity.mjs";
 import { withRuntimeLifecycleUpdateMutex } from "./runtime-lifecycle-mutex.mjs";
 import {
+  createRuntimeLifecycleOwner,
   lifecycleGuardIdentity,
   runtimeLifecycleBusyError,
   runtimeLifecycleOperationPattern,
@@ -105,17 +106,13 @@ function readRuntimeLifecycleLock(root, updateLocked = false) {
   };
 }
 
-function readRuntimeLifecycleGuard(root) {
-  return runtimeFile(
+function removeRuntimeLifecycleGuard(root, owner) {
+  const guard = runtimeFile(
     root,
     runtimeLifecycleFileName(root, runtimeLifecycleGuardName),
     "Codex runtime lifecycle guard",
     4_096,
   );
-}
-
-function removeRuntimeLifecycleGuard(root, owner) {
-  const guard = readRuntimeLifecycleGuard(root);
   try {
     if (guard.status === "absent") {
       if (owner.guard !== null) {
@@ -143,8 +140,16 @@ function removeRuntimeLifecycleGuard(root, owner) {
   }
 }
 
-function unlinkStableRuntimeLifecycleLock(root, expected, { testHooks } = {}) {
-  let current = readRuntimeLifecycleLock(root);
+function unlinkStableRuntimeLifecycleLock(
+  root,
+  expected,
+  { testHooks, updateLocked = false } = {},
+) {
+  if (!updateLocked)
+    return withRuntimeLifecycleUpdateMutex(root, () =>
+      unlinkStableRuntimeLifecycleLock(root, expected, { testHooks, updateLocked: true }),
+    );
+  let current = readRuntimeLifecycleLock(root, true);
   try {
     if (
       current.status === "absent" ||
@@ -154,17 +159,22 @@ function unlinkStableRuntimeLifecycleLock(root, expected, { testHooks } = {}) {
       throw new Error("Codex runtime lifecycle lock changed before removal.");
     }
     if (current.owner.guard !== null) {
-      replaceLifecycleOwner(root, current.owner.nonce, (owner, snapshot) => {
-        if (snapshot.fileIdentity !== expected.fileIdentity || snapshot.status !== "stale") {
-          throw new Error("Codex runtime lifecycle changed before stale recovery.");
-        }
-        owner.guard = null;
-        owner.descendants = [];
-        owner.delegations = [];
-        return owner;
-      });
+      replaceLifecycleOwner(
+        root,
+        current.owner.nonce,
+        (owner, snapshot) => {
+          if (snapshot.fileIdentity !== expected.fileIdentity || snapshot.status !== "stale") {
+            throw new Error("Codex runtime lifecycle changed before stale recovery.");
+          }
+          owner.guard = null;
+          owner.descendants = [];
+          owner.delegations = [];
+          return owner;
+        },
+        { updateLocked: true },
+      );
       closeRuntimeFile(current);
-      current = readRuntimeLifecycleLock(root);
+      current = readRuntimeLifecycleLock(root, true);
       if (current.owner?.nonce !== expected.owner.nonce || current.owner.guard !== null) {
         throw new Error("Codex runtime lifecycle changed after stale recovery.");
       }
@@ -182,30 +192,32 @@ function unlinkStableRuntimeLifecycleLock(root, expected, { testHooks } = {}) {
   }
 }
 
-function replaceLifecycleOwner(root, nonce, change, { testHooks } = {}) {
-  return withRuntimeLifecycleUpdateMutex(root, () => {
-    const current = readRuntimeLifecycleLock(root, true);
-    try {
-      if (current.status === "absent" || current.owner.nonce !== nonce) {
-        throw new Error("Codex runtime lifecycle capability changed before update.");
-      }
-      const next = change(structuredClone(current.owner), current);
-      if (!validRuntimeLifecycleOwner(next, repositoryRuntimeRootIdentity(root))) {
-        throw new Error("Codex runtime lifecycle update produced an invalid owner.");
-      }
-      testHooks?.beforeLifecycleOwnerReplace?.({ current, next });
-      atomicReplaceOwnedFile(
-        current.directory,
-        runtimeLifecycleFileName(root, runtimeLifecycleLockName),
-        serializeCanonicalJson(next),
-        "Codex runtime lifecycle lock",
-        { mode: 0o600 },
-      );
-      return next;
-    } finally {
-      closeRuntimeFile(current);
+function replaceLifecycleOwner(root, nonce, change, { testHooks, updateLocked = false } = {}) {
+  if (!updateLocked)
+    return withRuntimeLifecycleUpdateMutex(root, () =>
+      replaceLifecycleOwner(root, nonce, change, { testHooks, updateLocked: true }),
+    );
+  const current = readRuntimeLifecycleLock(root, true);
+  try {
+    if (current.status === "absent" || current.owner.nonce !== nonce) {
+      throw new Error("Codex runtime lifecycle capability changed before update.");
     }
-  });
+    const next = change(structuredClone(current.owner), current);
+    if (!validRuntimeLifecycleOwner(next, repositoryRuntimeRootIdentity(root))) {
+      throw new Error("Codex runtime lifecycle update produced an invalid owner.");
+    }
+    testHooks?.beforeLifecycleOwnerReplace?.({ current, next });
+    atomicReplaceOwnedFile(
+      current.directory,
+      runtimeLifecycleFileName(root, runtimeLifecycleLockName),
+      serializeCanonicalJson(next),
+      "Codex runtime lifecycle lock",
+      { mode: 0o600 },
+    );
+    return next;
+  } finally {
+    closeRuntimeFile(current);
+  }
 }
 
 function capabilityHandle(record) {
@@ -281,29 +293,24 @@ export function acquireRuntimeLifecycleLock({
     throw runtimeLifecycleBusyError(lifecycleCapabilities.get(canonical), "reentrant");
   }
   ensureRuntimeDirectory(canonical, { testHooks });
-  const current = readRuntimeLifecycleLock(canonical);
+  return withRuntimeLifecycleUpdateMutex(canonical, () =>
+    publishLifecycleOwner(canonical, operation, testHooks),
+  );
+}
+
+/** Admission and publication share the reader/update mutex; contenders never observe half an owner. */
+function publishLifecycleOwner(canonical, operation, testHooks) {
+  const current = readRuntimeLifecycleLock(canonical, true);
   try {
     if (current.status === "active" || current.status === "unknown") {
       throw runtimeLifecycleBusyError(current.owner, current.status);
     }
     if (current.status === "stale")
-      unlinkStableRuntimeLifecycleLock(canonical, current, { testHooks });
+      unlinkStableRuntimeLifecycleLock(canonical, current, { testHooks, updateLocked: true });
   } finally {
     closeRuntimeFile(current);
   }
-  const coordinator = captureProcessIdentity(process.pid);
-  if (!coordinator) throw new Error("Could not capture the lifecycle coordinator identity.");
-  const owner = {
-    schemaVersion: 2,
-    coordinator,
-    delegations: [],
-    descendants: [],
-    guard: null,
-    nonce: randomUUID(),
-    operation,
-    root: repositoryRuntimeRootIdentity(canonical),
-    startedAt: new Date().toISOString(),
-  };
+  const owner = createRuntimeLifecycleOwner(repositoryRuntimeRootIdentity(canonical), operation);
   let descriptor;
   let lockCreated = false;
   try {
@@ -312,14 +319,14 @@ export function acquireRuntimeLifecycleLock({
       testHooks?.beforeLifecycleLockCreate?.({ directory, owner });
       createExclusiveOwnedFile(
         directory,
-        runtimeLifecycleFileName(root, runtimeLifecycleLockName),
+        runtimeLifecycleFileName(canonical, runtimeLifecycleLockName),
         serializeCanonicalJson(owner),
         "Codex runtime lifecycle lock",
       );
       lockCreated = true;
       const guardStats = createExclusiveOwnedFile(
         directory,
-        runtimeLifecycleFileName(root, runtimeLifecycleGuardName),
+        runtimeLifecycleFileName(canonical, runtimeLifecycleGuardName),
         `${owner.nonce}\n`,
         "Codex runtime lifecycle guard",
       );
@@ -327,7 +334,7 @@ export function acquireRuntimeLifecycleLock({
     } finally {
       closeOwnedDirectoryBinding(directory);
     }
-    replaceLifecycleOwner(canonical, owner.nonce, () => owner, { testHooks });
+    replaceLifecycleOwner(canonical, owner.nonce, () => owner, { testHooks, updateLocked: true });
     descriptor = openRuntimeLifecycleGuard(canonical, owner.guard);
     const record = {
       descriptor,
@@ -345,11 +352,13 @@ export function acquireRuntimeLifecycleLock({
     if (lockCreated) {
       try {
         // No capability escaped acquisition; retire its unpublished/unused guard before cleanup.
-        replaceLifecycleOwner(canonical, owner.nonce, (failed) => ({ ...failed, guard: null }));
-        const failed = readRuntimeLifecycleLock(canonical);
+        replaceLifecycleOwner(canonical, owner.nonce, (failed) => ({ ...failed, guard: null }), {
+          updateLocked: true,
+        });
+        const failed = readRuntimeLifecycleLock(canonical, true);
         try {
           if (failed.owner?.nonce === owner.nonce) {
-            unlinkStableRuntimeLifecycleLock(canonical, failed, { testHooks });
+            unlinkStableRuntimeLifecycleLock(canonical, failed, { testHooks, updateLocked: true });
           }
         } finally {
           closeRuntimeFile(failed);

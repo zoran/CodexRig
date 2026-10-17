@@ -121,7 +121,10 @@ function commandRunner(root, capability, temporaryDirectory) {
   };
 }
 
-async function acquireMaintenanceCapability(root, { startup, onLifecycleWait, signal, timeout }) {
+async function acquireMaintenanceCapability(
+  root,
+  { startup, onLifecycleWait, signal, timeout, scope = "project lifecycle" },
+) {
   const started = performance.now();
   let nextNotice = 0;
   for (;;) {
@@ -137,7 +140,7 @@ async function acquireMaintenanceCapability(root, { startup, onLifecycleWait, si
         throw error;
       const elapsed = performance.now() - started;
       const { operation, pid, startedAt } = error.lifecycle;
-      const owner = `${operation} (coordinator PID ${pid}, started ${startedAt})`;
+      const owner = `${scope}: ${operation} (coordinator PID ${pid}, started ${startedAt})`;
       if (elapsed >= timeout)
         throw new Error(
           `Timed out waiting for ${owner}. The operation and its lock were preserved; retry after it finishes.`,
@@ -187,12 +190,13 @@ export async function maintainToolchain({
   const inventory = inspectRepositoryWorktrees({ root });
   onInventory(inventory);
   assertMaintenanceInventory(inventory, { startup });
-  const capability = await acquireMaintenanceCapability(root, {
+  const waitOptions = {
     startup,
     onLifecycleWait,
     signal,
     timeout: lifecycleWaitTimeoutMilliseconds,
-  });
+  };
+  const capability = await acquireMaintenanceCapability(root, waitOptions);
   let temporary, installationOwner, installationRoot;
   try {
     assertMaintenanceInventory(inspectRepositoryWorktrees({ root }), { startup });
@@ -263,10 +267,14 @@ export async function maintainToolchain({
     }
     verifyInputRecords(root, allInputs);
     installationRoot = prepareUserToolDirectories().lifecycle;
-    installationOwner = acquireRuntimeLifecycleLock({
-      root: installationRoot,
-      operation: "toolchain-maintenance",
+    // Always acquire project -> shared storage. Waiting must never reverse this order or
+    // borrow another project's capability; no shared payload can change before admission.
+    installationOwner = await acquireMaintenanceCapability(installationRoot, {
+      ...waitOptions,
+      scope: "shared tool installation",
     });
+    assertMaintenanceInventory(inspectRepositoryWorktrees({ root }), { startup });
+    verifyInputRecords(root, allInputs);
     const bootstrap = await installBootstrapTools({
       root,
       matrix: candidate,

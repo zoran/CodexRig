@@ -220,13 +220,16 @@ upgradeable product repositories while deliberately defining no child product or
   ownership or write-permission admission defers shared runtime and bundle collection with a
   diagnostic while startup and independent collectors continue. Primary/secondary pins, live
   executables/libraries, accounts and installed projects' offline inputs are retained. The shared
-  lifecycle lock covers staged installation through pin publication and cleanup. Known legacy
-  cache/data permissions are normalized only under verified private parents through the filesystem
-  owner. Old active runtimes and unmarked product state remain with their migration owner. Stable CI
-  uses the same maintenance owner with `--locked`, skipping release refresh and reproducing frozen
-  dependencies before entering the common command wrapper. Toolchain, dependency, native-tool and
-  public-release staging use the shared execution-scoped temporary owner, including recovery after
-  interruption; account state and retained tool pins stay outside disposable staging.
+  lifecycle lock covers staged installation through pin publication and cleanup. Startup acquires
+  the project lock before this shared lock, waits for confirmed active owners at either boundary,
+  and revalidates worktree/session ownership and staged inputs before installation. Other explicit
+  maintenance remains fail-fast under contention. Known legacy cache/data permissions are normalized
+  only under verified private parents through the filesystem owner. Old active runtimes and unmarked
+  product state remain with their migration owner. Stable CI uses the same maintenance owner with
+  `--locked`, skipping release refresh and reproducing frozen dependencies before entering the
+  common command wrapper. Toolchain, dependency, native-tool and public-release staging use the
+  shared execution-scoped temporary owner, including recovery after interruption; account state and
+  retained tool pins stay outside disposable staging.
 - Runtime and technology: Node.js ESM orchestrating the pnpm and mise toolchain.
 - Public contract: `deps:install`, `deps:report`, and `deps:update*` commands; the
   lifecycle-delegated `install-compatible.mjs --reproduce-locked` and `--reproduce-toolchain`
@@ -439,13 +442,16 @@ upgradeable product repositories while deliberately defining no child product or
   missing proof and competing worktree writers fail closed.
 - Private internals: Repository inventory, process-identity, session-lifecycle, isolated Git,
   launcher/writer liveness aggregation, per-root recovery classification, and Git/Git-less traversal
-  detail. Consumed delegation cancellation is read-only; owned supervisor cancellation waits for
-  safe readiness. The session lease accepts only schema 6 with namespace-bound coordinator,
-  supervisor, and exact Codex process identities. Lease mutation authenticates the exact controller
-  caller, terminal child proof becomes a durable `completed` transition before release, and a
-  crashed child-PID handoff, corrupt state, or any other mechanically indeterminate state fails
-  closed. Isolated Git accepts only an ordinary terminal result or the exact bounded managed-sandbox
-  completion marker with matching PID, arguments, status, signal, and output contract.
+  detail. Lifecycle admission, owner publication, inspection and retirement share the existing short
+  update mutex, so concurrent starters receive typed contention instead of partial state or
+  file-creation races. Consumed delegation cancellation is read-only; owned supervisor cancellation
+  waits for safe readiness. The session lease accepts only schema 6 with namespace-bound
+  coordinator, supervisor, and exact Codex process identities. Lease mutation authenticates the
+  exact controller caller, terminal child proof becomes a durable `completed` transition before
+  release, and a crashed child-PID handoff, corrupt state, or any other mechanically indeterminate
+  state fails closed. Isolated Git accepts only an ordinary terminal result or the exact bounded
+  managed-sandbox completion marker with matching PID, arguments, status, signal, and output
+  contract.
 - Owned data and migrations: Private ignored per-worktree writer lease and latest verified Codex
   session recovery marker under `.codex/runtime/`. Full reset holds the lifecycle lock, proves
   repository-wide runtime quiescence, and removes incompatible private runtime without interpreting
@@ -479,43 +485,44 @@ upgradeable product repositories while deliberately defining no child product or
 #### Setup And Project Portability
 
 - Root: `scripts/setup`
-- Responsibility: Inventories worktrees, waits up to ten minutes for confirmed active lifecycle
-  operations with owner diagnostics and rechecks session ownership, then invokes compatible
-  tool/package/CI maintenance with `--startup` before admission, then opens the native resume picker
-  with repository-root CODEX_HOME and explicit working directory. It reserves the checkout before
-  selection and binds the selected session only at authenticated SessionStart, preloads every
-  lifecycle module, accepts bounded non-executable Codex model/reasoning and voice preferences
-  beneath tracked project policy, rejects executable or unknown ignored runtime configuration,
-  validates the model's second-highest supported effort (currently Astra/`max`), projects that
-  tracked policy into every fresh or resumed CLI launch, and injects exactly two session-owned hook
-  definitions. Codex's stable `hooks/list` inventory must contain only those exact trusted/enabled
-  definitions; only afterward may the controller bind the gated supervisor, durable handoff, and
-  exact Codex PID. Lease release requires the exact controller to authenticate the supervisor's
-  terminal child-exit proof against its private issue-time gate secret and persist completion; a
-  wrapper exit code alone is insufficient, and cancellation before SessionStart creates no
-  activation or recovery record. The embedded built-in-only client is bound to the controller's
-  exact Node executable and token-bound loopback endpoint. Attestation expiry bounds the
-  machine-controlled Codex PID handoff; subsequent picker selection and same-session verification
-  require the unchanged issue-time proof and the individually live controller, supervisor and Codex
-  processes, without renewing the proof. Durable chat switches report the existing session binding
-  before invalid startup state or input drift, directing the developer to a full launcher restart.
-  Transcriptless native side conversations are acknowledged only under the active parent-bound
-  launcher, without renewing its startup proof, acquiring writer ownership, replacing recovery, or
-  entering durable reconstruction and Stop continuation. The capability also validates portable
-  configuration and staged white-label tenant-capable projects, installs hooks, initializes
-  repositories, and exports explicitly selected independent projects. Source-only generation/export
-  uses one recipe and source-owned staged validator. Local `.codex/tooling.json`, toolchain and
-  verification configuration provide the retained tools' contracts without source metadata.
-  `project:run` inventories repository ownership before preparing private tool state and executing
-  the requested command through `mise exec --locked` in the common repository environment; it grants
-  no authentication, publication or deployment authority. Mise pins and locks are explicitly loaded
-  from `.codex/`, outside host-shell ancestor discovery. Shared-tool directories and aliases require
-  managed admission before they can enter the executable search path as host paths. Interactive
-  Codex resume explicitly selects embedded mode with `--no-daemon`, preserving its session-only
-  hooks and controls. `startup.displayName` in `.codex/tooling.json` owns the launcher's ASCII
-  identity; generation sets the supplied project name. A bounded terminal-only reveal precedes five
-  progress phases, with static output for logs, CI, dumb terminals and `NO_COLOR`. Canonical startup
-  omits routine pnpm release-selection and healthy-storage notices while retaining progress, storage
+- Responsibility: Inventories worktrees, waits up to ten minutes at each project/shared-installation
+  boundary for confirmed active lifecycle operations with owner diagnostics and rechecks session
+  ownership and staged inputs, then invokes compatible tool/package/CI maintenance with `--startup`
+  before admission, then opens the native resume picker with repository-root CODEX_HOME and explicit
+  working directory. It reserves the checkout before selection and binds the selected session only
+  at authenticated SessionStart, preloads every lifecycle module, accepts bounded non-executable
+  Codex model/reasoning and voice preferences beneath tracked project policy, rejects executable or
+  unknown ignored runtime configuration, validates the model's second-highest supported effort
+  (currently Astra/`max`), projects that tracked policy into every fresh or resumed CLI launch, and
+  injects exactly two session-owned hook definitions. Codex's stable `hooks/list` inventory must
+  contain only those exact trusted/enabled definitions; only afterward may the controller bind the
+  gated supervisor, durable handoff, and exact Codex PID. Lease release requires the exact
+  controller to authenticate the supervisor's terminal child-exit proof against its private
+  issue-time gate secret and persist completion; a wrapper exit code alone is insufficient, and
+  cancellation before SessionStart creates no activation or recovery record. The embedded
+  built-in-only client is bound to the controller's exact Node executable and token-bound loopback
+  endpoint. Attestation expiry bounds the machine-controlled Codex PID handoff; subsequent picker
+  selection and same-session verification require the unchanged issue-time proof and the
+  individually live controller, supervisor and Codex processes, without renewing the proof. Durable
+  chat switches report the existing session binding before invalid startup state or input drift,
+  directing the developer to a full launcher restart. Transcriptless native side conversations are
+  acknowledged only under the active parent-bound launcher, without renewing its startup proof,
+  acquiring writer ownership, replacing recovery, or entering durable reconstruction and Stop
+  continuation. The capability also validates portable configuration and staged white-label
+  tenant-capable projects, installs hooks, initializes repositories, and exports explicitly selected
+  independent projects. Source-only generation/export uses one recipe and source-owned staged
+  validator. Local `.codex/tooling.json`, toolchain and verification configuration provide the
+  retained tools' contracts without source metadata. `project:run` inventories repository ownership
+  before preparing private tool state and executing the requested command through
+  `mise exec --locked` in the common repository environment; it grants no authentication,
+  publication or deployment authority. Mise pins and locks are explicitly loaded from `.codex/`,
+  outside host-shell ancestor discovery. Shared-tool directories and aliases require managed
+  admission before they can enter the executable search path as host paths. Interactive Codex resume
+  explicitly selects embedded mode with `--no-daemon`, preserving its session-only hooks and
+  controls. `startup.displayName` in `.codex/tooling.json` owns the launcher's ASCII identity;
+  generation sets the supplied project name. A bounded terminal-only reveal precedes five progress
+  phases, with static output for logs, CI, dumb terminals and `NO_COLOR`. Canonical startup omits
+  routine pnpm release-selection and healthy-storage notices while retaining progress, storage
   pressure, recovery and failures; direct maintenance keeps the diagnostic details. The portable
   launcher regression ships to children, belongs to toolchain admission, and runs once for launcher
   changes or complete publication coverage. It exercises the shell invocation and blocks
@@ -622,7 +629,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.15.0`.
+- Framework version: `6.16.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

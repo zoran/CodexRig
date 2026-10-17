@@ -41,10 +41,12 @@ Startup omits routine notices about skipped pnpm releases and sufficient free st
 storage pressure, recovery and failures remain visible. Direct toolchain maintenance without
 `--startup` retains those diagnostic details.
 
-If a verification or another lifecycle operation is still running, startup waits up to ten minutes
-and reports its operation, coordinator PID and start time. Ctrl-C cancels only the waiting startup.
-After release, startup checks session ownership again before maintenance. Uncertain ownership still
-blocks startup; never remove a live lock or terminate an unrelated process to bypass it.
+If verification or another lifecycle operation is still running, startup waits at both the project
+and shared-tool installation boundaries, for up to ten minutes per boundary. It reports which
+boundary is busy, the operation, coordinator PID and start time. Ctrl-C cancels only the waiting
+startup. After waiting, startup rechecks session ownership and staged source inputs before
+installation. A timeout preserves the running owner; uncertain ownership still blocks startup. Never
+remove a live lock or terminate an unrelated process to bypass it.
 
 Use `/side` inside a running session for a separate temporary conversation. After a framework
 update, exit and restart through the canonical launcher so the updated lifecycle code takes effect.
