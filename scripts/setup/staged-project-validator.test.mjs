@@ -78,6 +78,7 @@ test("generated children receive canonical task, planning, documentation, mainte
     ["Temporary Data And Storage Housekeeping", "<!-- current-temporary-storage-policy -->"],
     ["Long-Session Course Checks", "<!-- current-course-check-policy -->"],
     ["Verification Selection And Runtime", "<!-- current-verification-runtime-policy -->"],
+    ["Delegated Release", "<!-- current-delegated-release-policy -->"],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
     ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
     ["Test Strategy", "<!-- current-test-strategy-policy -->"],

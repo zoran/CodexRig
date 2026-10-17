@@ -1320,10 +1320,11 @@ primary records and pushes ordinary commits through the declared integration pat
 `main` when work is serialized and branch policy permits, otherwise through the short-lived task
 branch or protected path. Existing authorization, secret-scan, and verification boundaries still
 apply. This is part of normal slice integration, not a user-facing WIP/checkpoint workflow and not
-an isolation mechanism. Subagents never commit or push; the primary first accepts and integrates
-their files. Later uncommitted bytes remain recoverable only from the surviving host, so never claim
-arbitrary host-loss protection before a successful push. After integration, any temporary branch is
-retired through the authorized provider/Git path; only `main` is durable project truth.
+an isolation mechanism. The primary accepts and integrates agent files before
+[Delegated Release](#delegated-release). Later uncommitted bytes remain recoverable only from the
+surviving host, so never claim arbitrary host-loss protection before a successful push. After
+integration, any temporary branch is retired through the authorized provider/Git path; only `main`
+is durable project truth.
 
 Changes to a shared contract are integration work, not an excuse for concurrent edits by every
 consumer. Assign one integrator, migrate the contract, owned state, and consumers in dependency
@@ -2272,7 +2273,8 @@ danger-full-access, never staging or production.
   finish writing or running non-critical tests; if tests compete for the same build capacity, port,
   cache, database, or runner, defer or cancel the obsolete test run and make the newest deploy
   available first;
-- use latest-wins concurrency per dev target. A newer dev request cancels or supersedes every older
+- use latest-wins concurrency per dev target outside a frozen
+  [Delegated Release](#delegated-release). A newer dev request cancels or supersedes every older
   queued or running build/deploy for that target, prevents the obsolete artifact from becoming
   current, and receives scheduling priority. If an atomic or irreversible step cannot be cancelled
   safely, mark its run obsolete, let only that smallest critical section finish, then immediately
@@ -2287,8 +2289,8 @@ danger-full-access, never staging or production.
 
 Default `dev` does not independently authorize an unrelated external mutation. It selects the target
 and speed policy when building/deploying is already requested or is an established in-scope step.
-Subagents may prepare code and run isolated local checks but never mutate a shared external dev,
-staging, or production environment; external deployment remains with the primary.
+External deployment stays with the primary or its explicitly assigned
+[release worker](#delegated-release), within the same environment and credential authority.
 
 `staging` requires explicit user selection and a production-like promotion path. Before deployment,
 bind the intended artifact and configuration, complete affected integration/end-to-end and security
@@ -2488,8 +2490,8 @@ after another. The primary continues disjoint integration or other useful work a
 owner of protected policy and shared decisions.
 
 Reassess the runnable set after discovery, a material result or handoff, and every slice boundary.
-Accept handoffs, close completed owned threads through supported native controls, and confirm the
-slot is released before replacement; an idle or completed-but-open thread is not a free slot.
+Accept handoffs and close their scopes before follow-up; close unneeded threads through supported
+native controls and confirm slot release before replacement. An open thread still occupies a slot.
 Recheck capacity, effective permissions and ownership for every new assignment or follow-up. A phase
 that was necessarily serial does not make the rest of the outcome serial; conversely, an earlier
 four-agent wave never authorizes four agents after the conditions change.
@@ -2677,18 +2679,19 @@ Never let an interrupted delegated stream leave unexplained partial edits.
 Every spawn also receives an expected next checkpoint based on its bounded task. The primary checks
 its provenance-bound owned-agent inventory at each checkpoint, after material tool waits or
 handoffs, before admitting another agent, and as the session-side first step of completed-goal
-housekeeping. A subagent reports completion or blockage, but the primary alone closes or interrupts
-it after accepting, rejecting, or preserving its handoff. The primary then tells every affected
-active agent what result was accepted, which contracts/files or assumptions changed, what work
-remains, and that the slot and ownership claim were released. An idle agent with no concrete next
-bounded assignment is closed instead of being retained for speculative reuse. If an agent misses its
-task-appropriate checkpoint, request one concise status/handoff; close it when that produces no
-concrete progress, coherent recoverable state, or justified next checkpoint. Do not apply a blind
-wall-clock timeout to a known long-running tool, but do not let silent, blocked, abandoned,
-redundant, or completed agents accumulate. Before final handoff, the primary confirms that no
-unneeded owned subagent remains. Repository `repo:housekeeping` verifies the portable agent policy.
-Only the primary owns host-session agent cleanup because repository scripts cannot enumerate,
-communicate with, or terminate Codex conversations.
+housekeeping. A subagent reports completion or blockage; the primary accepts, rejects or preserves
+its handoff and closes that scope before follow-up. Only the primary closes or interrupts its owned
+threads. The primary then tells every affected active agent what result was accepted, which
+contracts/files or assumptions changed, what work remains, and that the slot and ownership claim
+were released. An idle agent with no concrete next bounded assignment is closed instead of being
+retained for speculative reuse. If an agent misses its task-appropriate checkpoint, request one
+concise status/handoff; close it when that produces no concrete progress, coherent recoverable
+state, or justified next checkpoint. Do not apply a blind wall-clock timeout to a known long-running
+tool, but do not let silent, blocked, abandoned, redundant, or completed agents accumulate. Before
+final handoff, the primary confirms that no unneeded owned subagent remains. Repository
+`repo:housekeeping` verifies the portable agent policy. Only the primary owns host-session agent
+cleanup because repository scripts cannot enumerate, communicate with, or terminate Codex
+conversations.
 
 ### Peer Coordination
 
@@ -2754,12 +2757,12 @@ primary YOLO override is governed by the narrower task authority above; protecte
 agent-policy, out-of-scope, and out-of-root paths remain forbidden. Hosted apps and tools need
 equivalent read-only/no-external-mutation policy because command sandboxing does not govern them.
 
-Subagents never commit, amend, merge, rebase, tag, push, force-push, publish, open/merge a change
-request, mutate provider protection, deploy a shared environment, consume credentials, or remove a
-checkout. The primary alone may steer or interrupt agents, inspect every resulting status/diff and
-untracked file against the declared write set, reject or repair out-of-scope changes, integrate
-compatible work, run affected evidence on the combined state, and perform any authorized commit,
-merge, push, deployment, or publication.
+Except for [Delegated Release](#delegated-release), subagents never commit, amend, merge, rebase,
+tag, push, force-push, publish, open/merge a change request, mutate provider protection, deploy a
+shared environment, consume credentials, or remove a checkout. The primary alone may steer or
+interrupt agents, inspect every resulting status/diff and untracked file against the declared write
+set, reject or repair out-of-scope changes, integrate compatible work, run affected evidence on the
+combined state, and perform any authorized commit, merge, push, deployment, or publication.
 
 Each subagent returns its final structured handoff immediately when its assigned task is complete or
 genuinely blocked, then waits only for the primary's close or narrowly scoped follow-up; it never
@@ -2889,98 +2892,127 @@ while a repository session is observably active may verification retain the sing
 `docs/project-context.md` for unfinished work. Publication removes that work cache and other source
 residue; this does not require deleting the calling session's private runtime.
 
-Explicitly authorized commit, push and deployment may run directly from the owning Codex session.
-Drain owned subagents and background writers before publication. The common publisher inventories
-all worktrees, rejects competing or indeterminate writers, and admits an active caller only when its
-exact live controller, supervisor and Codex process are bound to the current canonical lease and
-observable Linux process ancestry proves the command descends from that Codex process. An
-environment session ID alone is not proof. If this evidence is unavailable, use publication after
-sessions exit rather than bypassing the admission gate. The bound session, destination, source tree
-and HEAD are rechecked across publication. This is ownership evidence, not user authorization. Keep
-approved project credentials; neither session exit nor another login is intrinsically required for
-an already-authorized publication or deployment. Preserve staging/production, branch protection, CI
-and project deployment gates. Publication commands do not themselves deploy.
+The common publisher inventories its clone's worktrees and rejects competing or indeterminate
+writers. An active caller requires its exact live controller, supervisor and Codex process bound to
+the canonical lease plus observable Linux ancestry from that Codex process; an environment session
+ID is insufficient. Without this proof, publish after that clone's sessions exit. Session,
+destination, source, index and HEAD are rechecked. This proves ownership, not authority; neither
+another login nor session exit is required when existing credentials and admission suffice.
 
-For source publication, run the README's `pnpm framework:publish --message "<message>"` invocation.
-It binds central `main`, refreshes upstream, previews/applies source cleanup, runs housekeeping and
-hook installation, then verifies. Its reset owner uses `--publication`: for a proven calling session
-it removes only source process residue and preserves private runtime; outside active sessions it
-performs full reset. After verification it rechecks the same baseline and snapshot, commits exactly
-the verified non-ignored tree under the lifecycle lock, pushes that commit through the managed
-pre-push hook, verifies live remote `main`, runs `goal:new`, and performs Worktree Settlement.
-Pre-push remains read-only and requires a clean committed tree, the publication baseline and
-exact-current successful evidence. No force push, automatic merge, hook bypass or empty commit is
-permitted. A failed gate stops later mutations; a rejected push preserves the local commit for
-retry. Generated projects use `project:publish` on their configured branch upstream, preserve
-history and accounts, and do not perform source-framework reset. Creation never initializes Git or
+#### Delegated Release
+
+This section owns release delegation; entrypoints, roles and skills link here, generated projects
+project it unchanged. For authorized publication, assign one admitted `worker` as the dedicated
+release agent for commit/push, associated CI and a useful authorized deploy. The primary retains the
+outcome, architecture, integration, security decisions and acceptance. Release work grants no
+amend/merge/rebase/tag, force-push, provider-protection or policy-edit authority. The assignment
+uses an existing slot and preserves model, effective-permission, capacity, branch protection and
+environment gates. Existing authority needs no repeat approval; delegation grants no new
+environment, credential use, cost, irreversible action or permission override.
+
+Before handoff, accept the candidate writers' handoffs and prepare source through the existing
+cleanup/housekeeping owners. Bind repository identity, canonical release checkout, branch/upstream,
+authorized target, exact HEAD and reviewed staged tree, valid check/artifact/toolchain identities,
+migration and rollback limits. Use the existing session-local ownership registry and conversation:
+record agent/session/scope identity, owned process or provider run IDs, checkpoint, safe
+cancellation boundary and method. No extra release registry, pipeline or permanent role is needed.
+
+The current publisher mutates shared Git hooks/configuration, so linked worktrees do not establish
+release isolation. Use a separate ordinary clone with independent Git metadata (no alternates or
+shared mutable files), private runtime, index, build outputs and release configuration. Reusable
+installed tools may follow the existing storage contract. Prefer retaining the evidence-bearing
+checkout for release and moving new development to the separate clone. Do not copy credentials or
+verification receipts to manufacture admission; reuse evidence only where its existing owner
+validates the exact source and effective toolchain. Keep the development clone's writers running.
+Same-clone or unknown writers still block affected publication; rescope them or serialize only the
+conflicting work.
+
+Stage only accepted candidate files in the release clone and pass the literal full `<HEAD>:<tree>`
+object IDs from `git rev-parse HEAD` and `git write-tree` as `--candidate` to the existing README
+publisher. Admission requires a separate clone; source, index and HEAD must match before preparation
+and remain unchanged through verification and commit. Preparation drift requires a newly accepted
+candidate. Other writers never edit that checkout, outputs or active release configuration. Later
+development produces another candidate and does not cancel this release. The primary orders releases
+to the same destination/environment through its existing ownership coordination and the provider's
+actual serializer; keep that scope through CI and rollout. An unknown mutation result must be
+reconciled by original commit/run/resource identity before retry, including rebinding the candidate
+after a locally completed commit.
+
+The publisher assembles complete required coverage once; reuse valid per-check evidence and
+artifacts, rerunning only changed relevant inputs or failed checks at their owner. Handoff, role
+change and waiting do not invalidate evidence. Independent CI and deploy gates remain mandatory. At
+every push assess whether the integrated candidate is meaningfully testable in an already authorized
+target. If so, use its existing deploy owner; otherwise state the concrete reason (for example
+documentation-only, missing relevant acceptance, gated behavior or unsafe migration). Target
+selection alone grants no deploy authority. Push, queued CI and started rollout are not successful
+deployment: observe the actual rollout, health/smoke results and failure recovery under
+[Delivery Environments](#delivery-environments).
+
+Return commit and confirmed remote state, CI/run and artifact identities, target, actual rollout
+status, health/smoke evidence, short manual test paths and remaining limits; mark inapplicable or
+unobserved fields honestly. The primary accepts this handoff and closes the release scope before
+assigning useful follow-up with fresh capacity/permission admission. If none is ready, close the
+thread; reserve no idle release slot. Explain concrete isolation/capacity limits when serial work or
+fewer agents are necessary, and continue safe independent work. No real release is authorized merely
+by changing this framework policy.
+
+#### Publication Execution And Closure
+
+The README's `framework:publish` binds central `main`, refreshes upstream, prepares source with
+reset/housekeeping and installs hooks before verification. It rechecks baseline and snapshot,
+commits exactly the verified non-ignored tree under the lifecycle lock, pushes through managed
+pre-push, confirms remote `main`, runs `goal:new` and settles worktrees. Pre-push is read-only:
+require clean committed content, the publication baseline and exact-current successful evidence. No
+force push, automatic merge, hook bypass or empty commit. A failed gate stops subsequent mutations
+and preserves any local commit. Generated projects use `project:publish` on their configured
+upstream without framework reset, preserving history/accounts. Creation never initializes Git or
 publishes.
 
-Full `pnpm framework:reset --apply` is the explicit runtime sanitation path after all sessions exit.
-It holds the lifecycle lock and proves repository-wide runtime quiescence before removing disposable
-native state. Preserve authentication, runtime configuration, installation identity and exact
-publication evidence. Missing or unobservable Linux procfs or permission-obscured descriptors for an
-exact-root-bound process are indeterminate and block full reset; never infer inactivity from
-`EACCES` or `EPERM`. The sole current lease reader validates current state; incompatible private
-leases are discarded with quiescent disposable runtime without interpreting an older schema. Never
-remove open databases, WAL files or active session state. Full reset never rewrites Git history and
-is not a prerequisite for an otherwise valid in-session publication.
+Publication reset preserves a proven caller's private runtime and removes source residue; outside
+active sessions it performs full reset. Explicit `framework:reset --apply` requires all sessions
+exited, the lifecycle lock and proven repository-wide runtime quiescence. Missing procfs or obscured
+exact-root descriptors (`EACCES`/`EPERM`) are indeterminate. Preserve authentication, runtime
+config, installation identity and exact publication evidence; never remove open databases/WAL or
+active state. Quiescent reset discards incompatible disposable leases without interpreting old
+schemas and never rewrites Git history. Full reset is not a prerequisite for admitted in-session
+publication.
 
-End every final response about framework repository work with the current combined reset,
-verification, commit and push command in a fenced shell block, using a task-appropriate commit
-message. This standing publication guidance never authorizes executing the command. Before giving
-it, inspect the current README, package script and reset skill publication entry; reuse those reads
-when unchanged. Explain its cleanup, verification, commit and push effects and whether authority is
-present, then put the command last. The `bash scripts/setup/run-project.sh` prefix selects the
-project environment and runtime. Do not substitute individual steps, invent a wrapper or require
-`/quit` when calling-session admission succeeds. Without publication authority, state that the
-command remains unexecuted. Recommend full reset only for explicit local sanitation, export hygiene
-or diagnosed recovery, with its actual session-exit requirement.
+End final framework repository responses with the README's combined cleanup, verification, commit
+and push command in a fenced shell block, with a task-appropriate message and
+`bash scripts/setup/run-project.sh` prefix. Inspect README, package script and reset skill first;
+reuse unchanged reads. Explain effects and authority, put the command last and leave it unexecuted
+without publication authority. Do not invent a wrapper, substitute individual steps or require
+`/quit` when admission succeeds. Recommend full reset only for explicit sanitation, export hygiene
+or diagnosed recovery, with its session-exit requirement. Displaying the command grants no
+authority.
 
-At publication, the complete plan covers syntax/format, tests, build/typecheck when present,
-repository contracts, secrets, dependencies, and relevant product surfaces. It executes only entries
-without matching successful results. Network-volatile registry, advisory, or package-signature
-checks belong in `pnpm verify:external`, not every task gate. Development records independent
-results; only complete publication coverage establishes the acceptance basis. Pre-push may bind that
-same verified content to its committed Git state, never accept a source delta. It reruns security
-and pushed-object checks and validates exact-current successful evidence without repeating an
-unchanged product suite.
+Complete publication coverage includes syntax/format, tests, available build/typecheck, contracts,
+secrets, dependencies and relevant product surfaces. Execute only missing valid per-check evidence;
+network-volatile registry/advisory/signature checks stay in `verify:external`. Pre-push may rebind
+identical verified bytes to their commit, never accept a source delta; retain security and
+pushed-object scans without repeating unchanged suites.
 
-A publication goal checkpoint is green only when its requested outcome is published on central
-`main` and the actual integrated state has focused evidence, a review state with no relevant
-findings, a completed goal documentation review, any required dedicated critical-document
-preservation review, a fresh audit, course check, cleanup, applicable reset, and publication
-admission. In serialized direct-main mode, the primary commits exactly the goal-owned changes and
-pushes `main`. Under parallel delivery or protected-main policy, bounded task-branch commits are
-integration inputs; one integrator or the detected provider's merge serializer publishes them, after
-which the primary refreshes local `main` and closes the required checks on that resulting commit
-without creating a marker commit. If unrelated changes cannot be safely separated, no upstream is
-configured, authentication is unavailable, integration is unresolved, or publication is rejected,
-report the goal-closure blocker instead of broadening a commit, bypassing checks, force-pushing, or
-rewriting history. Otherwise immediately run `pnpm goal:new` and continue the next
-already-authorized goal without waiting for another prompt; only the complete authorized outcome is
-a normal handoff boundary.
+A publication checkpoint requires the requested outcome on central `main`, relevant evidence, clean
+review, documentation and critical-document preservation review, fresh audit/course check, cleanup,
+applicable reset and admission. Direct-main publication includes only goal-owned changes.
+Task-branch commits under parallel/protected-main delivery remain integration inputs until the
+integrator/provider serializer publishes them; refresh local `main` safely and check that resulting
+commit without marker commits. Unseparable changes, missing upstream/authentication, unresolved
+integration or rejected publication are blockers, never authority to broaden, bypass or rewrite.
 
-Before opening a subsequent goal in an authorized publication stream, run
-`bash scripts/setup/run-project.sh pnpm goal:new` immediately after the preceding goal is published.
-This command is the supported new-goal entry gate rather than a task-state document: it performs no
-fetch, commit, or push and creates no planning artifact. It fails closed unless it can prove that
-the canonical project is on central `main` with a clean non-ignored worktree, a commit, a configured
-remote `main` upstream, and zero commits ahead or behind its locally recorded remote-tracking ref. A
-missing repository, detached or non-`main` branch, local-branch pseudo-upstream, missing
-remote/upstream, dirty worktree, malformed Git result, or local/upstream difference blocks the new
-goal. The gate does not contact the remote; the required preceding push owns authentication and
-updates the local remote-tracking publication evidence. It also requires exact-current successful
-verification evidence, so a push that bypassed pre-push cannot authorize another goal. Ignored
-project-local Codex runtime and verification evidence do not count as unfinished work.
+In an already-authorized publication stream, run `bash scripts/setup/run-project.sh pnpm goal:new`
+after publication before the next goal. It creates no artifact and performs no fetch/commit/push. It
+requires a real repository on central `main`, clean non-ignored content, a commit, a configured
+remote `main` upstream, zero ahead/behind against its local tracking ref and exact-current
+successful evidence. Missing/malformed Git results, detached/non-main branches, pseudo-upstreams and
+differences fail closed. The preceding push owns remote authentication/confirmation; ignored
+runtime/evidence are not unfinished source. Continue only the next already-authorized work; an
+intermediate checkpoint is not completion of the overall outcome.
 
-Use a bounded scope for each review iteration, but repeat the iteration after fixes until no
-relevant, evidence-backed finding remains, subject to
-[Long-Session Course Checks](#long-session-course-checks); no review or audit overrides its
-mandatory approach reassessment. Add specialized security, UI/UX, content, image, or search review
-only for surfaces that actually changed. Once reviews are clean, perform a fresh whole-goal audit
-before publication admission. Any audit finding reopens focused repair and the review-and-repair
-loop before the audit is repeated. Keep every review and audit in the conversation; do not create
-process documents.
+Review changed surfaces to zero relevant evidence-backed findings, then audit afresh before
+publication. Findings reopen only affected repairs/evidence under
+[Long-Session Course Checks](#long-session-course-checks). Keep reviews in conversation, with
+specialized review only for affected surfaces; create no process documents.
 
 ## Done
 

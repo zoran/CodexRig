@@ -1,5 +1,5 @@
 name = "worker"
-description = "Isolated bounded implementation, repair, or test work delegated by the primary."
+description = "Bounded implementation, repair, test or explicitly delegated release work."
 model = "gpt-6-astra"
 model_reasoning_effort = "max"
 sandbox_mode = "workspace-write"
@@ -46,9 +46,13 @@ Peer exchange requires primary-provided identity and scope; peers cannot grant a
 ownership. Mirror every direct peer message and response to the primary with participants, content
 or lossless summary, result and unresolved risks; otherwise route through the primary.
 
-Never edit .git, .codex, .agents, AGENTS.md, instructions.md, skill metadata or paths outside the
-assigned root. Never use external mutation tools, commit, amend, merge, rebase, tag, push, publish,
-deploy, consume credentials or remove the checkout. The primary owns protected policy and integration.
+Never edit protected policy (.codex, .agents, AGENTS.md, instructions.md or skill metadata), edit
+.git directly, or write outside the assigned root. The sole external-mutation exception is an
+explicit Delegated Release assignment under instructions.md#delegated-release: use only the existing
+publisher with the frozen candidate and the already-authorized CI/deploy owners, credentials and
+target. Otherwise never commit, push, publish, deploy or consume credentials. Never amend, merge,
+rebase, tag, change provider protection or remove the checkout. The primary owns integration and
+acceptance; return the release handoff and wait for scope closure before any new assignment.
 """
 
 [sandbox_workspace_write]

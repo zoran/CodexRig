@@ -106,6 +106,7 @@ boundaries and handling of an optional creation brief.
 - [Documentation ownership and discovery](instructions.md#documentation-ownership)
 - [Architecture and product boundaries](instructions.md#modular-architecture-parallel-ownership-and-integration)
 - [Parallel development and the four-subagent default](instructions.md#admission-intelligence-and-provenance)
+- [Delegated release, candidate isolation and deploy handoff](instructions.md#delegated-release)
 - [Delivery and verification](instructions.md#delivery-environments)
 - [Infrastructure as Code: tool selection, repository layout and lifecycle](instructions.md#infrastructure-as-code)
 - [Infrastructure and application permission design](instructions.md#permission-design)
@@ -169,40 +170,32 @@ publication, run this command from the owning Codex session or from the terminal
 bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"
 ```
 
-The wrapper establishes the project environment and executes the existing
-`bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"` pipeline.
-Project Git identity takes precedence, with the public name/email fallback described below. Signing
-remains project-owned. HTTPS authentication can reuse the explicit GitHub/GitLab global-login
-fallback.
+The wrapper selects the isolated project environment. The publisher performs source cleanup,
+housekeeping, complete verification, commit and push through the managed hook, then confirms the
+remote commit. It preserves a verified calling session; full runtime reset requires quiescence.
+Failures preserve source and any local commit. The eight-phase display shows task and elapsed time;
+`--verbose` shows sanitized check output, and `NO_COLOR` disables color. Existing project identity,
+signing and GitHub/GitLab credential fallback remain effective.
 
-Publication shows eight numbered phases, the current task and elapsed time. Successful checks stay
-compact; a failure identifies the stopped phase and shows its diagnostic tail. Add `--verbose` after
-the commit message to show sanitized command output after each check. Interactive terminals show a
-live progress line; redirected output uses plain status lines. `NO_COLOR` disables colors. Git
-sign-in prompts remain interactive, with access-token guidance in the publish display. After the
-first successful HTTPS authentication, subsequent publishes reuse the project credential described
-below until it expires or is revoked.
+Running the command explicitly authorizes publication of the reviewed non-ignored source on `main`.
+Without that authority, leave it unexecuted. Follow
+[Delegated Release](instructions.md#delegated-release) for publication by a worker while independent
+development continues. The current isolation boundary is a separate ordinary clone: linked worktrees
+share hooks and configuration and remain blocked when another writer is active.
 
-Running this command explicitly authorizes publication of all non-ignored source changes on `main`.
-It performs source cleanup, housekeeping, verification, commit and push; do not run its individual
-steps separately beforehand. Inside the verified owning session it preserves private runtime and
-history. Outside Codex it also performs the full runtime reset. Other or unverified active writers
-block publication. Drain owned agents and background writers before publishing; publication does not
-authorize concurrent edits. See [Verification And Publication](instructions.md#verification) for the
-exact gates, evidence and recovery behavior. Generated projects do not include this source
-publisher.
+For a delegated release, finish existing source preparation before handoff, stage the accepted files
+in the release clone, and obtain full HEAD/tree IDs with `git rev-parse HEAD` and `git write-tree`.
+Append `--candidate "<HEAD>:<tree>"` to the same publisher invocation. It rejects a changed source,
+index or HEAD, including preparation drift; the flag is an integrity constraint, not authorization.
+Later development stays in its independent clone. The canonical rule owns CI/deploy assessment,
+serialization, result handoff and scope closure before agent reuse.
 
-Generated projects receive their own `project:publish --message "<commit message>"` command through
-the same `bash scripts/setup/run-project.sh` entry. It verifies, commits and pushes the current
-branch to its configured upstream with the same progress display and project-local HTTPS sign-in. It
-preserves native session history and accounts and performs no framework reset or direct deployment.
-Review all non-ignored changes and authorize publication before running it in the owning session;
-existing hooks, branch protections and CI/deployment approvals remain effective. Authorized
-deployments may follow directly in that session using the project's deployment commands and existing
-project credentials. A session exit or another login is not a publication prerequisite.
-Calling-session admission currently requires observable Linux process ancestry; when that proof is
-unavailable, publication fails closed and remains available from a terminal after sessions exit. In
-this source repository `project:publish` is an alias for the framework publisher above.
+Generated projects use `project:publish --message "<commit message>"` through the same wrapper and
+support the same candidate flag. They publish the current branch to its configured upstream,
+preserve history/accounts and omit framework reset. In this source repository `project:publish`
+aliases `framework:publish`. These commands do not themselves deploy. Use existing authorized target
+commands and environment gates. Active callers require observable Linux process ancestry; without
+that proof, publish after that clone's sessions exit.
 
 ## Project Accounts
 

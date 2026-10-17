@@ -118,6 +118,7 @@
       "scripts/goals/project-publication.mjs",
       "scripts/goals/project-publication.test.mjs",
       "scripts/goals/project-publication-integration.test.mjs",
+      "scripts/goals/release-candidate.test.mjs",
       "scripts/goals/publication-command.mjs",
       "scripts/goals/publication-command.test.mjs",
       "scripts/goals/project-publication.fixture.mjs"

@@ -25,39 +25,22 @@ See [verification selection](../instructions.md#verification-selection-and-runti
 changes take effect through normal generation/update and the next canonical launch, not by reloading
 an already-running agent.
 
-Root `developer_instructions` in the tracked config make the primary the sole orchestrator, inject
-[automatic planning and the review/audit contract](../instructions.md#planning-goals-slices-review-loops-and-audits)
-for new features and extensive, complex, or materially risky work, carry the
-[long-session continuation and course contract](../instructions.md#long-session-course-checks), bind
-owned-work provenance, require exact GPT Astra/`max` parity, and enforce the critical drain and
-terminal stop. The canonical [capacity policy](../instructions.md#capacity-admission-and-monitoring)
-resolves supported earned resets before account-only critical classification and requires a fresh
-native usage-permission check. Reserves cover the next coherent unit and its closure using current
-evidence in matching units; account quota, context and Goal tokens are distinct. Historical
-estimates do not bind a new session, and unknown costs do not establish exhaustion. Check smaller
-useful work or fewer agents before declaring a reserve shortfall; confirmed hard limits and the
-sealing session's terminal stop remain binding. They also carry the
-[parallel-development default](../instructions.md#admission-intelligence-and-provenance). `[agents]`
-owns the four-thread ceiling and matching global defaults; `.codex/agents/*.toml` injects bounded
-role behavior. This is an executable policy layer, not a documentation shortcut.
-`pnpm codex:validate` rejects missing markers, divergent intelligence, unsafe permissions, or
-incomplete drain policy.
+Root `developer_instructions` inject the primary's orchestration boundaries. `[agents]` owns the
+four-thread ceiling and intelligence defaults; `.codex/agents/*.toml` supplies bounded roles. The
+worker's [Delegated Release](../instructions.md#delegated-release) assignment occupies an existing
+slot. `pnpm codex:validate` rejects missing policy markers, divergent intelligence or permissions.
+These checks prove packaging/configuration, not model obedience over a long session.
 
-The four-thread ceiling excludes the primary. Planning names the currently useful independent
-assignments and their admission conditions; the primary starts admitted work concurrently and
-reassesses after discovery, handoffs and slice boundaries. An open idle thread still occupies a
-slot. Generated projects retain this configuration and the role policies, with their own workflow
-instructions; a numeric ceiling alone does not cause delegation.
-
-The [Planning Entry Gate](../instructions.md#planning-entry-gate) owns plan selection, visible
-creation before implementation and reconciliation during work and recovery. The config and safe
-entry route to it; generation and update review project the canonical planning section unchanged.
-Native Goals follow the
-[explicit request or need-based delegation boundary](../instructions.md#authorized-work-and-native-codex).
-Long-session guidance uses this same instruction layer and the existing bounded Stop reminder. It
-adds no scheduler, account monitor, or hook. Changed tracked instructions and preloaded Stop code
-take effect on the next canonical launch; editing them does not reload an already-running session.
-Static validation proves configuration and packaging, not model obedience over hours of work.
+The canonical owners are [Planning](../instructions.md#planning-entry-gate),
+[course checks](../instructions.md#long-session-course-checks),
+[agent admission](../instructions.md#admission-intelligence-and-provenance) and
+[capacity recovery/drain](../instructions.md#capacity-admission-and-monitoring).
+They govern useful parallel work, scope closure before follow-up, current-unit reserve decisions,
+earned resets and terminal handover. Native Goals follow their
+[authority boundary](../instructions.md#authorized-work-and-native-codex).
+Generation/update project the policy; no extra scheduler, quota monitor, release registry or hook
+exists. Tracked policy and preloaded Stop changes apply at the next canonical launch, not by
+reloading an already-running session.
 
 The primary and all roles use the configured model's second-highest supported effort: currently
 `gpt-6-astra` with `max` reasoning, one level below `ultra`. Installed-catalog validation checks the
@@ -152,7 +135,7 @@ shared coordination channel across hosts. Git remains later recovery and integra
 temporary branch is only a transport/integration input, and the published `main` receives the course
 check, review/audit, verification, and `goal:new` gate.
 
-For physical host-loss recovery or transfer, the primary commits and pushes each coherent resumable
+For physical host-loss recovery or transfer, the admitted publisher commits and pushes each coherent resumable
 slice through the declared integration path: directly on `main` for serialized work when branch
 policy permits, otherwise through the short-lived task branch or protected path. Existing
 authorization, secret-scan, and verification boundaries remain mandatory. This is not a separate

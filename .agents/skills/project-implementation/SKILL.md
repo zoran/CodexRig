@@ -102,7 +102,9 @@ reference-aware collectors for reusable payloads.
 For deployment and qualification failures, follow
 [Failure Recovery](../../../instructions.md#deployment-and-qualification-failure-recovery).
 Reconcile the original state before repeating a mutation with an unknown outcome. Preserve failed
-status and notifications; local repair evidence does not establish live acceptance.
+status and notifications; local repair evidence does not establish live acceptance. Authorized
+publication uses [Delegated Release](../../../instructions.md#delegated-release); candidate handoff
+does not stop development in independent checkouts.
 
 ## Rendered UI Work
 

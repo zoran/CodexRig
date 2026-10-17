@@ -31,16 +31,26 @@ const maximumOutputBytes = 64 * 1024 * 1024;
 
 /** Parses the one explicit publication request; messages remain literal argv values. */
 export function parsePublicationArguments(args, command = "project:publish") {
-  const verbose = args.length === 3 && args[2] === "--verbose";
+  const usage = `Usage: pnpm ${command} --message "<commit message>" [--candidate <HEAD>:<tree>] [--verbose]`;
   if (
-    (args.length !== 2 && !verbose) ||
     args[0] !== "--message" ||
+    typeof args[1] !== "string" ||
     !args[1].trim() ||
     args[1].includes("\0")
   ) {
-    throw new Error(`Usage: pnpm ${command} --message "<commit message>" [--verbose]`);
+    throw new Error(usage);
   }
-  return { message: args[1], ...(verbose ? { verbose: true } : {}) };
+  const options = { message: args[1] };
+  for (let index = 2; index < args.length; index += 1) {
+    if (args[index] === "--verbose" && !options.verbose) options.verbose = true;
+    else if (args[index] === "--candidate" && !options.candidate) {
+      const candidate = args[++index];
+      if (!/^(?:[0-9a-f]{40}:[0-9a-f]{40}|[0-9a-f]{64}:[0-9a-f]{64})$/u.test(candidate ?? ""))
+        throw new Error(usage);
+      options.candidate = candidate;
+    } else throw new Error(usage);
+  }
+  return options;
 }
 
 function publicationEnvironment(root) {
@@ -156,8 +166,8 @@ function publicationGit(root, output, runGit = spawnSync) {
   };
 }
 
-function inspectPublicationBinding(root, git, requiredBranch) {
-  const session = inspectPublicationSession(root);
+function inspectPublicationBinding(root, git, requiredBranch, isolated) {
+  const session = inspectPublicationSession(root, { isolated });
   const branchRef = git(["symbolic-ref", "--quiet", "HEAD"]);
   if (!branchRef.startsWith("refs/heads/")) throw new Error("Publication requires a named branch.");
   const branch = branchRef.slice("refs/heads/".length);
@@ -306,7 +316,7 @@ function sourceSnapshot(git) {
     // Start from the actual index so add --all preserves staged removals of ignored local files.
     git(["read-tree", indexTree], { environment });
     git(["add", "--all", "--", "."], { environment });
-    return { head, tree: git(["write-tree"], { environment }) };
+    return { head, indexTree, tree: git(["write-tree"], { environment }) };
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }
@@ -314,8 +324,14 @@ function sourceSnapshot(git) {
 
 function requireSnapshot(git, expected) {
   const actual = sourceSnapshot(git);
-  if (actual.head !== expected.head || actual.tree !== expected.tree) {
-    throw new Error("Source changed after verification; publication stopped before pushing.");
+  if (
+    actual.head !== expected.head ||
+    actual.tree !== expected.tree ||
+    actual.indexTree !== expected.indexTree
+  ) {
+    throw new Error(
+      "Source changed after verification or candidate handoff (including index); publication stopped before pushing.",
+    );
   }
 }
 
@@ -323,6 +339,7 @@ function requireSnapshot(git, expected) {
 export async function publishProject({
   root = toolingRoot,
   message,
+  candidate,
   verbose = false,
   runGate = runPublicationGate,
   runGit,
@@ -332,7 +349,11 @@ export async function publishProject({
   lifecycle = {},
   output = createPublicationOutput({ root, verbose, log, displayName }),
 } = {}) {
-  parsePublicationArguments(["--message", message ?? ""]);
+  parsePublicationArguments([
+    "--message",
+    message ?? "",
+    ...(candidate === undefined ? [] : ["--candidate", candidate]),
+  ]);
   if (realpathSync(root) !== root)
     throw new Error("Publication requires a canonical project root.");
   const git = publicationGit(root, output, runGit);
@@ -340,13 +361,18 @@ export async function publishProject({
   let verified;
   let commit;
   let commitIdentity;
+  const frozen = candidate ? candidate.split(":") : null;
+  const expectedCandidate = frozen
+    ? { head: frozen[0], tree: frozen[1], indexTree: frozen[1] }
+    : null;
+  const committedSnapshot = () => ({ head: commit, tree: verified.tree, indexTree: verified.tree });
   const gate = async (script, args = [], label = script) => {
     output.task(label);
     await runGate({ root, script, args, output });
   };
   const requireBinding = () => {
     if (
-      JSON.stringify(inspectPublicationBinding(root, git, requiredBranch)) !==
+      JSON.stringify(inspectPublicationBinding(root, git, requiredBranch, Boolean(candidate))) !==
       JSON.stringify(binding)
     ) {
       throw new Error("Git publication destination or ownership changed; publication stopped.");
@@ -356,13 +382,14 @@ export async function publishProject({
     requireBinding();
     if (verified) {
       requireManagedHook(root, binding);
-      requireSnapshot(git, commit ? { head: commit, tree: verified.tree } : verified);
+      requireSnapshot(git, commit ? committedSnapshot() : verified);
     }
   };
   output.start();
   await output.phase(1, "Check repository", async () => {
     output.task("Inspect worktrees and publication destination");
-    binding = inspectPublicationBinding(root, git, requiredBranch);
+    binding = inspectPublicationBinding(root, git, requiredBranch, Boolean(candidate));
+    if (expectedCandidate) requireSnapshot(git, expectedCandidate);
     lifecycle.inspect?.();
     await gate("worktree:status", ["--", "--json"], "Check worktree ownership");
     await gate(
@@ -387,6 +414,7 @@ export async function publishProject({
     requireBinding();
     requireManagedHook(root, binding);
     verified = sourceSnapshot(git);
+    if (expectedCandidate) requireSnapshot(git, expectedCandidate);
     if (verified.tree !== git(["rev-parse", "HEAD^{tree}"])) {
       output.task("Validate Git commit author and committer");
       commitIdentity = resolvePublicationIdentity({ root, runGit });
@@ -435,7 +463,7 @@ export async function publishProject({
         );
       } else output.detail("Verified tree is already committed; reusing the existing commit.");
       commit = git(["rev-parse", "HEAD"]);
-      requireSnapshot(git, { head: commit, tree: verified.tree });
+      requireSnapshot(git, committedSnapshot());
       if (
         git(["rev-parse", "HEAD^{tree}"]) !== verified.tree ||
         git(["write-tree"]) !== verified.tree
@@ -451,8 +479,11 @@ export async function publishProject({
   await output.phase(7, "Publish to upstream", async () => {
     requireBinding();
     requireManagedHook(root, binding);
-    requireSnapshot(git, { head: commit, tree: verified.tree });
+    requireSnapshot(git, committedSnapshot());
     await lifecycle.beforePush?.({ gate, output });
+    requireBinding();
+    requireManagedHook(root, binding);
+    requireSnapshot(git, committedSnapshot());
     output.task("Push verified commit through pre-push checks (Git may request sign-in)", {
       prompt: true,
     });
@@ -486,7 +517,7 @@ export async function publishProject({
   await output.phase(8, "Finish publication", async () => {
     await lifecycle.finish?.({ gate, output });
     requireBinding();
-    requireSnapshot(git, { head: commit, tree: verified.tree });
+    requireSnapshot(git, committedSnapshot());
     await gate("worktree:status", ["--", "--json"], "Confirm final worktree state");
   });
   const result = { commit, remote: binding.remote, branch: binding.targetBranch };

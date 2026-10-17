@@ -113,6 +113,7 @@ const requiredAgentInstructionFragments = Object.freeze([
 const requiredPrimaryInstructionFragments = Object.freeze([
   "primary orchestrator",
   "Maintenance Scope And Verification",
+  "Delegated Release",
   "exactly one current internal contract",
   "at most four live",
   "never pass a model or reasoning override",
@@ -534,7 +535,13 @@ export function parseProjectAgentConfig(content, expectedName) {
     "Never",
     "commit",
     ...(worker
-      ? ["already-authorized YOLO/danger-full-access override", "strict logical isolation boundary"]
+      ? [
+          "already-authorized YOLO/danger-full-access override",
+          "strict logical isolation boundary",
+          "Delegated Release",
+          "frozen candidate",
+          "scope closure",
+        ]
       : []),
   ]) {
     if (

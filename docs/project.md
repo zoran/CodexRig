@@ -340,11 +340,12 @@ upgradeable product repositories while deliberately defining no child product or
 - Runtime and technology: Node.js ESM on the framework's mise-pinned toolchain.
 - Public contract: `repo:housekeeping`, `goal:new` and `project:publish`. Explicit publication
   verifies, commits and pushes all reviewed non-ignored changes on the current branch to its
-  configured upstream, including from the proven calling canonical session once its other writers
-  drain. Shared snapshot, session, destination and managed-hook gates serve source and product
-  publication. The source composition enforces central `main` and clears source residue; it
-  preserves live private runtime and performs full reset only outside sessions. Product publication
-  preserves native history and accounts.
+  configured upstream. The optional HEAD/tree binding freezes a prepared staged release in a
+  separate clone while development continues elsewhere; source/index drift blocks before push.
+  Shared snapshot, session, destination and managed-hook gates serve source and product publication.
+  The source composition enforces central `main` and clears source residue; it preserves live
+  private runtime and performs full reset only outside sessions. Product publication preserves
+  native history and accounts.
 - Private internals: Atomic local reconciliation, health-check orchestration, Git publication,
   source identity, and evidence admission checks. Failed command excerpts retain stderr summaries
   independently of subsequent successful stdout, constrained by the sanitized chronological capture.
@@ -439,7 +440,9 @@ upgradeable product repositories while deliberately defining no child product or
   inventory, path-policy, Product Root, worktree-recovery, runtime-lease/session-recovery,
   delivery-discovery, snapshot, publication-session and credential-recovery APIs. Publication
   admission proves the caller descends from the exact live Codex process using Linux ancestry;
-  missing proof and competing worktree writers fail closed.
+  missing proof and competing worktree writers fail closed. Frozen release admission requires an
+  ordinary clone with no linked worktrees or object alternates; shared Git hooks/configuration make
+  linked worktrees unsuitable for concurrent release.
 - Private internals: Repository inventory, process-identity, session-lifecycle, isolated Git,
   launcher/writer liveness aggregation, per-root recovery classification, and Git/Git-less traversal
   detail. Lifecycle admission, owner publication, inspection and retirement share the existing short
@@ -629,7 +632,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.16.0`.
+- Framework version: `6.17.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

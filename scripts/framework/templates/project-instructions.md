@@ -287,9 +287,10 @@ honestly; do not substitute unverified success or automatic source repairs.
 
 `config/delivery.json` owns declared and detected environments. Dev is the default, not evidence
 that a deployment exists. The newest authorized developer build/deploy and manual feedback have
-priority; run isolated verification beside or afterward. Dev is latest-wins. Staging/prod require
-explicit selection and their scoped credentials, immutable artifact/configuration, migration and
-rollback evidence, serialized promotion and health checks. `pnpm verify` does not deploy.
+priority; run isolated verification beside or afterward. Dev is latest-wins outside a frozen
+[Delegated Release](#delegated-release). Staging/prod require explicit selection and their scoped
+credentials, immutable artifact/configuration, migration and rollback evidence, serialized promotion
+and health checks. `pnpm verify` does not deploy.
 
 ### Deployment And Qualification Failure Recovery
 
@@ -318,18 +319,16 @@ boundaries; verification must not install prerequisites or silently discard a re
 
 ### Verification And Publication Gates
 
-Explicitly authorized publication and deployment may run directly from the owning Codex session. Use
-the README's `project:publish` command to verify, commit and push the current branch to its
-configured upstream. Drain owned agents and background writers first. The publisher establishes the
-complete integrated verification basis once, reusing matching individual results from manual
-verification and earlier attempts. Pre-push consumes that evidence while retaining its security and
-pushed-object checks. Independent CI and deployment gates remain required. The publisher proves the
-calling canonical session through its exact live lease and observable Linux process ancestry;
-competing or unverified active writers remain blockers. Where this proof is unavailable, publish
-from the terminal after sessions exit. Preserve native history, project credentials, branch
-protections, CI approvals and deployment environment gates. Do not require another login or `/quit`
-when existing credentials and calling-session admission suffice. Publication does not itself deploy;
-continue an already-authorized deployment through the project's actual delivery commands.
+Use the README's `project:publish` command. The publisher verifies, commits and pushes to the
+configured upstream through the managed pre-push hook, confirms the remote commit and preserves
+native history/accounts. Pre-push consumes exact-current evidence and retains security/pushed-object
+checks. Active callers require the exact live canonical lease and observable Linux process ancestry;
+without it, publish after that clone's sessions exit. No force push, automatic merge, hook bypass or
+empty commit is permitted. Failures preserve source and any local commit for reconciliation.
+
+#### Delegated Release
+
+<!-- current-delegated-release-policy -->
 
 ## Completed-Goal Closure And Repository Housekeeping
 
@@ -376,10 +375,11 @@ decisions. Start admitted assignments concurrently, and let the primary continue
 work while owning shared decisions and integration.
 
 Reassess after discovery, material results, handoffs and every slice boundary. An initially serial
-phase does not make later independent work serial. Accept handoffs and close completed owned threads
-through supported native controls; confirm slot release before replacement, since idle or
-completed-but-open threads still occupy slots. Recheck capacity, permissions and ownership before
-every spawn or follow-up; an earlier admission does not carry forward after its conditions change.
+phase does not make later independent work serial. Accept handoffs and close scopes before
+follow-up; close unneeded threads through supported native controls and confirm slot release before
+replacement, since idle or completed-but-open threads still occupy slots. Recheck capacity,
+permissions and ownership before every spawn or follow-up; an earlier admission does not carry
+forward after its conditions change.
 
 Register owned agents and background tasks with repository/session identity, exact scope, returned
 identity, checkpoint, safe boundary and cancellation provenance. One host represents one developer;

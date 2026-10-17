@@ -2,7 +2,15 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -94,8 +102,36 @@ test("an active session in a sibling worktree blocks even the owning caller", (t
   const closeSibling = session(sibling);
   try {
     assert.throws(() => inspectPublicationSession(root), /active writer session/u);
+    assert.throws(() => inspectPublicationSession(root, { isolated: true }), /separate clone/u);
+    assert.throws(() => inspectPublicationSession(sibling, { isolated: true }), /separate clone/u);
   } finally {
     closeSibling();
     close();
   }
+});
+
+test("frozen release admission rejects borrowed Git objects", (t) => {
+  const root = fixture(t);
+  assert.equal(spawnSync("git", ["init", "--initial-branch=main"], { cwd: root }).status, 0);
+  const directory = path.join(root, ".git/objects/info");
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(path.join(directory, "alternates"), "/unowned/objects\n");
+  assert.throws(() => inspectPublicationSession(root, { isolated: true }), /separate clone/u);
+});
+
+test("frozen release admission rejects aliased Git configuration", async (t) => {
+  for (const [kind, link] of [
+    ["symlink", symlinkSync],
+    ["hardlink", linkSync],
+  ])
+    await t.test(kind, (t) => {
+      const root = fixture(t);
+      assert.equal(spawnSync("git", ["init", "--initial-branch=main"], { cwd: root }).status, 0);
+      const config = path.join(root, ".git/config");
+      const shared = path.join(root, "shared-config");
+      writeFileSync(shared, readFileSync(config));
+      rmSync(config);
+      link(shared, config);
+      assert.throws(() => inspectPublicationSession(root, { isolated: true }), /separate clone/u);
+    });
 });

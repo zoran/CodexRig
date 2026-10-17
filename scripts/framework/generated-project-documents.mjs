@@ -50,6 +50,7 @@ export function currentProjectInstructions(sourceRoot) {
     ["Temporary Data And Storage Housekeeping", "<!-- current-temporary-storage-policy -->"],
     ["Long-Session Course Checks", "<!-- current-course-check-policy -->"],
     ["Verification Selection And Runtime", "<!-- current-verification-runtime-policy -->"],
+    ["Delegated Release", "<!-- current-delegated-release-policy -->"],
     ["Test Strategy", "<!-- current-test-strategy-policy -->"],
     ["Deployment And Qualification Failure Recovery", "<!-- current-delivery-failure-policy -->"],
     ["Documentation Currency", "<!-- current-documentation-currency-policy -->"],
@@ -132,8 +133,8 @@ findings, not a new maintenance campaign.
 
 Portable startup requests on-request approval and network-disabled workspace-write. Explicit Dev
 \`--yolo\` changes runtime permissions only within existing authority. No unapproved staging/prod,
-commit or push. Explicitly authorized publication and deployment may run in the owning session;
-use the README command and retain environment gates. Default to parallel development with four concurrent subagents in addition to the
+commit or push. Use [Delegated Release](instructions.md#delegated-release) for authorized publication,
+the README command and existing environment gates. Default to parallel development with four concurrent subagents in addition to the
 primary when substantial disjoint work, permissions, confirmed capacity and integration permit.
 Keep at most four live; use fewer or work serially when necessary, briefly state why, and never
 invent work to fill slots. Name runnable assignments in the plan, start admitted work concurrently,
@@ -262,11 +263,10 @@ a rejected push preserves the local commit for retry without an empty commit. No
 automatic merge, force push, native-session reset or direct deployment is performed. Existing Git
 hooks, branch protections and any CI/deployment approvals still apply. A missing upstream must be
 configured explicitly before publication. The calling canonical session is admitted through exact
-Linux process ancestry; other or unverified active writers block publication. Drain owned agents
-and background writers first. Session exit is unnecessary when this proof is available. Authorized
-deployments can follow directly using project commands and existing project credentials; retain
-the project's environment approvals. If process ancestry cannot be proven, publish from the terminal
-after sessions exit.
+Linux process ancestry; competing or unverified writers in its clone block publication. Follow
+[Delegated Release](instructions.md#delegated-release) to keep independent development running, bind
+the prepared candidate with \`--candidate <HEAD>:<tree>\`, and assess the authorized deploy at each
+push. If process ancestry cannot be proven, publish after that clone's sessions exit.
 
 ## Verification
 

@@ -200,6 +200,7 @@ test("empty generation excludes source capabilities, private markers and new uns
       "scripts/repository/global-git-credential.test.mjs",
       "scripts/goals/publication-command.test.mjs",
       "scripts/goals/project-publication-integration.test.mjs",
+      "scripts/goals/release-candidate.test.mjs",
       "scripts/repository/git-publication-identity.test.mjs",
       "scripts/repository/publication-session.test.mjs",
       "scripts/setup/codex-launcher.test.mjs",

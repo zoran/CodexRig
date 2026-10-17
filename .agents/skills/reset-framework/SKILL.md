@@ -14,21 +14,18 @@ before selecting cleanup. A local improvement task can finish without publicatio
 not add commit/push, full runtime sanitation or another product phase to its scope. Preserve active
 runtime and unrelated work; use only the admitted source cleanup path when a live session owns it.
 
-For explicitly requested source-framework publication, use the existing orchestrator with explicit
-user authority, including from the verified owning Codex session after its other writers drain:
+For authorized source publication, follow
+[Delegated Release](../../../instructions.md#delegated-release) and use the existing orchestrator:
 
 ```bash
 bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"
 ```
 
-This reset-owned orchestrator uses the existing worktree, housekeeping, verification, hook, and
-goal-publication owners. It binds one central `main` remote, previews/applies reset and confirms a
-clean baseline, runs housekeeping and verification, resets verification residue, and compares the
-exact source snapshot before staging and committing under the lifecycle lock. It pushes that commit
-through the managed pre-push hook, verifies remote `main`, and runs `goal:new` and Worktree
-Settlement. Every failure stops subsequent steps. A rejected push preserves the local commit;
-rerunning the command does not create an empty commit. This command and its implementation are
-excluded from generated projects. The command does not infer publication authority for an agent.
+This source-only composition binds central `main` and the existing reset, housekeeping,
+verification, hook and goal-publication owners. The canonical publication policy owns ordering,
+candidate checks, failure preservation and settlement. Preparation must be complete before freezing
+a delegated candidate; pass its `--candidate <HEAD>:<tree>` to the same command. Policy does not
+itself authorize execution, and this source publisher is excluded from generated projects.
 
 When publication guidance is part of the requested handoff, follow the command-selection rule in
 [Verification](../../../instructions.md#verification): confirm the current package script and README

@@ -42,9 +42,9 @@ resume. Every extra action needs an acceptance benefit or material risk. Keep on
 contract and migrate owners/consumers together. Use relevant skills and one writer per surface.
 Read-only requests stay read-only. Continue accepted implementation to its real completion without
 routine approval pauses; commit, push, deployment and credential use retain their authority gates.
-Use targeted development checks; reviews, audits, handoffs and resume reuse valid results. Bundle
-complete verification once on the finished integrated state before push through the existing
-publisher and evidence store, under [Verification](instructions.md#verification).
+Use [Verification](instructions.md#verification) for targeted checks and evidence reuse, and
+[Delegated Release](instructions.md#delegated-release) for authorized publication while independent
+development continues. These owners define the candidate, isolation, deploy and handoff gates.
 
 Apply [Documentation Currency](instructions.md#documentation-currency) in each slice: update
 affected canonical owners with the change and integrate agents' documentation corrections before
@@ -77,7 +77,8 @@ Read-only roles stop under broader overrides. An explicit worker may inherit thi
 already-authorized Dev YOLO only for its exact disjoint write set, with no new authority. The
 primary owns protected policy, integration and closure. Register owned agents/background tasks with
 exact repository/session/scope identity, checkpoints and cancellation provenance; never contact or
-control foreign or ambiguous processes. Accept handoffs and close owned threads before reuse.
+control foreign or ambiguous processes. Accept handoffs and close scopes before follow-up; close
+unneeded threads before replacing them.
 
 Reserve completion capacity for the current bounded work; historical estimates cannot establish a
 new critical state. Follow canonical capacity recovery/admission; at confirmed critical capacity

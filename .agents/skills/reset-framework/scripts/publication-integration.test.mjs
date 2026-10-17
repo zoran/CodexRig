@@ -37,12 +37,24 @@ test("the framework command preserves its session through real reset, verificati
   const session = ownSession(f.root);
   f.write("history.jsonl", "retained session history\n");
   try {
+    // The primary prepares the source baseline before handing its frozen tree to a release worker.
+    f.run("bash", [
+      "scripts/setup/run-project.sh",
+      "pnpm",
+      "framework:reset",
+      "--publication",
+      "--apply",
+    ]);
+    f.run("git", ["add", "--all"]);
+    const candidate = `${f.run("git", ["rev-parse", "HEAD"]).trim()}:${f.run("git", ["write-tree"]).trim()}`;
     const output = f.run("bash", [
       "scripts/setup/run-project.sh",
       "pnpm",
       "framework:publish",
       "--message",
       "Publish framework in session",
+      "--candidate",
+      candidate,
     ]);
     assert.match(output, /All 8 phases completed/u);
     assert.deepEqual(inspectRuntimeSessionLease({ root: f.root }).lease, session.lease);

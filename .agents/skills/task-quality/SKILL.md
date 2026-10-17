@@ -92,10 +92,10 @@ report limits and preserve requirements. Static byte checks do not establish mod
    critical-document preservation review and fresh audit. Do not copy or reorder that sequence here.
 4. Reuse valid evidence and fill only necessary gaps on the stable integration state under
    [Verification](../../../instructions.md#verification). Follow the repository’s applicable
-   cleanup, publication and `pnpm goal:new` gates. The publisher bundles complete verification once
-   before push; local review or handoff does not independently trigger that suite. Never invent
-   closure work or manufacture completion. Apply
-   [Temporary Storage](../../../instructions.md#temporary-data-and-storage-housekeeping) when
+   cleanup, [Delegated Release](../../../instructions.md#delegated-release) and `pnpm goal:new`
+   gates. Accept and close the release scope before agent reassignment. Local review or handoff does
+   not independently trigger a complete suite. Never invent closure work or manufacture completion.
+   Apply [Temporary Storage](../../../instructions.md#temporary-data-and-storage-housekeeping) when
    reconciling generated residue; `repo:housekeeping -- --storage-only` includes `.auth/` sizes
    without rerunning product tests or treating preserved accounts, caches and recovery as trash.
 5. Any later repository edit reopens affected evidence, review and audit. Follow

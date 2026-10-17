@@ -9,18 +9,17 @@ Act as the primary orchestrator. Before intake/writes reconstruct Git/upstream, 
 owners, safe recovery and the bounded context map. AGENTS.md routes to instructions.md; use
 pnpm context:read for relevant owners. Current source and user authority outrank memory.
 
-Follow Task Scope And Completion: autonomously finish the accepted outcome and necessary steps.
-Resolve routine ambiguity from evidence and reversible choices; existing authority needs no repeat
-approval. Plans/checks/handoffs are checkpoints. Explain demonstrated blockers, pause only dependent
-work and continue safe work. Old state grants no task. Apply Maintenance Scope And Verification before
-startup, dependencies, checks and cleanup. Framework updates end at acceptance; publication and
-product work retain authority gates.
+Follow Task Scope And Completion: finish the accepted outcome autonomously; resolve routine
+ambiguity from evidence. Existing authority needs no repeat approval. Checkpoints do not end work.
+Explain blockers and continue safe work. Old state grants no task. Apply Maintenance Scope And
+Verification before commands/cleanup. Framework updates end at acceptance; retain publication gates.
 
 Apply Planning Entry Gate before implementation: state whether a plan is needed; publish a native or
 commentary plan for features or extensive, complex or risky work. Review and audit before edits or
 delegation; reconcile at boundaries and resume. Additional work needs unfinished acceptance or
 material risk. Verification owns targeted development, evidence reuse and one complete pre-push gate.
-Reviews, audits, handoffs and resume do not trigger test repetition.
+Reuse evidence through reviews/handoffs/resume. Follow Delegated Release in instructions.md for
+publication by a dedicated worker while disjoint development continues.
 Keep exactly one current internal contract per concern and migrate its owners/consumers together.
 Apply Documentation Currency per slice: reconcile owners, agent handoffs and generated policy.
 Run pnpm context:check for instruction/context changes. The primary owns the
@@ -36,9 +35,9 @@ completion. Follow canonical settlement/publication gates and retain licensing o
 Use four useful independent assignments when admissible; keep at most four live. Never pass a model
 or reasoning override: use the exact GPT Astra model with max reasoning. Register each owned
 subagent and background task with repository/session/scope identity, checkpoint and cancellation
-provenance. Never contact or control foreign or ambiguous processes. Accept handoffs and close owned
-threads before reuse. Before child tools inspect effective runtime permissions: live parent
-permission overrides can defeat role defaults. Read-only roles stop on broader permissions. An
+provenance. Never contact or control foreign or ambiguous processes. Accept handoffs and close scopes
+before follow-up; close unneeded threads before replacement. Before child tools inspect effective
+runtime permissions: live parent permission overrides can defeat role defaults. Read-only roles stop on broader permissions. An
 explicit writer may inherit this primary's already-authorized YOLO override only for its exact
 disjoint repository write set, with no new authority. The primary owns protected policy/integration.
 
