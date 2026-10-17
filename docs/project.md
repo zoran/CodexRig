@@ -100,16 +100,21 @@ upgradeable product repositories while deliberately defining no child product or
   per-slice documentation currency, the visible plan prerequisite, proportional review and course
   correction against the original outcome and cumulative effort to canonical policy. Generation
   projects the canonical course contract; review and recovery skills route to it. Bounded role
-  handoffs include affected document owners; the primary owns whole-repository acceptance. The
-  four-subagent ceiling excludes the primary and requires confirmed capacity, independence and
-  effective permissions. Capacity admission preserves native earned-reset and usage-permission
-  evidence, resolves supported free account recovery before account-only critical classification,
-  and retains hard limits and terminal seals. Reserves require current evidence for the next bounded
-  work and closure in matching units; historical estimates and unknown costs cannot establish a new
-  critical state. Smaller useful work or fewer agents precede a reserve-shortfall decision.
-  Generated projects receive the same roles and canonical task, planning, documentation and capacity
-  policies; source-to-child updates compare that current output for explicit local reconciliation.
-  Validation proves configuration and projection consistency, not model obedience.
+  handoffs include affected document owners; the primary owns whole-repository acceptance. Four
+  concurrent subagents are the default target, excluding the primary; the native ceiling remains
+  twelve. Useful independent work, confirmed capacity and effective permissions govern admission.
+  After accepting a handoff and closing its scope, the primary rechecks admission and immediately
+  assigns available owned agents the next ready task within the authorized outcome. This includes
+  additional user-requested or user-started agents with confirmed provenance. Smaller tasks may use
+  fewer agents; slot availability never justifies invented work. Capacity admission preserves native
+  earned-reset and usage-permission evidence, resolves supported free account recovery before
+  account-only critical classification, and retains hard limits and terminal seals. Reserves require
+  current evidence for the next bounded work and closure in matching units; historical estimates and
+  unknown costs cannot establish a new critical state. Smaller useful work or fewer agents precede a
+  reserve-shortfall decision. Generated projects receive the same agent defaults, continued
+  assignment, roles and canonical task, planning, documentation and capacity policies;
+  source-to-child updates compare that current output for explicit local reconciliation. Validation
+  proves configuration and projection consistency, not model obedience.
 - Runtime and technology: Declarative TOML, JSON, and Markdown consumed by Codex, with lifecycle
   entrypoints implemented in the framework's Node.js/Bash harness.
 - Public contract: Root `developer_instructions` and `[agents]` defaults in `.codex/config.toml`,
@@ -299,10 +304,10 @@ upgradeable product repositories while deliberately defining no child product or
   The same generation owner emits sibling trees and archives from explicit selection and templates.
   It projects the canonical maintenance scope boundary into child instructions; generated agent
   entry points and verification guidance route command selection through that policy. Canonical
-  verification, test strategy, failure recovery, storage and documentation policies are projected by
-  the same generator. Its focused consumers are the staged policy validator and independent
-  project-initialization tests. Portable configuration validation requires the primary's reference
-  to the maintenance scope boundary.
+  verification, test strategy, failure recovery, storage, documentation, agent admission and agent
+  lifecycle policies are projected by the same generator. Its focused consumers are the staged
+  policy validator and independent project-initialization tests. Portable configuration validation
+  requires the primary's reference to the maintenance scope boundary.
 - Tenant isolation: Not applicable; no product data plane.
 - Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/deps`, `scripts/docs`,
   `scripts/filesystem`, `scripts/goals`, `scripts/platform`, `scripts/repository`, `scripts/setup`,
@@ -632,7 +637,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.17.0`.
+- Framework version: `6.18.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

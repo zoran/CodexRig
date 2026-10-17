@@ -348,54 +348,34 @@ completed product work or impose another cleanup task.
 
 ## Subagent Orchestration And Integration Authority
 
-Parallel development is the default: plan for and use four concurrent subagents in addition to the
-primary whenever substantial independent work, safe write isolation, permissions, confirmed capacity
-and integration permit. Reassess useful parallel work at slice boundaries without waiting for the
-user to request it. Keep at most four live; use fewer or work serially for small tasks, dependent
-work or insufficient permissions, isolation or capacity, and briefly state why. Each delegation must
-advance the authorized outcome and justify its coordination and integration cost; never invent work
-or split cohesive changes merely to fill slots. Subagents never delegate further. Never override the
-configured GPT Astra model and its second-highest supported reasoning effort, currently `max`. Keep
-primary, global agent defaults, roles and the shared validation policy in agreement; the installed
-model catalog must confirm the configured effort's rank before canonical startup.
+### Admission, Intelligence, And Provenance
 
-Every assignment inherits the original user outcome and the correction/stop conditions from
-[Long-Session Course Checks](#long-session-course-checks). The primary owns cumulative effort, the
-whole-repository course check and final audit. Children report stalled or disproportionate work
-against that overall outcome and return evidence and document corrections for their assigned
-boundaries, then stop at their result or blocker. Do not turn a bounded assignment into an
-independent optimization or repository-wide audit campaign.
+<!-- current-agent-admission-policy -->
 
-Make the plan name assignments that can start now with an outcome, stopping condition, exclusions,
-affected document owners, focused evidence, exact scope, dependency boundary, selected role,
-checkpoint and primary integration order. Choose discovery, implementation, test or review work for
-actual independence and benefit, not a fixed four-role checklist. Planning discovery may run before
-the plan audit; delegated implementation must wait for that audit and resolution of material
-decisions. Start admitted assignments concurrently, and let the primary continue disjoint useful
-work while owning shared decisions and integration.
+### Effective Permissions And Write Isolation
 
-Reassess after discovery, material results, handoffs and every slice boundary. An initially serial
-phase does not make later independent work serial. Accept handoffs and close scopes before
-follow-up; close unneeded threads through supported native controls and confirm slot release before
-replacement, since idle or completed-but-open threads still occupy slots. Recheck capacity,
-permissions and ownership before every spawn or follow-up; an earlier admission does not carry
-forward after its conditions change.
+Never override the configured GPT Astra model and its second-highest supported reasoning effort,
+currently `max`. Keep primary, global agent defaults, roles and the shared validation policy in
+agreement; the installed model catalog must confirm the configured effort's rank before canonical
+startup.
 
-Register owned agents and background tasks with repository/session identity, exact scope, returned
-identity, checkpoint, safe boundary and cancellation provenance. One host represents one developer;
-visible local changes are developer-owned, but process control requires exact provenance. Different
-clones need explicit coordination; a local lease cannot prove them idle.
+One host represents one developer; visible local changes are developer-owned, but process control
+requires exact provenance. Different clones need explicit coordination; a local lease cannot prove
+them idle.
 
 Before child tools, require effective sandbox, approvals, network and checkout. Read-only roles stop
 on broader live overrides. An explicitly selected worker may accept this primary's authorized YOLO
 only for its exact disjoint write set, with no new network, credential, delegation, external
 mutation, commit, push or deploy authority. The primary owns protected policy, integration and
-closure. Never contact or control foreign/ambiguous processes. Accept handoffs and close unneeded
-owned agents.
+closure. Never contact or control foreign/ambiguous processes.
 
 ### Capacity Admission And Monitoring
 
 <!-- current-capacity-admission-policy -->
+
+### Agent Lifecycle And Idle Cleanup
+
+<!-- current-agent-lifecycle-policy -->
 
 ### Guarded And Critical Drain
 

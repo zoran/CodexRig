@@ -70,15 +70,19 @@ Kikic and CodexRig Framework credit; only NOTICE defines generated-output permis
 
 ## Coordinate And Close
 
-Use four useful concurrent subagents when independence, effective permissions and confirmed capacity
-permit; otherwise state the limit. Keep at most four live with exact configured GPT Astra/max parity
-and no model/reasoning override. Before child tools verify effective permissions and provenance.
-Read-only roles stop under broader overrides. An explicit worker may inherit this primary's
-already-authorized Dev YOLO only for its exact disjoint write set, with no new authority. The
-primary owns protected policy, integration and closure. Register owned agents/background tasks with
-exact repository/session/scope identity, checkpoints and cancellation provenance; never contact or
-control foreign or ambiguous processes. Accept handoffs and close scopes before follow-up; close
-unneeded threads before replacing them.
+Default to four useful concurrent subagents when independence, effective permissions and confirmed
+capacity permit; otherwise state the limit. Twelve is the native capacity ceiling, not the default.
+Include additional user-started agents after verifying ownership and admission. After each accepted
+handoff, close its scope and immediately assign the next ready bounded task; do not wait for another
+user prompt or the whole wave. Keep the admitted team working while useful authorized work remains,
+without inventing tasks. Follow the canonical lifecycle when dependencies prevent useful work. Keep
+at most twelve live with exact configured GPT Astra/max parity and no model/reasoning override.
+Before child tools verify effective permissions and provenance. Read-only roles stop under broader
+overrides. An explicit worker may inherit this primary's already-authorized Dev YOLO only for its
+exact disjoint write set, with no new authority. The primary owns protected policy, integration and
+closure. Register owned agents/background tasks with exact repository/session/scope identity,
+checkpoints and cancellation provenance; never contact or control foreign or ambiguous processes.
+Accept handoffs and close scopes before follow-up; close unneeded threads before replacing them.
 
 Reserve completion capacity for the current bounded work; historical estimates cannot establish a
 new critical state. Follow canonical capacity recovery/admission; at confirmed critical capacity

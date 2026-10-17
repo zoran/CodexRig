@@ -515,7 +515,8 @@ The plan is decision-ready only when it identifies:
 - the current parallelism decision under
   [Subagent Orchestration](#subagent-orchestration-and-integration-authority): useful independent
   assignments, dependencies, read/write ownership, admission evidence and integration order; target
-  four subagents in addition to the primary when admissible, otherwise state the limiting reason;
+  four subagents in addition to the primary by default, include admitted user-added agents, and
+  identify ready follow-up work; otherwise state the limiting reason;
 - review surfaces, audit criteria, cleanup expectations, publication boundaries, and any point that
   genuinely requires user or external input.
 
@@ -2482,36 +2483,41 @@ sufficient.
 Make the parallelism decision concrete in the current plan: identify which assignments are ready
 now, their expected outcome and focused evidence, exact read/write scope, dependency boundaries,
 selected role, checkpoint, and primary integration order. Include discovery, implementation, tests,
-or review only where they provide independent useful work; four is not a prescribed role checklist.
-Planning discovery may run in parallel before the plan audit, but no delegated implementation may
-bypass that audit or an unresolved material decision. Once admission passes, start the ready
-assignments concurrently rather than merely listing agents or running independent assignments one
-after another. The primary continues disjoint integration or other useful work and remains the sole
-owner of protected policy and shared decisions.
+or review only where they provide independent useful work; the target is not a prescribed role
+checklist. Planning discovery may run in parallel before the plan audit, but no delegated
+implementation may bypass that audit or an unresolved material decision. Once admission passes,
+start the ready assignments concurrently rather than merely listing agents or running independent
+assignments one after another. The primary continues disjoint integration or other useful work and
+remains the sole owner of protected policy and shared decisions.
 
-Reassess the runnable set after discovery, a material result or handoff, and every slice boundary.
-Accept handoffs and close their scopes before follow-up; close unneeded threads through supported
-native controls and confirm slot release before replacement. An open thread still occupies a slot.
-Recheck capacity, effective permissions and ownership for every new assignment or follow-up. A phase
-that was necessarily serial does not make the rest of the outcome serial; conversely, an earlier
-four-agent wave never authorizes four agents after the conditions change.
+Reassess the runnable set after discovery, every result or handoff, a dependency change, and each
+slice boundary. Keep ready bounded assignments in the current plan; maintain continuous dispatch
+under [Agent Lifecycle And Idle Cleanup](#agent-lifecycle-and-idle-cleanup), without waiting for the
+whole wave or another user prompt. Accept each handoff and close its scope before assigning the next
+task. Recheck capacity, effective permissions and ownership for every spawn or follow-up. A phase
+that was necessarily serial does not make the rest of the outcome serial; an earlier admission never
+authorizes continued work after its conditions change.
 
-Four concurrent subagents are the normal target when those conditions hold and remain the default
-ceiling: keep at most four live subagent threads and start at most four in one coordination wave,
-excluding the primary. Use fewer, or work serially, when the task is small, dependencies require
-sequencing, or independence, permissions, confirmed capacity, or integration capacity is
-insufficient; briefly state the limiting reason. Do not invent work or split cohesive changes merely
-to fill slots. More than four requires an explicit user override for the current outcome plus a
-fresh budget and conflict check; never persist that override by silently raising the repository
-default. Subagents never spawn or delegate to further agents.
+Four concurrent subagents are the normal target, excluding the primary. The native ceiling of twelve
+live subagent threads is capacity for explicitly requested or user-started additional agents, not a
+target of twelve. Include every such agent in the continuing team once repository/session ownership,
+scope and admission are verified; do not reduce an expanded team to four after a handoff while
+useful independent work remains. Use fewer, or work serially, when the task is small, dependencies
+require sequencing, or independence, permissions, confirmed capacity, or integration capacity is
+insufficient; briefly state the limiting reason. Never invent work, expand the accepted outcome or
+split cohesive changes merely to fill slots. Keep at most twelve live and obey any lower host limit.
+More than twelve requires an explicit user override for the current outcome, supported host capacity
+and a fresh budget and conflict check; never silently persist an increased default or ceiling.
+Subagents never spawn or delegate to further agents.
 
 This authority is injected as well as documented. Root `developer_instructions` in tracked
 `.codex/config.toml` bind the primary orchestrator, ownership/provenance boundary, intelligence
 parity, critical drain, and terminal handover stop. The same file's `[agents]` table owns the exact
-global Astra/`max` defaults and four-thread ceiling; project-scoped `.codex/agents/*.toml` layers
-inject the bounded role behavior into spawned sessions. Never pass a model or reasoning override at
-spawn. `pnpm codex:validate` fails closed when the primary policy, role policy, permissions, or
-exact primary/subagent intelligence pair is missing or divergent.
+global Astra/`max` defaults and twelve-thread capacity ceiling, while the injected instructions own
+the four-agent default and continuous dispatch. Project-scoped `.codex/agents/*.toml` layers inject
+the bounded role behavior into spawned sessions. Never pass a model or reasoning override at spawn.
+`pnpm codex:validate` fails closed when the primary policy, role policy, permissions, or exact
+primary/subagent intelligence pair is missing or divergent.
 
 Before using a returned agent identity, the primary records it in a session-local ownership registry
 with the repository realpath and stable repository identity, primary session/thread identity,
@@ -2521,9 +2527,11 @@ listing. Such a listing is untrusted discovery only: count, message, follow up, 
 an agent only when every provenance field matches this primary's registry. A matching name, idle
 state, model, account, or worktree label is never sufficient. An incomplete, stale, reused, or
 ambiguous identity fails closed—leave it untouched and resolve ownership through the appropriate
-repository/session coordination channel. Foreign agents never consume this task's four-agent limit,
-never release its ownership claims, and never receive this project's context. Direct peer exchange
-uses the same registry and may name only confirmed owned agents.
+repository/session coordination channel. A user-started agent joins this team only through a
+verified ownership handoff recorded in the same registry; the user's request to use additional
+agents never makes unrelated or ambiguous sessions controllable. Foreign agents never consume this
+task's twelve-agent limit, never release its ownership claims, and never receive this project's
+context. Direct peer exchange uses the same registry and may name only confirmed owned agents.
 
 Before starting an asynchronous process, detached command, or other background tool job, the primary
 adds it to the same session-local ownership registry with repository realpath/stable identity,
@@ -2676,19 +2684,34 @@ Never let an interrupted delegated stream leave unexplained partial edits.
 
 ### Agent Lifecycle And Idle Cleanup
 
-Every spawn also receives an expected next checkpoint based on its bounded task. The primary checks
-its provenance-bound owned-agent inventory at each checkpoint, after material tool waits or
-handoffs, before admitting another agent, and as the session-side first step of completed-goal
-housekeeping. A subagent reports completion or blockage; the primary accepts, rejects or preserves
-its handoff and closes that scope before follow-up. Only the primary closes or interrupts its owned
-threads. The primary then tells every affected active agent what result was accepted, which
-contracts/files or assumptions changed, what work remains, and that the slot and ownership claim
-were released. An idle agent with no concrete next bounded assignment is closed instead of being
-retained for speculative reuse. If an agent misses its task-appropriate checkpoint, request one
-concise status/handoff; close it when that produces no concrete progress, coherent recoverable
-state, or justified next checkpoint. Do not apply a blind wall-clock timeout to a known long-running
-tool, but do not let silent, blocked, abandoned, redundant, or completed agents accumulate. Before
-final handoff, the primary confirms that no unneeded owned subagent remains. Repository
+Every spawn receives an expected next checkpoint based on its bounded task. The primary checks its
+provenance-bound inventory at each checkpoint, after material tool waits, whenever a result or
+blocker arrives, before admission, and as the first session-side step of completed-goal
+housekeeping. Completion ends the assignment, not the primary's responsibility to schedule the
+available agent.
+
+For each result, promptly accept, reject or preserve the handoff, release the old scope's ownership
+claims, and update the plan and affected agents with accepted contracts, evidence and remaining
+work. Before continuing unrelated primary work or waiting for the other agents, select the next
+ready bounded assignment from the accepted outcome. Recheck admission and immediately issue that
+follow-up to the available agent through the supported native follow-up/resume control. Reuse its
+context where useful; do not close and respawn merely because one task finished. A follow-up names
+its new result, exact scope, dependencies, evidence and checkpoint; prior success grants no broader
+scope. Apply this dispatch loop to all admitted agents, including additional user-started agents,
+throughout implementation, repairs and verification. Never leave an available agent idle while
+suitable, independent, authorized work is ready, and never wait for another user prompt to assign
+that work.
+
+If no suitable task is ready, record the concrete dependency or admission limit and its next
+checkpoint in the current plan. Retain a waiting agent only for a named near-term dependent task;
+reassess it when that dependency resolves. Close an agent with no concrete remaining assignment,
+using supported native controls, and confirm slot release before replacement. Scope closure does not
+release a live thread's slot. When the outcome is complete, close remaining owned agents rather than
+inventing more work. Only the primary closes or interrupts owned threads. If an agent misses its
+task-appropriate checkpoint, request one concise status/handoff; close it when that produces no
+concrete progress, coherent recoverable state, or justified next checkpoint. Do not apply a blind
+wall-clock timeout to a known long-running tool, or let abandoned or redundant agents accumulate.
+Before final handoff, confirm that no unneeded owned subagent remains. Repository
 `repo:housekeeping` verifies the portable agent policy. Only the primary owns host-session agent
 cleanup because repository scripts cannot enumerate, communicate with, or terminate Codex
 conversations.

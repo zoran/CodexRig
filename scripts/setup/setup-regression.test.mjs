@@ -134,7 +134,7 @@ test("skill metadata preserves native implicit and explicit activation choices",
 test("Codex config parser accepts only the complete typed portable policy", () => {
   assert.deepEqual(validateCodexConfig(configFixture()), {
     developer_instructions:
-      "Act as the primary orchestrator. Apply Maintenance Scope And Verification before selecting commands. Follow Delegated Release. Retain exactly one current internal contract per concern. Keep at most four live agents and never pass a model or reasoning override; all use the exact GPT Astra model with max reasoning. Register every owned subagent and background task and leave foreign or ambiguous processes untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. After every completed slice, run pnpm worktree:status -- --json as the worktree settlement trigger; preservation is a safety state, never completion. Historical reserve estimates are not binding. Follow Capacity Admission And Monitoring before classifying account-window exhaustion; retain rateLimitResetCredits and ordinaryUsageAllowed, resolve needed supported free resets and refresh binding capacity. At unresolved 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.\n",
+      "Act as the primary orchestrator. Apply Maintenance Scope And Verification before selecting commands. Follow Delegated Release. Retain exactly one current internal contract per concern. Default to four useful concurrent subagents. Include additional user-started agents in ongoing scheduling; accept each handoff and immediately assign the next ready bounded task while authorized work remains. Keep at most twelve live agents and never pass a model or reasoning override; all use the exact GPT Astra model with max reasoning. Register every owned subagent and background task and leave foreign or ambiguous processes untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. After every completed slice, run pnpm worktree:status -- --json as the worktree settlement trigger; preservation is a safety state, never completion. Historical reserve estimates are not binding. Follow Capacity Admission And Monitoring before classifying account-window exhaustion; retain rateLimitResetCredits and ordinaryUsageAllowed, resolve needed supported free resets and refresh binding capacity. At unresolved 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.\n",
     project_doc_max_bytes: 32_768,
     project_doc_fallback_filenames: ["instructions.md"],
     model_reasoning_effort: "max",
@@ -150,7 +150,7 @@ test("Codex config parser accepts only the complete typed portable policy", () =
     "agents.enabled": true,
     "agents.default_subagent_model": "gpt-6-astra",
     "agents.default_subagent_reasoning_effort": "max",
-    "agents.max_concurrent_threads_per_session": 4,
+    "agents.max_concurrent_threads_per_session": 12,
     "agents.interrupt_message": true,
     "features.goals": true,
     "features.hooks": true,
@@ -223,6 +223,21 @@ test("Codex config parser accepts only the complete typed portable policy", () =
 
   for (const [label, content, expected] of [
     [
+      "missing four-agent default",
+      validPortableConfig.replace("Default to four useful concurrent subagents", ""),
+      /orchestration marker Default to four useful concurrent subagents/u,
+    ],
+    [
+      "missing additional user-started agent scheduling",
+      validPortableConfig.replace("additional user-started agents", ""),
+      /orchestration marker additional user-started agents/u,
+    ],
+    [
+      "missing immediate bounded follow-up dispatch",
+      validPortableConfig.replace("immediately assign the next ready bounded task", ""),
+      /orchestration marker immediately assign the next ready bounded task/u,
+    ],
+    [
       "missing current-reserve boundary",
       validPortableConfig.replace("Historical reserve estimates are not binding. ", ""),
       /orchestration marker historical reserve estimates are not binding/u,
@@ -258,7 +273,7 @@ test("Codex config parser accepts only the complete typed portable policy", () =
     ],
     [
       "unsupported agent thread limit",
-      validPortableConfig.replace("max_concurrent_threads_per_session = 4", "max_threads = 4"),
+      validPortableConfig.replace("max_concurrent_threads_per_session = 12", "max_threads = 12"),
       /unknown key agents\.max_threads/,
     ],
     ["unknown table", `${validPortableConfig}[profiles.local]\n`, /unknown key profiles/],
@@ -632,6 +647,14 @@ test("startup attestation binds the complete preloaded controller closure", (t) 
 test("project roles enforce exact Astra/max parity with the primary", () => {
   const defaultAgent = readFileSync(path.join(root, ".codex", "agents", "default.toml"), "utf8");
   const parsedDefault = parseProjectAgentConfig(defaultAgent, "default");
+  assert.throws(
+    () =>
+      parseProjectAgentConfig(
+        defaultAgent.replace(/State readiness for another\s+bounded assignment/u, ""),
+        "default",
+      ),
+    /orchestration marker State readiness for another bounded assignment/u,
+  );
   assert.throws(
     () =>
       parseProjectAgentConfig(

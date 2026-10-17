@@ -105,7 +105,7 @@ boundaries and handling of an optional creation brief.
 - [Project definition intake](instructions.md#first-prompt-project-definition-intake)
 - [Documentation ownership and discovery](instructions.md#documentation-ownership)
 - [Architecture and product boundaries](instructions.md#modular-architecture-parallel-ownership-and-integration)
-- [Parallel development and the four-subagent default](instructions.md#admission-intelligence-and-provenance)
+- [Four-agent default and continued task assignment](instructions.md#admission-intelligence-and-provenance)
 - [Delegated release, candidate isolation and deploy handoff](instructions.md#delegated-release)
 - [Delivery and verification](instructions.md#delivery-environments)
 - [Infrastructure as Code: tool selection, repository layout and lifecycle](instructions.md#infrastructure-as-code)

@@ -303,6 +303,13 @@ test("an unnamed tool and its child receive only their own home and no ambient a
 // real launcher and a descendant environment boundary, keeping durable accounts outside scratch.
 test("project commands isolate temporary data and reclaim it after success or failure", async (t) => {
   const [, root] = fixture(t);
+  // This fixture probes the complete verifier runtime, so declare its installed tools instead of
+  // relying on an outer Mise activation to survive entry into an otherwise tool-free project.
+  for (const name of ["mise.toml", "mise.lock"])
+    writeFileSync(
+      path.join(root, ".codex", name),
+      readFileSync(new URL(`../../.codex/${name}`, import.meta.url)),
+    );
   const environmentModule = new URL("./project-tool-environment.mjs", import.meta.url).href;
   const runtimeModule = new URL("../verify/verification-runtime-identity.mjs", import.meta.url)
     .href;

@@ -79,6 +79,8 @@ test("generated children receive canonical task, planning, documentation, mainte
     ["Long-Session Course Checks", "<!-- current-course-check-policy -->"],
     ["Verification Selection And Runtime", "<!-- current-verification-runtime-policy -->"],
     ["Delegated Release", "<!-- current-delegated-release-policy -->"],
+    ["Admission, Intelligence, And Provenance", "<!-- current-agent-admission-policy -->"],
+    ["Agent Lifecycle And Idle Cleanup", "<!-- current-agent-lifecycle-policy -->"],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
     ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
     ["Test Strategy", "<!-- current-test-strategy-policy -->"],
@@ -190,7 +192,7 @@ test("generated validators reject primary policy that omits recovery before acco
   const configPath = path.join(target, ".codex/config.toml");
   const current = readFileSync(configPath, "utf8");
   const obsolete = current.replace(
-    /before classifying account-window\s+exhaustion/u,
+    /before classifying account-window\s+exhaustion/iu,
     "only before the critical threshold",
   );
   assert.notEqual(obsolete, current, "Generated primary policy must declare recovery ordering.");

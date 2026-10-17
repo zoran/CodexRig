@@ -25,8 +25,11 @@ See [verification selection](../instructions.md#verification-selection-and-runti
 changes take effect through normal generation/update and the next canonical launch, not by reloading
 an already-running agent.
 
-Root `developer_instructions` inject the primary's orchestration boundaries. `[agents]` owns the
-four-thread ceiling and intelligence defaults; `.codex/agents/*.toml` supplies bounded roles. The
+Root `developer_instructions` inject the four-subagent default and continuous reassignment while
+useful authorized work remains. `[agents]` owns the twelve-subagent capacity ceiling (excluding the
+primary) and intelligence defaults; twelve is not the default team size. Additional user-started
+agents join the continuing team after ownership and admission checks. `.codex/agents/*.toml`
+supplies bounded roles. The
 worker's [Delegated Release](../instructions.md#delegated-release) assignment occupies an existing
 slot. `pnpm codex:validate` rejects missing policy markers, divergent intelligence or permissions.
 These checks prove packaging/configuration, not model obedience over a long session.
@@ -35,7 +38,10 @@ The canonical owners are [Planning](../instructions.md#planning-entry-gate),
 [course checks](../instructions.md#long-session-course-checks),
 [agent admission](../instructions.md#admission-intelligence-and-provenance) and
 [capacity recovery/drain](../instructions.md#capacity-admission-and-monitoring).
-They govern useful parallel work, scope closure before follow-up, current-unit reserve decisions,
+They govern useful parallel work and
+[continuous dispatch](../instructions.md#agent-lifecycle-and-idle-cleanup): accept each handoff,
+close its scope and assign the next ready task without waiting for the whole wave or another user
+prompt. They also govern current-unit reserve decisions,
 earned resets and terminal handover. Native Goals follow their
 [authority boundary](../instructions.md#authorized-work-and-native-codex).
 Generation/update project the policy; no extra scheduler, quota monitor, release registry or hook

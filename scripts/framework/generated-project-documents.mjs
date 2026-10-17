@@ -56,7 +56,9 @@ export function currentProjectInstructions(sourceRoot) {
     ["Documentation Currency", "<!-- current-documentation-currency-policy -->"],
     ["Documentation Ownership", "<!-- current-documentation-ownership-policy -->"],
     ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
+    ["Admission, Intelligence, And Provenance", "<!-- current-agent-admission-policy -->"],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
+    ["Agent Lifecycle And Idle Cleanup", "<!-- current-agent-lifecycle-policy -->"],
   ]) {
     const matches = sections.filter((section) => section.heading === heading);
     if (matches.length !== 1 || template.split(marker).length !== 2)
@@ -134,12 +136,18 @@ findings, not a new maintenance campaign.
 Portable startup requests on-request approval and network-disabled workspace-write. Explicit Dev
 \`--yolo\` changes runtime permissions only within existing authority. No unapproved staging/prod,
 commit or push. Use [Delegated Release](instructions.md#delegated-release) for authorized publication,
-the README command and existing environment gates. Default to parallel development with four concurrent subagents in addition to the
-primary when substantial disjoint work, permissions, confirmed capacity and integration permit.
-Keep at most four live; use fewer or work serially when necessary, briefly state why, and never
-invent work to fill slots. Name runnable assignments in the plan, start admitted work concurrently,
-and reassess after discovery, material results, handoffs and slice boundaries. Require exact
-GPT Astra/max parity, effective permission checks, provenance and a task-sized completion reserve.
+the README command and existing environment gates. Use four concurrent subagents by default, in
+addition to the primary, when substantial disjoint work, permissions, confirmed capacity and
+integration permit. The native ceiling is twelve; more than four requires an explicit user request
+or user-started agents and fresh admission. Keep provenance-verified user-added agents in the
+continuing roster under the same rules. Follow
+[Agent Lifecycle And Idle Cleanup](instructions.md#agent-lifecycle-and-idle-cleanup): after accepting
+each handoff and closing its scope, immediately assign the next ready bounded task to that agent,
+without waiting for the rest of the team or another user message. Use fewer or work serially when
+necessary, briefly state why, and never invent work to fill slots. Name runnable assignments in the
+plan, start admitted work concurrently, and reassess after discovery, material results, handoffs and
+slice boundaries. Require exact GPT Astra/max parity, effective permission checks, provenance and a
+task-sized completion reserve.
 Historical estimates cannot establish a new critical state; apply current capacity admission.
 At confirmed critical capacity drain owned work and
 seal with \`pnpm handover:create -- --critical\` as the final action, then stop completely.
@@ -360,6 +368,13 @@ third-party dependencies retain their applicable licenses.
 
 This directory owns inspectable native Codex policy and local tooling configuration.
 \`config.toml\` and \`agents/\` select the exact GPT Astra/max policy and requested permissions.
+Four concurrent subagents are the default, excluding the primary.
+\`agents.max_concurrent_threads_per_session = 12\` is the native capacity ceiling, not the default
+team size. More than four requires an explicit user request or user-started agents and fresh
+[admission](../instructions.md#admission-intelligence-and-provenance). After each accepted handoff,
+the primary immediately assigns the next useful authorized task; the same continuous assignment
+applies to provenance-verified user-added agents under
+[Agent Lifecycle And Idle Cleanup](../instructions.md#agent-lifecycle-and-idle-cleanup).
 \`tooling.json\` owns startup and provider settings; \`toolchain.json\` owns reviewed stable pins and
 archive integrity; \`verification.json\` declares this project's checks.
 

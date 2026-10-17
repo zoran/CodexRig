@@ -363,7 +363,6 @@
       "executable": "$node",
       "args": [
         "--test",
-        "--test-reporter=dot",
         "scripts/verify/adaptive-cli.test.mjs",
         "scripts/verify/adaptive-runner-routing.test.mjs",
         "scripts/verify/adaptive-runner.test.mjs",

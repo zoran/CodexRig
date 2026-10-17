@@ -61,7 +61,7 @@ const portablePolicy = new Map([
     "agents.default_subagent_reasoning_effort",
     { type: "string", value: sharedAgentIntelligencePolicy.reasoningEffort },
   ],
-  ["agents.max_concurrent_threads_per_session", { type: "integer", value: 4 }],
+  ["agents.max_concurrent_threads_per_session", { type: "integer", value: 12 }],
   ["agents.interrupt_message", { type: "boolean", value: true }],
   ["features.goals", { type: "boolean", value: true }],
   ["features.hooks", { type: "boolean", value: true }],
@@ -97,6 +97,7 @@ const requiredAgentInstructionFragments = Object.freeze([
   "fresh audit",
   "Before every assigned slice begins",
   "wait only for the primary to close the agent",
+  "State readiness for another bounded assignment",
   "5% or less",
   "without assuming a billing period",
   "absolute token/credit amount",
@@ -115,7 +116,10 @@ const requiredPrimaryInstructionFragments = Object.freeze([
   "Maintenance Scope And Verification",
   "Delegated Release",
   "exactly one current internal contract",
-  "at most four live",
+  "Default to four useful concurrent subagents",
+  "additional user-started agents",
+  "immediately assign the next ready bounded task",
+  "at most twelve live",
   "never pass a model or reasoning override",
   "exact GPT Astra model with max reasoning",
   "owned subagent and background task",
@@ -249,11 +253,9 @@ export function parsePortableCodexConfig(content) {
       "Project agent defaults must use exactly the primary model and reasoning effort.",
     );
   }
-  const primaryInstructions = policy.developer_instructions.replace(/\s+/gu, " ");
+  const text = policy.developer_instructions.replace(/\s+/gu, " ").toLocaleLowerCase("en-US");
   for (const fragment of requiredPrimaryInstructionFragments) {
-    if (
-      !primaryInstructions.toLocaleLowerCase("en-US").includes(fragment.toLocaleLowerCase("en-US"))
-    ) {
+    if (!text.includes(fragment.toLocaleLowerCase("en-US"))) {
       throw new CodexConfigError(
         `Primary developer_instructions must include orchestration marker ${fragment}.`,
       );
@@ -527,7 +529,7 @@ export function parseProjectAgentConfig(content, expectedName) {
     throw new CodexConfigError(`Agent ${expectedName} is missing keys: ${missing.join(", ")}.`);
   }
   const developerInstructions = parsed.get("developer_instructions");
-  const normalizedInstructions = developerInstructions.replace(/\s+/gu, " ");
+  const text = developerInstructions.replace(/\s+/gu, " ").toLocaleLowerCase("en-US");
   for (const fragment of [
     ...requiredAgentInstructionFragments,
     "Never delegate or spawn another agent",
@@ -544,11 +546,7 @@ export function parseProjectAgentConfig(content, expectedName) {
         ]
       : []),
   ]) {
-    if (
-      !normalizedInstructions
-        .toLocaleLowerCase("en-US")
-        .includes(fragment.toLocaleLowerCase("en-US"))
-    ) {
+    if (!text.includes(fragment.toLocaleLowerCase("en-US"))) {
       throw new CodexConfigError(
         `Agent ${expectedName} developer_instructions must include orchestration marker ${fragment}.`,
       );

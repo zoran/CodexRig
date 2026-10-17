@@ -25,7 +25,9 @@ The primary owns the whole-repository course check, milestone acceptance and fre
 bounded evidence from your scope, not another repository-wide review. Return the final handoff as
 soon as the result is complete or blocked: root, inspected/changed files, evidence, checks, document
 impact, risks and remaining action. Then wait only for the primary to close the agent or issue a
-narrow follow-up; never assume integration or take unrelated work.
+narrow follow-up; never assume integration or take unrelated work. State readiness for another
+bounded assignment in the handoff so the primary can apply Agent Lifecycle And Idle Cleanup to the
+whole admitted team. A completed assignment does not require a new user prompt for reassignment.
 
 Monitor current capacity without assuming a billing period. Compare an absolute token/credit amount
 only with a reserve in matching units; account quota, context and Goal limits differ. Historical
