@@ -104,7 +104,8 @@
       "scripts/docs/project-manifest-contract.mjs",
       "scripts/docs/ensure-project-manifest.mjs",
       "scripts/docs/initial-project-manifest.mjs",
-      "scripts/docs/document-context.mjs"
+      "scripts/docs/document-context.mjs",
+      "scripts/docs/markdown-fences.mjs"
     ],
     "filesystem": [
       "scripts/filesystem/owned-file-operations.mjs",
@@ -118,6 +119,7 @@
       "scripts/goals/project-publication.mjs",
       "scripts/goals/project-publication.test.mjs",
       "scripts/goals/project-publication-integration.test.mjs",
+      "scripts/goals/project-publication-verification.test.mjs",
       "scripts/goals/release-candidate.test.mjs",
       "scripts/goals/publication-command.mjs",
       "scripts/goals/publication-command.test.mjs",
@@ -147,6 +149,7 @@
       "scripts/repository/runtime-lifecycle-process.mjs",
       "scripts/repository/runtime-lifecycle-schema.mjs",
       "scripts/repository/runtime-owned-state.mjs",
+      "scripts/repository/runtime-process-cancellation.mjs",
       "scripts/repository/runtime-process-identity.mjs",
       "scripts/repository/runtime-process-io.mjs",
       "scripts/repository/runtime-session-lease.mjs",
@@ -175,7 +178,9 @@
     ],
     "security": ["scripts/security/secret-patterns.mjs"],
     "setup": [
+      "scripts/setup/bootstrap-entry.test.mjs",
       "scripts/setup/check-prereqs.sh",
+      "scripts/setup/check-prereqs.test.mjs",
       "scripts/setup/codex-launcher.test.mjs",
       "scripts/setup/install-git-hooks.sh",
       "scripts/setup/runtime-safety.test.mjs",

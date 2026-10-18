@@ -271,7 +271,7 @@ function hasSymlinkPathSegment(parentPath, targetPath) {
 }
 
 function readIndexablePage(pagePath, sitemapOrigins, repositoryRoot, sitemapRepositoryPath) {
-  const content = stripHtmlComments(readFileSync(pagePath, "utf8"));
+  const content = readFileSync(pagePath, "utf8");
   if (hasRobotsNoindex(content)) return { indexable: false, canonical: "" };
   const pageLabel = toRepositoryPath(repositoryRoot, pagePath);
   const canonical = canonicalUrlFromHtml(content);
@@ -319,10 +319,6 @@ function normalizeTimestamp(value) {
     throw new Error("--timestamp must be an ISO-8601 timestamp with seconds and timezone");
   }
   return new Date(value).toISOString().replace(".000Z", "+00:00");
-}
-
-function stripHtmlComments(content) {
-  return content.replace(/<!--[\s\S]*?-->/g, "");
 }
 
 function toRepositoryPath(repositoryRoot, fullPath) {

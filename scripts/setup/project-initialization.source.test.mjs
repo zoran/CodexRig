@@ -200,9 +200,12 @@ test("empty generation excludes source capabilities, private markers and new uns
       "scripts/repository/global-git-credential.test.mjs",
       "scripts/goals/publication-command.test.mjs",
       "scripts/goals/project-publication-integration.test.mjs",
+      "scripts/goals/project-publication-verification.test.mjs",
       "scripts/goals/release-candidate.test.mjs",
       "scripts/repository/git-publication-identity.test.mjs",
       "scripts/repository/publication-session.test.mjs",
+      "scripts/setup/bootstrap-entry.test.mjs",
+      "scripts/setup/check-prereqs.test.mjs",
       "scripts/setup/codex-launcher.test.mjs",
       "scripts/contracts/mise-toolchain-configuration.test.mjs",
       "scripts/deps/toolchain-releases.test.mjs",
@@ -262,8 +265,8 @@ test("generated tools and selected checks operate after the source checkout beco
   );
   assert.equal(installed.status, 0, installed.stdout + installed.stderr);
   // This exercises the complete generated suite, including portable publication regressions.
-  // Publication integration alone takes about 140 seconds; include preflight and remaining checks.
-  // This bounded nested-suite allowance does not change any individual verifier's limit.
+  // Publication lifecycle and evidence scenarios run in independent files, allowing the existing
+  // scheduler to parallelize them within this unchanged nested-suite allowance.
   const verified = run(generated, ["verify"], "pnpm", 240_000);
   assert.equal(
     verified.status,

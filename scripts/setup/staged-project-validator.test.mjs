@@ -15,6 +15,7 @@ import {
 import path from "node:path";
 import { after, before, test } from "node:test";
 import { pathToFileURL } from "node:url";
+import { format } from "prettier";
 import {
   cleanupTemporaryRoots,
   isolatedTrackedFrameworkSource,
@@ -23,6 +24,8 @@ import {
 import { stageProjectExport } from "../framework/stage-project-export.mjs";
 import { validateGeneratedProject } from "../framework/validate-staged-project.mjs";
 import { documentContextSections } from "../docs/document-context.mjs";
+import { markdownFileLinks, markdownHeadingContract } from "../docs/document-references.mjs";
+import { buildFrameworkUpgradePlan } from "../framework/framework-upgrade.mjs";
 import {
   prepareProjectToolDirectories,
   projectToolEnvironment,
@@ -57,6 +60,10 @@ function stage() {
   return target;
 }
 
+// Staging formats tables and prose; compare policy after that presentation-only transformation.
+const normalizedMarkdown = (content) =>
+  format(content, { parser: "markdown", proseWrap: "always" });
+
 test("generated children receive canonical task, planning, documentation, maintenance and safety policies", async () => {
   const target = stage();
   const sourceInstructions = readFileSync(path.join(source, "instructions.md"), "utf8");
@@ -67,9 +74,10 @@ test("generated children receive canonical task, planning, documentation, mainte
     );
     assert.equal(sections.length, 1, `${expectedHeading} must have exactly one owner.`);
     const { start, end } = sections[0];
-    return content.split(/\r?\n/u).slice(start, end).join(" ").replace(/\s+/gu, " ").trim();
+    return content.split(/\r?\n/u).slice(start, end).join("\n").trim();
   };
   for (const [heading, marker] of [
+    ["Task Reading Routes", "<!-- current-task-reading-routes -->"],
     ["Task Scope And Completion", "<!-- current-task-scope-policy -->"],
     ["Planning, Goals, Slices, Review Loops, And Audits", "<!-- current-planning-policy -->"],
     ["Documentation Ownership", "<!-- current-documentation-ownership-policy -->"],
@@ -81,17 +89,27 @@ test("generated children receive canonical task, planning, documentation, mainte
     ["Delegated Release", "<!-- current-delegated-release-policy -->"],
     ["Admission, Intelligence, And Provenance", "<!-- current-agent-admission-policy -->"],
     ["Agent Lifecycle And Idle Cleanup", "<!-- current-agent-lifecycle-policy -->"],
+    ["Peer Coordination", "<!-- current-peer-coordination-policy -->"],
+    [
+      "Intelligence Parity And Integration Authority",
+      "<!-- current-integration-authority-policy -->",
+    ],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
     ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
     ["Test Strategy", "<!-- current-test-strategy-policy -->"],
     ["Deployment And Qualification Failure Recovery", "<!-- current-delivery-failure-policy -->"],
   ]) {
     assert.equal(
-      policyBody(generatedInstructions, heading),
-      policyBody(sourceInstructions, heading),
+      await normalizedMarkdown(policyBody(generatedInstructions, heading)),
+      await normalizedMarkdown(policyBody(sourceInstructions, heading)),
     );
     assert.equal(generatedInstructions.includes(marker), false);
   }
+  const { anchors } = markdownHeadingContract("instructions.md", generatedInstructions);
+  for (const reference of markdownFileLinks(
+    policyBody(generatedInstructions, "Task Reading Routes"),
+  ))
+    assert.ok(anchors.has(reference.slice(1)), `Generated task route must resolve: ${reference}`);
   await validateGeneratedProject(target);
   const contextPath = path.join(target, "docs/project-context.md");
   const marker = /`([a-z]+-work-state)`/u.exec(generatedInstructions)?.[1];
@@ -142,6 +160,66 @@ test("generated children receive canonical task, planning, documentation, mainte
     false,
     "read-only child storage entry creates no maintenance state",
   );
+});
+
+test("current-output review carries shared entry and routing changes into existing children", async () => {
+  const updatedSource = isolatedTrackedFrameworkSource("stage-reviewed-policy-source-");
+  const agentsPath = path.join(updatedSource, "AGENTS.md");
+  const instructionsPath = path.join(updatedSource, "instructions.md");
+  const agents = readFileSync(agentsPath, "utf8");
+  const instructions = readFileSync(instructionsPath, "utf8");
+  const dispatchRule = "Carry the reviewed dispatch checkpoint into the next ready task.";
+  const routeRule = "Read the reviewed task route before changing portable project tooling.";
+  const amendedAgents = agents.replace(
+    "<!-- codexrig:portable-agent-entry:end -->",
+    `${dispatchRule}\n\n<!-- codexrig:portable-agent-entry:end -->`,
+  );
+  const amendedInstructions = instructions.replace(
+    "## Task Reading Routes\n",
+    `## Task Reading Routes\n\n${routeRule}\n`,
+  );
+  assert.notEqual(amendedAgents, agents);
+  assert.notEqual(amendedInstructions, instructions);
+  writeFileSync(agentsPath, amendedAgents);
+  writeFileSync(instructionsPath, amendedInstructions);
+  const generated = path.join(temporaryRoot("stage-current-policy-"), "project");
+  await stageProjectExport({
+    sourceRoot: updatedSource,
+    targetRoot: generated,
+    projectName: "stage-fixture",
+    includeUntracked: true,
+  });
+
+  const target = stage();
+  const options = { sourceRoot: updatedSource, targetRoot: target };
+  const preview = buildFrameworkUpgradePlan(options);
+  const documents = new Set(["AGENTS.md", "instructions.md"]);
+  const resolutions = preview.differences.map(({ kind, ...entry }) => ({
+    ...entry,
+    action: documents.has(entry.path) ? "source" : "keep",
+    reason: "Review the changed portable policy while retaining unrelated fixture owners.",
+  }));
+  const reviewed = buildFrameworkUpgradePlan({ ...options, resolutions });
+  assert.deepEqual(reviewed.conflicts, []);
+  for (const [file, rule] of [
+    ["AGENTS.md", dispatchRule],
+    ["instructions.md", routeRule],
+  ]) {
+    const operation = reviewed.operations.find(({ path: candidate }) => candidate === file);
+    assert.equal(operation?.action, "write", `${file} must carry the changed source policy.`);
+    const currentOutput = readFileSync(path.join(generated, file), "utf8");
+    assert.ok(currentOutput.includes(rule), `${file} generation must include the source revision.`);
+    assert.ok(
+      (await normalizedMarkdown(operation.content)) === (await normalizedMarkdown(currentOutput)),
+      `Reviewed ${file} must match freshly generated policy after Markdown formatting.`,
+    );
+    assert.doesNotMatch(operation.content, /codexrig-work-state|codexrig:portable-agent-entry/u);
+  }
+  assert.match(
+    reviewed.operations.find(({ path: file }) => file === "instructions.md").content,
+    /`project-work-state`/u,
+  );
+  assert.doesNotMatch(readFileSync(path.join(target, "AGENTS.md"), "utf8"), /reviewed dispatch/u);
 });
 
 test("generated validators reject primary policy without the maintenance scope boundary", async () => {

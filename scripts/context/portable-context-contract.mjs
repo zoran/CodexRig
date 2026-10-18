@@ -6,7 +6,7 @@ import {
   repositoryCodexHomeGitignoreBehaviorFindings,
   repositoryCodexHomeGitignoreFindings,
 } from "../repository/source-inventory.mjs";
-export const supportedCodexStartCommand = "bash scripts/setup/start-codex.sh";
+export const supportedCodexStartCommand = "bash -p scripts/setup/start-codex.sh";
 export const portableContextContractFiles = Object.freeze([
   ".codex/agents/default.toml",
   ".codex/agents/explorer.toml",

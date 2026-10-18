@@ -115,7 +115,7 @@ export function trustedPnpmCommand({
     return command;
   }
   throw new Error(
-    `Trusted pnpm ${expected.pnpm} was not resolved beside compatibility-owned Node.js ${expected.node}; use bash scripts/setup/run-project.sh.`,
+    `Trusted pnpm ${expected.pnpm} was not resolved beside compatibility-owned Node.js ${expected.node}; use bash -p scripts/setup/run-project.sh.`,
   );
 }
 

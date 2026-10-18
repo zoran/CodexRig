@@ -1,5 +1,6 @@
 /** Owns bounded navigation of public reference documents without deleting or summarizing their truth. */
 import { normalizeRepositoryPath, readRepositoryFile } from "../filesystem/repository-files.mjs";
+import { markdownLinesOutsideFences } from "./markdown-fences.mjs";
 
 export const contextOutputByteLimit = 16_384;
 
@@ -18,19 +19,11 @@ export function readContextDocument(root, requestedPath) {
   return { file, content: readRepositoryFile(root, file) };
 }
 
-/** Navigation entries use original physical lines. HTML is inspected as text, never executed. */
+/** Physical coordinates retain subtree end; directEnd excludes children. HTML is never executed. */
 export function documentContextSections(file, content) {
   const lines = content.split(/\r?\n/u);
   const headings = [];
-  let fence = null;
-  for (const [index, line] of lines.entries()) {
-    const marker = /^\s*(`{3,}|~{3,})/u.exec(line)?.[1];
-    if (marker) {
-      if (!fence) fence = marker[0];
-      else if (marker[0] === fence) fence = null;
-      continue;
-    }
-    if (fence) continue;
+  for (const [index, line] of markdownLinesOutsideFences(lines)) {
     const markdown = /^(#{1,6})\s+(.+?)\s*#*\s*$/u.exec(line);
     const html = /\.(?:html?)$/iu.test(file) ? /<h([1-6])\b[^>]*>(.*?)<\/h\1>/iu.exec(line) : null;
     if (markdown || html)
@@ -42,6 +35,7 @@ export function documentContextSections(file, content) {
   }
   return headings.map((entry, index) => ({
     ...entry,
+    directEnd: headings[index + 1]?.start - 1 || lines.length,
     end:
       headings.slice(index + 1).find((next) => next.level <= entry.level)?.start - 1 ||
       lines.length,
@@ -56,15 +50,20 @@ export function boundedContextOutput(text) {
   return text;
 }
 
-/** A section must be unique; a line selection is inclusive and never silently clamped. */
+/** Sections default to direct evidence plus child navigation; subtree reads remain explicitly bounded. */
 export function documentContextExcerpt(
   { file, content },
-  { section, lines, outline = false, offset = 0 } = {},
+  { section, lines, outline = false, offset = 0, subtree = false } = {},
 ) {
   const sourceLines = content.split(/\r?\n/u);
   const sections = documentContextSections(file, content);
   const header = `${file}: ${Buffer.byteLength(content)} bytes, ${sourceLines.length} lines.\n`;
   if (!Number.isSafeInteger(offset) || offset < 0) throw new Error("Invalid outline offset.");
+  if (outline && (section !== undefined || lines !== undefined || subtree))
+    throw new Error("Outline cannot be combined with an excerpt.");
+  if (subtree && section === undefined) throw new Error("--subtree requires --section.");
+  if (section !== undefined && lines !== undefined)
+    throw new Error("Choose either --section or --lines.");
   if (outline) {
     const page = sections.slice(offset, offset + 40);
     return boundedContextOutput(
@@ -80,15 +79,26 @@ export function documentContextExcerpt(
     );
   }
   if (offset) throw new Error("--offset requires --outline.");
-  if (section && lines) throw new Error("Choose either --section or --lines.");
   let start = 1,
     end = sourceLines.length;
-  if (section) {
+  const children = [];
+  if (section !== undefined) {
     const matches = sections.filter((entry) => entry.heading === section);
     if (matches.length !== 1)
       throw new Error("Section must match exactly one heading; inspect --outline.");
-    ({ start, end } = matches[0]);
-  } else if (lines) {
+    const selected = matches[0];
+    start = selected.start;
+    end = subtree ? selected.end : selected.directEnd;
+    if (!subtree) {
+      let childEnd = selected.directEnd;
+      for (const candidate of sections) {
+        if (candidate.start <= childEnd) continue;
+        if (candidate.start > selected.end) break;
+        children.push(candidate);
+        childEnd = candidate.end;
+      }
+    }
+  } else if (lines !== undefined) {
     const range = /^(\d+):(\d+)$/u.exec(lines);
     if (!range) throw new Error("Use --lines <first>:<last>.");
     start = Number(range[1]);
@@ -106,6 +116,16 @@ export function documentContextExcerpt(
     header +
       `Lines ${start}-${end}; remaining text is not loaded.\n` +
       sourceLines.slice(start - 1, end).join("\n") +
-      "\n",
+      "\n" +
+      (children.length
+        ? "\nImmediate child sections (navigation only; child bodies not loaded):\n" +
+          children
+            .map(
+              (entry) => `${entry.start}-${entry.end} ${"#".repeat(entry.level)} ${entry.heading}`,
+            )
+            .join("\n") +
+          "\nRead the child sections required for this task; navigation is not substantive evidence.\n" +
+          "Select a child with --section <heading>, or include all descendants with --section <heading> --subtree.\n"
+        : ""),
   );
 }

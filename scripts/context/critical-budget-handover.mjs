@@ -313,43 +313,63 @@ export function createCriticalBudgetHandover({
   });
 }
 
+function* repositoryHandovers({ root, testHooks, maximumCandidates = Infinity }) {
+  let store;
+  try {
+    store = handoverStore(root, { testHooks });
+  } catch {
+    return;
+  }
+  if (!store) return;
+  try {
+    const binding = repositoryBinding(root);
+    testHooks?.beforeHandoverDiscovery?.({ store });
+    for (const filename of listOwnedDirectory(store, "critical-budget handover directory")
+      .filter((name) => filenamePattern.test(name))
+      .sort()
+      .slice(-maximumCandidates)) {
+      let metadata;
+      try {
+        metadata = parsedHandover(readOwnedPrompt(store, filename).content);
+      } catch {
+        // Invalid, unsafe, or partially written files prove neither context nor a terminal seal.
+        continue;
+      }
+      if (metadata.repositoryBinding === binding) yield { filename, metadata };
+    }
+  } finally {
+    closeOwnedDirectoryBinding(store);
+  }
+}
+
+/** Terminal evidence belongs to the exact runtime session, independent of startup recency. */
+export function hasCriticalBudgetHandoverForSession({
+  root = toolingRoot,
+  sealingSessionId,
+  testHooks,
+} = {}) {
+  for (const { metadata } of repositoryHandovers({ root, testHooks })) {
+    if (metadata.sealingSessionId === sealingSessionId) return true;
+  }
+  return false;
+}
+
 export function discoverRecentCriticalBudgetHandover({
   root = toolingRoot,
   now = Date.now,
   testHooks,
 } = {}) {
-  let store;
-  try {
-    store = handoverStore(root, { testHooks });
-  } catch {
-    return null;
-  }
-  if (!store) return null;
-  const binding = repositoryBinding(root);
   const currentTime = now();
   const candidates = [];
-  try {
-    testHooks?.beforeHandoverDiscovery?.({ store });
-    for (const filename of listOwnedDirectory(store, "critical-budget handover directory")
-      .filter((name) => filenamePattern.test(name))
-      .sort()
-      .slice(-candidateLimit)) {
-      try {
-        const metadata = parsedHandover(readOwnedPrompt(store, filename).content);
-        const age = currentTime - metadata.createdAtMilliseconds;
-        if (
-          metadata.repositoryBinding === binding &&
-          age >= -clockSkewMilliseconds &&
-          age <= criticalHandoverMaxAgeMilliseconds
-        ) {
-          candidates.push({ filename, metadata });
-        }
-      } catch {
-        // Invalid, unsafe, foreign, or partially written ignored files never enter startup context.
-      }
+  for (const candidate of repositoryHandovers({
+    root,
+    testHooks,
+    maximumCandidates: candidateLimit,
+  })) {
+    const age = currentTime - candidate.metadata.createdAtMilliseconds;
+    if (age >= -clockSkewMilliseconds && age <= criticalHandoverMaxAgeMilliseconds) {
+      candidates.push(candidate);
     }
-  } finally {
-    closeOwnedDirectoryBinding(store);
   }
   candidates.sort(
     (left, right) =>
@@ -469,7 +489,7 @@ function main() {
     console.log(`Critical-budget handover sealed: ${handover.relativePath}`);
     console.log("Stop now. Do not run another task, tool, follow-up, or automatic continuation.");
     console.log(
-      "Developer: exit Codex completely with /quit, then run bash scripts/setup/start-codex.sh " +
+      "Developer: exit Codex completely with /quit, then run bash -p scripts/setup/start-codex.sh " +
         "from the project root in your terminal. /new and /resume do not restart the launcher. " +
         "Accept this handover when the new session announces it.",
     );

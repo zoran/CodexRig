@@ -38,14 +38,6 @@ export function entryRouting({
   workspaceManifests,
 }) {
   const categories = effectiveCategories(entry, { verifyOnlyRootManifest });
-  if (categories.includes("active documentation") && /\.(?:md|txt)$/u.test(entry.path)) {
-    const commands = selectCommands(available, categoryConsumerKeys(categories));
-    return {
-      categories,
-      ownerKeys: commands.map((command) => command.key),
-      readOnlyCommands: commands,
-    };
-  }
   if (categories.includes("editorial source change")) {
     const commands = selectCommands(available, [
       "format",
@@ -111,6 +103,18 @@ export function entryRouting({
     commands.push(command);
     ownerKeys.add(command.key);
     hasExactOwner = true;
+  }
+  // Some documentation is executable input to generators and their regression fixtures. Preserve
+  // those explicit consumers before returning the ordinary lightweight documentation owners.
+  if (categories.includes("active documentation") && /\.(?:md|txt)$/u.test(entry.path)) {
+    const documentationCommands = selectCommands(available, categoryConsumerKeys(categories));
+    commands.push(...documentationCommands);
+    documentationCommands.forEach((command) => ownerKeys.add(command.key));
+    return {
+      categories,
+      ownerKeys: [...ownerKeys].sort(),
+      readOnlyCommands: dedupeCommands(commands),
+    };
   }
   const orchestrationFallback = available.get("verification-orchestration-regressions");
   const removedVerificationTest =

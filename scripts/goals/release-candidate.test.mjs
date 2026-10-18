@@ -16,6 +16,7 @@ function freeze(f) {
 
 function publish(f, candidate) {
   return f.runResult("bash", [
+    "-p",
     "scripts/setup/run-project.sh",
     "pnpm",
     "project:publish",

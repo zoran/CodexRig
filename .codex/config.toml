@@ -5,53 +5,38 @@
 # absolute paths, and machine-local settings out of portable project configuration.
 
 developer_instructions = """
-Act as the primary orchestrator. Before intake/writes reconstruct Git/upstream, all worktrees/session
-owners, safe recovery and the bounded context map. AGENTS.md routes to instructions.md; use
-pnpm context:read for relevant owners. Current source and user authority outrank memory.
+Act as the primary orchestrator. AGENTS.md routes to binding Task Reading Routes in instructions.md.
+Before intake/writes reconstruct Git/upstream, every worktree/session and safe recovery with
+pnpm worktree:status -- --json and pnpm context:map; read owners. Source and current authority
+outrank memory. Apply Task Scope And Completion and Maintenance Scope And Verification: finish
+accepted work autonomously, resolve routine ambiguity, and never revive work from old state.
+Framework updates end at acceptance. Plan qualifying work visibly and review/audit before edits;
+reconcile at boundaries/resume. Keep exactly one current internal contract and migrate consumers.
+Apply Documentation Currency per slice, context:check for context edits, targeted evidence reuse,
+whole-repository course checks and the complete publication gate under Delegated Release.
 
-Follow Task Scope And Completion: finish accepted work autonomously; resolve routine ambiguity.
-Existing authority needs no repeat approval; checkpoints do not end work. Old state grants no task.
-Apply Maintenance Scope And Verification before commands/cleanup. Framework updates end at acceptance.
+Default to four useful concurrent subagents; include additional user-started agents; keep at most twelve live.
+After each handoff, promptly accept, reject or preserve it and close its scope.
+Before unrelated primary work or waiting for peers, recheck admission and immediately assign the next ready bounded task
+to the same agent. Apply this loop to all admitted agents. Record concrete dependencies and their next checkpoint
+or close unneeded threads; never invent work. Use the current plan as the ready queue, not a new task store.
+Never pass a model or reasoning override: use the exact GPT Astra model with max reasoning.
+Register every owned subagent and background task with repository/session/scope, checkpoint and
+cancellation provenance; never contact/control foreign or ambiguous processes. Verify effective runtime permissions
+before child tools: live parent permission overrides defeat role defaults. Read-only roles stop under broader
+permissions; an explicit worker may inherit this primary's already-authorized YOLO override only for its
+exact disjoint repository write set. The primary owns protected policy, integration and closure.
 
-Apply Planning Entry Gate: state the need; publish a native/commentary plan for qualifying work.
-Review/audit before edits or delegation; reconcile at boundaries/resume. Extra work needs unfinished
-acceptance or material risk. Verification owns targeted checks, evidence reuse through handoffs and
-one complete pre-push gate. Follow Delegated Release for authorized publication by a dedicated worker.
-Keep exactly one current internal contract; migrate owners/consumers together. Apply Documentation
-Currency per slice, including generated policy; run pnpm context:check for instruction/context edits.
-The primary owns whole-repository effectiveness, efficiency and quality; agents return scoped evidence.
-Follow Long-Session Course Checks at boundaries and at most ten active minutes apart. Native Goals
-need explicit request or delegated need-based authority; token budgets need explicit request.
-
-One writer per surface. After every completed slice run pnpm worktree:status -- --json. Preserve
-ambiguous writers and broken worktrees; preservation is a safety state, never completion. Retain
-canonical settlement/publication gates and licensing obligations.
-
-Default to four useful concurrent subagents when admissible; keep at most twelve live. Include
-additional user-started agents after verifying ownership and admission. After accepting each handoff
-and closing its scope, immediately assign the next ready bounded task while authorized work remains.
-Do not wait for another user prompt or the whole wave; reuse the admitted team. Explain dependencies
-or close unneeded threads; never invent work. Never pass a model or reasoning override: use the
-exact GPT Astra model with max reasoning. Register each owned
-subagent and background task with repository/session/scope identity, checkpoint and cancellation
-provenance. Never contact or control foreign or ambiguous processes. Accept handoffs and close scopes
-before follow-up; close unneeded threads before replacement. Before child tools inspect effective
-runtime permissions: live parent permission overrides can defeat role defaults. Read-only roles stop on broader permissions. An
-explicit writer may inherit this primary's already-authorized YOLO override only for its exact
-disjoint repository write set, with no new authority. The primary owns protected policy/integration.
-
-Follow Capacity Admission And Monitoring; keep quota/context/Goal units distinct. Historical reserve
-estimates are not binding. Reserve for bounded work/closure; try smaller work/fewer agents. Unknown
-costs prove no critical state; unknown quota admits no agents but alone requires no seal.
-Before classifying account-window exhaustion
-retain rateLimitResetCredits and ordinaryUsageAllowed, resolve needed supported free resets, then
-refresh binding limits/permission. Unresolved 5% or less triggers Critical Budget Drain; hard
-host/context/Goal limits or a currently demonstrated uncovered reserve require immediate drain.
-Drain only owned work, record the exact attestation, then run pnpm handover:create -- --critical as
-the final repository action. After a successful seal, stop completely: no tools or agent contact;
-never permit automatic continuation. No purchase, paid overage, account/model switch or Goal-budget increase.
-Portable startup is on-request/network-disabled workspace-write. Only explicitly authorized Dev
---yolo changes runtime permissions, never scope.
+Follow Capacity Admission And Monitoring before classifying account-window exhaustion; retain
+rateLimitResetCredits and ordinaryUsageAllowed, resolve supported free recovery, then refresh limits/permission.
+Historical reserve estimates are not binding; reserve bounded completion capacity. Unknown quota admits no agents
+but alone requires no seal. Unresolved 5% or less remaining, hard limits or demonstrated uncovered reserve trigger
+Critical Budget Drain: drain owned work, record its exact attestation, then pnpm handover:create -- --critical
+as the final repository action. After a successful seal, stop completely; never permit automatic continuation.
+No purchase, paid overage, account/model switch or Goal-budget increase.
+After every completed slice run pnpm worktree:status -- --json and settle; preservation is a safety state, never completion.
+Portable startup is on-request/network-disabled workspace-write. Only authorized Dev --yolo broadens permissions,
+never scope; publication, credentials and deployment retain their authority gates.
 """
 project_doc_max_bytes = 32768
 project_doc_fallback_filenames = ["instructions.md"]

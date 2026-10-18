@@ -2,21 +2,19 @@
 import path from "node:path";
 import { readRepositoryFile } from "../filesystem/repository-files.mjs";
 import { markdownBodyForHeadingValidation } from "./document-scope.mjs";
+import { markdownLinesOutsideFences } from "./markdown-fences.mjs";
 
 const maximumSectionSpanLines = 200;
 
 /** Extracts inline Markdown destinations outside examples and comments; no document code executes. */
 export function markdownFileLinks(content) {
   const lines = [];
-  let fenced = false;
-  for (const line of String(content)
-    .replace(/<!--[\s\S]*?-->/gu, "")
-    .split(/\r?\n/u)) {
-    if (/^\s*(?:```|~~~)/u.test(line)) {
-      fenced = !fenced;
-      continue;
-    }
-    if (!fenced) lines.push(line.replace(/(`+).*?\1/gu, ""));
+  for (const [, line] of markdownLinesOutsideFences(
+    String(content)
+      .replace(/<!--[\s\S]*?-->/gu, "")
+      .split(/\r?\n/u),
+  )) {
+    lines.push(line.replace(/(`+).*?\1/gu, ""));
   }
   const prose = lines.join("\n");
   const destination = (raw) => /^<([^>]+)>|^([^\s]+)(?:\s+["'].*["'])?$/u.exec(raw.trim());
@@ -72,13 +70,7 @@ export function markdownHeadingContract(relativePath, content) {
   const lines = markdownLinesAfterFrontmatter(
     markdownBodyForHeadingValidation(relativePath, content),
   );
-  let fenced = false;
-  for (const [index, line] of lines.entries()) {
-    if (/^\s*(?:```|~~~)/u.test(line)) {
-      fenced = !fenced;
-      continue;
-    }
-    if (fenced) continue;
+  for (const [index, line] of markdownLinesOutsideFences(lines)) {
     const match = /^(#{1,6})\s+(.+?)\s*$/u.exec(line);
     if (!match) continue;
     const label = headingLabel(match[2]);

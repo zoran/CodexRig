@@ -68,19 +68,9 @@ const portablePolicy = new Map([
   ["features.memories", { type: "boolean" }],
   ["features.network_proxy", { type: "boolean" }],
   ["features.prevent_idle_sleep", { type: "boolean" }],
-  [
-    "tui.status_line",
-    {
-      type: "string-array",
-    },
-  ],
+  ["tui.status_line", { type: "string-array" }],
   ["tui.status_line_use_colors", { type: "boolean" }],
-  [
-    "tui.terminal_title",
-    {
-      type: "string-array",
-    },
-  ],
+  ["tui.terminal_title", { type: "string-array" }],
   ["tui.theme", { type: "string" }],
 ]);
 const portableTables = new Set(["agents", "features", "sandbox_workspace_write", "tui"]);
@@ -89,6 +79,7 @@ const portableTables = new Set(["agents", "features", "sandbox_workspace_write",
 const runtimeModelPreferencePattern = /^[a-z0-9][a-z0-9._-]{0,127}$/u;
 const runtimeReasoningPreferencePattern = /^[a-z][a-z0-9_-]{0,63}$/u;
 const requiredAgentRoles = new Set(["default", "explorer", "worker"]);
+// Markers guard required wording, not semantic compliance, runtime isolation, or model obedience.
 const requiredAgentInstructionFragments = Object.freeze([
   "manifest-led discovery",
   "matched source",
@@ -119,6 +110,12 @@ const requiredPrimaryInstructionFragments = Object.freeze([
   "Default to four useful concurrent subagents",
   "additional user-started agents",
   "immediately assign the next ready bounded task",
+  "accept, reject or preserve",
+  "close its scope",
+  "Before unrelated primary work",
+  "recheck admission",
+  "to the same agent",
+  "dependencies and their next checkpoint",
   "at most twelve live",
   "never pass a model or reasoning override",
   "exact GPT Astra model with max reasoning",

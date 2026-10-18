@@ -474,7 +474,7 @@ test("an in-process chat switch explains restart, preserves recovery, and permit
   assert.match(rejected.stderr, /"continue":false/u);
   assert.match(rejected.stderr, /launcher is already bound to another durable Codex session/u);
   assert.match(rejected.stderr, /Exit Codex completely with \/quit/u);
-  assert.match(rejected.stderr, /bash scripts\/setup\/start-codex\.sh/u);
+  assert.match(rejected.stderr, /bash -p scripts\/setup\/start-codex\.sh/u);
   assert.equal(inspectRuntimeSessionLease({ root: fixture.project }).status, "absent");
   assert.equal(capturedCalls(fixture).length, 1);
   assert.equal(

@@ -11,7 +11,10 @@ import { detectGitProvider, platformRoot } from "./git-provider.mjs";
 import { applyGithubPlatform, githubRulesetPayload } from "./github-platform.mjs";
 import { applyGitlabPlatform } from "./gitlab-platform.mjs";
 import { providerApiBase } from "./platform-api.mjs";
-import { platformConfigurationState } from "./platform-configuration-state.mjs";
+import {
+  platformConfigurationState,
+  recoverPlatformConfigurationLock,
+} from "./platform-configuration-state.mjs";
 
 export { githubRulesetPayload };
 
@@ -86,10 +89,24 @@ export async function configurePlatform({
   root = platformRoot,
   environment = process.env,
   fetchImpl = globalThis.fetch,
-  contract = readToolingConfiguration(root),
-  detected = detectGitProvider({ root, environment, contract }),
+  contract,
+  detected,
   apply = false,
+  recoverLock = false,
+  confirmQuiescent = false,
+  expectedLockFingerprint,
 } = {}) {
+  // Local recovery must not inspect provider configuration, account files or remote state.
+  if (recoverLock)
+    return recoverPlatformConfigurationLock(root, {
+      apply,
+      confirmQuiescent,
+      expectedFingerprint: expectedLockFingerprint,
+    });
+  if (confirmQuiescent || expectedLockFingerprint !== undefined)
+    throw new Error("Lock recovery arguments require --recover-lock.");
+  contract ??= readToolingConfiguration(root);
+  detected ??= detectGitProvider({ root, environment, contract });
   const validatedContract = validateToolingConfiguration(structuredClone(contract));
   const plan = platformConfigurationPlan({ contract: validatedContract, detected });
   if (!apply) return { applied: false, plan, warnings: [] };
@@ -113,27 +130,77 @@ export async function configurePlatform({
   }
 }
 
-function parseArgs(argv) {
-  const args = new Set(argv.filter((argument) => argument !== "--"));
-  const allowed = new Set(["--apply", "--json", "--help", "-h"]);
-  const unknown = [...args].find((argument) => !allowed.has(argument));
-  if (unknown) throw new Error(`Unknown platform configuration option: ${unknown}.`);
+export function parseArgs(argv) {
+  const args = argv.filter((argument) => argument !== "--");
+  const flags = new Set();
+  const allowed = new Set([
+    "--apply",
+    "--json",
+    "--help",
+    "-h",
+    "--recover-lock",
+    "--confirm-quiescent",
+  ]);
+  let expectedLockFingerprint;
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (argument === "--expected-lock-fingerprint") {
+      if (expectedLockFingerprint !== undefined || !/^[a-f0-9]{64}$/u.test(args[index + 1] ?? ""))
+        throw new Error("Expected lock fingerprint must be supplied once as a SHA-256 value.");
+      expectedLockFingerprint = args[++index];
+    } else {
+      if (!allowed.has(argument))
+        throw new Error(`Unknown platform configuration option: ${argument}.`);
+      flags.add(argument);
+    }
+  }
+  if (
+    !flags.has("--recover-lock") &&
+    (flags.has("--confirm-quiescent") || expectedLockFingerprint !== undefined)
+  )
+    throw new Error("Lock recovery arguments require --recover-lock.");
   return {
-    apply: args.has("--apply"),
-    help: args.has("--help") || args.has("-h"),
-    json: args.has("--json"),
+    apply: flags.has("--apply"),
+    help: flags.has("--help") || flags.has("-h"),
+    json: flags.has("--json"),
+    recoverLock: flags.has("--recover-lock"),
+    confirmQuiescent: flags.has("--confirm-quiescent"),
+    expectedLockFingerprint,
   };
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log("Usage: pnpm platform:configure [-- --json] [--apply]");
+    console.log(
+      "Usage: pnpm platform:configure [-- --json] [--apply]\n" +
+        "       pnpm platform:configure -- --recover-lock [--json]\n" +
+        "       pnpm platform:configure -- --recover-lock --apply --confirm-quiescent --expected-lock-fingerprint <sha256>",
+    );
     return;
   }
-  const result = await configurePlatform({ apply: args.apply });
+  const result = await configurePlatform(args);
   if (args.json) {
     console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  if (args.recoverLock) {
+    if (result.applied) {
+      console.log(
+        "Retired the reviewed local platform lock; the reconciliation journal was left unchanged.",
+      );
+    } else if (!result.lockPresent) {
+      console.log("No local platform configuration lock requires recovery.");
+    } else {
+      console.log(`Platform lock owner status: ${result.ownerStatus}.`);
+      console.log(`Reviewed lock fingerprint: ${result.fingerprint}`);
+      console.log(
+        "After independently confirming that all platform configuration writers have stopped, run:",
+      );
+      console.log(
+        `pnpm platform:configure -- --recover-lock --apply --confirm-quiescent --expected-lock-fingerprint ${result.fingerprint}`,
+      );
+    }
     return;
   }
   console.log(

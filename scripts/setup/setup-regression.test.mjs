@@ -56,6 +56,7 @@ import {
   run,
   temporaryRoot,
   validPortableConfig,
+  validPrimaryInstructions,
 } from "./setup-regression-test-helpers.mjs";
 
 test("the sole TOML parser is strict and supports the portable config subset", () => {
@@ -133,8 +134,7 @@ test("skill metadata preserves native implicit and explicit activation choices",
 
 test("Codex config parser accepts only the complete typed portable policy", () => {
   assert.deepEqual(validateCodexConfig(configFixture()), {
-    developer_instructions:
-      "Act as the primary orchestrator. Apply Maintenance Scope And Verification before selecting commands. Follow Delegated Release. Retain exactly one current internal contract per concern. Default to four useful concurrent subagents. Include additional user-started agents in ongoing scheduling; accept each handoff and immediately assign the next ready bounded task while authorized work remains. Keep at most twelve live agents and never pass a model or reasoning override; all use the exact GPT Astra model with max reasoning. Register every owned subagent and background task and leave foreign or ambiguous processes untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. After every completed slice, run pnpm worktree:status -- --json as the worktree settlement trigger; preservation is a safety state, never completion. Historical reserve estimates are not binding. Follow Capacity Admission And Monitoring before classifying account-window exhaustion; retain rateLimitResetCredits and ordinaryUsageAllowed, resolve needed supported free resets and refresh binding capacity. At unresolved 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.\n",
+    developer_instructions: validPrimaryInstructions,
     project_doc_max_bytes: 32_768,
     project_doc_fallback_filenames: ["instructions.md"],
     model_reasoning_effort: "max",
@@ -330,6 +330,34 @@ test("Codex config parser accepts only the complete typed portable policy", () =
   }
 });
 
+// Regression: required dispatch clauses were not checked before policy reached startup/export.
+// This guards the wording contract; it does not prove lifecycle semantics or model obedience.
+test("primary policy requires each continuous-dispatch clause", () => {
+  assert.equal(
+    parsePortableCodexConfig(validPortableConfig).developer_instructions,
+    validPrimaryInstructions,
+  );
+  for (const fragment of [
+    "accept, reject or preserve",
+    "close its scope",
+    "Before unrelated primary work",
+    "recheck admission",
+    "to the same agent",
+    "dependencies and their next checkpoint",
+  ]) {
+    const incomplete = validPortableConfig.replace(fragment, "");
+    assert.notEqual(incomplete, validPortableConfig, `Fixture must contain ${fragment}.`);
+    assert.throws(
+      () => parsePortableCodexConfig(incomplete),
+      (error) =>
+        error instanceof CodexConfigError &&
+        error.message ===
+          `Primary developer_instructions must include orchestration marker ${fragment}.`,
+      fragment,
+    );
+  }
+});
+
 test("malformed portable TOML diagnostics never echo source values", () => {
   const token = `sk-proj-${"x".repeat(32)}`;
   for (const parser of [parsePortableCodexConfig, parsePortableToml]) {
@@ -455,8 +483,8 @@ test("session controller injects exactly two narrowly trusted Codex hook identit
   assert.deepEqual(
     hooks.map((hook) => hook.currentHash),
     [
-      "sha256:4eebb9d030b703339bf675708292c60fae1d4386dd43e5f142d646c914362151",
-      "sha256:e1cf4a7ed1589a15080d76bbe031d5b3c1e4db20d4e526d21a4604b0f50fe2fd",
+      "sha256:3c9ea5c3234a1139b06723cf55e05e090ad79842721a9c1b5a7f4df619d380c5",
+      "sha256:a070f2fbd7f49919ec2f0a13ce4654ae4890915a19c128672c0bfd10ff2c93cd",
     ],
   );
   assert.equal(hookArguments.includes("--dangerously-bypass-hook-trust"), false);
@@ -655,12 +683,13 @@ test("project roles enforce exact Astra/max parity with the primary", () => {
       ),
     /orchestration marker State readiness for another bounded assignment/u,
   );
+  const withoutHistoricalReserveGuard = defaultAgent.replace(
+    /Historical\s+reserve\s+estimates\s+are\s+not\s+binding/iu,
+    "",
+  );
+  assert.notEqual(withoutHistoricalReserveGuard, defaultAgent);
   assert.throws(
-    () =>
-      parseProjectAgentConfig(
-        defaultAgent.replace(/Historical\s+reserve estimates are not binding\./u, ""),
-        "default",
-      ),
+    () => parseProjectAgentConfig(withoutHistoricalReserveGuard, "default"),
     /orchestration marker historical reserve estimates are not binding/u,
   );
   assert.equal(parsedDefault.model, "gpt-6-astra");
@@ -861,6 +890,7 @@ test("hook installation is managed and never overwrites an unrelated hook", () =
     "scripts/contracts/semver-contract.mjs",
     "scripts/repository/project-temporary-storage.mjs",
     "scripts/repository/project-tool-environment.mjs",
+    "scripts/repository/runtime-process-cancellation.mjs",
     "scripts/repository/runtime-process-identity.mjs",
     "scripts/repository/source-inventory-policy.mjs",
     "scripts/repository/user-tool-storage.mjs",

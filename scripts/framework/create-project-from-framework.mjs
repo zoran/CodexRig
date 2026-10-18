@@ -79,9 +79,6 @@ async function main() {
     assertProjectSourceReady(roots.sourceRoot);
     assertSourceProductBoundaryClean(roots.sourceRoot);
     assertSourceGitStateUnchanged(roots.sourceRoot, sourceGitState);
-    assertProjectSourceReady(roots.sourceRoot);
-    assertSourceProductBoundaryClean(roots.sourceRoot);
-    assertSourceGitStateUnchanged(roots.sourceRoot, sourceGitState);
     sourceHasChanges = sourceHasGitChanges(roots.sourceRoot);
     published = false;
   } catch (error) {

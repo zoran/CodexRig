@@ -43,6 +43,14 @@ for command_name in bash git rg shellcheck tar; do
   require_system_command "$command_name"
 done
 
+host_platform="$(node -p 'process.platform')"
+if [[ "$host_platform" == linux ]]; then
+  if ! command -v python3 >/dev/null 2>&1 ||
+    ! python3 -I -B -c 'import ctypes; ctypes.CDLL(None)' >/dev/null 2>&1; then
+    missing_system+=("python3 (Python 3 with ctypes for process-cancellation verification)")
+  fi
+fi
+
 if ! command -v mise >/dev/null 2>&1; then
   runtime_issues+=("mise")
 fi
@@ -82,13 +90,13 @@ if (("${#runtime_issues[@]}" > 0)); then
 Project runtimes are missing, mismatched, or inactive. This check is read-only.
 
 Prepare the project-pinned tools in user storage and dependencies through their maintenance owner:
-  node scripts/deps/maintain-toolchain.mjs
+  env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs
 
 Run commands inside the repository environment:
-  bash scripts/setup/run-project.sh bash scripts/setup/check-prereqs.sh
+  bash -p scripts/setup/run-project.sh bash scripts/setup/check-prereqs.sh
 
 Canonical interactive startup performs maintenance before session selection:
-  bash scripts/setup/start-codex.sh
+  bash -p scripts/setup/start-codex.sh
 
 Locked runtime platforms: Linux x64/arm64 (glibc and musl), macOS arm64, and Windows x64.
 Intel macOS is not supported because pnpm 11 has no Darwin x64 standalone artifact.
@@ -104,8 +112,8 @@ Missing required system tools.
 The launcher owns pinned Mise and Codex installations in user storage. Shared system binaries are
 read-only bootstrap; these package commands are suggestions for the human host owner:
 
-  Debian/Ubuntu: sudo apt-get install -y git ripgrep shellcheck
-  Fedora:        sudo dnf install -y git ripgrep ShellCheck
+  Debian/Ubuntu: sudo apt-get install -y git ripgrep shellcheck python3
+  Fedora:        sudo dnf install -y git ripgrep ShellCheck python3
   Homebrew (macOS arm64): brew install git ripgrep shellcheck
 EOF
   printf '\nMissing system tools:\n' >&2

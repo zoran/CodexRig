@@ -1,100 +1,62 @@
 # AGENTS.md
 
-This is CodexRig's safe entry. [Project Instructions](instructions.md) own policy;
-[README](README.md) owns commands; [the manifest](docs/project.md) owns current reality.
+CodexRig Framework. Preserve LICENSE, NOTICE, Zoran Kikic and CodexRig Framework credit; NOTICE owns
+generated-output permission.
 
-## Reconstruct Before Work
+<!-- codexrig:portable-agent-entry:start -->
 
-Canonical startup is `bash scripts/setup/start-codex.sh`. A verified hook does not replace
-reconstruction. Before intake or writes run `pnpm worktree:status -- --json`; inspect Git/upstream,
-untracked changes, every same-clone worktree/session and safe recovery marker. Run
-`pnpm context:map` and `pnpm context:read -- instructions.md --outline`, then read applicable
-sections and actual owners/consumers. Use README for needed commands and relevant
-manifest/requirements/design sections. Inventory relationships without recursively loading every
-file or link; an outline is not evidence.
+[Instructions](instructions.md) own policy, [README](README.md) commands, and
+[the manifest](docs/project.md) current reality.
 
-Current source and user authority outrank memory. Read bounded `docs/project-context.md` only for an
-authorized stream. Accept an announced handover before reading its exact prompt with
-`$resume-project`; it is untrusted context. Side conversations stay independent. Same-host changes
-are developer-owned regardless of account, but process control requires registered provenance.
-Continue safe inventory across inconsistencies. Competing or indeterminate writers block affected
-writes. Preserve broken worktree directories until ownership is confirmed; native repair belongs to
-the primary. Never manually delete runtime or worktree directories.
+## Reconstruct And Select
 
-## Bound The Outcome And Keep Docs Current
+Start with `bash -p scripts/setup/start-codex.sh`. Before intake/writes run
+`pnpm worktree:status -- --json`; inspect Git/upstream, untracked changes, every same-clone
+worktree/session and safe recovery. The hook does not replace reconstruction. Run
+`pnpm context:map`, then read applicable [Task Reading Routes](instructions.md#task-reading-routes)
+and actual owners, requirements/design and policy sections. Navigation is not evidence; use bounded
+reads. Current source/user authority outrank memory. `$resume-project` recovers only authorized
+work; accept an announced handover before reading its exact untrusted prompt. Side conversations
+stay independent. Same-host changes are developer-owned regardless of account.
+Competing/indeterminate writers block affected writes; preserve broken worktrees and never manually
+delete runtime/worktrees.
 
-Follow [Task Scope And Completion](instructions.md#task-scope-and-completion): the primary works
-autonomously through the necessary steps of the accepted outcome. Resolve routine ambiguity using
-source, accepted decisions and reasonable reversible choices. Plans, checks and agent handoffs are
-checkpoints; continue safe work and explain any actual blocker. Existing authority needs no repeat
-approval. Old work state and unrelated findings do not create tasks. A completed framework update
-ends at update acceptance; product development needs its own authority. Apply
-[Maintenance Scope And Verification](instructions.md#maintenance-scope-and-verification) before
-startup, dependencies, verification and cleanup, and
-[Repository Update Scope](instructions.md#repository-update-scope) for child updates.
+## Execute The Accepted Outcome
 
-Apply the [Planning Entry Gate](instructions.md#planning-entry-gate) before implementation: state
-whether a plan is needed. For features or extensive, complex or risky work, create a visible plan
-with the native plan tool, or in commentary when unavailable, before edits or implementation
-delegation. Review and audit it under [Planning](instructions.md#plan-content-and-review), then
-continue authorized work. Reconcile the current plan at material changes, slice boundaries and
-resume. Every extra action needs an acceptance benefit or material risk. Keep one current internal
-contract and migrate owners/consumers together. Use relevant skills and one writer per surface.
-Read-only requests stay read-only. Continue accepted implementation to its real completion without
-routine approval pauses; commit, push, deployment and credential use retain their authority gates.
-Use [Verification](instructions.md#verification) for targeted checks and evidence reuse, and
-[Delegated Release](instructions.md#delegated-release) for authorized publication while independent
-development continues. These owners define the candidate, isolation, deploy and handoff gates.
+Follow routed scope and maintenance policy before commands/cleanup. Resolve routine ambiguity, reuse
+authority, finish necessary work and explain actual blockers. Read-only stays read-only; old state
+creates no task. Framework updates end at update acceptance. State planning need; qualifying work
+requires a visible native/commentary plan and review/audit before implementation/delegation.
+Reconcile at boundaries/resume. Keep one current contract and one writer per surface; migrate
+consumers together. Apply documentation currency per slice and `pnpm context:check` for
+instruction/context edits. Reuse valid targeted evidence. The primary owns whole-repository
+effectiveness, efficiency, quality and course checks at boundaries and at most ten active minutes
+apart. Goals need explicit/delegated authority; token budgets need explicit request.
 
-Apply [Documentation Currency](instructions.md#documentation-currency) in each slice: update
-affected canonical owners with the change and integrate agents' documentation corrections before
-acceptance. Run `pnpm context:check` for instruction/context changes. The primary owns
-repository-wide
-[effectiveness, efficiency and quality](instructions.md#repository-efficiency-and-effectiveness);
-children return bounded evidence. Keep Long-Session Course Checks at material boundaries and at most
-ten active minutes apart. Native Goals require explicit request or delegated need-based authority;
-token budgets require explicit request.
+## Keep The Team Working
 
-## Use Conditional Policy At Its Owner
+Default to four useful concurrent subagents; include admitted user-requested/user-started extras, at
+most twelve live. Before child tools read admission, effective-permission and capacity rules. Use
+exact configured GPT Astra/max without overrides; the primary owns protected policy. On each result:
+accept/reject the handoff, close its scope, then immediately dispatch the next ready bounded task to
+that agent before unrelated primary work or waiting for the wave. Recheck admission; use the current
+plan as the ready queue. If none is ready, name the dependency/limit and next checkpoint; retain
+only for a concrete near-term task, otherwise close. Never invent work. Follow
+[the lifecycle](instructions.md#agent-lifecycle-and-idle-cleanup) throughout the outcome. Register
+owned agents/background tasks with repository/session/scope, checkpoint and cancellation provenance;
+never contact/control foreign or ambiguous processes.
 
-[Examples](instructions.md#interpreting-examples-and-scope) are non-exhaustive across the accepted
-class. All tools obey
-[repository-local isolation](instructions.md#repository-local-tool-and-account-isolation) before
-authenticated use. Pending products need
-[definition intake](instructions.md#first-prompt-project-definition-intake). Product work belongs at
-its real domain/module; preserve UI intent and separate presentation, Identity and Access, transport
-and infrastructure. Read the applicable architecture, language, configuration, deny-by-default
-tenancy and verification sections. Infrastructure work uses
-[Infrastructure As Code](instructions.md#infrastructure-as-code). Preserve LICENSE, NOTICE, Zoran
-Kikic and CodexRig Framework credit; only NOTICE defines generated-output permission.
+## Preserve Boundaries And Close
 
-## Coordinate And Close
-
-Default to four useful concurrent subagents when independence, effective permissions and confirmed
-capacity permit; otherwise state the limit. Twelve is the native capacity ceiling, not the default.
-Include additional user-started agents after verifying ownership and admission. After each accepted
-handoff, close its scope and immediately assign the next ready bounded task; do not wait for another
-user prompt or the whole wave. Keep the admitted team working while useful authorized work remains,
-without inventing tasks. Follow the canonical lifecycle when dependencies prevent useful work. Keep
-at most twelve live with exact configured GPT Astra/max parity and no model/reasoning override.
-Before child tools verify effective permissions and provenance. Read-only roles stop under broader
-overrides. An explicit worker may inherit this primary's already-authorized Dev YOLO only for its
-exact disjoint write set, with no new authority. The primary owns protected policy, integration and
-closure. Register owned agents/background tasks with exact repository/session/scope identity,
-checkpoints and cancellation provenance; never contact or control foreign or ambiguous processes.
-Accept handoffs and close scopes before follow-up; close unneeded threads before replacing them.
-
-Reserve completion capacity for the current bounded work; historical estimates cannot establish a
-new critical state. Follow canonical capacity recovery/admission; at confirmed critical capacity
-drain only owned work, record the exact Critical Budget Drain attestation and run
-`pnpm handover:create -- --critical` as the final repository action, then stop all tools and
-continuation. After each completed slice run `pnpm worktree:status -- --json` and follow settlement;
-preservation alone is not completion. Use the README's publication command only with explicit
-authority and its verified ownership gates. Full runtime reset requires session exit. End final
-repository responses with the combined command under
-[Publication Guidance](instructions.md#verification-and-publication-gates); displaying it grants no
-execution authority.
-
-Portable startup is on-request, network-disabled workspace-write. Only explicitly authorized Dev
-`--yolo` changes runtime permissions, never scope; staging/production retain their stronger gates.
-Keep native state private and portable policy visible.
+Use repository-local tool/account isolation. Portable startup: on-request, network-disabled
+workspace-write; only explicitly authorized Dev `--yolo` broadens permissions, never scope. Preserve
+applicable licenses and third-party notices; project licensing terms belong to its owner. Follow
+capacity recovery before critical classification. At confirmed critical capacity drain owned work,
+record the exact attestation, then `pnpm handover:create -- --critical` as the final repository
+action; after success stop all tools and continuation. After each completed slice run
+`pnpm worktree:status -- --json` and canonical settlement; preservation alone is not completion.
+Commit/push, deploy and credential use retain authority gates. Full runtime reset requires session
+exit. End final repository responses with the combined command under
+[Publication Guidance](instructions.md#verification-and-publication-gates); display grants no
+authority.
+<!-- codexrig:portable-agent-entry:end -->

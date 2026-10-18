@@ -26,7 +26,7 @@ export function postProjectCreationGuidance({ sourceHasChanges }) {
     ...(sourceHasChanges
       ? [
           "Optional source publication after review and explicit authorization, including from the owning Codex session:",
-          'bash scripts/setup/run-project.sh pnpm framework:publish --message "<message>"',
+          'bash -p scripts/setup/run-project.sh pnpm framework:publish --message "<message>"',
           "This explicit command cleans source, verifies, commits all non-ignored changes, pushes central main, and checks goal:new; active private runtime is preserved.",
         ]
       : []),

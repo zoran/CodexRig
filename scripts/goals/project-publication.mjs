@@ -288,7 +288,7 @@ function requireUpstreamContained(git, binding) {
       `Branch ${branch} is ${behind} commit(s) behind ${upstream}.\n` +
         "Review upstream changes first. Local changes must be preserved and reconciled before fast-forwarding.\n" +
         "Then run:\n" +
-        "bash scripts/setup/run-project.sh git merge --ff-only '@{upstream}'\n" +
+        "bash -p scripts/setup/run-project.sh git merge --ff-only '@{upstream}'\n" +
         "Run publication again after the branch is synchronized.",
     );
   }
@@ -303,7 +303,7 @@ function requireUpstreamContained(git, binding) {
   throw new Error(
     `Branch ${branch} and ${upstream} have diverged: ${ahead} local and ${behind} upstream commit(s).\n` +
       "Preserve local changes and reconcile the histories before publishing. Review with:\n" +
-      "bash scripts/setup/run-project.sh git log --oneline --left-right 'HEAD...@{upstream}'",
+      "bash -p scripts/setup/run-project.sh git log --oneline --left-right 'HEAD...@{upstream}'",
   );
 }
 

@@ -1,6 +1,7 @@
 /** Owns bounded and cancellable execution of publication gates; diagnostics use the terminal owner. */
 import { spawn } from "node:child_process";
 import process from "node:process";
+import { createOwnedProcessCancellation } from "../repository/runtime-process-cancellation.mjs";
 import { sanitizeMultilineForTerminal } from "../terminal/terminal-output.mjs";
 
 const maximumOutputBytes = 64 * 1024 * 1024;
@@ -22,30 +23,21 @@ export async function runPublicationCommand({
       detached: grouped,
       stdio: ["ignore", "pipe", "pipe"],
     });
+    const cancellation = createOwnedProcessCancellation(child, { graceMilliseconds: 2000 });
     const chunks = [];
     const stdout = [];
     const stderr = [];
     let bytes = 0;
     let failure;
     let stopping = false;
-    let forceTimer;
-    const cancel = (signal) => {
-      if (!child.pid) return;
-      try {
-        // This group was created by this exact spawn; never discover or signal other processes.
-        if (grouped) process.kill(-child.pid, signal);
-        else child.kill(signal);
-      } catch (error) {
-        if (error.code !== "ESRCH")
-          failure ??= "The owned publication command could not be stopped.";
-      }
-    };
+    let cancelled;
     const stop = (reason) => {
       failure ??= reason;
       if (stopping) return;
       stopping = true;
-      cancel("SIGTERM");
-      forceTimer = setTimeout(() => cancel("SIGKILL"), 2000);
+      cancelled = cancellation.cancel("SIGTERM").catch((error) => {
+        failure = `${failure} ${error.message}`;
+      });
     };
     const capture = (stream, chunk) => {
       bytes += chunk.length;
@@ -66,14 +58,18 @@ export async function runPublicationCommand({
     const timer = setTimeout(() => stop("Publication command timed out."), timeout);
     const cleanup = () => {
       clearTimeout(timer);
-      clearTimeout(forceTimer);
       for (const [signal, handler] of handlers) process.off(signal, handler);
     };
-    child.once("error", (error) => {
+    child.once("error", async (error) => {
+      clearTimeout(timer);
+      await cancelled;
       cleanup();
       reject(new Error(`Publication command could not start: ${error.code ?? "unknown error"}.`));
     });
-    child.once("close", (status, signal) => {
+    child.once("close", async (status, signal) => {
+      clearTimeout(timer);
+      // Direct-child closure does not establish that its owned descendants have stopped.
+      await cancelled;
       cleanup();
       resolve({
         status,

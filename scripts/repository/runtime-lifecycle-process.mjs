@@ -15,6 +15,7 @@ import {
 } from "./runtime-session-lease.mjs";
 import { runtimeLifecycleOperationPattern } from "./runtime-lifecycle-schema.mjs";
 import { spawnSyncWithBoundedIo as spawnSync } from "./runtime-process-io.mjs";
+import { createOwnedProcessCancellation } from "./runtime-process-cancellation.mjs";
 
 const supervisorTokenVariable = "CODEXRIG_LIFECYCLE_SUPERVISOR_TOKEN";
 const supervisorOperationVariable = "CODEXRIG_LIFECYCLE_SUPERVISOR_OPERATION";
@@ -138,7 +139,21 @@ function childEnvironment({
 }
 
 function cancelUnusedDelegations(repositoryRoot, lifecycleCapability, delegations) {
-  for (const delegation of [delegations.command, delegations.witness, delegations.supervisor]) {
+  // Once adopted, the supervisor owns its witness and command token. Incomplete cancellation
+  // must leave that evidence durable instead of a caller treating supervisor exit as cleanup.
+  try {
+    if (
+      !cancelRuntimeLifecycleDelegation({
+        root: repositoryRoot,
+        owner: lifecycleCapability,
+        token: delegations.supervisor.token,
+      })
+    )
+      return;
+  } catch {
+    return;
+  }
+  for (const delegation of [delegations.command, delegations.witness]) {
     if (!delegation) continue;
     try {
       cancelRuntimeLifecycleDelegation({
@@ -298,38 +313,9 @@ function targetEnvironment() {
   return environment;
 }
 
-function signalProcessGroup(child, signal) {
-  if (!child?.pid) return;
-  try {
-    if (process.platform !== "win32") process.kill(-child.pid, signal);
-    else child.kill(signal);
-  } catch (error) {
-    if (error?.code !== "ESRCH") throw error;
-  }
-}
-
 function signalExitCode(signal) {
   const number = os.constants.signals?.[signal];
   return Number.isInteger(number) ? 128 + number : 1;
-}
-
-async function terminateAndReapProcessGroup(child) {
-  if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
-  const closed = new Promise((resolve) => {
-    child.once("close", resolve);
-    child.once("error", resolve);
-  });
-  signalProcessGroup(child, "SIGTERM");
-  const graceful = await Promise.race([
-    closed.then(() => true),
-    new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(false), 5_000);
-      timer.unref();
-    }),
-  ]);
-  if (graceful) return;
-  signalProcessGroup(child, "SIGKILL");
-  await closed;
 }
 
 async function supervise(command, args) {
@@ -349,7 +335,16 @@ async function supervise(command, args) {
   let child;
   let registration;
   let shutdownSignal = null;
-  let escalation;
+  let cancellation;
+  let cancelled;
+  let cancellationFailed = false;
+  const cancel = (signal) => {
+    cancelled ??= cancellation?.cancel(signal).catch((error) => {
+      cancellationFailed = true;
+      return error;
+    });
+    return cancelled;
+  };
   const handlers = new Map();
   try {
     child = spawn(command, args, {
@@ -358,6 +353,7 @@ async function supervise(command, args) {
       env: targetEnvironment(),
       stdio: ["inherit", "inherit", "inherit", guardDescriptor],
     });
+    cancellation = createOwnedProcessCancellation(child);
     if (child.pid) {
       registration = registerRuntimeLifecycleDescendant({
         allowExisting: Boolean(process.env[commandTokenVariable]),
@@ -371,9 +367,7 @@ async function supervise(command, args) {
       const handler = () => {
         if (shutdownSignal) return;
         shutdownSignal = signal;
-        signalProcessGroup(child, signal);
-        escalation = setTimeout(() => signalProcessGroup(child, "SIGKILL"), 5_000);
-        escalation.unref();
+        cancel(signal);
       };
       handlers.set(signal, handler);
       process.on(signal, handler);
@@ -391,23 +385,24 @@ async function supervise(command, args) {
       child.once("error", reject);
       child.once("close", (status, signal) => resolve({ signal, status }));
     });
+    const cancellationError = await cancelled;
+    if (cancellationError) throw cancellationError;
     if (shutdownSignal) return signalExitCode(shutdownSignal);
     if (result.signal) return signalExitCode(result.signal);
     return result.status ?? 1;
   } catch (error) {
-    await terminateAndReapProcessGroup(child);
+    await cancel("SIGTERM");
     throw error;
   } finally {
-    if (escalation) clearTimeout(escalation);
     for (const [signal, handler] of handlers) process.off(signal, handler);
-    if (registration) {
+    if (!cancellationFailed && registration) {
       unregisterRuntimeLifecycleDescendant({
         root: repositoryRoot,
         owner: lifecycleCapability,
         registration,
       });
     }
-    if (process.env[commandTokenVariable]) {
+    if (!cancellationFailed && process.env[commandTokenVariable]) {
       try {
         cancelRuntimeLifecycleDelegation({
           root: repositoryRoot,
@@ -418,16 +413,18 @@ async function supervise(command, args) {
         // A command that adopted the delegation owns its durable cleanup.
       }
     }
-    try {
-      cancelRuntimeLifecycleDelegation({
-        root: repositoryRoot,
-        owner: lifecycleCapability,
-        token: requiredEnvironment(witnessTokenVariable),
-      });
-    } catch {
-      // A killed supervisor leaves the pre-spawn witness durable for fail-closed recovery.
-    }
-    releaseRuntimeLifecycleLock({ root: repositoryRoot, owner: lifecycleCapability });
+    if (!cancellationFailed)
+      try {
+        cancelRuntimeLifecycleDelegation({
+          root: repositoryRoot,
+          owner: lifecycleCapability,
+          token: requiredEnvironment(witnessTokenVariable),
+        });
+      } catch {
+        // A killed supervisor leaves the pre-spawn witness durable for fail-closed recovery.
+      }
+    if (!cancellationFailed)
+      releaseRuntimeLifecycleLock({ root: repositoryRoot, owner: lifecycleCapability });
   }
 }
 

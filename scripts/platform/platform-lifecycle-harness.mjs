@@ -1,4 +1,77 @@
 /** Owns platform lifecycle harness behavior for the Git provider integration boundary. */
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import path from "node:path";
+import { configurePlatform as configureActualPlatform } from "./configure-platform.mjs";
+
+export async function configurePlatform(options) {
+  if (options.apply && options.root) {
+    const dir = path.join(options.root, ".auth");
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const detected = options.detected;
+    fs.writeFileSync(
+      path.join(dir, "git-platform.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        provider: detected.provider,
+        hostname: detected.hostname,
+        repository: detected.slug,
+        token: "test-token",
+      }),
+      { mode: 0o600 },
+    );
+  }
+  return configureActualPlatform(options);
+}
+
+/** Leaves a lock issued by an exact owned child that has exited before its caller resumes. */
+export function abandonPlatformLock(root, plan) {
+  const moduleUrl = new URL("./platform-configuration-state.mjs", import.meta.url).href;
+  return spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      `import { platformConfigurationState } from ${JSON.stringify(moduleUrl)}; platformConfigurationState(process.argv[1], JSON.parse(process.argv[2])).acquire();`,
+      root,
+      JSON.stringify(plan),
+    ],
+    { cwd: root, encoding: "utf8", stdio: "pipe", timeout: 15_000 },
+  );
+}
+
+/** Schedules a competing caller after the stale lock's bytes are read, before takeover. */
+export function interleavePlatformLockRead(root, action, interleave) {
+  const lock = path.join(root, ".project-state/platform-configuration.lock");
+  const initial = fs.lstatSync(lock);
+  const read = fs.readFileSync;
+  let interleaved = false;
+  fs.readFileSync = (target, ...options) => {
+    const content = read(target, ...options);
+    const sameFile =
+      typeof target === "number"
+        ? (() => {
+            const current = fs.fstatSync(target);
+            return current.dev === initial.dev && current.ino === initial.ino;
+          })()
+        : target === lock;
+    if (!interleaved && sameFile) {
+      interleaved = true;
+      interleave();
+    }
+    return content;
+  };
+  syncBuiltinESMExports();
+  try {
+    action();
+    return interleaved;
+  } finally {
+    fs.readFileSync = read;
+    syncBuiltinESMExports();
+  }
+}
+
 export function applyAccessUpdates(existing, updates, initialId) {
   let nextId = Math.max(initialId, ...existing.map((entry) => entry.id ?? 0));
   let result = structuredClone(existing);

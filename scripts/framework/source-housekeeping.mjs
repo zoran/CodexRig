@@ -51,7 +51,7 @@ export function reconcileHousekeepingVersion({ root, apply, lifecycleCapability 
       }
     } catch (error) {
       throw new Error(
-        `${error.message} Source housekeeping is incomplete. Retry with bash scripts/setup/run-project.sh node scripts/framework/source-housekeeping.mjs --apply; this also works when pnpm's pre-script guard rejects stale installation metadata.`,
+        `${error.message} Source housekeeping is incomplete. Retry with bash -p scripts/setup/run-project.sh node scripts/framework/source-housekeeping.mjs --apply; this also works when pnpm's pre-script guard rejects stale installation metadata.`,
         { cause: error },
       );
     }

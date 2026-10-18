@@ -17,6 +17,11 @@ import { test } from "node:test";
 import { toolingRoot as root } from "../filesystem/repository-files.mjs";
 
 test("launcher maintains before admission, fails closed, and admits only native picker controls", (t) => {
+  const launchInvocation = JSON.parse(
+    readFileSync(path.join(root, "package.json"), "utf8"),
+  ).scripts["codex:start"].split(/\s+/u);
+  assert.equal(launchInvocation[0], "bash");
+  assert.equal(launchInvocation.at(-1), "scripts/setup/start-codex.sh");
   const project = mkdtempSync(path.join(os.tmpdir(), "codex launcher with spaces "));
   t.after(() => rmSync(project, { recursive: true, force: true }));
   const bin = path.join(project, "bin");
@@ -30,8 +35,13 @@ test("launcher maintains before admission, fails closed, and admits only native 
     path.join(setup, "start-codex-session.sh"),
   );
   const capture = path.join(project, "calls");
+  const bootstrapSentinel = path.join(project, "bootstrap-sentinel");
+  const shellPreload = path.join(project, "shell-preload");
+  writeFileSync(shellPreload, 'printf "BASH_ENV\\n" >> "$BOOTSTRAP_SENTINEL"\n');
   const ambientHome = path.join(project, "caller-home");
   const sanitizedKeys = [
+    "BASH_ENV",
+    "ENV",
     "NODE_OPTIONS",
     "NODE_PATH",
     "NPM_CONFIG_NODE_OPTIONS",
@@ -110,7 +120,7 @@ test("launcher maintains before admission, fails closed, and admits only native 
   }
   function invoke(args = [], extra = {}) {
     writeFileSync(capture, "");
-    return spawnSync("bash", [launcher, ...args], {
+    return spawnSync(launchInvocation[0], [...launchInvocation.slice(1, -1), launcher, ...args], {
       cwd: project,
       encoding: "utf8",
       input: "",
@@ -123,6 +133,12 @@ test("launcher maintains before admission, fails closed, and admits only native 
         FAKE_CODEX_EXECUTABLE: codex,
         CODEX_HOME: ambientHome,
         ...Object.fromEntries(sanitizedKeys.map((key) => [key, "synthetic-stale-control"])),
+        BASH_ENV: shellPreload,
+        ENV: shellPreload,
+        SHELLOPTS: "xtrace",
+        BOOTSTRAP_SENTINEL: bootstrapSentinel,
+        "BASH_FUNC_unset%%":
+          '() { printf "function\\n" >> "$BOOTSTRAP_SENTINEL"; builtin unset "$@"; }',
         ...extra,
       },
     });
@@ -137,6 +153,8 @@ test("launcher maintains before admission, fails closed, and admits only native 
   ]) {
     const result = invoke(args);
     assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(bootstrapSentinel), false, "shell preloads must not execute");
+    assert.equal(result.stderr, "", "inherited xtrace must not expose launcher arguments");
     const observed = calls();
     assert.deepEqual(observed[0], {
       executable: "node",

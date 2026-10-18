@@ -14,6 +14,7 @@ import {
   currentProjectInstructions,
 } from "./generated-project-documents.mjs";
 import { projectOutputText } from "./project-output-projection.mjs";
+import { formatGeneratedMarkdownText } from "./generated-project-finalization.mjs";
 import {
   isProjectToolPath,
   reviewedProjectDocuments,
@@ -117,9 +118,21 @@ export function buildReviewedFrameworkUpgradePlan(
     const current = targetUpgradeFileState(target, file);
     const desired =
       file === "AGENTS.md"
-        ? state(projectOutputText(initialProjectAgents(currentPackage.name || "this project")))
+        ? state(
+            formatGeneratedMarkdownText(
+              source,
+              file,
+              projectOutputText(initialProjectAgents(source)),
+            ),
+          )
         : file === "instructions.md"
-          ? state(currentProjectInstructions(source))
+          ? state(
+              formatGeneratedMarkdownText(
+                source,
+                file,
+                projectOutputText(currentProjectInstructions(source)),
+              ),
+            )
           : file === "package.json"
             ? state(JSON.stringify(packageCandidate, null, 2) + "\n", current.mode)
             : reviewedProjectDocuments.includes(file) || projectPaths.includes(file)

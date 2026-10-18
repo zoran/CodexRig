@@ -11,6 +11,53 @@ import {
   markdownBodyForHeadingValidation,
 } from "./document-scope.mjs";
 import { readmeDocumentationFindings } from "./project-document-policy.mjs";
+import {
+  documentFragmentFindings,
+  markdownFileLinks,
+  markdownHeadingContract,
+} from "./document-references.mjs";
+
+test("nested fence examples stay out of documentation headings and links", () => {
+  for (const marker of ["`", "~"]) {
+    const other = marker === "`" ? "~" : "`";
+    const content = [
+      "---",
+      "title: Fenced guide",
+      "# Frontmatter comment",
+      "---",
+      "# Guide",
+      "",
+      `${marker.repeat(4)}markdown`,
+      `${marker.repeat(3)}markdown`,
+      "# Literal example title",
+      "[Example link](missing-example.md)",
+      marker.repeat(3),
+      "## Shorter fence literal",
+      other.repeat(4),
+      "## Other fence literal",
+      `${marker.repeat(4)} trailing text`,
+      "## Nonclosing suffix",
+      "[Ignored reference][example]",
+      "[example]: missing-reference.md",
+      `${marker.repeat(5)} \t`,
+      "",
+      "## [Résumé](guide.md) & *Usage* ##",
+      "[Real link](real.md#anchor)",
+      "`[Inline example](missing-inline.md)`",
+      "<!-- [Comment](missing-comment.md) -->",
+      "[Reference][real]",
+      "[real]: reference.md",
+    ].join("\r\n");
+    const contract = markdownHeadingContract("docs/guide.md", content);
+    assert.deepEqual(contract.findings, []);
+    assert.deepEqual([...contract.anchors], ["guide", "résumé-usage"]);
+    assert.deepEqual(markdownFileLinks(content), ["guide.md", "real.md#anchor", "reference.md"]);
+    assert.deepEqual(documentFragmentFindings("docs/guide.md", content, "résumé-usage"), []);
+    assert.deepEqual(documentFragmentFindings("docs/guide.md", content, "literal-example-title"), [
+      "broken heading reference docs/guide.md#literal-example-title",
+    ]);
+  }
+});
 
 test("sync and verification scope includes Markdown in arbitrary active project roots", () => {
   for (const relativePath of [

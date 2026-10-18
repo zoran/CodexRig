@@ -31,9 +31,11 @@ refresh or unrelated defect investigation follows from this assignment. Apply
 2. Read source selection `.codexrig/project-tools.json`, relevant current owners and target
    consumers. Preview `pnpm framework:upgrade -- --target <root>`. It compares current generated
    tools and policy with the whole portable target tool surface without pretending the target is a
-   pristine baseline. Differences include target-only files, missing tools, policy, package commands
-   and configuration. Inventory private paths by name only; a private file outside the migration
-   surface is never opened or removed to make a portable-export scan pass.
+   pristine baseline. Current-output review uses generation's installed source formatter and
+   `.prettierrc.json` for canonical policy bytes; it neither installs tools nor formats target
+   files. Differences include target-only files, missing tools, policy, package commands and
+   configuration. Inventory private paths by name only; a private file outside the migration surface
+   is never opened or removed to make a portable-export scan pass.
 3. Classify every difference: current framework behavior, intentional product extension, obsolete
    framework behavior or unresolved ownership. Inspect real imports and command consumers before
    retirement. Include AGENTS, instructions, injected policy, roles, skills, startup hooks, package

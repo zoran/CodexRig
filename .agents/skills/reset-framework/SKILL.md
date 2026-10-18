@@ -18,7 +18,7 @@ For authorized source publication, follow
 [Delegated Release](../../../instructions.md#delegated-release) and use the existing orchestrator:
 
 ```bash
-bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"
+bash -p scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"
 ```
 
 This source-only composition binds central `main` and the existing reset, housekeeping,
@@ -38,9 +38,9 @@ For an explicitly reset-only/local outcome or a diagnosed recovery need, use the
 boundary and explain why publication is outside that action:
 
 ```bash
-node .agents/skills/reset-framework/scripts/reset-framework.mjs
-node .agents/skills/reset-framework/scripts/reset-framework.mjs --apply
-node .agents/skills/reset-framework/scripts/reset-framework.mjs
+env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/reset-framework.mjs
+env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/reset-framework.mjs --apply
+env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/reset-framework.mjs
 ```
 
 The first command is a read-only preview and exits non-zero while reset candidates exist. Review its

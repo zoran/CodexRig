@@ -250,35 +250,21 @@ export function runGeneratedNode(sourceRoot, root, relativeScript, args = []) {
   }
 }
 
-export function formatGeneratedMarkdown(sourceRoot, targetRoot) {
+function runGeneratedMarkdownFormatter(sourceRoot, targetRoot, argumentsList, input = "") {
   const formatterPath = path.join(sourceRoot, "node_modules", "prettier", "bin", "prettier.cjs");
   if (!existsSync(formatterPath)) {
     fail(
-      "Project initialization requires the framework's installed formatter. Run node scripts/deps/maintain-toolchain.mjs --locked first.",
+      "Project generation and review require the framework's installed formatter. Run env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs --locked first.",
     );
   }
-  // The source owns this formatter invocation. Its cache must never materialize inside the
-  // portable output, which is still an unpublished artifact rather than an active tool home.
-  prepareProjectToolDirectories(sourceRoot);
   const result = spawnSync(
     process.execPath,
-    [
-      formatterPath,
-      "--write",
-      "AGENTS.md",
-      "README.md",
-      "docs/future-modules.md",
-      "docs/project.md",
-      "instructions.md",
-      ...(existsSync(path.join(targetRoot, initialRequirementsPath))
-        ? [initialRequirementsPath]
-        : []),
-    ],
+    [formatterPath, "--config", path.join(sourceRoot, ".prettierrc.json"), ...argumentsList],
     {
       cwd: targetRoot,
       env: projectToolEnvironment({ root: sourceRoot }),
       encoding: "utf8",
-      input: "",
+      input,
       stdio: "pipe",
     },
   );
@@ -286,6 +272,34 @@ export function formatGeneratedMarkdown(sourceRoot, targetRoot) {
   if (result.status !== 0) {
     fail(`Generated Markdown formatter failed with status ${result.status}`);
   }
+  return result.stdout;
+}
+
+/** Serializes desired policy without touching target files or accepting target formatter changes. */
+export function formatGeneratedMarkdownText(sourceRoot, relativePath, content) {
+  return runGeneratedMarkdownFormatter(
+    sourceRoot,
+    sourceRoot,
+    ["--stdin-filepath", relativePath],
+    content,
+  );
+}
+
+export function formatGeneratedMarkdown(sourceRoot, targetRoot) {
+  // The source owns this formatter invocation. Its cache must never materialize inside the
+  // portable output, which is still an unpublished artifact rather than an active tool home.
+  prepareProjectToolDirectories(sourceRoot);
+  runGeneratedMarkdownFormatter(sourceRoot, targetRoot, [
+    "--write",
+    "AGENTS.md",
+    "README.md",
+    "docs/future-modules.md",
+    "docs/project.md",
+    "instructions.md",
+    ...(existsSync(path.join(targetRoot, initialRequirementsPath))
+      ? [initialRequirementsPath]
+      : []),
+  ]);
 }
 
 export function assertGeneratedProjectClean(

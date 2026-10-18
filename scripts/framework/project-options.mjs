@@ -9,7 +9,7 @@ export function fail(message) {
 export function usage() {
   return [
     "Usage:",
-    "  bash scripts/setup/run-project.sh node scripts/framework/create-project-from-framework.mjs",
+    "  bash -p scripts/setup/run-project.sh node scripts/framework/create-project-from-framework.mjs",
     '    --name "<Project Name>" [--description "<detailed product description>"]',
     "    [--directory <project-folder>] [--output-parent <path>] [--include-untracked]",
   ].join("\n");

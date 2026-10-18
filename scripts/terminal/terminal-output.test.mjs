@@ -130,6 +130,41 @@ test("context output redacts recognized secrets after removing control sequences
   assert.equal(sanitized.match(/<redacted-secret>/g)?.length, 4);
 });
 
+test("verification failure headings preserve actionable findings and still redact credentials", () => {
+  const diagnostic = [
+    "Code pattern verification failed:",
+    "- scripts/docs/markdown-fences.mjs: file header no longer names its responsibility",
+    "Session check failed: missing lease",
+    "Secret scan failed:",
+    "- scripts/example.mjs: credential found",
+    "Authorization code: opaque-authorization-code",
+    "code=opaque-code",
+    "code check failed=opaque-key-value",
+    "token:",
+    "opaque-continued-token",
+    "ordinary=value remains visible",
+  ].join("\n");
+  const expected = [
+    "Code pattern verification failed:",
+    "- scripts/docs/markdown-fences.mjs: file header no longer names its responsibility",
+    "Session check failed: missing lease",
+    "Secret scan failed:",
+    "- scripts/example.mjs: credential found",
+    "Authorization code:<redacted-secret>",
+    "code=<redacted-secret>",
+    "code check failed=<redacted-secret>",
+    "token:<redacted-secret>",
+    "<redacted-secret>",
+    "ordinary=value remains visible",
+  ].join("\n");
+  assert.equal(sanitizeMultilineForTerminal(diagnostic), expected);
+  assert.equal(formatContextError(new Error(diagnostic)), expected.replaceAll("\n", " "));
+  assert.equal(
+    sanitizeMultilineForTerminal("Secret scan failed: token=opaque-inline-token"),
+    "Secret scan failed: token=<redacted-secret>",
+  );
+});
+
 test("terminal diagnostics redact opaque named credentials and authorization headers", () => {
   const sanitized = sanitizeMultilineForTerminal(
     [

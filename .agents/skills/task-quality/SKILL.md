@@ -65,11 +65,9 @@ must be resolved, but review/audit loops cannot override mandatory approach reas
 work after sufficient acceptance evidence. In review-only mode, report rather than repair; do not
 call a known-defective state clean.
 
-Every audit applies
-[Repository Efficiency And Effectiveness](../../../instructions.md#repository-efficiency-and-effectiveness):
-assess repository-wide outcome preservation, context/runtime/verification/maintenance cost and
-coherence from the bounded map and affected consumers. Fix only evidenced in-scope regressions;
-report limits and preserve requirements. Static byte checks do not establish model effectiveness.
+Every audit applies the canonical
+[Repository Efficiency And Effectiveness](../../../instructions.md#repository-efficiency-and-effectiveness)
+criteria; compose the assigned `$system-coherence` evidence without repeating its code review.
 
 ## Audit And Settle
 

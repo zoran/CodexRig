@@ -45,7 +45,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [attestation, trackId, ...extra] = process.argv.slice(2);
   if (attestation !== "--disposable-checkout" || !trackId || extra.length)
     throw new Error(
-      "Usage: node scripts/framework/prepare-compatibility-track.mjs --disposable-checkout <declared-track>",
+      "Usage: env -u NODE_OPTIONS -u NODE_PATH node scripts/framework/prepare-compatibility-track.mjs --disposable-checkout <declared-track>",
     );
   prepareCompatibilityTrack({ trackId, onProgress: console.log }).catch((error) => {
     console.error(`Compatibility preparation failed: ${error.message}`);

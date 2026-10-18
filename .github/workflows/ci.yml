@@ -22,16 +22,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Provision the disposable container's read-only bootstrap utilities
-        run: apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck
+        run: apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck python3
       - name: Reproduce repository-local tools and locked dependencies
-        run: node scripts/deps/maintain-toolchain.mjs --locked
+        run: env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs --locked
       - name: Check scheduled repository housekeeping and freshness
         if: github.event_name == 'schedule'
-        run: bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --check --online
+        run: bash -p scripts/setup/run-project.sh pnpm repo:housekeeping -- --check --online
       - name: Validate framework and detected platform contracts
-        run: bash scripts/setup/run-project.sh pnpm framework:doctor
+        run: bash -p scripts/setup/run-project.sh pnpm framework:doctor
       - name: Run the complete deterministic verification plan
-        run: bash scripts/setup/run-project.sh pnpm verify
+        run: bash -p scripts/setup/run-project.sh pnpm verify
   compatibility-matrix:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -45,8 +45,8 @@ jobs:
           persist-credentials: false
       - id: matrix
         run:
-          echo "matrix=$(node scripts/framework/compatibility-matrix.mjs --github-matrix)" >>
-          "$GITHUB_OUTPUT"
+          echo "matrix=$(env -u NODE_OPTIONS -u NODE_PATH node
+          scripts/framework/compatibility-matrix.mjs --github-matrix)" >> "$GITHUB_OUTPUT"
   compatibility-canary:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     needs: compatibility-matrix
@@ -64,17 +64,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Provision the disposable container's read-only bootstrap utilities
-        run: apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck
+        run: apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck python3
       - name: Prepare the explicitly selected disposable toolchain experiment
         env:
           COMPATIBILITY_TRACK: ${{ matrix.id }}
         run:
-          node scripts/framework/prepare-compatibility-track.mjs --disposable-checkout
-          "$COMPATIBILITY_TRACK"
+          env -u NODE_OPTIONS -u NODE_PATH node scripts/framework/prepare-compatibility-track.mjs
+          --disposable-checkout "$COMPATIBILITY_TRACK"
       - name: Verify the actual selected runtime
         env:
           COMPATIBILITY_TRACK: ${{ matrix.id }}
         run:
-          bash scripts/setup/run-project.sh node scripts/framework/compatibility-matrix.mjs
+          bash -p scripts/setup/run-project.sh node scripts/framework/compatibility-matrix.mjs
           --check-track "$COMPATIBILITY_TRACK"
-      - run: bash scripts/setup/run-project.sh pnpm verify
+      - run: bash -p scripts/setup/run-project.sh pnpm verify

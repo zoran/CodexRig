@@ -11,6 +11,7 @@ import {
   sha256,
 } from "../filesystem/repository-files.mjs";
 import { readFrameworkContract } from "../contracts/framework-contract.mjs";
+import { validateToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 import { listPortableTransferFiles } from "../repository/source-inventory.mjs";
 import {
   readProjectToolSelection,
@@ -47,20 +48,20 @@ import {
 function same(left, right) {
   return left.sha256 === right.sha256 && left.mode === right.mode;
 }
-export function desiredProjectToolFile(source, file, selection) {
+export function desiredProjectToolFile(source, file, selection, displayName) {
   let content = readRepositoryFile(source, file);
   if (file === ".codex/config.toml") {
     if ((content.match(/^memories = false$/gmu)?.length ?? 0) !== 1)
       throw new Error("Source memory configuration is not the current template.");
     content = content.replace(/^memories = false$/mu, "memories = true");
-  } else if (file === ".codex/tooling.json") {
-    content = projectToolingConfiguration(content);
   } else if (file === ".codex/verification.json") {
     content =
       JSON.stringify(selectedProjectVerification(JSON.parse(content), selection), null, 2) + "\n";
   } else if ([".github/workflows/ci.yml", ".gitlab-ci.yml"].includes(file))
     content = projectCiProjection(file, content);
   content = projectOutputText(content);
+  // The launcher label is target-owned and must not pass through source-brand projection.
+  if (file === ".codex/tooling.json") content = projectToolingConfiguration(content, displayName);
   return {
     exists: true,
     content,
@@ -113,11 +114,15 @@ function packageMigration(base, current, desired, conflicts) {
 /** Baseline is an explicitly supplied pristine generated tree. Old metadata is opaque file content. */
 export function buildFrameworkUpgradePlan(options) {
   const { sourceRoot = toolingRoot, targetRoot, baselineRoot } = options;
+  const target = realUpgradeDirectory(targetRoot, "target");
+  const targetTooling = targetUpgradeFileState(target, ".codex/tooling.json");
+  const displayName = targetTooling.exists
+    ? validateToolingConfiguration(JSON.parse(targetTooling.content)).startup.displayName
+    : undefined;
+  const desiredTool = (source, file, selection) =>
+    desiredProjectToolFile(source, file, selection, displayName);
   if (!baselineRoot) {
-    const plan = buildReviewedFrameworkUpgradePlan(
-      { ...options, sourceRoot },
-      desiredProjectToolFile,
-    );
+    const plan = buildReviewedFrameworkUpgradePlan({ ...options, sourceRoot }, desiredTool);
     if (options.regenerate === true) {
       plan.regenerate = true;
       plan.regenerationRuntimeHash = regenerationRuntimeHash(sourceRoot);
@@ -133,7 +138,6 @@ export function buildFrameworkUpgradePlan(options) {
   if (options.regenerate || options.projectPaths?.length)
     throw new Error("Regeneration and explicit project owners require current-output review.");
   const source = realUpgradeDirectory(sourceRoot, "source");
-  const target = realUpgradeDirectory(targetRoot, "target");
   const baseline = realUpgradeDirectory(baselineRoot, "pristine generated reference");
   const roots = [source, target, baseline];
   for (const left of roots)
@@ -159,7 +163,7 @@ export function buildFrameworkUpgradePlan(options) {
     const before = targetUpgradeFileState(baseline, file);
     const current = targetUpgradeFileState(target, file);
     const desired = desiredSet.has(file)
-      ? desiredProjectToolFile(source, file, selection)
+      ? desiredTool(source, file, selection)
       : { exists: false, mode: null, sha256: null };
     snapshots.push({ file, before, current, desired });
     if (same(current, desired) || (desired.exists && same(before, desired))) continue;

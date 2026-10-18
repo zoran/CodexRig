@@ -16,13 +16,13 @@ verify:
   timeout: 20 minutes
   before_script:
     - test -n "${CI_JOB_IMAGE:-}"
-    - apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck
-    - node scripts/deps/maintain-toolchain.mjs --locked
+    - apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck python3
+    - env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs --locked
   script:
-    - if [ "$CI_PIPELINE_SOURCE" = "schedule" ]; then bash scripts/setup/run-project.sh pnpm
+    - if [ "$CI_PIPELINE_SOURCE" = "schedule" ]; then bash -p scripts/setup/run-project.sh pnpm
       repo:housekeeping -- --check --online; fi
-    - bash scripts/setup/run-project.sh pnpm framework:doctor
-    - bash scripts/setup/run-project.sh pnpm verify
+    - bash -p scripts/setup/run-project.sh pnpm framework:doctor
+    - bash -p scripts/setup/run-project.sh pnpm verify
 compatibility-matrix:
   stage: compatibility
   rules:
@@ -30,7 +30,8 @@ compatibility-matrix:
     - if: '$CI_PIPELINE_SOURCE == "web"'
   before_script: []
   script:
-    - node scripts/framework/compatibility-matrix.mjs --gitlab-child > compatibility-child.yml
+    - env -u NODE_OPTIONS -u NODE_PATH node scripts/framework/compatibility-matrix.mjs
+      --gitlab-child > compatibility-child.yml
   artifacts:
     expire_in: 1 day
     paths: [compatibility-child.yml]

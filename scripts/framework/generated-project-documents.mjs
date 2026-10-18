@@ -38,6 +38,7 @@ export function currentProjectInstructions(sourceRoot) {
     "utf8",
   );
   for (const [heading, marker] of [
+    ["Task Reading Routes", "<!-- current-task-reading-routes -->"],
     ["Interpreting Examples And Scope", "<!-- current-examples-and-scope-policy -->"],
     [
       "Repository-Local Tool And Account Isolation",
@@ -59,6 +60,11 @@ export function currentProjectInstructions(sourceRoot) {
     ["Admission, Intelligence, And Provenance", "<!-- current-agent-admission-policy -->"],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
     ["Agent Lifecycle And Idle Cleanup", "<!-- current-agent-lifecycle-policy -->"],
+    ["Peer Coordination", "<!-- current-peer-coordination-policy -->"],
+    [
+      "Intelligence Parity And Integration Authority",
+      "<!-- current-integration-authority-policy -->",
+    ],
   ]) {
     const matches = sections.filter((section) => section.heading === heading);
     if (matches.length !== 1 || template.split(marker).length !== 2)
@@ -70,90 +76,28 @@ export function currentProjectInstructions(sourceRoot) {
   return template;
 }
 
-/** Current safe-entry projection, shared by generation and explicitly reviewed updates. */
-export function initialProjectAgents(projectName) {
+/** Identity-independent safe-entry projection, shared by generation and reviewed updates. */
+export function initialProjectAgents(sourceRoot) {
+  const source = readFileSync(path.join(sourceRoot, "AGENTS.md"), "utf8");
+  const startMarker = "<!-- codexrig:portable-agent-entry:start -->";
+  const endMarker = "<!-- codexrig:portable-agent-entry:end -->";
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker);
+  const body = source.slice(start + startMarker.length, end).trim();
+  if (
+    source.split(startMarker).length !== 2 ||
+    source.split(endMarker).length !== 2 ||
+    start >= end ||
+    !body
+  )
+    throw new Error("Portable agent entry needs one nonempty block with unique ordered markers.");
   return `# AGENTS.md
 
-This is the safe-entry guide for ${escapeMarkdownText(projectName)}. [Project Instructions](instructions.md)
-own this repository's workflow. Follow [Task Scope And Completion](instructions.md#task-scope-and-completion):
-the primary autonomously completes the accepted outcome and its necessary steps. Resolve routine
-ambiguity from evidence and reasonable reversible choices; existing authority needs no repeat approval.
-Plans, checks and agent handoffs are checkpoints. Explain actual blockers and continue safe work.
-Old work state grants no task. A framework update ends at update acceptance.
+This is the safe-entry guide for this project.
 
-## Start And Reconstruct
+${body}
 
-Start here with \`bash scripts/setup/start-codex.sh\`. Before intake or writes run
-\`pnpm context:map\`; read relevant policy, manifest and requirements/design sections with
-\`pnpm context:read\`. Use README for needed commands; never recursively dump linked documents.
-When resuming authorized work read bounded project context. Always run
-\`pnpm worktree:status -- --json\`; inspect Git,
-upstream, untracked changes, every same-clone worktree/session and exact recovery metadata. Preserve
-ambiguous writers and broken worktree directories. A side conversation remains independent.
-
-## Product Authority
-
-Treat examples as non-exhaustive; follow
-[Interpreting Examples And Scope](instructions.md#interpreting-examples-and-scope) across the
-authorized class and its future additions.
-All tools follow [repository-local account and tool state](instructions.md#repository-local-tool-and-account-isolation);
-new tools must satisfy the same isolation boundary before authenticated use.
-Build and maintain infrastructure as code with scenario-appropriate Ansible, Terraform or Pulumi;
-follow [Infrastructure As Code](instructions.md#infrastructure-as-code) for tool ownership, real
-repository structures, state/secrets and verification before infrastructure work.
-
-A pending definition requires the focused requirements intake. A brief does not authorize code.
-Honor any static-UI acceptance gate before application implementation. README owns setup/use and
-links, the manifest owns current technical inventory, the specification owns requirements/acceptance,
-a UI reference is separate, and project context owns only this project's current bounded task.
-Apply [Documentation Currency](instructions.md#documentation-currency) in each slice: update affected
-owners with the change and integrate agents' documentation corrections before acceptance.
-Apply [Maintenance Scope And Verification](instructions.md#maintenance-scope-and-verification)
-before startup, dependency maintenance, verification and cleanup; these commands cannot expand the
-task into product work.
-
-## Delivery And Safety
-
-Apply the [Planning Entry Gate](instructions.md#planning-entry-gate) before implementation: state
-whether a plan is needed. For features or extensive, complex or risky work, create a visible plan
-with the native plan tool, or in commentary when unavailable, before edits or implementation
-delegation. Review and audit it under [Planning](instructions.md#plan-content-and-review), then
-continue authorized work. Reconcile the current plan at material changes, slice boundaries and resume. Use
-goals where useful, native Goals only with explicit request or delegated need-based authority.
-Repair at the actual owner, keep one current contract and one writer per surface, preserve user
-changes, and use relevant skills. After a slice, reuse valid evidence, fill only affected gaps, and perform system-coherence review to no
-relevant findings, a fresh audit and Worktree Settlement. The primary owns the whole-project assessment; children return assigned evidence.
-Every extra iteration needs an unfinished acceptance condition or concrete material risk. Every audit follows
-[Repository Efficiency And Effectiveness](instructions.md#repository-efficiency-and-effectiveness).
-Run \`pnpm context:check\` for instruction/context changes and preserve full requirements through
-bounded reads. Apply the Long-Session Course Checks in instructions.md.
-Stable tools and product checks are declared in \`.codex/verification.json\`; select evidence under
-the maintenance scope boundary without weakening publication gates. Development uses targeted
-checks; reviews, audits, handoffs and resume do not repeat valid evidence. Bundle complete coverage
-once before push through the publisher and existing evidence store. Tool failures are bounded
-findings, not a new maintenance campaign.
-
-Portable startup requests on-request approval and network-disabled workspace-write. Explicit Dev
-\`--yolo\` changes runtime permissions only within existing authority. No unapproved staging/prod,
-commit or push. Use [Delegated Release](instructions.md#delegated-release) for authorized publication,
-the README command and existing environment gates. Use four concurrent subagents by default, in
-addition to the primary, when substantial disjoint work, permissions, confirmed capacity and
-integration permit. The native ceiling is twelve; more than four requires an explicit user request
-or user-started agents and fresh admission. Keep provenance-verified user-added agents in the
-continuing roster under the same rules. Follow
-[Agent Lifecycle And Idle Cleanup](instructions.md#agent-lifecycle-and-idle-cleanup): after accepting
-each handoff and closing its scope, immediately assign the next ready bounded task to that agent,
-without waiting for the rest of the team or another user message. Use fewer or work serially when
-necessary, briefly state why, and never invent work to fill slots. Name runnable assignments in the
-plan, start admitted work concurrently, and reassess after discovery, material results, handoffs and
-slice boundaries. Require exact GPT Astra/max parity, effective permission checks, provenance and a
-task-sized completion reserve.
-Historical estimates cannot establish a new critical state; apply current capacity admission.
-At confirmed critical capacity drain owned work and
-seal with \`pnpm handover:create -- --critical\` as the final action, then stop completely.
-
-Keep private state inside this root's ignored CODEX_HOME. Never delete active runtime or a worktree
-directory manually. Project licensing decisions belong to the project owner.
+Project licensing decisions belong to the project owner.
 `;
 }
 
@@ -169,7 +113,7 @@ export function writeIdentityDocs(sourceRoot, targetRoot, projectName, descripti
   if (description)
     writeRelative(targetRoot, initialRequirementsPath, initialRequirementsDocument(description));
   writeRelative(targetRoot, "instructions.md", currentProjectInstructions(sourceRoot));
-  writeRelative(targetRoot, "AGENTS.md", initialProjectAgents(projectName));
+  writeRelative(targetRoot, "AGENTS.md", initialProjectAgents(sourceRoot));
   writeRelative(
     targetRoot,
     "README.md",
@@ -179,10 +123,13 @@ This repository owns its product and a bounded set of inspectable development to
 
 ## Setup And Start
 
+Provide Node.js, Git, Bash, ripgrep, ShellCheck and the system archive tool. Linux verification also
+requires Python 3 with \`ctypes\` for owned-process cancellation tests.
+
 \`\`\`bash
-node scripts/deps/maintain-toolchain.mjs
-bash scripts/setup/run-project.sh pnpm setup
-bash scripts/setup/start-codex.sh
+env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs
+bash -p scripts/setup/run-project.sh pnpm setup
+bash -p scripts/setup/start-codex.sh
 \`\`\`
 
 Use \`--yolo\` only for an explicitly authorized Dev session; use \`--no-alt-screen\` when needed.
@@ -207,7 +154,7 @@ history. Do not delete \`.codex/runtime\` manually or run source-framework reset
 independent project. Retry the canonical launcher only after recovery has been validated.
 
 After a critical handover, exit Codex completely with \`/quit\`, then run
-\`bash scripts/setup/start-codex.sh\` from this root in your terminal. Accept the preserved handover
+\`bash -p scripts/setup/start-codex.sh\` from this root in your terminal. Accept the preserved handover
 when the new session announces it. \`/new\` and \`/resume\` inside the running CLI retain the old
 launcher and cannot replace this restart. Keep the handover and runtime files intact.
 The receiving session reassesses current capacity under the
@@ -229,9 +176,12 @@ workflows, boundaries and acceptance before implementation. Preserve separate UI
 ${description ? "- [Requirements intake draft](docs/requirements.md)\n" : ""}
 ## Project Commands
 
-Use \`pnpm context:map\` for repository navigation, \`pnpm context:read -- <document> --outline\`
-for bounded reading and \`pnpm context:check\` for instruction growth.
-Use \`bash scripts/setup/run-project.sh <command> [arguments]\` from a host shell to execute
+Use \`pnpm context:map\` for repository navigation and task reading routes.
+\`pnpm context:read -- <document> --outline\` lists sections;
+\`pnpm context:read -- <document> --section "<heading>"\` reads the direct body and lists
+unread children. Follow applicable children; add \`--subtree\` only when all descendants are
+relevant and fit the output bound. Run \`pnpm context:check\` for instruction growth.
+Use \`bash -p scripts/setup/run-project.sh <command> [arguments]\` from a host shell to execute
 through \`mise exec --locked\` with repository-local
 home and mutable state. Pins and artifact locks live in \`.codex/mise.toml\` and \`.codex/mise.lock\`,
 loaded explicitly so the outer host shell does not activate project tools after Codex exits.
@@ -249,7 +199,7 @@ inventory and \`pnpm verify:changed -- --print-plan\` for development evidence. 
 \`pnpm repo:housekeeping -- --apply\` reconciles local repository facts. Apply
 [Maintenance Scope And Verification](instructions.md#maintenance-scope-and-verification) before
 these commands; inspect their side effects and selected checks against the accepted task.
-Use \`bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --storage-only\` for disk growth;
+Use \`bash -p scripts/setup/run-project.sh pnpm repo:housekeeping -- --storage-only\` for disk growth;
 see [Tool Storage And Accounts](#tool-storage-and-accounts) for locations and cleanup.
 Unmarked scratch, mutable devices and recovery records require their real owner's reconciliation.
 See [temporary storage](instructions.md#temporary-data-and-storage-housekeeping).
@@ -261,7 +211,7 @@ Review all non-ignored changes and authorize publication. Run from the owning Co
 from the terminal:
 
 \`\`\`bash
-bash scripts/setup/run-project.sh pnpm project:publish --message "<commit message>"
+bash -p scripts/setup/run-project.sh pnpm project:publish --message "<commit message>"
 \`\`\`
 
 This explicitly authorizes committing all non-ignored changes on the current branch and pushing
@@ -310,7 +260,7 @@ and reason and continues without changing that project's permissions or referenc
 package, cache and scratch collectors continue.
 
 For storage migration with unchanged versions and lockfiles, use
-\`node scripts/deps/maintain-toolchain.mjs --locked\`. Its online stage prepares the final
+\`env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs --locked\`. Its online stage prepares the final
 destination's required rebuild before reproducing the same graph offline.
 
 Before staging or downloads, maintenance checks for at least 2 GiB available on each affected
@@ -380,7 +330,7 @@ archive integrity; \`verification.json\` declares this project's checks.
 
 ## Start And Isolation
 
-Run \`bash scripts/setup/start-codex.sh\` from this root. Private native memories, transcripts and
+Run \`bash -p scripts/setup/start-codex.sh\` from this root. Private native memories, transcripts and
 credentials belong only in this root's ignored CODEX_HOME; leases and recovery stay in
 \`.codex/runtime/\`. Generation transfers none of them. The controller proves exactly two trusted
 session-only hooks before binding a writer. A native side conversation neither reads work context

@@ -31,7 +31,7 @@ description:
   consumer ranges, widen patch applicability without evidence, or allow unused patches to unblock
   startup. Inspect the resulting graph for both lost patches and duplicate unpatched native
   packages.
-- Use `bash scripts/setup/run-project.sh node scripts/deps/install-compatible.mjs` for initial
+- Use `bash -p scripts/setup/run-project.sh node scripts/deps/install-compatible.mjs` for initial
   installation and dependency-graph refreshes. It resolves the newest stable versions allowed by
   workspace ranges and explicit pins under strict peer and Node.js engine compatibility, then
   installs the reviewed lockfile. A frozen install is a reproducibility command, not a freshness

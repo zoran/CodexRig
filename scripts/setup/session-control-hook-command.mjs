@@ -24,7 +24,7 @@ export const sessionControlHookClientSource = [
   `const inputMaximum=${sessionControlHookInputMaximumBytes};`,
   `const responseMaximum=${sessionControlHookResponseMaximumBytes};`,
   "let finished=false;",
-  'const fail=()=>{if(finished)return;finished=true;const reason=mode==="stop"?"CodexRig Stop lifecycle could not reach its issue-time controller. Stop completely and restart with bash scripts/setup/start-codex.sh.":"CodexRig startup verification could not reach its issue-time controller. Start with bash scripts/setup/start-codex.sh.";const output=mode==="stop"?{systemMessage:reason}:{continue:false,stopReason:reason,systemMessage:reason};process.stdout.write(JSON.stringify(output)+"\\n");};',
+  'const fail=()=>{if(finished)return;finished=true;const reason=mode==="stop"?"CodexRig Stop lifecycle could not reach its issue-time controller. Stop completely and restart with bash -p scripts/setup/start-codex.sh.":"CodexRig startup verification could not reach its issue-time controller. Start with bash -p scripts/setup/start-codex.sh.";const output=mode==="stop"?{systemMessage:reason}:{continue:false,stopReason:reason,systemMessage:reason};process.stdout.write(JSON.stringify(output)+"\\n");};',
   'if(mode!=="session-start"&&mode!=="stop")fail();',
   "const chunks=[];let size=0;",
   'process.stdin.on("data",chunk=>{size+=chunk.length;if(size>inputMaximum){fail();process.stdin.destroy();return;}chunks.push(chunk);});',

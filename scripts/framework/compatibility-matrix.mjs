@@ -62,11 +62,11 @@ export function gitlabChildPipeline(matrix = readCompatibilityMatrix()) {
       "    GIT_DEPTH: '0'",
       "  before_script:",
       '    - test -n "${CI_JOB_IMAGE:-}"',
-      "    - apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck",
-      '    - node scripts/framework/prepare-compatibility-track.mjs --disposable-checkout "$CODEXRIG_COMPATIBILITY_TRACK"',
+      "    - apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck python3",
+      '    - env -u NODE_OPTIONS -u NODE_PATH node scripts/framework/prepare-compatibility-track.mjs --disposable-checkout "$CODEXRIG_COMPATIBILITY_TRACK"',
       "  script:",
-      '    - bash scripts/setup/run-project.sh node scripts/framework/compatibility-matrix.mjs --check-track "$CODEXRIG_COMPATIBILITY_TRACK"',
-      "    - bash scripts/setup/run-project.sh pnpm verify",
+      '    - bash -p scripts/setup/run-project.sh node scripts/framework/compatibility-matrix.mjs --check-track "$CODEXRIG_COMPATIBILITY_TRACK"',
+      "    - bash -p scripts/setup/run-project.sh pnpm verify",
       "",
     );
   }

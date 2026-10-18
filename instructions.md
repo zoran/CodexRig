@@ -3,6 +3,57 @@
 This file is the single committed workflow authority for the repository. Other entry documents
 repeat only the guardrails needed to remain safe when opened alone; resolve workflow detail here.
 
+## Task Reading Routes
+
+Complete startup reconstruction once per primary startup/resume, then read every row applicable to
+the accepted task before its dependent action. Reuse unchanged evidence; a new row is triggered by
+changed scope or risk, not by every tool call. These routes select binding policy, never waive it.
+`context:map` projects these routes. `context:read --section` reads the direct body and lists unread
+children; follow applicable children. Use `--section <heading> --subtree` only when all descendants
+are relevant and fit the output bound. Outlines and child navigation are not substantive evidence.
+
+- **Every task:** [Task scope](#task-scope-and-completion),
+  [maintenance scope](#maintenance-scope-and-verification), [planning gate](#planning-entry-gate);
+  relevant manifest, requirements/design and actual owners.
+- **Startup or authorized resume:** [Reconstruction](#startup-repository-reconstruction);
+  [launcher/session lifecycle](#launcher-and-session-lifecycle) for runtime work and
+  [handover receipt](#critical-handover-receipt) when announced. `$resume-project` for an accepted
+  handover or unfinished authorized outcome.
+- **Planning:** [Plan review](#plan-content-and-review) and
+  [course checks](#long-session-course-checks). Planning a read-only audit does not select an
+  implementation workflow.
+- **Implementation or implementation-ready design:**
+  [Engineering and slice acceptance](#best-available-engineering-not-quick-fixes),
+  `$project-implementation`; [course checks](#long-session-course-checks).
+- **Product definition or architecture:**
+  [Definition intake](#first-prompt-project-definition-intake), applicable children of
+  [architecture](#modular-architecture-parallel-ownership-and-integration),
+  `$architecture-evolution`; preserve UI, locale, tenant and configuration boundaries.
+- **Agents or background work:** [Admission/provenance](#admission-intelligence-and-provenance),
+  [effective permissions](#effective-permissions-and-write-isolation),
+  [capacity](#capacity-admission-and-monitoring),
+  [integration authority](#intelligence-parity-and-integration-authority),
+  [peer coordination](#peer-coordination),
+  [dispatch and closure](#agent-lifecycle-and-idle-cleanup).
+- **Account tools, infrastructure or delivery:**
+  [Tool/account isolation](#repository-local-tool-and-account-isolation), applicable
+  [infrastructure](#infrastructure-as-code), [delivery](#delivery-environments) and
+  [security](#security-and-privacy) rules.
+- **Review or audit:** Relevant review skill and [course checks](#long-session-course-checks).
+- **Select or run verification:** [Verification selection](#verification-selection-and-runtime).
+  Read [test strategy](#test-strategy) when designing/changing tests or assessing coverage.
+- **Documentation changes:** [Document ownership](#documentation-ownership),
+  [currency](#documentation-currency), [preservation](#context-economy-and-canonical-owners).
+- **Framework generation/update:** Relevant create/update skill and
+  [maintenance scope](#maintenance-scope-and-verification); preserve child adaptations and migrate
+  generated policy with its owner.
+- **Completion or authorized publication:**
+  [Closure](#completed-goal-closure-and-repository-housekeeping),
+  [publication gates](#verification-and-publication-gates); [delegated release](#delegated-release)
+  when assigned.
+- **Guarded or critical capacity:** [Capacity recovery](#capacity-admission-and-monitoring), then
+  [drain](#guarded-and-critical-drain); a successful critical seal is terminal.
+
 ## Interpreting Examples And Scope
 
 Treat examples as illustrations of the underlying requirement, not an exhaustive list. Infer the
@@ -31,37 +82,38 @@ in the repository. The existing installation owners may populate immutable versi
 native package caches shared by this user's projects; they must not update unrelated host programs
 or write host/sibling account configuration, credentials or accounts.
 
-Use `bash scripts/setup/run-project.sh <command> [arguments]` as the external-command entry from a
-host shell; `pnpm project:run -- <command> [arguments]` is its alias inside an isolated session. The
-bootstrap clears executable preload controls before invoking Node, Mise or a package manager. It
-establishes the canonical repository environment before `mise exec --locked` selects the toolchain.
-Pins and artifact locks live in `.codex/mise.toml` and `.codex/mise.lock`, loaded explicitly by that
-boundary. Keep them out of root-level Mise auto-discovery so returning to the host shell cannot
-activate project tools against host storage. Internal subprocess owners reuse that environment; do
-not wrap every nested command in another Mise process. The initial installer must establish the same
-environment before invoking Mise itself. Mise version selection or optional sandboxing alone does
-not isolate preparation or native credential stores. Use existing project account owners. Start from
-explicit safe inheritance, with repository-bound home, configuration and unknown tool state. Only
-explicitly admitted non-account installation/cache paths use user storage. Mise installs and native
-bootstrap bundles use `~/.local/share/project-tools/`; npm/pnpm/Mise caches use
-`~/.cache/project-tools/`. The default home comes from the OS account, never the project-private
-`HOME`. `PROJECT_TOOL_STORAGE_HOME` may relocate this storage under another real developer-owned
-home (for example in isolated integration fixtures); it never changes account discovery. Reject
-linked or foreign-writable storage parents. The common environment also sets
-`PLAYWRIGHT_BROWSERS_PATH` and `PUPPETEER_CACHE_DIR` to separate browser-distribution caches there.
-Install and launch through the same boundary; do not replace these paths with per-run or replica
-directories. Browser profiles, cookies, downloads and persistent login state never belong in these
-shared caches. pnpm's `virtualStoreType: global` keeps package graphs outside the repository, with
-project resolution links and metadata in `node_modules`. pnpm's native CI behavior may use a
-disposable local graph; CI gates and frozen installation remain unchanged. Outside the explicit
-GitHub/GitLab exception below, do not copy host credentials, inherit ambient tokens or agent
-sockets, silently use a system keyring, follow external credential/configuration includes, or fall
-back to a host/instance identity. Keep private paths out of Git, context, generation and transfer;
-routine reset and housekeeping must preserve accounts. Separate current credentials from disposable
-caches and obsolete installations. Mise's native `tracked-configs` references are shared; project
-trust decisions, encrypted environment state and accounts remain private. Cross-project runtime
-collection admits only public, non-executing exact pins.
-[Dependency maintenance](#dependency-installation-and-freshness) owns installation migration;
+From a host shell use `bash -p scripts/setup/run-project.sh <command> [arguments]`; in an isolated
+session use `pnpm project:run -- <command> [arguments]`. Bash `-p` blocks inherited startup files,
+functions and shell options before execution; it grants no OS or Codex permissions. The bootstrap
+clears other preload controls before Node, Mise or a package manager and establishes the canonical
+repository environment before `mise exec --locked` selects the toolchain. Pins and artifact locks
+live in `.codex/mise.toml` and `.codex/mise.lock`, loaded explicitly by that boundary. Keep them out
+of root-level Mise auto-discovery so returning to the host shell cannot activate project tools
+against host storage. Internal subprocess owners reuse that environment; do not wrap every nested
+command in another Mise process. Before installation, invoke Node owners as
+`env -u NODE_OPTIONS -u NODE_PATH node ...`; they must establish this environment before Mise. Mise
+version selection or optional sandboxing alone does not isolate preparation or native credential
+stores. Use existing project account owners. Start from explicit safe inheritance, with
+repository-bound home, configuration and unknown tool state. Only explicitly admitted non-account
+installation/cache paths use user storage. Mise installs and native bootstrap bundles use
+`~/.local/share/project-tools/`; npm/pnpm/Mise caches use `~/.cache/project-tools/`. The default
+home comes from the OS account, never the project-private `HOME`. `PROJECT_TOOL_STORAGE_HOME` may
+relocate this storage under another real developer-owned home (for example in isolated integration
+fixtures); it never changes account discovery. Reject linked or foreign-writable storage parents.
+The common environment also sets `PLAYWRIGHT_BROWSERS_PATH` and `PUPPETEER_CACHE_DIR` to separate
+browser-distribution caches there. Install and launch through the same boundary; do not replace
+these paths with per-run or replica directories. Browser profiles, cookies, downloads and persistent
+login state never belong in these shared caches. pnpm's `virtualStoreType: global` keeps package
+graphs outside the repository, with project resolution links and metadata in `node_modules`. pnpm's
+native CI behavior may use a disposable local graph; CI gates and frozen installation remain
+unchanged. Outside the explicit GitHub/GitLab exception below, do not copy host credentials, inherit
+ambient tokens or agent sockets, silently use a system keyring, follow external
+credential/configuration includes, or fall back to a host/instance identity. Keep private paths out
+of Git, context, generation and transfer; routine reset and housekeeping must preserve accounts.
+Separate current credentials from disposable caches and obsolete installations. Mise's native
+`tracked-configs` references are shared; project trust decisions, encrypted environment state and
+accounts remain private. Cross-project runtime collection admits only public, non-executing exact
+pins. [Dependency maintenance](#dependency-installation-and-freshness) owns installation migration;
 [storage housekeeping](#temporary-data-and-storage-housekeeping) owns reference checks and safe
 retirement. Do not move an entire Gradle/Android home or `.auth/` into a common home: these can
 contain credentials and mutable user data. Future SDK/cache adapters must separate reusable payloads
@@ -675,6 +727,10 @@ generated/process residue that is no longer needed must be retired or the goal r
 current owning session may remain active through explicitly authorized publication; its private
 runtime is preserved until a separate full reset after exit.
 
+#### Closure Sequence
+
+Read the complete sequence before executing closure; its numbered steps are one ordered gate.
+
 1. Finish all goal-owned implementation, integration preparation, dead-path removal, configuration
    cleanup, bounded context maintenance, and other repository-mutating work. First perform the deep
    Orchestration Housekeeping the repository command cannot perform: classify current capacity,
@@ -685,15 +741,15 @@ runtime is preserved until a separate full reset after exit.
    ownership/slots. Reconcile the completed-slice Worktree Settlement inventory and prove that every
    no-longer-needed goal-owned worktree and coordination artifact has reached its terminal
    disposition; an unresolved item keeps the goal open. Then run Repository Housekeeping with
-   `bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply`. The command may reconcile
-   only mechanically provable local repository facts: it clears proven-dead writer leases, preserves
-   those worktrees' exact recovery markers, and prunes only Git registrations whose missing paths
-   are held across the native prune by exact process-bound exclusive non-directory reservations
-   while process-bound Git locks protect every non-missing linked sibling. If a reservation cannot
-   be acquired or its identity changes, the registration remains. Before native prune, one shared
-   process-bound transaction in the Git common directory records every reserved path and
-   preservation reason, so an interrupted post-prune reservation remains discoverable after its Git
-   registration disappears. After an interrupted cleanup, only an unchanged current-contract
+   `bash -p scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply`. The command may
+   reconcile only mechanically provable local repository facts: it clears proven-dead writer leases,
+   preserves those worktrees' exact recovery markers, and prunes only Git registrations whose
+   missing paths are held across the native prune by exact process-bound exclusive non-directory
+   reservations while process-bound Git locks protect every non-missing linked sibling. If a
+   reservation cannot be acquired or its identity changes, the registration remains. Before native
+   prune, one shared process-bound transaction in the Git common directory records every reserved
+   path and preservation reason, so an interrupted post-prune reservation remains discoverable after
+   its Git registration disappears. After an interrupted cleanup, only an unchanged current-contract
    transaction, reservation, or preservation lock whose exact owner is mechanically proven dead is
    retired automatically. A current process identity observed outside its bound PID namespace or
    otherwise mechanically indeterminate is not proof of death and remains an ownership-confirmation
@@ -731,8 +787,8 @@ runtime is preserved until a separate full reset after exit.
    lifecycle lock, preserving manifests and the lockfile. It repeats this derived-state recovery
    even when release mirrors already agree. An interrupted run whose stale installation blocks pnpm
    resumes through
-   `bash scripts/setup/run-project.sh node scripts/framework/source-housekeeping.mjs --apply`. This
-   source-only reproduction never requests registry freshness or bypasses the dependency guard.
+   `bash -p scripts/setup/run-project.sh node scripts/framework/source-housekeeping.mjs --apply`.
+   This source-only reproduction never requests registry freshness or bypasses the dependency guard.
 3. Complete [Documentation Currency](#documentation-currency) from the slice owner decisions and any
    required critical-document authority and dedicated preservation review. Repeat affected focused
    checks, root-cause review and repair only for unresolved relevant findings, subject to
@@ -1256,6 +1312,8 @@ manifest, Identity and Access, API, data/configuration, secrets, and repository 
 ambiguous tenant enforcement remains a blocker for developer classification rather than becoming a
 guessed manifest fact.
 
+### Module Evolution And Contracts
+
 The reusable CodexRig source is itself a product and follows the same reality rule. Its direct
 `scripts/<capability>/` roots, portable skill library, and project-agent role library are explicit
 source-framework capability roots rather than Product Roots; every discovered capability root must
@@ -1296,6 +1354,8 @@ compatible in domain semantics, contract and schema versions, data ownership, li
 timeout behavior, and operational expectations. Verify both the focused component boundary and a
 realistic assembled flow through its consumers so the assembled system is verified as one
 functioning unit; local replaceability is not complete when the components no longer work together.
+
+### Parallel Development And Integration
 
 Parallel development follows those same boundaries. Use one central `main` as the only durable
 integration branch; do not create long-lived module, developer, or environment branches. Git is
@@ -1342,7 +1402,7 @@ selected remote.
 ## Session Start
 
 1. Start Codex from the repository root with the exact supported command
-   `bash scripts/setup/start-codex.sh`. Before writes, the launcher inventories every same-clone
+   `bash -p scripts/setup/start-codex.sh`. Before writes, the launcher inventories every same-clone
    worktree and safe recovery record. It automatically maintains compatible dependencies, Node.js,
    pnpm, mise, Codex, and CI pins; any update failure stops startup. It then validates the runtime
    and portable policy, binds the external executables, reserves and attests one current writer
@@ -1353,7 +1413,7 @@ selected remote.
    `codex resume --cd "$PWD"` picker with repository-root `CODEX_HOME`, without an exact ID or
    `--last`. Enter prompts after selecting a session; attestation binds the accepted control mode.
    Canonical no-approval, danger-full-access Dev operation requires exiting any current safe session
-   and starting exactly `bash scripts/setup/start-codex.sh --yolo`. A later UI or parent-runtime
+   and starting exactly `bash -p scripts/setup/start-codex.sh --yolo`. A later UI or parent-runtime
    permission change may alter effective live permissions but cannot retroactively convert the
    already-attested startup mode. Tracked portable config remains on-request, network-disabled
    `workspace-write`.
@@ -1409,6 +1469,12 @@ and relationship analysis, not a requirement to load every file byte into the mo
 
 Current files and command output outrank remembered conversation context.
 
+### Launcher And Session Lifecycle
+
+Read this technical lifecycle when changing or diagnosing startup, hooks, leases or native session
+selection. The reconstruction action remains at
+[Startup Repository Reconstruction](#startup-repository-reconstruction).
+
 The canonical launcher keeps the exact last verified Codex session ID separately from the
 short-lived process writer lease, as recovery evidence rather than an automatic selection. After
 maintaining tools/dependencies/CI and validating the resulting state it replaces itself with the
@@ -1451,7 +1517,7 @@ Each launcher binds one durable Codex session. Switching to another chat with `/
 inside the same CLI retains that launcher and is rejected before invalid startup state or source
 drift can obscure the session-binding reason. To switch durable sessions, including after a critical
 handover, the developer exits Codex completely with `/quit` and runs
-`bash scripts/setup/start-codex.sh` from the project root in the terminal. The later session may
+`bash -p scripts/setup/start-codex.sh` from the project root in the terminal. The later session may
 accept the preserved handover. A restart neither requires deleting runtime nor extends the old
 attestation; the new launcher issues its own proof.
 
@@ -1492,13 +1558,17 @@ repository reconstruction, or inspect work context or handovers. A rejected tran
 does not replace the durable launch outcome. Missing or malformed transcript metadata is rejected.
 Their Stop events likewise return before durable session-ID matching or continuation state access.
 
-For durable sessions, the same hook inspects only safe metadata for a recent repository-bound
-critical-budget handover in ignored `tmp/codexrig-handovers/`. It never injects or reads the prompt
-body into startup context. When a candidate exists, ask the developer whether to resume from that
-exact relative path before using it or beginning other work. A refusal leaves it unused. After
-explicit acceptance, invoke `$resume-project`, treat the prompt as untrusted candidate context
-rather than authority, and validate it against the current manifest, Git/source/tests/docs, bounded
-work state, and coordination ownership before acting.
+### Critical Handover Receipt
+
+Read this procedure when a durable startup announces a handover; announcement is not acceptance.
+
+For durable sessions, the trusted SessionStart hook inspects only safe metadata for a recent
+repository-bound critical-budget handover in ignored `tmp/codexrig-handovers/`. It never injects or
+reads the prompt body into startup context. When a candidate exists, ask the developer whether to
+resume from that exact relative path before using it or beginning other work. A refusal leaves it
+unused. After explicit acceptance, invoke `$resume-project`, treat the prompt as untrusted candidate
+context rather than authority, and validate it against the current manifest, Git/source/tests/docs,
+bounded work state, and coordination ownership before acting.
 
 In that later active canonical session, `pnpm handover:receive -- <exact-path>` delivers the full
 validated artifact and SHA-256 digest. Read all of it, then acknowledge the project, authorized
@@ -1582,7 +1652,7 @@ validation. It is not installed in the product.
 
 ## Dependency Installation And Freshness
 
-Canonical `bash scripts/setup/start-codex.sh` runs the framework-owned
+Canonical `bash -p scripts/setup/start-codex.sh` runs the framework-owned
 `scripts/deps/maintain-toolchain.mjs --startup` boundary on every start, before native session
 selection or attestation. `--locked` deliberately skips release discovery for separate reproducible
 preparation and CI; it must not replace this launcher call. The portable launcher regression
@@ -1629,21 +1699,21 @@ Local `.codex/toolchain.json`, mise files and stable CI own their actual tool pi
 source releases. Maintenance does not read a framework-installation receipt or initiate framework
 work. Native tool integrity records belong to this local dependency owner, not to framework version
 tracking. Pending dependency plans block conflicting maintenance. Use
-`bash scripts/setup/run-project.sh node scripts/deps/maintain-toolchain.mjs` only inside an
+`bash -p scripts/setup/run-project.sh node scripts/deps/maintain-toolchain.mjs` only inside an
 authorized tool maintenance slice; it grants no control over another session. Moving beyond declared
 dependency ranges or tool/action major lines requires migration review and affected consumer
 evidence. Session-only `/side` hooks never run maintenance.
 
-Initial `node scripts/deps/maintain-toolchain.mjs` preparation installs both tools and dependencies
-for this repository and every generated project, with payloads in user storage. Use
-`bash scripts/setup/run-project.sh node scripts/deps/install-compatible.mjs` for explicit
-dependency-only maintenance. Invoking the checked-in Node boundary directly avoids pnpm's pre-script
-dependency-state guard precisely while it brings `node_modules` current, without allowing a
-project-local executable to shadow the mise-pinned pnpm. It resolves the newest stable versions
-allowed by all workspace manifest ranges, explicit pins, overrides, and pnpm supply-chain policy in
-an isolated staging directory. Resolution fails on invalid peer dependencies or packages that
-exclude the mise-pinned Node.js runtime. Executable pnpm hooks are unsupported; their absence is a
-stable transaction input and hook loading is disabled during staged resolution. Only after the
+Initial `env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs` preparation
+installs both tools and dependencies for this repository and every generated project, with payloads
+in user storage. Use `bash -p scripts/setup/run-project.sh node scripts/deps/install-compatible.mjs`
+for explicit dependency-only maintenance. Invoking the checked-in Node boundary directly avoids
+pnpm's pre-script dependency-state guard precisely while it brings `node_modules` current, without
+allowing a project-local executable to shadow the mise-pinned pnpm. It resolves the newest stable
+versions allowed by all workspace manifest ranges, explicit pins, overrides, and pnpm supply-chain
+policy in an isolated staging directory. Resolution fails on invalid peer dependencies or packages
+that exclude the mise-pinned Node.js runtime. Executable pnpm hooks are unsupported; their absence
+is a stable transaction input and hook loading is disabled during staged resolution. Only after the
 complete source input remains unchanged and the staged resolution succeeds may it atomically replace
 `pnpm-lock.yaml`; installation then reproduces that lockfile with lifecycle scripts disabled.
 
@@ -1721,16 +1791,18 @@ opaque; version planning compares markers without adding compatibility readers. 
 versions are independent; products contain neither a source release contract nor an install receipt.
 
 Stable CI uses a disposable container for OS/bootstrap provisioning, then
-`node scripts/deps/maintain-toolchain.mjs --locked` and the repository command wrapper. It
-reproduces reviewed private tools and the unchanged package lock without refreshing release
-selectors. GitLab requires a container executor; never provision OS packages on a shared shell
-runner. Source-only compatibility jobs explicitly prepare their declared track with
-`prepare-compatibility-track.mjs --disposable-checkout <track>`: the same maintenance owner migrates
-exact candidate pins, package-manager selection and tool lock inside that disposable checkout, while
-package dependencies stay frozen. The fixture's release mirrors advance through their existing owner
-so full verification still exercises the release gate. These test inputs are never published, copied
-to children or accepted as stable pins. No separate global installer or old schema reader is
-maintained for CI.
+`env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs --locked` and the
+repository command wrapper. It reproduces reviewed private tools and the unchanged package lock
+without refreshing release selectors. GitLab requires a container executor; never provision OS
+packages on a shared shell runner. Source-only compatibility jobs explicitly prepare their declared
+track with `prepare-compatibility-track.mjs --disposable-checkout <track>`: the same maintenance
+owner migrates exact candidate pins, package-manager selection and tool lock inside that disposable
+checkout, while package dependencies stay frozen. The fixture's release mirrors advance through
+their existing owner so full verification still exercises the release gate. These test inputs are
+never published, copied to children or accepted as stable pins. No separate global installer or old
+schema reader is maintained for CI.
+
+### Generated Projects And Reviewed Updates
 
 Explicit migration runs only from the source, using
 [Update Project from Framework](.agents/skills/update-project-from-framework/SKILL.md).
@@ -1769,6 +1841,8 @@ is not acceptance. Active source work context is excluded and preserved, never c
 product. Source-state changes during creation discard staging. Creation never initializes Git,
 mutates or resets the source, commits or pushes. Source publication remains the explicit publication
 orchestrator, which also supports the verified calling session.
+
+### Git Platform Policy
 
 Provider detection prefers CI identity, then the selected branch upstream, `origin`, or the sole
 remote. Standard GitHub/GitLab hosts work without configuration; self-hosted domains must have one
@@ -2076,17 +2150,23 @@ acceptance.
 ### Context Economy And Canonical Owners
 
 Keep every framework element visible while loading only the context required for the current work.
-Root `AGENTS.md` is the always-loaded safe-entry bootstrap and stays within the 8 KiB
+Root `AGENTS.md` is the always-loaded safe-entry bootstrap and stays within the 4 KiB
 `context:check` bound. That check conservatively counts both native home/project instruction scopes,
 plus injected policy, skill metadata and a hook allowance. Delegated contexts additionally include
 the largest single role's instructions; both assembled estimates must fit the same budget. The
-configured 32 KiB native instruction limit does not limit subsequent tool reads. Keep full
-references available through bounded excerpts. This file owns complete workflow policy; the README
-owns human setup and use; `docs/project.md` owns current implemented reality;
-`docs/future-modules.md` owns confirmed deferred candidates; and a focused document exists only for
-a distinct audience and maintenance owner. Bootstrap safety projections provide the minimum safe
-summary and link to the canonical owner. The README links documentation without summarizing or
-copying its contents.
+configured 32 KiB native instruction limit does not limit subsequent tool reads. Injected primary
+instructions stay within 3 KiB and each role within 4 KiB. Direct policy sections stay within 8 KiB;
+split oversized sections at real decision boundaries and route required children explicitly.
+`context:check` reports the largest direct sections separately from automatic-load estimates.
+`context:map` exposes the canonical [task routes](#task-reading-routes). `context:read --section`
+loads the direct body and lists unread children; read every applicable child before dependent work.
+Use explicit `--subtree` for a relevant complete section within the 16 KiB read bound. Full
+references remain available; byte counts establish size, not model behavior or task performance.
+This file owns complete workflow policy; the README owns human setup and use; `docs/project.md` owns
+current implemented reality; `docs/future-modules.md` owns confirmed deferred candidates; and a
+focused document exists only for a distinct audience and maintenance owner. Bootstrap safety
+projections provide the minimum safe summary and link to the canonical owner. The README links
+documentation without summarizing or copying its contents.
 
 Repository skills use progressive disclosure: their name and description make selection possible,
 while the full `SKILL.md` workflow is read only when relevant. Do not preload every skill into entry
@@ -2254,8 +2334,8 @@ danger-full-access, never staging or production.
 - portable sessions default to `approval_policy = "on-request"` with network-disabled
   `workspace-write`. Only when the user has already started or explicitly requested a YOLO/fully
   autonomous Dev session through the canonical launcher's explicit
-  `bash scripts/setup/start-codex.sh --yolo` control, treat that as `approval_policy = "never"` plus
-  `danger-full-access` within the existing Dev authority. Never carry this mode into staging or
+  `bash -p scripts/setup/start-codex.sh --yolo` control, treat that as `approval_policy = "never"`
+  plus `danger-full-access` within the existing Dev authority. Never carry this mode into staging or
   production. Do not ask for redundant confirmations, approval pauses, or permission to run ordinary
   in-scope builds, checks, edits, and replaceable Dev deploys. Preflight credentials, tools,
   provider access, destructive boundaries, and long-running dependencies before unattended work;
@@ -2690,17 +2770,20 @@ blocker arrives, before admission, and as the first session-side step of complet
 housekeeping. Completion ends the assignment, not the primary's responsibility to schedule the
 available agent.
 
-For each result, promptly accept, reject or preserve the handoff, release the old scope's ownership
-claims, and update the plan and affected agents with accepted contracts, evidence and remaining
-work. Before continuing unrelated primary work or waiting for the other agents, select the next
-ready bounded assignment from the accepted outcome. Recheck admission and immediately issue that
-follow-up to the available agent through the supported native follow-up/resume control. Reuse its
-context where useful; do not close and respawn merely because one task finished. A follow-up names
-its new result, exact scope, dependencies, evidence and checkpoint; prior success grants no broader
-scope. Apply this dispatch loop to all admitted agents, including additional user-started agents,
-throughout implementation, repairs and verification. Never leave an available agent idle while
-suitable, independent, authorized work is ready, and never wait for another user prompt to assign
-that work.
+Service each result or blocker at the next primary boundary, before unrelated primary work or
+waiting for the whole wave. Use the current accepted plan as the only ready queue; a separate task
+store or scheduler is unnecessary. Apply this dispatch sequence throughout implementation, repairs
+and verification to every admitted agent, including additional user-started agents:
+
+1. Promptly accept, reject or preserve the handoff, close its scope and release its ownership
+   claims. Update the plan and affected agents with accepted contracts, evidence and remaining work.
+2. Select the next suitable, independent, authorized bounded assignment and recheck admission.
+3. Immediately issue the follow-up to the same available agent through the supported native
+   follow-up/resume control, naming the result, exact scope, dependencies, evidence and checkpoint.
+   Reuse useful context; prior success grants no broader scope. Do not close and respawn merely
+   because an assignment finished or wait for another user prompt while ready work remains.
+4. If no suitable task is ready, apply the dependency/closure rule below. Never invent work to fill
+   the team, or leave an agent idle while suitable authorized work is ready.
 
 If no suitable task is ready, record the concrete dependency or admission limit and its next
 checkpoint in the current plan. Retain a waiting agent only for a named near-term dependent task;
@@ -2891,12 +2974,14 @@ A forced rerun requires both `--force-full` and a structured
 `--force-reason "owner-request: <owner-id> - <reason>"` or `"uncovered-risk: <risk-id> - <reason>"`;
 cache bypass is forbidden.
 
-Documentation uses lightweight format, structure, language and security checks. Parser-proven
-comment/format-only source changes use lightweight source checks; pragmas, unknown syntax and
-unavailable parsers retain conservative source invalidation. Never infer equivalence by removing
-whitespace or comments with a regular expression. Preserve secret and pushed-object scans,
-deployment artifact/configuration bindings and independent protected CI. A local task handoff does
-not require a full publication run; bundle that gate once before push and reuse still-valid results.
+Documentation uses lightweight format, structure, language and security checks. Documentation used
+as executable input also selects its explicitly registered consumers; those same dependencies
+invalidate reusable test evidence. Parser-proven comment/format-only source changes use lightweight
+source checks; pragmas, unknown syntax and unavailable parsers retain conservative source
+invalidation. Never infer equivalence by removing whitespace or comments with a regular expression.
+Preserve secret and pushed-object scans, deployment artifact/configuration bindings and independent
+protected CI. A local task handoff does not require a full publication run; bundle that gate once
+before push and reuse still-valid results.
 
 The runner reports the active key and elapsed time. Set `diagnosticAfterMs` from measured duration
 and check type; the unmeasured default is a five-minute diagnosis checkpoint. Exceeding it stops new
@@ -3002,7 +3087,7 @@ publication.
 
 End final framework repository responses with the README's combined cleanup, verification, commit
 and push command in a fenced shell block, with a task-appropriate message and
-`bash scripts/setup/run-project.sh` prefix. Inspect README, package script and reset skill first;
+`bash -p scripts/setup/run-project.sh` prefix. Inspect README, package script and reset skill first;
 reuse unchanged reads. Explain effects and authority, put the command last and leave it unexecuted
 without publication authority. Do not invent a wrapper, substitute individual steps or require
 `/quit` when admission succeeds. Recommend full reset only for explicit sanitation, export hygiene
@@ -3023,14 +3108,15 @@ integrator/provider serializer publishes them; refresh local `main` safely and c
 commit without marker commits. Unseparable changes, missing upstream/authentication, unresolved
 integration or rejected publication are blockers, never authority to broaden, bypass or rewrite.
 
-In an already-authorized publication stream, run `bash scripts/setup/run-project.sh pnpm goal:new`
-after publication before the next goal. It creates no artifact and performs no fetch/commit/push. It
-requires a real repository on central `main`, clean non-ignored content, a commit, a configured
-remote `main` upstream, zero ahead/behind against its local tracking ref and exact-current
-successful evidence. Missing/malformed Git results, detached/non-main branches, pseudo-upstreams and
-differences fail closed. The preceding push owns remote authentication/confirmation; ignored
-runtime/evidence are not unfinished source. Continue only the next already-authorized work; an
-intermediate checkpoint is not completion of the overall outcome.
+In an already-authorized publication stream, run
+`bash -p scripts/setup/run-project.sh pnpm goal:new` after publication before the next goal. It
+creates no artifact and performs no fetch/commit/push. It requires a real repository on central
+`main`, clean non-ignored content, a commit, a configured remote `main` upstream, zero ahead/behind
+against its local tracking ref and exact-current successful evidence. Missing/malformed Git results,
+detached/non-main branches, pseudo-upstreams and differences fail closed. The preceding push owns
+remote authentication/confirmation; ignored runtime/evidence are not unfinished source. Continue
+only the next already-authorized work; an intermediate checkpoint is not completion of the overall
+outcome.
 
 Review changed surfaces to zero relevant evidence-backed findings, then audit afresh before
 publication. Findings reopen only affected repairs/evidence under

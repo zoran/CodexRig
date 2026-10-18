@@ -44,10 +44,10 @@ file and database.
 
 Run:
 
-`bash scripts/setup/run-project.sh node scripts/framework/create-project-from-framework.mjs --name "<Project Name>" --description "<Confirmed Detailed Product Description>"`
+`bash -p scripts/setup/run-project.sh node scripts/framework/create-project-from-framework.mjs --name "<Project Name>" --description "<Confirmed Detailed Product Description>"`
 
-Run `node scripts/deps/maintain-toolchain.mjs` and then
-`bash scripts/setup/run-project.sh pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile`
+Run `env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs` and then
+`bash -p scripts/setup/run-project.sh pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile`
 in the source workspace first. Creation uses the source's locked runtime and pinned formatter to
 make generated Markdown deterministic. This is a source-only tooling hydration step, not the
 generated project's dependency freshness policy.
@@ -76,13 +76,13 @@ Selected reusable bytes remain exact except for declared document, identity, nam
 configuration and CI projections. Parity rejects missing, unexpected or undeclared changed output.
 Both stable CI adapters remain; source experiments and internal regression campaigns do not.
 
-After publication, run `node scripts/deps/maintain-toolchain.mjs` and
-`bash scripts/setup/run-project.sh pnpm setup` in the generated project. The compatible installer
-must resolve the newest stable graph allowed by the generated workspace ranges, explicit pins,
-overrides, and supply-chain policy under strict peer and Node.js engine checks before it atomically
-refreshes and installs the lockfile. Do not substitute a frozen install for this freshness step.
-Registry uncertainty or an installation failure must leave durable dependency inputs unchanged and
-block successful handoff.
+After publication, run `env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs`
+and `bash -p scripts/setup/run-project.sh pnpm setup` in the generated project. The compatible
+installer must resolve the newest stable graph allowed by the generated workspace ranges, explicit
+pins, overrides, and supply-chain policy under strict peer and Node.js engine checks before it
+atomically refreshes and installs the lockfile. Do not substitute a frozen install for this
+freshness step. Registry uncertainty or an installation failure must leave durable dependency inputs
+unchanged and block successful handoff.
 
 Use `--directory <folder>` only when the user requests a specific outer project-folder name. The
 default target preserves a safe single-segment project name and creates the workspace at

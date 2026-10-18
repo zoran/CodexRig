@@ -102,7 +102,15 @@ function firstDiagnosticDelimiter(line, { sensitiveOnly = false } = {}) {
       continue;
     }
     const name = diagnosticNameBeforeDelimiter(line.slice(0, delimiter.index));
-    if (name && (!sensitiveOnly || sensitiveCredentialName(name))) {
+    // A prose outcome such as `Code pattern verification failed:` is a diagnostic heading,
+    // not a credential field. Keep this distinction local to colon-delimited diagnostics;
+    // assignments, URL parameters and actual credential labels retain their broad protection.
+    const outcomeHeading =
+      delimiter[0] === ":" &&
+      name &&
+      !name.includes(terminalSeparator) &&
+      /\s(?:verification|validation|check|scan) (?:failed|passed|succeeded)$/iu.test(name);
+    if (name && (!sensitiveOnly || (!outcomeHeading && sensitiveCredentialName(name)))) {
       return { delimiterIndex: delimiter.index, name };
     }
   }

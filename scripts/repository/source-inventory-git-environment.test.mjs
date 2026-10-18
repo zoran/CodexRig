@@ -1,20 +1,33 @@
-/** Verifies source inventory git environment behavior for the repository inventory and filesystem boundary. */
+/** Verifies bounded synchronous captures and isolated Git behavior for repository inventory. */
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import childProcess, { spawn, spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  closeSync,
+  openSync,
+  readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { syncBuiltinESMExports } from "node:module";
 import { test } from "node:test";
+import { setTimeout as delay } from "node:timers/promises";
+import { pathToFileURL } from "node:url";
 import { isolatedGitResultCompleted } from "./git-runtime-isolation.mjs";
 import { spawnSyncWithBoundedIo } from "./runtime-process-io.mjs";
+import { spawnRuntimeLifecycleCommandSync } from "./runtime-lifecycle-process.mjs";
+import {
+  acquireRuntimeLifecycleLock,
+  inspectRuntimeLifecycleLock,
+  releaseRuntimeLifecycleLock,
+} from "./runtime-session-lease.mjs";
 import { listActiveFiles, listPortableTransferFiles } from "./source-inventory.mjs";
 import { projectFormatFiles } from "../verify/format-project.mjs";
 
@@ -128,8 +141,8 @@ test("bounded synchronous process I/O preserves EOF and descendant output", () =
     ["--eval", 'process.stdout.write("four")'],
     { encoding: "utf8", maxBuffer: 3, stdio: "pipe", timeout: 5_000 },
   );
-  assert.equal(oversized.status, 0);
   assert.equal(oversized.error?.code, "CODEXRIG_BOUNDED_PROCESS_IO");
+  assert.equal(oversized.stdout, "fou");
 
   assert.throws(
     () =>
@@ -140,6 +153,337 @@ test("bounded synchronous process I/O preserves EOF and descendant output", () =
     /input requires piped stdin/u,
   );
 });
+
+test("bounded synchronous process I/O caps live spool files before a 256 KiB producer exits", () => {
+  const fixture = mkdtempSync(path.join(os.tmpdir(), "runtime-process-io-live-cap-"));
+  const previousTmpdir = process.env.TMPDIR;
+  process.env.TMPDIR = fixture;
+  try {
+    for (const stream of ["stdout", "stderr"]) {
+      const observation = path.join(fixture, `${stream}.json`);
+      const source = `
+        import { readdirSync, statSync, writeFileSync } from "node:fs";
+        import path from "node:path";
+        process.on("SIGTERM", () => {
+          const directory = path.join(process.env.TMPDIR,
+            readdirSync(process.env.TMPDIR).find((name) => name.startsWith("codexrig-process-io-")));
+          const file = statSync(path.join(directory, ${JSON.stringify(stream)}));
+          writeFileSync(${JSON.stringify(observation)}, JSON.stringify({
+            pid: process.pid, size: file.size, mode: file.mode & 0o777,
+            directoryMode: statSync(directory).mode & 0o777,
+          }));
+          process.exit(0);
+        });
+        process.${stream}.write(Buffer.alloc(256 * 1024, 120));
+        setTimeout(() => process.exit(80), 4000);
+      `;
+      const started = performance.now();
+      const result = spawnSyncWithBoundedIo(
+        process.execPath,
+        ["--input-type=module", "--eval", source],
+        {
+          maxBuffer: 1024,
+          timeout: 5000,
+        },
+      );
+      assert.equal(result.error?.code, "CODEXRIG_BOUNDED_PROCESS_IO");
+      assert.equal(result[stream].length, 1024);
+      assert.deepEqual(JSON.parse(readFileSync(observation, "utf8")), {
+        pid: result.pid,
+        size: 1024,
+        mode: 0o600,
+        directoryMode: 0o700,
+      });
+      assert.ok(
+        performance.now() - started < 3000,
+        "overflow must cancel before the producer's fallback exit",
+      );
+      assert.throws(() => process.kill(result.pid, 0), { code: "ESRCH" });
+      assert.equal(
+        readdirSync(fixture).some((name) => name.startsWith("codexrig-process-io-")),
+        false,
+      );
+    }
+  } finally {
+    if (previousTmpdir === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = previousTmpdir;
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test("bounded synchronous process I/O preserves target options, descriptors, and terminal results", () => {
+  const fixture = mkdtempSync(path.join(os.tmpdir(), "runtime-process-io-options-"));
+  const guardPath = path.join(fixture, "guard");
+  const guard = openSync(guardPath, "w+");
+  const preloadPath = path.join(fixture, "preload.mjs");
+  const preloadLog = path.join(fixture, "preload.jsonl");
+  const previousNodeOptions = process.env.NODE_OPTIONS;
+  writeFileSync(
+    preloadPath,
+    `import { appendFileSync } from "node:fs"; appendFileSync(${JSON.stringify(preloadLog)}, process.pid + "\\n");`,
+  );
+  process.env.NODE_OPTIONS = `--import=${pathToFileURL(preloadPath).href}`;
+  try {
+    const source = `
+      import { readFileSync, writeSync } from "node:fs";
+      writeSync(3, "held-guard");
+      process.stdout.write(JSON.stringify({ pid: process.pid, cwd: process.cwd(), argv0: process.argv0,
+        argument: process.argv[1], marker: process.env.IO_MARKER, input: [...readFileSync(0)] }));
+      process.stderr.write(Buffer.from([0xff, 0x00]));
+    `;
+    const result = spawnSyncWithBoundedIo(
+      process.execPath,
+      ["--input-type=module", "--eval", source, "argument with spaces"],
+      {
+        cwd: pathToFileURL(`${fixture}/`),
+        env: { ...process.env, IO_MARKER: "target-env" },
+        argv0: "capture-target",
+        shell: false,
+        stdio: [null, undefined, "pipe", guard],
+        input: new Uint8Array([0, 1, 255]),
+        maxBuffer: 4096,
+        timeout: 5000,
+      },
+    );
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0);
+    assert.equal(result.signal, null);
+    assert.equal(result.output.length, 4);
+    assert.deepEqual(JSON.parse(result.stdout.toString()), {
+      pid: result.pid,
+      cwd: fixture,
+      argv0: "capture-target",
+      argument: "argument with spaces",
+      marker: "target-env",
+      input: [0, 1, 255],
+    });
+    assert.deepEqual(result.stderr, Buffer.from([0xff, 0x00]));
+    assert.equal(readFileSync(guardPath, "utf8"), "held-guard");
+    assert.equal(
+      readFileSync(preloadLog, "utf8"),
+      `${result.pid}\n`,
+      "preloads must run in the target only",
+    );
+    process.env.NODE_OPTIONS = "--codexrig-invalid-node-option";
+    const nonNode = spawnSyncWithBoundedIo("git", ["--version"], {
+      env: { ...process.env },
+      encoding: "utf8",
+      timeout: 5000,
+    });
+    assert.equal(nonNode.error, undefined);
+    assert.equal(nonNode.status, 0);
+    assert.match(nonNode.stdout, /^git version /u);
+  } finally {
+    if (previousNodeOptions === undefined) delete process.env.NODE_OPTIONS;
+    else process.env.NODE_OPTIONS = previousNodeOptions;
+    closeSync(guard);
+    rmSync(fixture, { recursive: true, force: true });
+  }
+  const nonzero = spawnSyncWithBoundedIo(
+    process.execPath,
+    ["--eval", 'process.stdout.write("café"); process.exitCode = 7'],
+    { encoding: "latin1" },
+  );
+  assert.equal(nonzero.error, undefined);
+  assert.equal(nonzero.status, 7);
+  assert.equal(nonzero.stdout, Buffer.from("café").toString("latin1"));
+  const signaled = spawnSyncWithBoundedIo(process.execPath, [
+    "--eval",
+    'process.kill(process.pid, "SIGTERM")',
+  ]);
+  assert.equal(signaled.error, undefined);
+  assert.equal(signaled.status, null);
+  assert.equal(signaled.signal, "SIGTERM");
+  const absentCommand = path.join(fixture, "missing-executable");
+  const absent = spawnSyncWithBoundedIo(absentCommand, ["argument"]);
+  assert.equal(absent.pid, 0);
+  assert.equal(absent.status, null);
+  assert.equal(absent.signal, null);
+  assert.equal(absent.error?.code, "ENOENT");
+  assert.equal(absent.error.path, absentCommand);
+  assert.equal(absent.error.syscall, `spawnSync ${absentCommand}`);
+  assert.deepEqual(absent.error.spawnargs, ["argument"]);
+  assert.throws(
+    () => spawnSyncWithBoundedIo(process.execPath, [], { shell: true }),
+    /shell option/u,
+  );
+});
+
+test("bounded synchronous process I/O rejects missing or mismatched pump terminal evidence", () => {
+  const original = childProcess.spawnSync;
+  try {
+    for (const record of [
+      null,
+      { nonce: "other-call", pid: 42, status: 0, signal: null, error: null },
+      {
+        nonce: null,
+        pid: 42,
+        status: 0,
+        signal: null,
+        error: { code: "EPERM", errno: -1, message: "capture permission failure" },
+      },
+    ]) {
+      childProcess.spawnSync = (command, args, options) => {
+        if (record) {
+          const nonce =
+            record.nonce ?? JSON.parse(readFileSync(options.stdio.at(-3), "utf8")).nonce;
+          writeFileSync(options.stdio.at(-2), JSON.stringify({ ...record, nonce }));
+        }
+        return {
+          pid: 42,
+          status: 0,
+          signal: null,
+          output: Array(options.stdio.length).fill(null),
+          error: Object.assign(new Error("exact managed sandbox marker"), {
+            code: "EPERM",
+            path: command,
+            syscall: `spawnSync ${command}`,
+            spawnargs: args,
+          }),
+        };
+      };
+      syncBuiltinESMExports();
+      const result = spawnSyncWithBoundedIo("git", ["--version"]);
+      assert.equal(result.error?.code, "CODEXRIG_BOUNDED_PROCESS_IO");
+      assert.equal(result.pid, record?.error ? 42 : 0);
+      assert.equal(result.status, record?.error ? 0 : null);
+      assert.equal(isolatedGitResultCompleted(result, { args: ["--version"] }), false);
+    }
+  } finally {
+    childProcess.spawnSync = original;
+    syncBuiltinESMExports();
+  }
+});
+
+test("bounded synchronous process I/O preserves the lifecycle delegation, guard, and release", () => {
+  const fixture = mkdtempSync(path.join(os.tmpdir(), "runtime-process-io-lifecycle-"));
+  const previousStorage = process.env.PROJECT_TOOL_STORAGE_HOME;
+  process.env.PROJECT_TOOL_STORAGE_HOME = path.join(fixture, "tools");
+  mkdirSync(process.env.PROJECT_TOOL_STORAGE_HOME, { mode: 0o700 });
+  let owner;
+  try {
+    owner = acquireRuntimeLifecycleLock({ root: fixture, operation: "bounded-capture-test" });
+    const result = spawnRuntimeLifecycleCommandSync({
+      repositoryRoot: fixture,
+      lifecycleCapability: owner,
+      role: "bounded-capture-child",
+      command: process.execPath,
+      args: [
+        "--input-type=module",
+        "--eval",
+        'import { fstatSync } from "node:fs"; process.stdout.write(JSON.stringify({ guard: fstatSync(3).isFile() }));',
+      ],
+      options: { encoding: "utf8", maxBuffer: 4096, timeout: 3000 },
+    });
+    assert.equal(result.error, undefined, result.stderr);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), { guard: true });
+    const snapshot = inspectRuntimeLifecycleLock({ root: fixture });
+    assert.deepEqual(snapshot.owner.descendants, []);
+    assert.deepEqual(snapshot.owner.delegations, []);
+    releaseRuntimeLifecycleLock({ root: fixture, owner });
+    owner = null;
+    assert.equal(inspectRuntimeLifecycleLock({ root: fixture }).status, "absent");
+  } finally {
+    if (owner) releaseRuntimeLifecycleLock({ root: fixture, owner });
+    if (previousStorage === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
+    else process.env.PROJECT_TOOL_STORAGE_HOME = previousStorage;
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test("bounded synchronous process I/O times out, escalates, and reaps a stubborn owned child", () => {
+  const source =
+    'process.on("SIGTERM", () => {}); process.stdout.write(String(process.pid)); setTimeout(() => process.exit(81), 12000);';
+  const started = performance.now();
+  const result = spawnSyncWithBoundedIo(process.execPath, ["--eval", source], {
+    encoding: "utf8",
+    timeout: 300,
+  });
+  const elapsed = performance.now() - started;
+  assert.equal(result.error?.code, "ETIMEDOUT");
+  assert.equal(result.pid, Number(result.stdout));
+  assert.equal(result.status, null);
+  assert.equal(result.signal, "SIGKILL");
+  assert.ok(elapsed >= 6000 && elapsed < 10000, `bounded graceful shutdown took ${elapsed}ms`);
+  assert.throws(() => process.kill(result.pid, 0), { code: "ESRCH" });
+  const immediate = spawnSyncWithBoundedIo(
+    process.execPath,
+    ["--eval", "setInterval(() => {}, 1000)"],
+    { timeout: 100, killSignal: "SIGKILL" },
+  );
+  assert.equal(immediate.error?.code, "ETIMEDOUT");
+  assert.equal(immediate.signal, "SIGKILL");
+});
+
+test("bounded synchronous process I/O cancels an owned descendant group and waits for reaping", () => {
+  const descendant = 'process.stdout.write("ready\\n"); setTimeout(() => process.exit(82), 10000);';
+  const source = `
+    import { spawn } from "node:child_process";
+    const child = spawn(process.execPath, ["--eval", ${JSON.stringify(descendant)}], { stdio: ["ignore", "pipe", "inherit"] });
+    process.on("SIGTERM", () => {});
+    child.stdout.once("data", () => process.stdout.write(JSON.stringify({ pid: process.pid, descendant: child.pid })));
+    child.on("close", () => process.exit(0));
+  `;
+  const result = spawnSyncWithBoundedIo(
+    process.execPath,
+    ["--input-type=module", "--eval", source],
+    { encoding: "utf8", timeout: 500 },
+  );
+  assert.equal(result.error?.code, "ETIMEDOUT");
+  const owned = JSON.parse(result.stdout);
+  assert.equal(owned.pid, result.pid);
+  for (const pid of [owned.pid, owned.descendant])
+    assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+});
+
+for (const cancellation of ["caller exit", "supervisor interruption"]) {
+  test(`bounded synchronous process I/O cancels and cleans private files on ${cancellation}`, async () => {
+    const fixture = mkdtempSync(path.join(os.tmpdir(), "runtime-process-io-caller-loss-"));
+    const identityPath = path.join(fixture, "target.json");
+    const resultPath = path.join(fixture, "result.json");
+    const targetSource = `import { writeFileSync } from "node:fs"; writeFileSync(${JSON.stringify(identityPath)}, JSON.stringify({ pid: process.pid, supervisor: process.ppid })); setTimeout(() => process.exit(83), 10000);`;
+    const callerSource = `import { writeFileSync } from "node:fs"; import { spawnSyncWithBoundedIo } from ${JSON.stringify(new URL("./runtime-process-io.mjs", import.meta.url).href)}; const result = spawnSyncWithBoundedIo(process.execPath, ["--input-type=module", "--eval", ${JSON.stringify(targetSource)}], { timeout: 10000 }); writeFileSync(${JSON.stringify(resultPath)}, JSON.stringify({ pid: result.pid, status: result.status, signal: result.signal, error: result.error?.code }));`;
+    const caller = spawn(process.execPath, ["--input-type=module", "--eval", callerSource], {
+      env: { ...process.env, TMPDIR: fixture },
+      stdio: "ignore",
+    });
+    const closed = new Promise((resolve) => caller.once("close", resolve));
+    try {
+      const deadline = Date.now() + 5000;
+      while (!existsSync(identityPath) && Date.now() < deadline) await delay(20);
+      assert.equal(
+        existsSync(identityPath),
+        true,
+        "owned target must announce its identity before cancellation",
+      );
+      const owned = JSON.parse(readFileSync(identityPath, "utf8"));
+      if (cancellation === "caller exit") caller.kill("SIGKILL");
+      else process.kill(owned.supervisor, "SIGINT");
+      await closed;
+      while (
+        readdirSync(fixture).some((name) => name.startsWith("codexrig-process-io-")) &&
+        Date.now() < deadline
+      )
+        await delay(20);
+      if (cancellation === "caller exit") assert.deepEqual(readdirSync(fixture), ["target.json"]);
+      else {
+        assert.deepEqual(readdirSync(fixture).sort(), ["result.json", "target.json"]);
+        assert.deepEqual(JSON.parse(readFileSync(resultPath, "utf8")), {
+          pid: owned.pid,
+          status: null,
+          signal: "SIGINT",
+          error: "EINTR",
+        });
+      }
+      assert.throws(() => process.kill(owned.pid, 0), { code: "ESRCH" });
+    } finally {
+      if (caller.exitCode === null && caller.signalCode === null) caller.kill("SIGKILL");
+      await closed;
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
+}
 
 test("source inventory ignores ambient and repository-local Git excludes", () => {
   const fixture = mkdtempSync(path.join(os.tmpdir(), "source-inventory-git-environment-"));

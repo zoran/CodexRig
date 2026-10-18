@@ -198,6 +198,7 @@ test("the installed hook cannot be skipped through BASH_ENV", () => {
     "scripts/repository/git-runtime-isolation.mjs",
     "scripts/repository/project-temporary-storage.mjs",
     "scripts/repository/project-tool-environment.mjs",
+    "scripts/repository/runtime-process-cancellation.mjs",
     "scripts/repository/runtime-process-identity.mjs",
     "scripts/repository/source-inventory-policy.mjs",
     "scripts/repository/user-tool-storage.mjs",

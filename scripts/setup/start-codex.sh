@@ -2,9 +2,8 @@
 # Owns start codex behavior for the setup, launch, and portable project boundary.
 set -euo pipefail
 
-# Repository startup must not inherit executable Node/package-manager or non-interactive shell
-# preload controls. The initial Bash interpreter has already started, but every child trust-boundary
-# process below observes this sanitized environment.
+# The canonical bash -p invocation rejects Bash startup preloads before this script begins.
+# Clear executable Node/package-manager and child-shell controls before later trust boundaries.
 unset BASH_ENV ENV NODE_OPTIONS NODE_PATH CODEXRIG_LAUNCHER_PID \
   CODEXRIG_SESSION_CONTROL_NODE CODEXRIG_SESSION_CONTROL_PORT \
   CODEXRIG_SESSION_CONTROL_TOKEN CODEXRIG_STARTUP_CONTROL_POLICY \

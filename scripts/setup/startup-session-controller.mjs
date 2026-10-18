@@ -165,7 +165,7 @@ function boundedRequestBody(request) {
 function sessionStartFailure(error, root) {
   const reason =
     `CodexRig startup verification failed: ${formatContextError(error, root)} ` +
-    "Exit Codex completely with /quit, then run bash scripts/setup/start-codex.sh " +
+    "Exit Codex completely with /quit, then run bash -p scripts/setup/start-codex.sh " +
     "from the project root in your terminal.";
   return { continue: false, stopReason: reason, systemMessage: reason };
 }
@@ -174,7 +174,7 @@ function stopFailure(error, root) {
   return {
     systemMessage:
       `CodexRig Stop lifecycle failed inside its issue-time controller: ${formatContextError(error, root)}. ` +
-      "Stop completely and restart with bash scripts/setup/start-codex.sh.",
+      "Stop completely and restart with bash -p scripts/setup/start-codex.sh.",
   };
 }
 
@@ -576,7 +576,7 @@ export function startupControllerFailureMessage(error, root = toolingRoot) {
     "using this project, then follow the startup recovery procedure in README.md. " +
     "Do not delete .codex/runtime manually; its maintenance owner must prove repository-wide " +
     "quiescence and preserve accounts before replacing incompatible disposable state. Then retry " +
-    "bash scripts/setup/start-codex.sh."
+    "bash -p scripts/setup/start-codex.sh."
   );
 }
 

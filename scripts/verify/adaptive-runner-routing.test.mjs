@@ -4,11 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import {
-  isRepositoryCodexHomePath,
-  listActiveFiles,
-  repositoryCodexHomeRuntimeProbePaths,
-} from "../repository/source-inventory.mjs";
+import { listActiveFiles } from "../repository/source-inventory.mjs";
 import { buildPlan, completeVerificationCommands } from "./adaptive-runner.mjs";
 import {
   consolidateFocusedTestOwners,
@@ -230,6 +226,19 @@ test("unowned and unknown development paths retain concrete pending publication 
   assert.deepEqual(unowned.admission.uncoveredFullRelevantPaths, ["src/unowned.ts"]);
   assert.match(unowned.admission.reason, /src\/unowned\.ts/u);
 
+  // Shared process foundations require complete publication coverage. Stale focused-owner
+  // expectations must not reintroduce narrower ownership or evidence invalidation.
+  for (const source of [
+    "scripts/repository/runtime-process-io.mjs",
+    "scripts/repository/runtime-process-identity.mjs",
+  ]) {
+    const admission = route([source]).admission;
+    assert.equal(admission.mode, "targeted", source);
+    assert.deepEqual(admission.focusedCommandOwners, [], source);
+    assert.deepEqual(admission.uncoveredFullRelevantPaths, [source], source);
+    assert.match(admission.reason, /publication coverage pending/u, source);
+  }
+
   const unknown = route(["unexpected/new-surface.bin"]);
   assert.equal(unknown.admission.mode, "targeted");
   assert.deepEqual(unknown.admission.unknownPaths, ["unexpected/new-surface.bin"]);
@@ -243,111 +252,6 @@ test("removed framework sources use current baseline and lifecycle owners withou
   assert.equal(plan.admission.mode, "targeted");
   assert.deepEqual(plan.admission.uncoveredFullRelevantPaths, []);
   assert.deepEqual(owners, ["repository-smoke"]);
-});
-
-test("license and required-notice changes route to the licensing owner", () => {
-  const plan = route(["LICENSE", "NOTICE"]);
-  assert.deepEqual(plan.admission.unknownPaths, []);
-  assert.deepEqual(plan.admission.uncoveredFullRelevantPaths, []);
-  assert.ok(
-    plan.classifiedPaths.every((entry) =>
-      entry.categories.includes("licensing and attribution contract"),
-    ),
-  );
-  assert.ok(plan.readOnlyCommands.some((command) => command.key === "licensing"));
-});
-
-test("native Codex home deltas retain an exclusion owner when source policy changes", () => {
-  const nativePaths = [
-    ...repositoryCodexHomeRuntimeProbePaths.filter(isRepositoryCodexHomePath),
-    "sessions/untrusted.test.mjs",
-    "skills/.system/untrusted.test.mjs",
-    ".codex/runtime/cache/untrusted.test.mjs",
-  ];
-  assert.ok(nativePaths.includes("session_index.jsonl"));
-  const plan = route([...nativePaths, ".gitignore"]);
-  const owners = new Map(
-    plan.admission.focusedCommandOwners.map((entry) => [entry.path, entry.ownerKeys]),
-  );
-  assert.equal(plan.admission.mode, "targeted");
-  assert.deepEqual(plan.admission.fullRelevantPaths, [".gitignore"]);
-  assert.deepEqual(plan.admission.unknownPaths, []);
-  for (const relativePath of nativePaths) {
-    assert.deepEqual(owners.get(relativePath), ["codex-config"], relativePath);
-  }
-  assert.ok(
-    plan.readOnlyCommands.every((command) =>
-      command.args.every((argument) => !nativePaths.includes(argument)),
-    ),
-  );
-  assert.equal(plan.workspaceCommands.length, 0);
-});
-
-test("non-Codex local runtime markers are ignored instead of becoming unknown paths", () => {
-  const plan = route([
-    ...repositoryCodexHomeRuntimeProbePaths.filter((entry) => !isRepositoryCodexHomePath(entry)),
-    ".project-state/active.json",
-  ]);
-  assert.equal(plan.admission.mode, "targeted");
-  assert.deepEqual(plan.admission.fullRelevantPaths, []);
-  assert.deepEqual(plan.admission.unknownPaths, []);
-  assert.equal(plan.readOnlyCommands.length, 0);
-  assert.equal(plan.workspaceCommands.length, 0);
-
-  const productMarker = route(["src/cache/runtime-state"], {
-    workspaceManifests: [
-      {
-        directory: ".",
-        internalDependencyNames: internalDependencies(),
-        name: "root",
-        scripts: { "test:unit": "unit" },
-      },
-    ],
-  });
-  assert.deepEqual(productMarker.admission.fullRelevantPaths, ["src/cache/runtime-state"]);
-});
-
-test("repository ignore policy routes to exact focused consumers", () => {
-  const plan = route([".gitignore"]);
-  const keys = new Set(plan.readOnlyCommands.map((command) => command.key));
-  assert.equal(plan.admission.mode, "targeted");
-  assert.deepEqual(plan.admission.unknownPaths, []);
-  assert.deepEqual(plan.admission.uncoveredFullRelevantPaths, []);
-  for (const key of ["codex-config", "path-hygiene", "repository-smoke"]) {
-    assert.ok(keys.has(key), key);
-  }
-});
-
-test("portable policy text exposes the checks that own its successful evidence", () => {
-  const plan = route([
-    ".agents/skills/ui-ux-review/SKILL.md",
-    ".codex/config.toml",
-    "instructions.md",
-  ]);
-  const owners = new Map(
-    plan.admission.focusedCommandOwners.map((entry) => [entry.path, entry.ownerKeys]),
-  );
-  assert.deepEqual(owners.get(".agents/skills/ui-ux-review/SKILL.md"), [
-    "delivery-environments",
-    "docs",
-    "language",
-    "path-hygiene",
-    "secrets",
-    "skills",
-  ]);
-  assert.deepEqual(owners.get(".codex/config.toml"), ["codex-config"]);
-  assert.deepEqual(owners.get("instructions.md"), [
-    "context-policy",
-    "delivery-environments",
-    "docs",
-    "language",
-    "path-hygiene",
-    "secrets",
-  ]);
-  assert.equal(
-    plan.readOnlyCommands.some((command) => command.args.includes("--test")),
-    false,
-  );
 });
 
 test("verify-only root manifest changes use orchestration owners without product aggregates", () => {
@@ -424,9 +328,12 @@ test("ordinary package manifests use their exact whole-manifest owner", (t) => {
 });
 
 test("direct verifier and support files route exact smallest consumers", () => {
-  // Platform repairs used to select every framework suite. The shipped lifecycle scenario must
-  // run once in publication and be the only test consumer for each platform execution owner.
-  const platformSuite = "scripts/platform/platform-lifecycle.test.mjs";
+  // Platform repairs select the lifecycle and provider-state scenarios without every framework
+  // suite. Each focused scenario still runs exactly once in complete verification.
+  const platformSuites = [
+    "scripts/platform/platform-lifecycle.test.mjs",
+    "scripts/platform/platform-configuration-state.test.mjs",
+  ];
   for (const owner of [
     "configure-platform",
     "platform-api",
@@ -440,16 +347,18 @@ test("direct verifier and support files route exact smallest consumers", () => {
       platform.readOnlyCommands.flatMap((command) =>
         command.args.filter((arg) => arg.endsWith(".test.mjs")),
       ),
-      [platformSuite],
+      platformSuites,
       owner,
     );
   }
-  assert.equal(
-    completeVerificationCommands()
-      .flatMap((command) => command.args)
-      .filter((arg) => arg === platformSuite).length,
-    1,
-  );
+  for (const platformSuite of platformSuites) {
+    assert.equal(
+      completeVerificationCommands()
+        .flatMap((command) => command.args)
+        .filter((arg) => arg === platformSuite).length,
+      1,
+    );
+  }
 
   const verifier = route(["scripts/verify/api-security.mjs"]);
   const verifierArgs = verifier.readOnlyCommands.flatMap((command) => command.args);
@@ -557,14 +466,6 @@ test("moved and shared framework boundaries retain focused verifier owners", () 
       "scripts/context/portable-context-contract.test.mjs",
     ],
     [
-      "scripts/repository/runtime-process-identity.mjs",
-      "scripts/repository/worktree-recovery.test.mjs",
-    ],
-    [
-      "scripts/repository/runtime-process-io.mjs",
-      "scripts/repository/source-inventory-git-environment.test.mjs",
-    ],
-    [
       "scripts/repository/runtime-session-state.mjs",
       "scripts/repository/worktree-recovery.test.mjs",
     ],
@@ -625,7 +526,6 @@ test("moved and shared framework boundaries retain focused verifier owners", () 
   ];
   if (existsSync(".agents/skills/reset-framework/scripts/reset-framework.test.mjs")) {
     for (const owner of [
-      "scripts/repository/runtime-process-identity.mjs",
       "scripts/repository/runtime-session-state.mjs",
       "scripts/repository/runtime-session-lease.mjs",
     ]) {

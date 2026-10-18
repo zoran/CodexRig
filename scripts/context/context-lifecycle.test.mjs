@@ -22,6 +22,7 @@ import {
   createCriticalBudgetHandover,
   criticalHandoverMaxAgeMilliseconds,
   discoverRecentCriticalBudgetHandover,
+  hasCriticalBudgetHandoverForSession,
 } from "./critical-budget-handover.mjs";
 import * as handoverLifecycle from "./critical-budget-handover.mjs";
 import { evaluateAutonomousContinuation, runStopLifecycle } from "./session-stop-lifecycle.mjs";
@@ -280,6 +281,48 @@ test("Stop lifecycle continues active outcomes and bounds unchanged automatic lo
   assert.equal(existsSync(continuationPath), false);
 });
 
+for (const newerCandidates of [0, 1, 129]) {
+  test(`same-session seal stays terminal with ${newerCandidates} newer candidates`, async () => {
+    const project = temporaryDirectory("critical-budget-terminal-");
+    copyToolingConfiguration(project);
+    const now = Date.now();
+    const sealedAt = now - (newerCandidates ? 1_000 : criticalHandoverMaxAgeMilliseconds + 1);
+    writeRuntimeSessionLease(project, new Date(sealedAt - 1_000).toISOString());
+    const leasePath = path.join(project, ".codex", "runtime", "codexrig-session.json");
+    const sealingLease = readFileSync(leasePath);
+    writeWorkingContext(project, workState(), criticalDrainBody);
+    const sealed = createCriticalBudgetHandover({ root: project, now: () => sealedAt });
+    if (newerCandidates) {
+      writeRuntimeSessionLease(project, new Date(now - 500).toISOString());
+      for (let index = 0; index < newerCandidates; index += 1) {
+        createCriticalBudgetHandover({
+          root: project,
+          now: () => now,
+          random: (size) => Buffer.alloc(size, index),
+        });
+      }
+      writeFileSync(leasePath, sealingLease);
+    }
+    const candidate = discoverRecentCriticalBudgetHandover({ root: project });
+    if (newerCandidates) assert.notEqual(candidate.sealingSessionId, sealed.sealingSessionId);
+    else {
+      assert.equal(candidate, null);
+      const expiresAt = sealedAt + criticalHandoverMaxAgeMilliseconds;
+      assert.deepEqual(
+        discoverRecentCriticalBudgetHandover({ root: project, now: () => expiresAt }),
+        sealed,
+      );
+    }
+    const stopped = await runStopLifecycle({ root: project, hookInput: stopHookInput() });
+    assert.equal(stopped.decision, undefined);
+    assert.match(stopped.systemMessage, /Stop completely/u);
+    assert.equal(existsSync(path.join(project, ".codex/runtime/stop-continuation")), false);
+    writeRuntimeSessionLease(project, new Date(now).toISOString());
+    const resumed = await runStopLifecycle({ root: project, hookInput: stopHookInput() });
+    assert.equal(resumed.decision, "block");
+  });
+}
+
 test("critical-budget handover seals privately, asks before resume, and terminates Stop work", async () => {
   const project = temporaryDirectory("critical-budget-handover-");
   mkdirSync(path.join(project, ".codex"), { recursive: true });
@@ -340,6 +383,7 @@ test("critical-budget handover seals privately, asks before resume, and terminat
   ]) {
     writeFileSync(sealedPath, tampered, "utf8");
     assert.equal(discoverRecentCriticalBudgetHandover({ root: project, now: () => now + 1 }), null);
+    assert.equal(hasCriticalBudgetHandoverForSession({ root: project, sealingSessionId }), false);
     writeFileSync(sealedPath, prompt, "utf8");
   }
 
@@ -369,6 +413,14 @@ test("critical-budget handover seals privately, asks before resume, and terminat
   });
   assert.match(lifecycle.systemMessage, /do not continue automatically/u);
 
+  for (const leaseContent of [null, "{}\n"]) {
+    const leasePath = path.join(project, ".codex/runtime/codexrig-session.json");
+    if (leaseContent === null) rmSync(leasePath);
+    else writeFileSync(leasePath, leaseContent, { mode: 0o600 });
+    const fallback = await runStopLifecycle({ root: project, hookInput: stopHookInput() });
+    assert.match(fallback.systemMessage, /Stop completely/u);
+  }
+
   const resumedSessionId = writeRuntimeSessionLease(project, new Date(now - 60_000).toISOString());
   assert.notEqual(resumedSessionId, sealingSessionId);
   const resumedLifecycle = await runStopLifecycle({
@@ -393,6 +445,7 @@ test("critical-budget handover seals privately, asks before resume, and terminat
   copyFileSync(sealedPath, copied);
   chmodSync(copied, 0o600);
   assert.equal(discoverRecentCriticalBudgetHandover({ root: foreign, now: () => now + 1 }), null);
+  assert.equal(hasCriticalBudgetHandoverForSession({ root: foreign, sealingSessionId }), false);
 
   const incomplete = temporaryDirectory("critical-budget-handover-incomplete-");
   copyToolingConfiguration(incomplete);
@@ -440,6 +493,10 @@ test("critical-budget handover seals privately, asks before resume, and terminat
     /storage is unsafe/u,
   );
   assert.equal(discoverRecentCriticalBudgetHandover({ root: unsafeParent, now: () => now }), null);
+  assert.equal(
+    hasCriticalBudgetHandoverForSession({ root: unsafeParent, sealingSessionId }),
+    false,
+  );
 });
 
 // Problem: sealed handovers had no exact receiving/acknowledgement lifecycle and could be offered again.

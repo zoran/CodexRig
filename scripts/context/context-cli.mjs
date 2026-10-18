@@ -7,6 +7,7 @@ import { readRepositoryFile, toolingRoot } from "../filesystem/repository-files.
 import {
   boundedContextOutput,
   documentContextExcerpt,
+  documentContextSections,
   readContextDocument,
 } from "../docs/document-context.mjs";
 import { contextBudgets, inspectContextBudget } from "./context-budget.mjs";
@@ -14,6 +15,19 @@ import { projectWorkContextFindings } from "./project-work-state.mjs";
 
 export function repositoryContextMap(root = toolingRoot) {
   const manifest = readRepositoryFile(root, "docs/project.md");
+  const policy = readContextDocument(root, "instructions.md");
+  const routeSections = documentContextSections(policy.file, policy.content).filter(
+    ({ heading }) => heading === "Task Reading Routes",
+  );
+  if (routeSections.length !== 1 || routeSections[0].level !== 2)
+    throw new Error(
+      "instructions.md must contain exactly one level-2 Task Reading Routes section.",
+    );
+  const routeSection = routeSections[0];
+  const routes = policy.content
+    .split(/(?<=\n)/u)
+    .slice(routeSection.start, routeSection.directEnd)
+    .join("");
   const modules = [];
   let heading = "";
   for (const line of manifest.split(/\r?\n/u)) {
@@ -26,6 +40,8 @@ export function repositoryContextMap(root = toolingRoot) {
   return boundedContextOutput(
     [
       "Repository context map (navigation only; read relevant owners before decisions).",
+      "Task Reading Routes (from instructions.md):",
+      routes,
       ...links,
       `Active module roots (${modules.length}):`,
       ...modules,
@@ -63,13 +79,14 @@ export function contextCommand(args, root = toolingRoot) {
   if (mode === "map" && !argv.length) return { output: repositoryContextMap(root) };
   if (mode !== "read" || !argv.length)
     throw new Error(
-      "Usage: context:read <document> [--outline [--offset N] | --section <heading> | --lines first:last]",
+      "Usage: context:read <document> [--outline [--offset N] | --section <heading> [--subtree] | --lines first:last]",
     );
   const file = argv.shift(),
     options = {};
   while (argv.length) {
     const flag = argv.shift();
-    if (flag === "--outline" && !options.outline) options.outline = true;
+    if (["--outline", "--subtree"].includes(flag) && !Object.hasOwn(options, flag.slice(2)))
+      options[flag.slice(2)] = true;
     else if (
       ["--section", "--lines", "--offset"].includes(flag) &&
       argv.length &&
@@ -78,8 +95,8 @@ export function contextCommand(args, root = toolingRoot) {
       options[flag.slice(2)] = flag === "--offset" ? Number(argv.shift()) : argv.shift();
     else throw new Error("Unknown or repeated context read option.");
   }
-  if (options.outline && (options.lines || options.section))
-    throw new Error("Outline cannot be combined with an excerpt.");
+  if (Object.hasOwn(options, "offset") && !options.outline)
+    throw new Error("--offset requires --outline.");
   return { output: documentContextExcerpt(readContextDocument(root, file), options) };
 }
 

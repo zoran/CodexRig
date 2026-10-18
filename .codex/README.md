@@ -84,13 +84,13 @@ canonical start uses that same owner before it admits a session.
 Run from the repository root:
 
 ```bash
-bash scripts/setup/start-codex.sh
+bash -p scripts/setup/start-codex.sh
 ```
 
 Portable Codex sessions default to on-request approval and network-disabled workspace-write; only an
 explicitly authorized Dev session launched with `--yolo` may use no approvals and
 danger-full-access, never staging or production. For that authorized Dev session, use
-`bash scripts/setup/start-codex.sh --yolo`; that closed launcher control selects Codex's
+`bash -p scripts/setup/start-codex.sh --yolo`; that closed launcher control selects Codex's
 no-approval/full-access mode and unrestricted command network for Dev and never authorizes staging,
 production, broader scope, credentials, or irreversible external work. Enter prompts after selecting
 a session; positional launcher arguments are not supported.
@@ -98,7 +98,7 @@ a session; positional launcher arguments are not supported.
 An already-running safe session cannot be converted into a canonical YOLO session in place. A UI or
 parent-runtime permission change can alter the effective live sandbox, approvals, or network, but
 the repository cannot rewrite the startup mode that was already attested. Exit and relaunch with
-`bash scripts/setup/start-codex.sh --yolo` when canonical Dev full access is required. Tracked
+`bash -p scripts/setup/start-codex.sh --yolo` when canonical Dev full access is required. Tracked
 `.codex/config.toml` intentionally stays on-request, network-disabled `workspace-write` so every
 portable clone starts safe. Requested config, startup-attested mode, and effective live permissions
 are distinct facts; parent overrides can also be reapplied to children, which is why child admission
@@ -210,19 +210,19 @@ private runtime from Git, staging, export, and generated projects.
 Portable defaults may vary by project but contain no secrets, telemetry targets, notification
 commands, persisted trust entries, personal paths, or local domains. After changing
 model/reasoning/features/TUI/hooks, keep every role on the exact primary GPT Astra model with its
-second-highest supported effort and run `bash scripts/setup/run-project.sh pnpm codex:validate`.
+second-highest supported effort and run `bash -p scripts/setup/run-project.sh pnpm codex:validate`.
 
 The canonical lifecycle does not require a manual `/hooks` approval: the issue-time controller
 computes trust for only its two exact session-owned definitions, and the Codex preflight proves the
 installed CLI accepted those hashes before a writable session exists. Any additional user,
 project-file, or plugin hook blocks canonical startup instead of receiving derived trust. A changed
 or externally prohibited controller hook likewise blocks startup instead of being skipped, globally
-trusted, or mistaken for completion. Ignored `.codex/runtime/config.toml` may retain only private,
+trusted, or mistaken for completion. Ignored repository-root `config.toml` may retain only private,
 non-executable project trust, hook-state, notice, approval-routing, service-tier metadata, and
-bounded Codex-persisted model/reasoning preferences. Tracked project config remains the effective
-model/reasoning source of truth, and the controller projects its exact values into every fresh or
-resumed Codex CLI launch. `notify`, MCP, plugin, provider, and unknown configuration is rejected
-before any Codex process can consume it and rechecked before every real launch or fallback.
+bounded Codex-persisted model/reasoning preferences. Tracked `.codex/config.toml` remains the
+effective model/reasoning source of truth, and the controller projects its exact values into every
+fresh or resumed Codex CLI launch. `notify`, MCP, plugin, provider, and unknown configuration is
+rejected before any Codex process can consume it and rechecked before every real launch or fallback.
 
 ## Portable Creation Boundary
 

@@ -175,7 +175,7 @@ test("publication distinguishes synchronized, ahead, behind, diverged and unrela
           assert.ok(
             message
               .split("\n")
-              .includes("bash scripts/setup/run-project.sh git merge --ff-only '@{upstream}'"),
+              .includes("bash -p scripts/setup/run-project.sh git merge --ff-only '@{upstream}'"),
           );
         } else if (state === "diverged") {
           assert.match(message, /diverged.*1 local.*1 upstream/);
@@ -184,7 +184,7 @@ test("publication distinguishes synchronized, ahead, behind, diverged and unrela
             message
               .split("\n")
               .includes(
-                "bash scripts/setup/run-project.sh git log --oneline --left-right 'HEAD...@{upstream}'",
+                "bash -p scripts/setup/run-project.sh git log --oneline --left-right 'HEAD...@{upstream}'",
               ),
           );
         } else assert.match(message, /No common ancestor.*destination.*history/s);

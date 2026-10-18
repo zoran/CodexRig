@@ -19,6 +19,32 @@ for (const [provider, file] of [
     const generated = projectCiProjection(file, source);
     for (const content of [source, generated]) {
       assert.deepEqual(ciAdapterContractViolations(provider, content), []);
+      for (const prefix of ["node", "env -u NODE_OPTIONS node", "env -u NODE_PATH node"]) {
+        const exposed = content.replace("env -u NODE_OPTIONS -u NODE_PATH node", prefix);
+        assert.notEqual(exposed, content, "the initial installer must remove both Node controls");
+        assert.ok(
+          ciAdapterContractViolations(provider, exposed).includes("reviewed-local-install"),
+          prefix,
+        );
+      }
+      const provisions = [...content.matchAll(/ripgrep shellcheck python3/gu)];
+      assert.ok(provisions.length, "Linux cancellation fixtures require Python");
+      for (const provision of provisions) {
+        const withoutPython =
+          content.slice(0, provision.index) +
+          "ripgrep shellcheck" +
+          content.slice(provision.index + provision[0].length);
+        assert.ok(
+          ciAdapterContractViolations(provider, withoutPython).includes(
+            "linux-cancellation-prerequisite",
+          ),
+        );
+      }
+      assert.ok(
+        ciAdapterContractViolations(provider, content.replaceAll("bash -p ", "bash ")).includes(
+          "isolated-verification",
+        ),
+      );
       assert.ok(
         ciAdapterContractViolations(
           provider,
@@ -38,9 +64,20 @@ for (const [provider, file] of [
         ).includes("global-tool-install"),
       );
     }
+    for (const prefix of ["node", "env -u NODE_OPTIONS node", "env -u NODE_PATH node"]) {
+      const exposed = source.replace(
+        /env -u NODE_OPTIONS -u NODE_PATH node(\s+scripts\/framework\/compatibility-matrix\.mjs)/u,
+        `${prefix}$1`,
+      );
+      assert.notEqual(exposed, source, "the matrix bootstrap must remove both Node controls");
+      assert.ok(
+        ciAdapterContractViolations(provider, exposed).includes("isolated-matrix-generation"),
+        prefix,
+      );
+    }
     assert.doesNotMatch(
       generated,
-      /prepare-compatibility-track|compatibility-canary|framework:doctor|repo:housekeeping/u,
+      /compatibility-matrix:|prepare-compatibility-track|compatibility-canary|framework:doctor|repo:housekeeping/u,
     );
   });
 }
@@ -54,6 +91,7 @@ test("GitLab experiments select declared tracks through the same owned maintenan
     matrix.canaries.length,
   );
   assert.equal(source.split("run-project.sh pnpm verify").length - 1, matrix.canaries.length);
+  assert.equal(source.split("ripgrep shellcheck python3").length - 1, matrix.canaries.length);
   for (const track of matrix.canaries)
     assert.ok(source.includes(`CODEXRIG_COMPATIBILITY_TRACK: '${track.id}'`));
 });

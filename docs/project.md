@@ -71,9 +71,9 @@ upgradeable product repositories while deliberately defining no child product or
 - Root: `.agents/skills`
 - Responsibility: Defines discoverable, reusable workflows for implementation, architecture,
   combined code/system review, UI/UX preservation review, maintenance, generation, reset and
-  explicitly requested post-exit source publication through `framework:publish`. Discovery follows
-  canonical instructions rather than a separate skill; specialist reviews remain conditional on the
-  affected surface.
+  explicitly requested source publication through `framework:publish`, either from its verified
+  owning session or after the clone's sessions exit. Discovery follows canonical instructions rather
+  than a separate skill; specialist reviews remain conditional on the affected surface.
 - Runtime and technology: Markdown/YAML skill contracts with Node.js ESM for referenced automation.
 - Public contract: Each skill's `SKILL.md`, `agents/openai.yaml`, and referenced scripts,
   references, or assets.
@@ -85,7 +85,7 @@ upgradeable product repositories while deliberately defining no child product or
 - Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/docs`,
   `scripts/filesystem`, `scripts/framework`, `scripts/goals`, `scripts/repository`, `scripts/setup`,
   `scripts/terminal`, `scripts/verify`.
-- Focused verifier: `node scripts/verify/repository-smoke.mjs`
+- Focused verifier: `node scripts/verify/skill-paths.mjs`
 - Steward: Primary framework maintainer.
 
 #### Codex Session And Agent Policy
@@ -96,25 +96,17 @@ upgradeable product repositories while deliberately defining no child product or
   effective-permission admission that fails closed when parent runtime overrides defeat a role
   sandbox. The setup controller injects and narrowly trusts the two lifecycle hooks at issue time;
   SessionStart requires complete same-clone worktree/session reconstruction before intake or writes.
-  Native guidance routes autonomous completion, task interpretation, concrete blocker handling,
-  per-slice documentation currency, the visible plan prerequisite, proportional review and course
-  correction against the original outcome and cumulative effort to canonical policy. Generation
-  projects the canonical course contract; review and recovery skills route to it. Bounded role
-  handoffs include affected document owners; the primary owns whole-repository acceptance. Four
-  concurrent subagents are the default target, excluding the primary; the native ceiling remains
-  twelve. Useful independent work, confirmed capacity and effective permissions govern admission.
-  After accepting a handoff and closing its scope, the primary rechecks admission and immediately
-  assigns available owned agents the next ready task within the authorized outcome. This includes
-  additional user-requested or user-started agents with confirmed provenance. Smaller tasks may use
-  fewer agents; slot availability never justifies invented work. Capacity admission preserves native
-  earned-reset and usage-permission evidence, resolves supported free account recovery before
-  account-only critical classification, and retains hard limits and terminal seals. Reserves require
-  current evidence for the next bounded work and closure in matching units; historical estimates and
-  unknown costs cannot establish a new critical state. Smaller useful work or fewer agents precede a
-  reserve-shortfall decision. Generated projects receive the same agent defaults, continued
-  assignment, roles and canonical task, planning, documentation and capacity policies;
-  source-to-child updates compare that current output for explicit local reconciliation. Validation
-  proves configuration and projection consistency, not model obedience.
+  Concise entry instructions route task, planning, documentation, course checks and whole-repository
+  acceptance to [canonical policy](../instructions.md#task-reading-routes). Four useful concurrent
+  agents are the default; twelve is the native ceiling, excluding the primary. The injected dispatch
+  sequence accepts each handoff, closes its scope and assigns the same agent the next ready task
+  before unrelated primary work or waiting for peers. It includes admitted user-started agents and
+  uses the current plan as its ready queue.
+  [Admission and capacity](../instructions.md#admission-intelligence-and-provenance) retain
+  effective permissions, provenance, supported free recovery, current-unit reserves and
+  terminal-drain gates. Smaller teams remain valid when useful work or capacity is limited.
+  Generation and reviewed updates share these roles, defaults and canonical policy projections.
+  Validation checks typed configuration and required wording; it does not prove model obedience.
 - Runtime and technology: Declarative TOML, JSON, and Markdown consumed by Codex, with lifecycle
   entrypoints implemented in the framework's Node.js/Bash harness.
 - Public contract: Root `developer_instructions` and `[agents]` defaults in `.codex/config.toml`,
@@ -137,12 +129,15 @@ upgradeable product repositories while deliberately defining no child product or
   subsequent user turns do not re-arm unchanged state. Shared receipt/continuation guidance requires
   comparing historical tasks, blockers, approvals and test claims with current source and authority;
   a marker establishes neither intent nor semantic truth. Releasing the loop guard is not
-  completion.
+  completion. A valid seal remains terminal for its exact active runtime session regardless of age
+  or newer artifacts; startup discovery retains its recency and inventory limits.
 - Runtime and technology: Node.js ESM and built-ins on the framework's mise-pinned toolchain.
-- Public contract: `context:map`, bounded Markdown/HTML `context:read`, `context:check` for
-  instruction bytes and optional work-state structure (also checked by `docs:check`),
-  `handover:create`, `handover:receive`, `handover:acknowledge`, exported portable context
-  validators, and the preloaded Stop lifecycle. Receipt requires an active canonical session
+- Public contract: `context:map` projects the canonical task-reading routes; bounded Markdown/HTML
+  `context:read` returns a direct section body plus unread-child navigation, or explicit `--subtree`
+  within 16 KiB. `context:check` separately reports automatic instruction estimates and direct
+  policy section sizes, and checks optional work-state structure (also checked by `docs:check`).
+  Other APIs: `handover:create`, `handover:receive`, `handover:acknowledge`, exported portable
+  context validators, and the preloaded Stop lifecycle. Receipt requires an active canonical session
   distinct from the sealing session and the exact accepted repository-bound artifact;
   acknowledgement removes only unchanged received bytes, not native conversation history. Current
   evidence/capacity guidance travels outside the integrity-bound historical prompt, including older
@@ -263,8 +258,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Public contract: `docs:check`, manifest and delivery-projection parsers, document classification,
   and initialization. Supplied creation briefs are linked requirements drafts, separate from current
   technical inventory.
-- Private internals: Markdown section parsing, local reference validation and repository-to-manifest
-  discovery.
+- Private internals: Shared fenced-code state for Markdown section navigation, heading validation
+  and local reference extraction; repository-to-manifest discovery.
 - Owned data and migrations: No mutable data; validates tracked documentation.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/filesystem`, `scripts/repository`.
@@ -282,7 +277,9 @@ upgradeable product repositories while deliberately defining no child product or
 - Public contract: `framework:doctor`, `framework:version`, `framework:upgrade`,
   `compatibility:matrix` and the source housekeeping adapter. Migration requires an explicit target
   and current generated output, with explicit hash-bound policy/tool reconciliation or an optional
-  pristine reference; product code and identity are preserved.
+  pristine reference; product code and identity are preserved. Current-output and pristine-baseline
+  upgrades retain the validated target launcher display name while preserving reconciliation for
+  other tooling adaptations; missing tooling retains its generation fallback.
 - Private internals: Conservative SemVer classification, three-way file/package comparison, exact
   target runtime exclusion, conflict planning, transactional journal and rollback. Explicit reviewed
   file modes are applied before atomic publication and restored on rollback, independently of the
@@ -302,18 +299,20 @@ upgradeable product repositories while deliberately defining no child product or
   `.project-state/framework-upgrade/` journals disappear after settlement. Source selection is
   `.codexrig/project-tools.json`; products have no installation receipt or source release identity.
   The same generation owner emits sibling trees and archives from explicit selection and templates.
-  It projects the canonical maintenance scope boundary into child instructions; generated agent
-  entry points and verification guidance route command selection through that policy. Canonical
-  verification, test strategy, failure recovery, storage, documentation, agent admission and agent
-  lifecycle policies are projected by the same generator. Its focused consumers are the staged
-  policy validator and independent project-initialization tests. Portable configuration validation
-  requires the primary's reference to the maintenance scope boundary.
+  It extracts the portable entry block from source `AGENTS.md` and projects canonical task routes,
+  maintenance, verification, test strategy, failure recovery, storage, documentation, admission,
+  peer/integration authority and agent lifecycle policies into child instructions. New generation
+  and reviewed updates use the same identity-neutral policy output; child-specific adaptations still
+  require explicit reconciliation. Both serialize desired policy with the source's installed pinned
+  formatter and configuration; read-only review leaves target files untouched. Its focused consumers
+  are the staged policy validator and independent project-initialization tests. Portable
+  configuration validation requires the primary's reference to the maintenance scope boundary.
 - Tenant isolation: Not applicable; no product data plane.
 - Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/deps`, `scripts/docs`,
   `scripts/filesystem`, `scripts/goals`, `scripts/platform`, `scripts/repository`, `scripts/setup`,
   `scripts/terminal`, `scripts/verify`.
 - Focused verifier:
-  `node --test scripts/framework/framework-version.test.mjs scripts/framework/framework-upgrade.test.mjs scripts/framework/compatibility-integrity.test.mjs`
+  `node --test scripts/framework/framework-version.test.mjs scripts/framework/framework-upgrade.test.mjs scripts/framework/framework-upgrade-identity.test.mjs scripts/framework/compatibility-integrity.test.mjs`
 - Steward: Framework lifecycle maintainer.
 
 #### Git Hook Adapter
@@ -354,6 +353,8 @@ upgradeable product repositories while deliberately defining no child product or
 - Private internals: Atomic local reconciliation, health-check orchestration, Git publication,
   source identity, and evidence admission checks. Failed command excerpts retain stderr summaries
   independently of subsequent successful stdout, constrained by the sanitized chronological capture.
+  Publication cancellation delegates exact-identity process-group completion to Repository
+  Boundaries, retains a two-second grace, and reports unproven completion before the gate settles.
 - Owned data and migrations: Project-owned `config/delivery.json` detected evidence and its bounded
   `docs/project.md` projection; in reusable source only, synchronized framework/package/manifest
   release metadata; no external environment or product data.
@@ -361,7 +362,7 @@ upgradeable product repositories while deliberately defining no child product or
 - Allowed dependencies: `scripts/contracts`, `scripts/deps`, `scripts/docs`, `scripts/filesystem`,
   `scripts/repository`, `scripts/setup`, `scripts/terminal`, `scripts/verify`.
 - Focused verifier:
-  `node --test scripts/goals/repository-housekeeping.test.mjs scripts/goals/goal-publication-precondition.test.mjs scripts/goals/project-publication.test.mjs scripts/goals/project-publication-integration.test.mjs scripts/goals/publication-command.test.mjs`
+  `node --test scripts/goals/repository-housekeeping.test.mjs scripts/goals/goal-publication-precondition.test.mjs scripts/goals/project-publication.test.mjs scripts/goals/project-publication-integration.test.mjs scripts/goals/project-publication-verification.test.mjs scripts/goals/publication-command.test.mjs`
 - Steward: Goal lifecycle maintainer.
 
 #### Git Platform Adapters
@@ -376,17 +377,24 @@ upgradeable product repositories while deliberately defining no child product or
 - Runtime and technology: Node.js ESM using credential-free contract parsing and HTTPS adapters.
 - Public contract: `platform:detect` and `platform:configure`; authenticated apply reads the private
   `.auth/git-platform.json` profile bound to the selected provider, host and repository.
+  `platform:configure -- --recover-lock` previews local lock retirement; applying it requires the
+  reviewed fingerprint and explicit confirmation of independently established quiescence, without
+  accessing provider credentials or APIs.
 - Private internals: Provider API clients, pagination, host allowlists, and reconciliation state.
   Safe API errors distinguish local admission, response headers and body failures, plus read-only,
   not-started or unknown operation outcomes. Service failures remain failures without automatic
   retry.
 - Owned data and migrations: Private pending-operation journal and owned lock. Recovery state is
   retained until provider read-back succeeds; remote changes require an explicit primary-owned
-  apply.
+  apply. Short lock and journal mutations share the repository update mutex and validate the held
+  process-bound lock. Automatic takeover requires a proven dead owner; indeterminate or superseded
+  locks remain intact until explicit local retirement. Retirement binds the exact file identity and
+  opaque bytes, rejects proven live owners, and preserves the journal for reconciliation.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/contracts`, `scripts/filesystem`, `scripts/repository`,
   `scripts/terminal`.
-- Focused verifier: `node --test scripts/platform/platform-lifecycle.test.mjs`
+- Focused verifier:
+  `node --test scripts/platform/platform-lifecycle.test.mjs scripts/platform/platform-configuration-state.test.mjs`
 - Steward: Platform integration maintainer.
 
 #### Repository Boundaries
@@ -459,7 +467,14 @@ upgradeable product repositories while deliberately defining no child product or
   release, and a crashed child-PID handoff, corrupt state, or any other mechanically indeterminate
   state fails closed. Isolated Git accepts only an ordinary terminal result or the exact bounded
   managed-sandbox completion marker with matching PID, arguments, status, signal, and output
-  contract.
+  contract. Captured synchronous commands use built-in-only I/O supervision loaded before execution,
+  private deterministic-EOF stdin, per-stream spool limits enforced during production, and
+  nonce-bound terminal evidence. Cancellation waits for observed running descendants after direct
+  child closure, with five-second lifecycle and six-second capture grace periods. Linux discovery
+  and signaling use established process identities; unavailable group visibility, including on other
+  platforms, reports incomplete cancellation and preserves lifecycle evidence. Normal completion
+  preserves background launches. Caller-loss cleanup removes only the recorded private directory.
+  Each capture starts one additional Node process.
 - Owned data and migrations: Private ignored per-worktree writer lease and latest verified Codex
   session recovery marker under `.codex/runtime/`. Full reset holds the lifecycle lock, proves
   repository-wide runtime quiescence, and removes incompatible private runtime without interpreting
@@ -573,7 +588,8 @@ upgradeable product repositories while deliberately defining no child product or
 
 - Root: `scripts/terminal`
 - Responsibility: Sanitizes paths, secrets, and multiline errors before diagnostics reach terminals;
-  renders startup and publication progress with bounded interactive and redirected output.
+  preserves actionable verifier headings and findings, and renders startup and publication progress
+  with bounded interactive and redirected output.
 - Runtime and technology: Node.js ESM deterministic output sanitization.
 - Public contract: Exported terminal sanitization, context-error formatting and publication progress
   helpers. The publication owner supplies tasks and outcomes; the renderer never decides gates.
@@ -594,7 +610,9 @@ upgradeable product repositories while deliberately defining no child product or
   evidence bindings (semantic security remains an executed-flow review), enforces physical surface
   and cross-surface import separation, checks responsive multi-device hazards,
   localization/source-language truth, product-stack drift, and source/declaration-header currency,
-  and performs repository quality gates.
+  and performs repository quality gates. SEO checks distinguish document markup from literals, Astro
+  frontmatter and MDX code examples, and require parsed JS/TS or MDX value exports for framework
+  metadata exemptions. They do not execute metadata generators or prove rendered browser output.
 - Runtime and technology: Node.js ESM orchestration plus bounded Bash verifier adapters.
 - Public contract: `verify`, `verify:changed`, `verify:pre-push`, `verify:external`, `docs:check`,
   `auth:check`, `localization:check`, `tenancy:check`, and `format*` commands.
@@ -608,8 +626,10 @@ upgradeable product repositories while deliberately defining no child product or
   retention is reported without replacing the check result; unsafe cleanup still fails. Only
   publication verification establishes complete acceptance; commit refresh binds identical content.
   The same registry binds source consumers, runtime, Git basis and delivery artifacts. Parser-proven
-  editorial source changes and documentation use lightweight checks. Publisher and pre-push share
-  this single record; no second cache or test selector exists.
+  editorial source changes and ordinary documentation use lightweight checks; documentation used as
+  executable input also selects its registered test consumers and invalidates their reusable
+  evidence. Publisher and pre-push share this single record; no second cache or test selector
+  exists.
 - Owned data and migrations: One replace-in-place evidence record and verification lock under
   ignored `.codex/runtime/`; no product data or migrations.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
@@ -626,7 +646,12 @@ upgradeable product repositories while deliberately defining no child product or
   web stacks.
 - Runtime and technology: Node.js ESM with stack-neutral web-surface scanning.
 - Public contract: `web:update-sitemap-lastmod` and exported web/sitemap scan APIs.
-- Private internals: Sitemap discovery, metadata normalization, and stack-specific file matching.
+- Private internals: Sitemap discovery and shared static HTML traversal for titles, canonical links
+  and meta values. It distinguishes quoted literals, comments and raw-text bodies while preserving
+  real metadata after quoted comment delimiters, complete attribute names and order-independent
+  values. Parsed JSX self-closing positions and ordinary HTML raw-text boundaries retain their
+  respective semantics. Other internals include metadata normalization and stack-specific file
+  matching.
 - Owned data and migrations: Managed sitemap metadata changes only; no service data or migrations.
 - Tenant isolation: Not applicable; source-framework capability with no child product data plane.
 - Allowed dependencies: `scripts/repository`, `scripts/stack`.
@@ -637,7 +662,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.18.0`.
+- Framework version: `6.19.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

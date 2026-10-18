@@ -437,29 +437,43 @@ test("full apply reclaims dead execution scratch before unresolved capacity stop
   );
   assert.equal(producer.status, 0, producer.stderr);
   assert.ok(existsSync(producer.stdout));
+  // The bounded-I/O supervisor starts Docker in another process, beyond an in-process spawn mock.
+  // Bind the executable boundary itself so this low-space fixture cannot reach the host daemon.
+  const bin = path.join(root, "bin");
+  const dockerCalls = path.join(root, "docker-calls.jsonl");
+  mkdirSync(bin);
+  writeFileSync(
+    path.join(bin, "docker"),
+    `#!${process.execPath}
+import {appendFileSync} from "node:fs";
+appendFileSync(${JSON.stringify(dockerCalls)}, JSON.stringify(process.argv.slice(2)) + "\\n");
+process.stderr.write("fixture Docker unavailable\\n");
+process.exitCode = 1;
+`,
+    { mode: 0o700 },
+  );
   const preload = path.join(root, "external-boundaries.mjs");
   writeFileSync(
     preload,
     `
     import fs from "node:fs";
-    import cp from "node:child_process";
     import {syncBuiltinESMExports} from "node:module";
-    const spawn=cp.spawnSync;
     fs.statfsSync=()=>({bsize:1n,blocks:100n,bfree:6n,bavail:1n});
-    cp.spawnSync=(command,...args)=>command==="docker"
-      ? {error:new Error("fixture Docker unavailable"),status:null,stdout:"",stderr:""}
-      : spawn(command,...args);
     syncBuiltinESMExports();
   `,
   );
   const result = spawnSyncWithBoundedIo(process.execPath, ["--import", preload, entry, "--apply"], {
     cwd: root,
+    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}` },
     encoding: "utf8",
     input: "",
     timeout: 20_000,
   });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /fixture Docker unavailable/u);
+  assert.deepEqual(readFileSync(dockerCalls, "utf8").trim().split("\n").map(JSON.parse), [
+    ["--host", "unix:///var/run/docker.sock", "info", "--format", "{{json .DockerRootDir}}"],
+  ]);
   assert.equal(
     existsSync(producer.stdout),
     false,

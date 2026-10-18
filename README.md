@@ -7,12 +7,13 @@ imposing a product stack.
 
 ## Start
 
-Provide a current Node.js bootstrap, Git, Bash, ripgrep, ShellCheck and the system archive tool. The
+Provide a current Node.js bootstrap, Git, Bash, ripgrep, ShellCheck and the system archive tool.
+Linux verification also requires Python 3 with `ctypes` for owned-process cancellation tests. The
 launcher installs reviewed Mise, Codex and locked project runtimes in managed user storage, with
 project-private accounts and tracked tool pins. Run from the repository root:
 
 ```bash
-bash scripts/setup/start-codex.sh
+bash -p scripts/setup/start-codex.sh
 ```
 
 To start an explicitly authorized Dev session with no approval prompts, unrestricted command network
@@ -20,11 +21,13 @@ access, and no filesystem sandbox, you must exit the current Codex session and l
 canonical entry point with `--yolo`:
 
 ```bash
-bash scripts/setup/start-codex.sh --yolo
+bash -p scripts/setup/start-codex.sh --yolo
 ```
 
-Only `--no-alt-screen` and `--yolo` are launcher controls. Enter prompts after selecting a session.
-For permission boundaries, session recovery and agent inheritance, see
+The Bash `-p` option blocks inherited executable shell configuration before the launcher runs; it
+does not grant additional OS or Codex permissions. Keep it in host-shell invocations. Only
+`--no-alt-screen` and `--yolo` are launcher controls. Enter prompts after selecting a session. For
+permission boundaries, session recovery and agent inheritance, see
 [Session Start](instructions.md#session-start) and
 [Effective Permissions](instructions.md#effective-permissions-and-write-isolation).
 
@@ -56,12 +59,13 @@ compatible dependencies without opening Codex. Every subsequent project command 
 repository-local entry:
 
 ```bash
-node scripts/deps/maintain-toolchain.mjs
-bash scripts/setup/run-project.sh pnpm setup
-bash scripts/setup/run-project.sh pnpm framework:doctor -- --online
+env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs
+bash -p scripts/setup/run-project.sh pnpm setup
+bash -p scripts/setup/run-project.sh pnpm framework:doctor -- --online
 ```
 
-CI and reproducible setup use `node scripts/deps/maintain-toolchain.mjs --locked` to install only
+CI and reproducible setup use
+`env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs --locked` to install only
 the reviewed tool pins and frozen dependency graph. For storage migration, its online stage prepares
 the final destination's required rebuild before reproducing the unchanged graph offline. CI runs in
 disposable containers; source-only compatibility experiments explicitly prepare a declared candidate
@@ -72,10 +76,10 @@ this framework. Run the reset owner directly with the read-only Node bootstrap, 
 command entry correctly refuses an unsafe lease. Never delete `.codex/runtime` manually:
 
 ```bash
-node .agents/skills/reset-framework/scripts/reset-framework.mjs
-node .agents/skills/reset-framework/scripts/reset-framework.mjs --apply
-node .agents/skills/reset-framework/scripts/reset-framework.mjs
-bash scripts/setup/start-codex.sh
+env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/reset-framework.mjs
+env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/reset-framework.mjs --apply
+env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/reset-framework.mjs
+bash -p scripts/setup/start-codex.sh
 ```
 
 ## Current Contracts Only
@@ -115,7 +119,7 @@ boundaries and handling of an optional creation brief.
 ## Essential Commands
 
 Run these commands inside the canonical session. From a host shell, prefix them with
-`bash scripts/setup/run-project.sh`. Project pins and locks live under `.codex/` and are loaded
+`bash -p scripts/setup/run-project.sh`. Project pins and locks live under `.codex/` and are loaded
 explicitly, so the host shell does not activate them after Codex exits. The launcher explicitly uses
 Codex's embedded mode (`--no-daemon`) for its trusted session-only hooks and settings. An ASCII name
 reveal introduces five startup phases. The launcher name is owned by `startup.displayName` in
@@ -130,7 +134,7 @@ pnpm platform:configure                 # preview
 pnpm platform:configure -- --apply      # mutate the detected remote
 pnpm compatibility:matrix
 pnpm worktree:status -- --json
-bash scripts/setup/run-project.sh <command> [arguments] # project environment, then mise exec --locked
+bash -p scripts/setup/run-project.sh <command> [arguments] # project environment, then mise exec --locked
 pnpm verify:changed -- --print-plan
 pnpm verify                             # explicit complete verification; publication invokes it
 pnpm handover:create -- --critical       # terminal critical-capacity seal
@@ -156,18 +160,19 @@ The handover command requires a current critical-capacity decision under
 [Capacity Admission And Monitoring](instructions.md#capacity-admission-and-monitoring); historical
 reserves and unknown costs alone cannot trigger it. After it reports a sealed path, the Codex
 session must stop without another action. To continue from that handover, exit Codex completely with
-`/quit`, then run `bash scripts/setup/start-codex.sh` from the project root in your terminal. Accept
-the handover when the new session announces it. `/new` and `/resume` inside the running CLI retain
-its existing launcher; they cannot replace this restart. Keep the handover and runtime files intact.
-The receiving session reassesses capacity; restarting proves neither renewed account capacity nor
-continued exhaustion. Receipt adds current guidance while preserving the exact captured artifact.
+`/quit`, then run `bash -p scripts/setup/start-codex.sh` from the project root in your terminal.
+Accept the handover when the new session announces it. `/new` and `/resume` inside the running CLI
+retain its existing launcher; they cannot replace this restart. Keep the handover and runtime files
+intact. The receiving session reassesses capacity; restarting proves neither renewed account
+capacity nor continued exhaustion. Receipt adds current guidance while preserving the exact captured
+artifact.
 
 To finish framework work, the existing `framework:publish` script runs the complete cleanup,
 verification, commit and push sequence. After reviewing all source changes and authorizing
 publication, run this command from the owning Codex session or from the terminal:
 
 ```bash
-bash scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"
+bash -p scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"
 ```
 
 The wrapper selects the isolated project environment. The publisher performs source cleanup,
@@ -205,7 +210,7 @@ state live under `.auth/project-tools/`; native Codex state remains in the root 
 Reusable installations use separate user storage; see
 [Repository Housekeeping](#repository-housekeeping) for locations and retention. Private state is
 excluded from Git, context, generation and transfer. Login commands run through
-`bash scripts/setup/run-project.sh` with the project's private accounts.
+`bash -p scripts/setup/run-project.sh` with the project's private accounts.
 
 Persistent public tool settings belong in the project-private Mise configuration at
 `.auth/project-tools/config/mise/config.toml`. The normal project wrapper loads them before
@@ -263,9 +268,18 @@ blocks a duplicate create. Follow
 [failure recovery](instructions.md#deployment-and-qualification-failure-recovery); an HTTP 503 or
 lost response alone does not establish that a write failed to apply.
 
+If an obsolete or indeterminate local platform lock blocks configuration, first confirm that no
+platform configuration process is still running. Preview the lock with
+`pnpm platform:configure -- --recover-lock --json`. After reviewing its fingerprint and
+independently confirming quiescence, retire that exact lock with
+`pnpm platform:configure -- --recover-lock --apply --confirm-quiescent --expected-lock-fingerprint <sha256>`.
+Recovery rejects a changed lock or a proven live owner and preserves the reconciliation journal.
+These recovery commands are local; they do not read credentials or call the provider. Retry provider
+configuration separately with its normal authority and read-back requirements.
+
 ## Repository Housekeeping
 
-Run `bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply` for repository
+Run `bash -p scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply` for repository
 maintenance. See
 [closure and housekeeping](instructions.md#completed-goal-closure-and-repository-housekeeping) for
 its required order, preservation boundaries and source-version reconciliation.
@@ -283,11 +297,12 @@ Docker build cache once toward 3 GiB, then measures again. Restoring the 2 GiB m
 the higher cleanup target is not a startup gate. Failed collection or a still insufficient reserve
 stops installation. Full housekeeping first reclaims safe managed scratch and unused tool storage.
 
-For disk growth, use `bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --storage-only`.
-It reports allocated bytes in scratch, `.auth/` and its tool subdirectories, native history/cache
-and operation state without reading credential contents or running product checks. Add `--apply` to
-recover abandoned managed scratch, collect unreferenced shared tool/package versions and expire
-native caches through their existing owners. Canonical startup runs the same tool collectors. Native
+For disk growth, use
+`bash -p scripts/setup/run-project.sh pnpm repo:housekeeping -- --storage-only`. It reports
+allocated bytes in scratch, `.auth/` and its tool subdirectories, native history/cache and operation
+state without reading credential contents or running product checks. Add `--apply` to recover
+abandoned managed scratch, collect unreferenced shared tool/package versions and expire native
+caches through their existing owners. Canonical startup runs the same tool collectors. Native
 Mise/pnpm project references preserve other projects' pins and package graphs. Shared references
 accept exact native and `npm:pnpm` pins; each project retains its own executable admission. Tracked
 private Mise configurations retain shared runtime versions without being read or evaluated by
@@ -310,11 +325,14 @@ device/operation data require their producer's reconciliation; see
 
 ## Documentation Context Economy
 
-Use `pnpm context:map` for navigation, `pnpm context:read -- instructions.md --outline` for section
-discovery, and `pnpm context:check` for instruction bounds and work-marker structure. Large
-reference documents stay intact; select relevant sections instead of loading them all. The byte
-budgets are repository guardrails, not native model limits or proof of quality. They complement
-outcome-based review. The design follows
+Use `pnpm context:map` for the binding task routes and owner navigation. Read a section with
+`pnpm context:read -- instructions.md --section "Task Reading Routes"`; the reader returns its
+direct body and lists unread child sections. Read every applicable child before dependent work. Use
+`--outline` to discover headings or add `--subtree` to read a relevant complete section within the
+16 KiB output bound. `pnpm context:check` checks automatic instruction budgets, direct
+policy-section sizes and work-marker structure. Large references remain available without loading
+them all. The byte budgets are repository guardrails, not native model limits or proof of quality.
+They complement outcome-based review. The design follows
 [OpenAI context guidance](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)
 and [progressive skill disclosure](https://learn.chatgpt.com/docs/build-skills). The
 [repository-context study, revision 2](https://arxiv.org/html/2602.11988v2) found no general success
@@ -335,6 +353,10 @@ this source, preview the current generated tools and policy against an explicit 
 pnpm framework:upgrade -- --target <project-root>
 pnpm framework:upgrade -- --target <project-root> --reconcile <reviewed-decisions.json>
 ```
+
+Creation and current-output review use the source's installed pinned formatter and
+`.prettierrc.json` to compare the same policy bytes. A preview neither installs tools nor formats
+target files.
 
 Every divergent existing file needs a reasoned decision bound to its current and desired hashes and
 modes. Review the write/delete plan and intentional product deviations before adding `--apply`. All

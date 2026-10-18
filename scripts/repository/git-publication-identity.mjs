@@ -19,8 +19,8 @@ const identityKeys = [
 ];
 const identityHelp =
   "Publication needs valid Git author and committer metadata. Configure this project with:\n" +
-  '  bash scripts/setup/run-project.sh git config --local user.name "Your Name"\n' +
-  '  bash scripts/setup/run-project.sh git config --local user.email "you@example.com"\n' +
+  '  bash -p scripts/setup/run-project.sh git config --local user.name "Your Name"\n' +
+  '  bash -p scripts/setup/run-project.sh git config --local user.email "you@example.com"\n' +
   "Also check any explicit project author.name/email or committer.name/email settings.";
 
 function validMetadata(value) {

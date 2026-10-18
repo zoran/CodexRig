@@ -5,6 +5,10 @@ This file owns this product repository's workflow. README owns setup/use and dis
 existing specification owner. A static UI reference is a separate design artifact. Optional
 `docs/project-context.md` carries only this repository's current bounded authorized task.
 
+## Task Reading Routes
+
+<!-- current-task-reading-routes -->
+
 ## Interpreting Examples And Scope
 
 <!-- current-examples-and-scope-policy -->
@@ -50,7 +54,9 @@ and never creates a Goal. Do not add a scheduler or second task store.
 
 ## Session Start
 
-Start from this repository with `bash scripts/setup/start-codex.sh`. It inventories worktrees,
+### Launcher And Session Lifecycle
+
+Start from this repository with `bash -p scripts/setup/start-codex.sh`. It inventories worktrees,
 maintains compatible local tools and dependencies, checks policy and archive integrity, then opens
 native resume with this root as `CODEX_HOME` and `--cd`. Stable pins live in
 `.codex/toolchain.json`; `.codex/tooling.json` owns local startup and Git-provider settings.
@@ -67,7 +73,7 @@ restart through the launcher; preserve the private files needed by any active na
 
 Each launcher binds one durable session. To switch to another chat, including after a critical
 handover, the developer exits Codex completely with `/quit` and runs
-`bash scripts/setup/start-codex.sh` from the project root in the terminal. `/new` and `/resume`
+`bash -p scripts/setup/start-codex.sh` from the project root in the terminal. `/new` and `/resume`
 inside the running CLI retain its existing launcher and cannot replace this restart. The later
 session may accept the preserved handover; no manual runtime deletion or extension of the old proof
 is needed.
@@ -87,9 +93,13 @@ worktree directories; native repair requires confirmed directory ownership.
 Resume only a coherent stream matching current accepted authority. Preserve unrelated old product
 work during maintenance; finish the update at its own acceptance boundary. Current source and
 commands outrank remembered context. A native side conversation is independent and must not read
-work context or trigger durable continuation. Accept a SessionStart-announced handover explicitly
-before reading its prompt; use `$resume-project`, validate it against this repository, then receive
-and acknowledge only the exact accepted artifact in a later canonical session.
+work context or trigger durable continuation.
+
+### Critical Handover Receipt
+
+Accept a SessionStart-announced handover explicitly before reading its prompt; use
+`$resume-project`, validate it against this repository, then receive and acknowledge only the exact
+accepted artifact in a later canonical session.
 
 ## First-Prompt Project Definition Intake
 
@@ -262,22 +272,23 @@ not apply a review simply because a keyword appears. Keep findings and evidence 
 ## Dependency Installation And Freshness
 
 Prepare project-pinned tools in user storage and compatible dependencies with
-`node scripts/deps/maintain-toolchain.mjs`, then run `bash scripts/setup/run-project.sh pnpm setup`.
-Normal `start-codex.sh` invokes `maintain-toolchain.mjs --startup` to discover new releases before
-session admission. Preserve that invocation; `--locked` is separate reproducible preparation and CI,
-and deliberately skips release discovery. The portable launcher regression checks the actual shell
-entry during affected development checks and publication. The compatible installer owns
-range/pin/peer/engine policy, archive integrity, transaction and rollback. Keep manifests, lockfiles
-and pins in Git; installed payloads use the shared user storage owner and pnpm global virtual store.
-Account configuration stays project-private. The installer reuses verified legacy bundles without
-downloading them again, preserves manifests and lockfiles, and holds the shared lifecycle lock
-through pin publication and cleanup. `--locked` reproduces declared pins and the existing lockfile
-when relocating installed state. Its online stage prepares the final destination's required rebuild
-before offline reproduction. The [storage owner](#temporary-data-and-storage-housekeeping) owns
-capacity admission before staging and gates retirement on references and quiescence. A frozen
-install proves reproducibility, not registry freshness. CI uses reviewed stable pins, frozen inputs,
-disabled install scripts/pnpmfile and verified archives. Report offline or registry uncertainty
-honestly; do not substitute unverified success or automatic source repairs.
+`env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs`, then run
+`bash -p scripts/setup/run-project.sh pnpm setup`. Normal `start-codex.sh` invokes
+`maintain-toolchain.mjs --startup` to discover new releases before session admission. Preserve that
+invocation; `--locked` is separate reproducible preparation and CI, and deliberately skips release
+discovery. The portable launcher regression checks the actual shell entry during affected
+development checks and publication. The compatible installer owns range/pin/peer/engine policy,
+archive integrity, transaction and rollback. Keep manifests, lockfiles and pins in Git; installed
+payloads use the shared user storage owner and pnpm global virtual store. Account configuration
+stays project-private. The installer reuses verified legacy bundles without downloading them again,
+preserves manifests and lockfiles, and holds the shared lifecycle lock through pin publication and
+cleanup. `--locked` reproduces declared pins and the existing lockfile when relocating installed
+state. Its online stage prepares the final destination's required rebuild before offline
+reproduction. The [storage owner](#temporary-data-and-storage-housekeeping) owns capacity admission
+before staging and gates retirement on references and quiescence. A frozen install proves
+reproducibility, not registry freshness. CI uses reviewed stable pins, frozen inputs, disabled
+install scripts/pnpmfile and verified archives. Report offline or registry uncertainty honestly; do
+not substitute unverified success or automatic source repairs.
 
 ## Infrastructure As Code
 
@@ -336,7 +347,7 @@ Apply [Maintenance Scope And Verification](#maintenance-scope-and-verification) 
 below. Finish authorized code, documentation, cleanup and reviews. Settle every no-longer-needed
 owned worktree and coordination claim through its owner. Preserve ambiguous directories and active
 runtime; never manually delete `.codex/runtime/` or a worktree directory. Run
-`bash scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply`, audit current truth, reuse
+`bash -p scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply`, audit current truth, reuse
 valid evidence and fill only affected gaps. Complete verification belongs to publication, not each
 review or handoff. Commit/push only with authority and the actual integration policy; `goal:new`
 checks clean, verified publication on central main. An unrelated tooling finding does not reactivate
@@ -354,10 +365,9 @@ completed product work or impose another cleanup task.
 
 ### Effective Permissions And Write Isolation
 
-Never override the configured GPT Astra model and its second-highest supported reasoning effort,
-currently `max`. Keep primary, global agent defaults, roles and the shared validation policy in
-agreement; the installed model catalog must confirm the configured effort's rank before canonical
-startup.
+Before canonical startup, validate the configured model and effort against the installed catalog
+under
+[Intelligence Parity And Integration Authority](#intelligence-parity-and-integration-authority).
 
 One host represents one developer; visible local changes are developer-owned, but process control
 requires exact provenance. Different clones need explicit coordination; a local lease cannot prove
@@ -376,6 +386,14 @@ closure. Never contact or control foreign/ambiguous processes.
 ### Agent Lifecycle And Idle Cleanup
 
 <!-- current-agent-lifecycle-policy -->
+
+### Peer Coordination
+
+<!-- current-peer-coordination-policy -->
+
+### Intelligence Parity And Integration Authority
+
+<!-- current-integration-authority-policy -->
 
 ### Guarded And Critical Drain
 

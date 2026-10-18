@@ -3,16 +3,59 @@ import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { readRepositoryFile, toolingRoot } from "../filesystem/repository-files.mjs";
 import { parsePortableToml } from "../contracts/portable-toml.mjs";
+import { documentContextSections } from "../docs/document-context.mjs";
 
 export const contextBudgets = Object.freeze({
-  bootstrap: 8192,
-  developer: 4096,
-  role: 6144,
+  bootstrap: 4096,
+  developer: 3072,
+  role: 4096,
   skill: 16384,
   metadata: 8192,
   automatic: 32768,
+  directSection: 8192,
 });
 const bytes = (text) => Buffer.byteLength(text, "utf8");
+
+/** Measures original source bytes in disjoint direct bodies, including unheaded content. */
+export function inspectContextReference(file, content) {
+  const lines = content.split("\n");
+  const bodies = documentContextSections(file, content);
+  const preambleEnd = (bodies[0]?.start ?? lines.length + 1) - 1;
+  if (preambleEnd > 0 && content.length > 0)
+    bodies.unshift({ heading: "(unheaded content)", start: 1, directEnd: preambleEnd });
+  const sections = bodies
+    .map(({ heading, start, directEnd }) => ({
+      heading,
+      start,
+      end: directEnd,
+      bytes: bytes(
+        lines.slice(start - 1, directEnd).join("\n") + (directEnd < lines.length ? "\n" : ""),
+      ),
+    }))
+    .sort((a, b) => b.bytes - a.bytes || a.start - b.start);
+  const oversized =
+    file === "instructions.md"
+      ? sections.filter((section) => section.bytes > contextBudgets.directSection)
+      : [];
+  const findings = [];
+  if (oversized.length) {
+    const largest = oversized[0];
+    findings.push(
+      `${file}: direct-section context exceeds ${contextBudgets.directSection} bytes in ${oversized.length} section(s); largest is "${largest.heading}" at lines ${largest.start}-${largest.end} (${largest.bytes} bytes). Retain essential boundaries and consolidate at the canonical owner.`,
+    );
+  }
+  return {
+    reference: {
+      file,
+      bytes: bytes(content),
+      directSectionCount: sections.length,
+      largestDirectSectionBytes: sections[0]?.bytes ?? 0,
+      largestDirectSections: sections.slice(0, 3),
+      access: "outline and relevant direct sections; never unconditional full text",
+    },
+    findings,
+  };
+}
 
 export function inspectContextBudget(root = toolingRoot) {
   const findings = [],
@@ -77,15 +120,10 @@ export function inspectContextBudget(root = toolingRoot) {
     "docs/project-context.md",
   ].flatMap((file) => {
     const content = readRepositoryFile(root, file, { optional: true });
-    return content === null
-      ? []
-      : [
-          {
-            file,
-            bytes: bytes(content),
-            access: "outline and relevant excerpts; never unconditional full text",
-          },
-        ];
+    if (content === null) return [];
+    const inspected = inspectContextReference(file, content);
+    findings.push(...inspected.findings);
+    return [inspected.reference];
   });
   return {
     automaticBytes: automatic,
@@ -95,6 +133,6 @@ export function inspectContextBudget(root = toolingRoot) {
     references,
     findings,
     evidence:
-      "Static repository bytes only; excludes host tools, conversation, native memory and task-specific reads. Semantic audit and representative task evidence remain required.",
+      "Static repository bytes only. Automatic and delegated estimates exclude references and task-specific reads. Direct-section measurements count original source bytes, excluding reader framing; they do not measure a complete task context. Host tools, conversation, native memory and source-code reads are excluded. Semantic audit and representative task evidence remain required.",
   };
 }

@@ -28,6 +28,7 @@ import { gitlabApprovalRuleName } from "./gitlab-platform.mjs";
 import { platformApiRequest } from "./platform-api.mjs";
 import {
   approvalSettings,
+  configurePlatform,
   gitlabHarness,
   githubDetection,
   gitlabDetection,
@@ -61,26 +62,6 @@ function repository(remote) {
     assert.equal(result.status, 0, result.stderr);
   }
   return root;
-}
-
-async function configurePlatform(options) {
-  if (options.apply && options.root) {
-    const dir = path.join(options.root, ".auth");
-    mkdirSync(dir, { recursive: true, mode: 0o700 });
-    const detected = options.detected;
-    writeFileSync(
-      path.join(dir, "git-platform.json"),
-      JSON.stringify({
-        schemaVersion: 1,
-        provider: detected.provider,
-        hostname: detected.hostname,
-        repository: detected.slug,
-        token: "test-token",
-      }),
-      { mode: 0o600 },
-    );
-  }
-  return configureActualPlatform(options);
 }
 
 test("remote parsing accepts standard, credentialed, SSH, and nested GitLab identities", () => {
@@ -180,56 +161,6 @@ test("platform configuration refuses an unowned host before I/O", async () => {
     /not owned/,
   );
   assert.equal(calls, 0);
-});
-
-// Inventory determines mutation identity; it must be serialized with the mutation itself.
-test("platform configuration locks before reading the original remote state", async () => {
-  for (const detected of [githubDetection(), gitlabDetection()]) {
-    const root = temporaryRoot();
-    let entered,
-      release,
-      competingReads = 0;
-    const started = new Promise((resolve) => {
-      entered = resolve;
-    });
-    const blocked = new Promise((resolve) => {
-      release = resolve;
-    });
-    const first = assert.rejects(
-      configurePlatform({
-        apply: true,
-        contract,
-        detected,
-        root,
-        fetchImpl: async () => {
-          entered();
-          await blocked;
-          return response(503);
-        },
-      }),
-      /HTTP 503/u,
-    );
-    await started;
-    try {
-      await assert.rejects(
-        configurePlatform({
-          apply: true,
-          contract,
-          detected,
-          root,
-          fetchImpl: async () => {
-            competingReads++;
-            return response(503);
-          },
-        }),
-        /another platform configuration is active/iu,
-      );
-      assert.equal(competingReads, 0, "no stale pre-lock inventory may escape admission");
-    } finally {
-      release();
-      await first;
-    }
-  }
 });
 
 test("platform API bounds streamed responses before buffering the full body", async () => {

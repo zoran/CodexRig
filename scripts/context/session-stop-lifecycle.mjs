@@ -3,7 +3,10 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { discoverRecentCriticalBudgetHandover } from "./critical-budget-handover.mjs";
+import {
+  discoverRecentCriticalBudgetHandover,
+  hasCriticalBudgetHandoverForSession,
+} from "./critical-budget-handover.mjs";
 import { readProjectWorkContext, workContextResumeBoundary } from "./project-work-state.mjs";
 import { inspectRuntimeSessionLease } from "../repository/runtime-session-lease.mjs";
 import {
@@ -200,23 +203,23 @@ function prepareAutonomousContinuation(root, hookInput) {
 }
 
 function sealedHandoverStop(root, testHooks) {
-  const sealedHandover = discoverRecentCriticalBudgetHandover({ root, testHooks });
-  if (!sealedHandover) return null;
-
-  // A handover is terminal only for the runtime session that could have sealed it. A later
-  // canonical session still discovers the handover at SessionStart, but must be able to resume,
-  // continue and stop normally after the developer accepts it.
+  let session;
   try {
-    const session = inspectRuntimeSessionLease({ root });
-    if (
-      session.status === "active" &&
-      session.lease.sessionId !== sealedHandover.sealingSessionId
-    ) {
-      return null;
-    }
+    session = inspectRuntimeSessionLease({ root });
   } catch {
-    // Missing or unsafe lease evidence cannot weaken the terminal guarantee in the sealing session.
+    // Missing or unsafe lease evidence retains the conservative recent-handover fallback.
   }
+  // A current-session seal never expires or yields to another session's newer artifact. Startup
+  // still offers only recent candidates, and a later unsealed canonical session can resume work.
+  const sealed =
+    session?.status === "active"
+      ? hasCriticalBudgetHandoverForSession({
+          root,
+          sealingSessionId: session.lease.sessionId,
+          testHooks,
+        })
+      : discoverRecentCriticalBudgetHandover({ root, testHooks });
+  if (!sealed) return null;
   return {
     systemMessage:
       "A critical-budget handover is sealed for this runtime session. Stop completely: do not " +
