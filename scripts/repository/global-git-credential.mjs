@@ -33,6 +33,8 @@ function attributes(input) {
     const separator = line.indexOf("=");
     if (separator < 1) return null;
     const key = line.slice(0, separator);
+    // Git permits repeated list attributes; this username/password adapter ignores their metadata.
+    if (key.endsWith("[]")) continue;
     if (Object.hasOwn(values, key)) return null;
     values[key] = line.slice(separator + 1);
   }

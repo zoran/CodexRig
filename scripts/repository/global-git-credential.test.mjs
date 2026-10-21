@@ -23,6 +23,11 @@ import {
 } from "./project-tool-environment.mjs";
 
 const request = "protocol=https\nhost=github.com\npath=team/product.git\n\n";
+const listMetadata =
+  "capability[]=authtype\ncapability[]=state\n" +
+  'wwwauth[]=Basic realm="fixture"\nwwwauth[]=Bearer realm="fixture"\n' +
+  "state[]=fixture:first\nstate[]=fixture:second\n" +
+  "future[]=first\nfuture[]=\nfuture[]=second\n";
 const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
 
 function fixture(
@@ -34,6 +39,7 @@ function fixture(
     provider = "github",
     host = provider === "github" ? "github.com" : "gitlab.com",
     requestHost = host,
+    helperAttributes = "",
   } = {},
 ) {
   const directory = mkdtempSync(path.join(os.tmpdir(), "github fallback's "));
@@ -80,7 +86,7 @@ if(${JSON.stringify(isCli)}) {
   process.env[key]=path.join(process.env.HOME,'.local/state/dev-cloud-tools/user',${JSON.stringify(provider)},'config');
 }
 appendFileSync(${JSON.stringify(calls)}, JSON.stringify({args:process.argv.slice(2),home:process.env.HOME,ambient:process.env.GITHUB_TOKEN,ambientGitLab:process.env.GITLAB_TOKEN,gitConfig:process.env.GIT_CONFIG_COUNT,cliConfig:process.env.GH_CONFIG_DIR??process.env.GLAB_CONFIG_DIR})+'\\n');
-process.stdout.write(${JSON.stringify(`${isCli && provider === "gitlab" ? "capability[]=authtype\n" : ""}username=global-user\npassword=${isCli && !cli ? "cli-fixture-account" : globalPassword}\n${isCli && provider === "gitlab" ? "oauth_refresh_token=unused-fixture-refresh\n" : ""}\n`)});
+process.stdout.write(${JSON.stringify(`${helperAttributes}${isCli && provider === "gitlab" ? "capability[]=authtype\n" : ""}username=global-user\npassword=${isCli && !cli ? "cli-fixture-account" : globalPassword}\n${isCli && provider === "gitlab" ? "oauth_refresh_token=unused-fixture-refresh\n" : ""}\n`)});
 `,
       { mode: 0o700 },
     );
@@ -126,6 +132,24 @@ let input='';for await(const chunk of process.stdin)input+=chunk;process.stdout.
 }
 
 for (const provider of ["github", "gitlab"]) {
+  test(`${provider}: repeated Git transport metadata retains global credential fallback`, (t) => {
+    const f = fixture(t, { provider });
+    const result = globalGitCredential({
+      root: f.root,
+      hostHome: f.hostHome,
+      operation: "get",
+      input:
+        listMetadata +
+        request.replace("github.com", provider === "github" ? "github.com" : "gitlab.com"),
+      inherited: f.env,
+    });
+    assert.equal(result, "username=global-user\npassword=global-fixture-account\n\n");
+    assert.deepEqual(
+      f.calls().map(({ args }) => args),
+      [["get"]],
+    );
+  });
+
   test(`${provider}: rejected project and global credentials advance to the CLI account`, (t) => {
     const f = fixture(t, { provider, includeCli: true });
     const input = request.replace(
@@ -214,6 +238,43 @@ for (const provider of ["github", "gitlab"]) {
   });
 }
 
+test("CLI response list metadata is ignored without advertising new capabilities", (t) => {
+  const f = fixture(t, { cli: true, helperAttributes: listMetadata });
+  assert.equal(
+    globalGitCredential({
+      root: f.root,
+      hostHome: f.hostHome,
+      operation: "get",
+      input: request,
+      inherited: f.env,
+    }),
+    "username=global-user\npassword=global-fixture-account\n\n",
+  );
+});
+
+for (const duplicate of [
+  "username=global-user\n",
+  "password=global-fixture-account\n",
+  "protocol=https\nprotocol=https\n",
+  "host=github.com\nhost=github.com\n",
+  "path=team/product.git\npath=team/product.git\n",
+  "password_expiry_utc=9999999999\npassword_expiry_utc=9999999999\n",
+]) {
+  test(`CLI responses still reject duplicate ${duplicate.split("=")[0]} scalars`, (t) => {
+    const f = fixture(t, { cli: true, helperAttributes: listMetadata + duplicate });
+    assert.equal(
+      globalGitCredential({
+        root: f.root,
+        hostHome: f.hostHome,
+        operation: "get",
+        input: request,
+        inherited: f.env,
+      }),
+      "",
+    );
+  });
+}
+
 test("GitHub username matching follows the CLI's case-insensitive account contract", (t) => {
   const f = fixture(t, { cli: true });
   const result = f.git("fill", request.trim() + "\nusername=GLOBAL-USER\n\n");
@@ -270,11 +331,13 @@ test("rejection evidence is private, request-bound, distinct and removed at oper
       input,
       inherited: { ...f.env, ...recovery.environment },
     });
-  const rejected = request.trim() + "\nusername=user\npassword=deliberately-invalid-fixture\n\n";
+  const rejected =
+    listMetadata + request.trim() + "\nusername=user\npassword=deliberately-invalid-fixture\n\n";
   for (const input of [
     rejected.replace("github.com", "gitlab.com"),
     rejected.replace("team/product.git", "other/private.git"),
     rejected.replace("https", "http"),
+    rejected.replace("password=", "password=deliberately-invalid-fixture\npassword="),
   ]) {
     assert.equal(invoke(input), "");
     assert.equal(recovery.canRetry(), false);
@@ -431,13 +494,26 @@ test("other hosts, insecure transport, malformed requests and writes never consu
     request.replace("github.com", "github.com.attacker.invalid"),
     request.replace("https", "http"),
     request.replace("path=", "host="),
+    ...[
+      "protocol=https",
+      "host=github.com",
+      "path=team/product.git",
+      "username=global-user",
+      "password=",
+      "password_expiry_utc=9999999999",
+    ].map((field) => `${field}\n${field}\n${request}`),
+    request.replace("protocol=", "protocol[]="),
+    `capability[]\n${request}`,
+    `capability[]=bad\0value\n${request}`,
+    `capability[]=bad\rvalue\n${request}`,
+    `capability[]=${"x".repeat(64 * 1024)}\n${request}`,
   ]) {
     assert.equal(
       globalGitCredential({
         root: f.root,
         hostHome: f.hostHome,
         operation: "get",
-        input,
+        input: listMetadata + input,
         inherited: f.env,
       }),
       "",
