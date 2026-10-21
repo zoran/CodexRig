@@ -40,9 +40,14 @@ without refreshing tools or dependencies. See
 maintenance behavior and failure handling, and
 [Startup Repository Reconstruction](instructions.md#startup-repository-reconstruction) for recovery.
 
-Startup omits routine notices about skipped pnpm releases and sufficient free storage. Progress,
-storage pressure, recovery and failures remain visible. Direct toolchain maintenance without
-`--startup` retains those diagnostic details.
+If a framework defect prevents startup, update the source clone with `git pull --ff-only` from a
+normal terminal, then retry the launcher. The updated source can also preview and reconcile a child
+without starting it; follow [Update Generated Projects](#update-generated-projects) and stop all
+target sessions before applying the update.
+
+Startup omits routine notices about skipped Node.js/pnpm releases and sufficient free storage.
+Progress, storage pressure, recovery and failures remain visible. Direct toolchain maintenance
+without `--startup` retains those diagnostic details.
 
 If verification or another lifecycle operation is still running, startup waits at both the project
 and shared-tool installation boundaries, for up to ten minutes per boundary. It reports which

@@ -132,10 +132,12 @@ export function nativePnpmArtifactUrls(version) {
   });
 }
 
-function nodeArtifactUrls(version) {
+/** Node binaries must cover every platform; a source-archive fallback is not equivalent. */
+export function nativeNodeArtifactUrls(version) {
+  parseSemver(version, "Native Node version");
   const release = `https://nodejs.org/dist/v${version}/node-v${version}`;
   const musl = `https://unofficial-builds.nodejs.org/download/release/v${version}/node-v${version}`;
-  return {
+  return Object.freeze({
     "linux-arm64": `${release}-linux-arm64.tar.gz`,
     "linux-arm64-musl": `${musl}-linux-arm64-musl.tar.gz`,
     "linux-x64": `${release}-linux-x64.tar.gz`,
@@ -143,7 +145,7 @@ function nodeArtifactUrls(version) {
     "macos-arm64": `${release}-darwin-arm64.tar.gz`,
     "macos-x64": `${release}-darwin-x64.tar.gz`,
     "windows-x64": `${release}-win-x64.zip`,
-  };
+  });
 }
 
 function uniqueLockedField(block, field) {
@@ -176,7 +178,8 @@ export function candidateMiseLockFindings(content, versionLists) {
         ),
       ),
     ];
-    const urls = tool === "pnpm" ? nativePnpmArtifactUrls(version) : nodeArtifactUrls(version);
+    const urls =
+      tool === "pnpm" ? nativePnpmArtifactUrls(version) : nativeNodeArtifactUrls(version);
     if (platformBlocks.map((match) => match[1]).join(",") !== Object.keys(urls).join(","))
       findings.push(`mise.lock ${tool} platforms must match the supported artifact matrix exactly`);
     const backend = tool === "node" ? "core:node" : "aqua:pnpm/pnpm";

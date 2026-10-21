@@ -62,6 +62,15 @@ function omitForeignArtifact(lock) {
   return altered;
 }
 
+function nodeSourceFallback(lock) {
+  const altered = lock.replace(
+    /url = "https:\/\/unofficial-builds\.nodejs\.org\/download\/release\/v([^/]+)\/node-v[^/]+-linux-arm64-musl\.tar\.gz"/u,
+    (_, version) => `url = "https://nodejs.org/dist/v${version}/node-v${version}.tar.gz"`,
+  );
+  assert.notEqual(altered, lock, "fixture must contain the native Node musl binary");
+  return altered;
+}
+
 async function heldVerification(root, operation = "verification") {
   const module = new URL("../repository/runtime-session-lease.mjs", import.meta.url).href;
   const child = spawn(
@@ -358,54 +367,59 @@ for (const scope of ["project", "shared"]) {
   });
 }
 
-for (const mutationAt of ["before-install", "after-dependencies"]) {
-  test(`maintenance rejects an incomplete foreign platform ${mutationAt} without publishing`, async (t) => {
-    const root = fixture(t);
-    if (mutationAt === "before-install") {
-      const file = path.join(root, ".codex/mise.lock");
-      writeFileSync(file, omitForeignArtifact(readFileSync(file, "utf8")));
-    }
-    const before = new Map(
-      [...toolchainConfigurationPaths, "package.json", "pnpm-lock.yaml"].map((relative) => [
-        relative,
-        readFileSync(path.join(root, relative), "utf8"),
-      ]),
-    );
-    const calls = [];
-    await assert.rejects(
-      maintainToolchain({
-        prepareStorage: () => {},
-        root,
-        locked: true,
-        fetchImpl: async () => {
-          throw new Error("locked candidate must not use network");
-        },
-        installBootstrapTools: async () => ({ mise: "fixture-mise", codex: "fixture-codex" }),
-        admitProjectTools: () => {},
-        runCommand: (command, args, options = {}) => {
-          calls.push(args);
-          if (args.includes("--stage-locked")) {
-            const file = path.join(options.cwd, ".codex/mise.lock");
-            writeFileSync(file, omitForeignArtifact(readFileSync(file, "utf8")));
-            writeFileSync(
-              path.join(options.cwd, "pnpm-lock.yaml"),
-              "lockfileVersion: '9.0'\n# candidate\n",
-            );
-          }
-          return "";
-        },
-      }),
-      /Candidate toolchain lock is invalid:.*linux-arm64-musl/u,
-    );
-    assert.equal(
-      calls.some((args) => args.includes("--reproduce-toolchain")),
-      false,
-    );
-    if (mutationAt === "before-install") assert.deepEqual(calls, []);
-    else assert.ok(calls.some((args) => args.includes("--stage-locked")));
-    for (const [relative, bytes] of before)
-      assert.equal(readFileSync(path.join(root, relative), "utf8"), bytes);
-    assert.equal(inspectRuntimeLifecycleLock({ root }).status, "absent");
-    assert.equal(existsSync(path.join(root, ".project-state/repository-housekeeping")), false);
-  });
+for (const [label, corruptLock] of [
+  ["an incomplete foreign pnpm platform", omitForeignArtifact],
+  ["a Node musl source fallback", nodeSourceFallback],
+]) {
+  for (const mutationAt of ["before-install", "after-dependencies"]) {
+    test(`maintenance rejects ${label} ${mutationAt} without publishing`, async (t) => {
+      const root = fixture(t);
+      if (mutationAt === "before-install") {
+        const file = path.join(root, ".codex/mise.lock");
+        writeFileSync(file, corruptLock(readFileSync(file, "utf8")));
+      }
+      const before = new Map(
+        [...toolchainConfigurationPaths, "package.json", "pnpm-lock.yaml"].map((relative) => [
+          relative,
+          readFileSync(path.join(root, relative), "utf8"),
+        ]),
+      );
+      const calls = [];
+      await assert.rejects(
+        maintainToolchain({
+          prepareStorage: () => {},
+          root,
+          locked: true,
+          fetchImpl: async () => {
+            throw new Error("locked candidate must not use network");
+          },
+          installBootstrapTools: async () => ({ mise: "fixture-mise", codex: "fixture-codex" }),
+          admitProjectTools: () => {},
+          runCommand: (command, args, options = {}) => {
+            calls.push(args);
+            if (args.includes("--stage-locked")) {
+              const file = path.join(options.cwd, ".codex/mise.lock");
+              writeFileSync(file, corruptLock(readFileSync(file, "utf8")));
+              writeFileSync(
+                path.join(options.cwd, "pnpm-lock.yaml"),
+                "lockfileVersion: '9.0'\n# candidate\n",
+              );
+            }
+            return "";
+          },
+        }),
+        /Candidate toolchain lock is invalid:.*linux-arm64-musl/u,
+      );
+      assert.equal(
+        calls.some((args) => args.includes("--reproduce-toolchain")),
+        false,
+      );
+      if (mutationAt === "before-install") assert.deepEqual(calls, []);
+      else assert.ok(calls.some((args) => args.includes("--stage-locked")));
+      for (const [relative, bytes] of before)
+        assert.equal(readFileSync(path.join(root, relative), "utf8"), bytes);
+      assert.equal(inspectRuntimeLifecycleLock({ root }).status, "absent");
+      assert.equal(existsSync(path.join(root, ".project-state/repository-housekeeping")), false);
+    });
+  }
 }

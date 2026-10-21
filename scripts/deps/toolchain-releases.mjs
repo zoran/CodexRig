@@ -26,7 +26,10 @@ import {
   miseBinaryPlatforms,
   validateToolchainConfiguration,
 } from "../contracts/toolchain-configuration.mjs";
-import { nativePnpmArtifactUrls } from "../contracts/mise-toolchain-configuration.mjs";
+import {
+  nativeNodeArtifactUrls,
+  nativePnpmArtifactUrls,
+} from "../contracts/mise-toolchain-configuration.mjs";
 
 /** Reads bounded public metadata or release bytes without credentials or cached fallback. */
 export async function releaseBytes(url, maximumBytes, fetchImpl = globalThis.fetch) {
@@ -76,12 +79,12 @@ export function latestCompatibleVersion(versions, range, current) {
   return selected;
 }
 
-async function nativeArtifactAvailable(url, fetchImpl) {
+async function nativeArtifactAvailable(tool, url, fetchImpl) {
   let address = new URL(url);
   const signal = AbortSignal.timeout(180_000);
   for (let redirects = 0; redirects <= 4; redirects += 1) {
     if (address.protocol !== "https:" || address.username || address.password)
-      throw new Error("Native pnpm artifact sources must use public HTTPS.");
+      throw new Error(`Native ${tool} artifact sources must use public HTTPS.`);
     const response = await fetchImpl(address.href, {
       method: "HEAD",
       redirect: "manual",
@@ -95,28 +98,35 @@ async function nativeArtifactAvailable(url, fetchImpl) {
     if (response.status === 404 && redirects === 0) return false;
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get("location");
-      if (!location) throw new Error("Native pnpm artifact redirect has no location.");
+      if (!location) throw new Error(`Native ${tool} artifact redirect has no location.`);
       address = new URL(location, address);
       continue;
     }
     throw new Error(
-      `Native pnpm artifact lookup returned HTTP ${response.status}; release availability is indeterminate.`,
+      `Native ${tool} artifact lookup returned HTTP ${response.status}; release availability is indeterminate.`,
     );
   }
-  throw new Error("Native pnpm artifact lookup exceeded its redirect bound.");
+  throw new Error(`Native ${tool} artifact lookup exceeded its redirect bound.`);
 }
 
-async function missingNativePnpmPlatforms(version, fetchImpl) {
-  const artifacts = Object.entries(nativePnpmArtifactUrls(version));
+async function missingNativePlatforms(tool, version, fetchImpl) {
+  const urls = tool === "node" ? nativeNodeArtifactUrls(version) : nativePnpmArtifactUrls(version);
+  const artifacts = Object.entries(urls);
   const results = await Promise.allSettled(
-    artifacts.map(([, url]) => nativeArtifactAvailable(url, fetchImpl)),
+    artifacts.map(([, url]) => nativeArtifactAvailable(tool, url, fetchImpl)),
   );
   for (const result of results) if (result.status === "rejected") throw result.reason;
   return artifacts.filter((_, index) => !results[index].value).map(([platform]) => platform);
 }
 
-async function latestCompatibleNativePnpm(versions, range, current, { fetchImpl, onProgress }) {
-  // Keep the shared freshness check: absence of a non-older npm version is indeterminate.
+async function latestCompatibleNativeVersion(
+  tool,
+  versions,
+  range,
+  current,
+  { fetchImpl, onProgress },
+) {
+  // Keep the shared freshness check: absence of a non-older eligible version is indeterminate.
   latestCompatibleVersion(versions, range, current);
   const candidates = versions
     .filter(
@@ -128,19 +138,21 @@ async function latestCompatibleNativePnpm(versions, range, current, { fetchImpl,
     .sort((left, right) => compareSemver(right, left));
   let skipped = false;
   for (const version of candidates) {
-    const missing = await missingNativePnpmPlatforms(version, fetchImpl);
+    const missing = await missingNativePlatforms(tool, version, fetchImpl);
     if (missing.length) {
       onProgress(
-        `Skipping pnpm ${version}: official native artifacts missing for ${missing.join(", ")}.`,
+        `Skipping ${tool} ${version}: official native artifacts missing for ${missing.join(", ")}.`,
       );
       skipped = true;
       continue;
     }
     if (skipped && version === current)
-      onProgress(`Retaining pnpm ${current}: all required native artifacts are available.`);
+      onProgress(`Retaining ${tool} ${current}: all required native artifacts are available.`);
     return version;
   }
-  throw new Error("No complete compatible native pnpm release is available; refusing a downgrade.");
+  throw new Error(
+    `No complete compatible native ${tool} release is available; refusing a downgrade.`,
+  );
 }
 
 function npmUrl(name, version = "") {
@@ -211,10 +223,12 @@ export async function resolveCompatibilityToolchain(
   const requested = /^\d+$/u.test(track.node)
     ? `>=${track.node}.0.0 <${Number(track.node) + 1}.0.0`
     : `>=${track.node} <=${track.node}`;
-  matrix.stable.node.version = latestCompatibleVersion(
+  matrix.stable.node.version = await latestCompatibleNativeVersion(
+    "node",
     nodes.map((entry) => entry.version.replace(/^v/u, "")),
     requested,
     /^\d+$/u.test(track.node) ? `${track.node}.0.0` : track.node,
+    { fetchImpl, onProgress: () => {} },
   );
   const pnpm = await npmRelease("pnpm", track.pnpm, fetchImpl);
   parseSemver(pnpm.version, "Compatibility pnpm");
@@ -223,7 +237,7 @@ export async function resolveCompatibilityToolchain(
     !versionMatchesReleaseSelector(matrix.ci.codexVersion, track.codex)
   )
     throw new Error("Resolved compatibility release does not match its declared selector.");
-  const missing = await missingNativePnpmPlatforms(pnpm.version, fetchImpl);
+  const missing = await missingNativePlatforms("pnpm", pnpm.version, fetchImpl);
   if (missing.length)
     throw new Error(
       `Compatibility pnpm ${pnpm.version} is missing official native artifacts for ${missing.join(", ")}.`,
@@ -249,12 +263,15 @@ export async function resolveToolchainReleases(
   ]);
   for (const result of results) if (result.status === "rejected") throw result.reason;
   const [nodes, pnpm, matrix, mise] = results.map((result) => result.value);
-  matrix.stable.node.version = latestCompatibleVersion(
+  matrix.stable.node.version = await latestCompatibleNativeVersion(
+    "node",
     nodes.filter((entry) => entry.lts).map((entry) => entry.version.replace(/^v/u, "")),
     current.stable.node.range,
     current.stable.node.version,
+    { fetchImpl, onProgress },
   );
-  matrix.stable.pnpm.version = await latestCompatibleNativePnpm(
+  matrix.stable.pnpm.version = await latestCompatibleNativeVersion(
+    "pnpm",
     Object.keys(pnpm.versions ?? {}),
     current.stable.pnpm.range,
     current.stable.pnpm.version,

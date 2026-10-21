@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   candidateMiseLockFindings,
+  nativeNodeArtifactUrls,
   nativePnpmArtifactUrls,
 } from "./mise-toolchain-configuration.mjs";
 
@@ -38,6 +39,24 @@ function candidate() {
     nativeBlock("pnpm", pins.pnpm[0], nativePnpmArtifactUrls(pins.pnpm[0]))
   );
 }
+
+test("native Node release admission retains all seven exact supported binary URLs", () => {
+  assert.deepEqual(nativeNodeArtifactUrls("24.21.0"), nodeArtifacts);
+  assert.ok(Object.isFrozen(nativeNodeArtifactUrls("24.21.0")));
+  assert.throws(() => nativeNodeArtifactUrls("24.21.0/other"), /version/iu);
+});
+
+test("candidate admission rejects a Node source archive in place of a missing musl binary", () => {
+  const content = candidate();
+  const fallback = content.replace(
+    nodeArtifacts["linux-arm64-musl"],
+    "https://nodejs.org/dist/v24.21.0/node-v24.21.0.tar.gz",
+  );
+  assert.match(
+    candidateMiseLockFindings(fallback, pins).join("\n"),
+    /node linux-arm64-musl URL must match its official versioned artifact exactly once/u,
+  );
+});
 
 test("native pnpm release admission retains all six exact supported artifact URLs", () => {
   const release = "https://github.com/pnpm/pnpm/releases/download/v11.28.0";

@@ -1035,7 +1035,10 @@
       ".agents/skills/reset-framework/scripts/publication-integration.test.mjs"
     ],
     "scripts/contracts/mise-toolchain-configuration.mjs": [
-      "scripts/contracts/mise-toolchain-configuration.test.mjs"
+      "scripts/contracts/mise-toolchain-configuration.test.mjs",
+      "scripts/deps/toolchain-releases.test.mjs",
+      "scripts/deps/toolchain-maintenance.test.mjs",
+      "scripts/framework/toolchain-maintenance.test.mjs"
     ],
     "scripts/verify/verification-check-inputs.mjs": [
       "scripts/goals/project-publication-integration.test.mjs",

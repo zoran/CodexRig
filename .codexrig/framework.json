@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "frameworkId": "codexrig",
-  "frameworkVersion": "6.19.0",
+  "frameworkVersion": "6.20.0",
   "compatibilityFile": ".codexrig/compatibility.json",
   "projectToolsFile": ".codexrig/project-tools.json"
 }

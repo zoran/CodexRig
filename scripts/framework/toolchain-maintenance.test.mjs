@@ -162,7 +162,11 @@ function registry({ tamper = false, newerNode = false } = {}) {
       ];
     else if (decoded === "https://registry.npmjs.org/pnpm")
       data = { versions: { [matrix.stable.pnpm.version]: {}, "12.0.0": {} } };
-    else if (decoded.startsWith("https://github.com/pnpm/pnpm/releases/download/"))
+    else if (
+      decoded.startsWith("https://github.com/pnpm/pnpm/releases/download/") ||
+      /^https:\/\/nodejs\.org\/dist\/v[^/]+\/node-v/u.test(decoded) ||
+      /^https:\/\/unofficial-builds\.nodejs\.org\/download\/release\/v[^/]+\/node-v/u.test(decoded)
+    )
       return new Response(null, { status: 200 });
     else if (decoded.startsWith("https://registry.npmjs.org/pnpm/"))
       data = {
@@ -486,7 +490,7 @@ for (const failure of ["network", "peer", "reproduce", "concurrent", "pending", 
     const runCommand = (command, args, options = {}) => {
       calls.push([command, ...args]);
       if (args[0] === "--version") return matrix.ci.miseVersion;
-      if (args[0] === "lock" && failure === "reproduce") {
+      if (args[0] === "lock" && ["none", "reproduce"].includes(failure)) {
         const file = path.join(options.cwd, ".codex/mise.lock");
         writeFileSync(
           file,
@@ -511,7 +515,7 @@ for (const failure of ["network", "peer", "reproduce", "concurrent", "pending", 
           ? async () => {
               throw new Error("registry unavailable");
             }
-          : registry({ newerNode: failure === "reproduce" }),
+          : registry({ newerNode: ["none", "reproduce"].includes(failure) }),
       runCommand,
       spawnGit: githubGitFixture,
       installBootstrapTools: async () => ({ mise: "mise", codex: "codex" }),
@@ -520,6 +524,11 @@ for (const failure of ["network", "peer", "reproduce", "concurrent", "pending", 
     if (failure === "none") {
       const result = await operation;
       assert.ok(result.changedPaths.includes("pnpm-lock.yaml"));
+      assert.ok(result.changedPaths.includes(".codex/mise.lock"));
+      assert.match(
+        readFileSync(path.join(root, ".codex/mise.lock"), "utf8"),
+        /https:\/\/unofficial-builds\.nodejs\.org\/download\/release\/v24\.99\.0\/node-v24\.99\.0-linux-arm64-musl\.tar\.gz/u,
+      );
       assert.ok(calls.some((args) => args.includes("--reproduce-toolchain")));
     } else {
       await assert.rejects(

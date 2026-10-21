@@ -202,34 +202,34 @@ upgradeable product repositories while deliberately defining no child product or
   user's shared pnpm store. Existing repository-local package installations are rebuilt through pnpm
   while preserving the lockfile. Failures retain bounded, sanitized pnpm diagnostics. Canonical
   startup invokes the same owner's compatible project-pinned toolchain and reviewed stable CI
-  maintenance. Native pnpm release selection probes every supported platform archive over public
-  HTTPS and retains the current complete release when newer releases lack artifacts; unavailable
-  metadata remains a startup error. The shared toolchain contract validates staged lockfiles before
-  installation and publication as well as during repository verification. Mise versions/checksums
-  come from its official public distribution; action pins come from isolated native Git tags with
-  commit verification for newer releases, avoiding GitHub REST quotas and credentials. Official Mise
-  binaries, complete Codex platform bundles and their integrity records use
-  `~/.local/share/project-tools/tools`; Mise runtimes and pnpm payloads also use this user storage
-  owner. Shared native installation uses the existing lifecycle lock at the shared root; per-project
-  credentials remain isolated. pnpm's global virtual store deduplicates dependency graphs, with
-  project links/metadata only. Verified legacy native bundles can migrate without downloads;
-  successful quiescent startup retires their legacy copies. `tool-storage-housekeeping.mjs` composes
-  native Mise/pnpm/npm collectors at startup and housekeeping, without installation or tests. Shared
-  runtime/bundle collection uses Mise's existing public pin registry across projects; package GC
-  uses pnpm's registry. Private Mise configuration or a project root that fails canonical-path,
-  ownership or write-permission admission defers shared runtime and bundle collection with a
-  diagnostic while startup and independent collectors continue. Primary/secondary pins, live
-  executables/libraries, accounts and installed projects' offline inputs are retained. The shared
-  lifecycle lock covers staged installation through pin publication and cleanup. Startup acquires
-  the project lock before this shared lock, waits for confirmed active owners at either boundary,
-  and revalidates worktree/session ownership and staged inputs before installation. Other explicit
-  maintenance remains fail-fast under contention. Known legacy cache/data permissions are normalized
-  only under verified private parents through the filesystem owner. Old active runtimes and unmarked
-  product state remain with their migration owner. Stable CI uses the same maintenance owner with
-  `--locked`, skipping release refresh and reproducing frozen dependencies before entering the
-  common command wrapper. Toolchain, dependency, native-tool and public-release staging use the
-  shared execution-scoped temporary owner, including recovery after interruption; account state and
-  retained tool pins stay outside disposable staging.
+  maintenance. Native Node.js and pnpm release selection probes every supported platform archive
+  over public HTTPS and retains the current complete release when newer releases lack artifacts;
+  unavailable metadata remains a startup error. The shared toolchain contract validates staged
+  lockfiles before installation and publication as well as during repository verification. Mise
+  versions/checksums come from its official public distribution; action pins come from isolated
+  native Git tags with commit verification for newer releases, avoiding GitHub REST quotas and
+  credentials. Official Mise binaries, complete Codex platform bundles and their integrity records
+  use `~/.local/share/project-tools/tools`; Mise runtimes and pnpm payloads also use this user
+  storage owner. Shared native installation uses the existing lifecycle lock at the shared root;
+  per-project credentials remain isolated. pnpm's global virtual store deduplicates dependency
+  graphs, with project links/metadata only. Verified legacy native bundles can migrate without
+  downloads; successful quiescent startup retires their legacy copies.
+  `tool-storage-housekeeping.mjs` composes native Mise/pnpm/npm collectors at startup and
+  housekeeping, without installation or tests. Shared runtime/bundle collection uses Mise's existing
+  public pin registry across projects; package GC uses pnpm's registry. Private Mise configuration
+  or a project root that fails canonical-path, ownership or write-permission admission defers shared
+  runtime and bundle collection with a diagnostic while startup and independent collectors continue.
+  Primary/secondary pins, live executables/libraries, accounts and installed projects' offline
+  inputs are retained. The shared lifecycle lock covers staged installation through pin publication
+  and cleanup. Startup acquires the project lock before this shared lock, waits for confirmed active
+  owners at either boundary, and revalidates worktree/session ownership and staged inputs before
+  installation. Other explicit maintenance remains fail-fast under contention. Known legacy
+  cache/data permissions are normalized only under verified private parents through the filesystem
+  owner. Old active runtimes and unmarked product state remain with their migration owner. Stable CI
+  uses the same maintenance owner with `--locked`, skipping release refresh and reproducing frozen
+  dependencies before entering the common command wrapper. Toolchain, dependency, native-tool and
+  public-release staging use the shared execution-scoped temporary owner, including recovery after
+  interruption; account state and retained tool pins stay outside disposable staging.
 - Runtime and technology: Node.js ESM orchestrating the pnpm and mise toolchain.
 - Public contract: `deps:install`, `deps:report`, and `deps:update*` commands; the
   lifecycle-delegated `install-compatible.mjs --reproduce-locked` and `--reproduce-toolchain`
@@ -662,7 +662,7 @@ upgradeable product repositories while deliberately defining no child product or
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `6.19.0`.
+- Framework version: `6.20.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->
