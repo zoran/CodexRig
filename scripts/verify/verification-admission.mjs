@@ -23,21 +23,43 @@ import {
 import {
   categoryConsumerKeys,
   effectiveCategories,
-  exactConsumerRegistry,
   ownedCategoryConsumers,
   removedFrameworkSourceConsumers,
 } from "./verification-admission-registry.mjs";
-const explicitTestConsumerRegistry = new Map(
-  Object.entries(readVerificationConfiguration().testConsumers),
-);
+const defaultConfiguration = readVerificationConfiguration();
 export function entryRouting({
   entry,
   available,
   repositoryRoot,
   verifyOnlyRootManifest,
   workspaceManifests,
+  configuration = defaultConfiguration,
 }) {
+  const focusedConsumer = (testPath) => {
+    const owner = [...available.values()].find((command) => commandCoversTest(command, testPath));
+    return {
+      ...focusedTestCommand(testPath, entry.path),
+      ...(owner
+        ? {
+            reuseMaxAgeMs: owner.reuseMaxAgeMs,
+            diagnosticAfterMs: owner.diagnosticAfterMs,
+            cancellable: owner.cancellable,
+          }
+        : {}),
+    };
+  };
   const categories = effectiveCategories(entry, { verifyOnlyRootManifest });
+  if (configuration.sharedInputs?.includes(entry.path)) {
+    const commands = [...available.values()].filter((command) => !command.coveredBy);
+    return {
+      categories: categories.filter(
+        (category) => category !== "unknown or incomplete change scope",
+      ),
+      ownerKeys: commands.map((command) => command.key),
+      readOnlyCommands: commands,
+      workspaceDirectories: workspaceManifests.map((manifest) => manifest.directory),
+    };
+  }
   if (categories.includes("editorial source change")) {
     const commands = selectCommands(available, [
       "format",
@@ -62,7 +84,7 @@ export function entryRouting({
     directOwners.forEach((command) => ownerKeys.add(command.key));
     hasExactOwner = true;
   }
-  const exactKeys = exactConsumerRegistry.get(entry.path) ?? [];
+  const exactKeys = configuration.exactConsumers[entry.path] ?? [];
   const exactCommands = selectCommands(available, exactKeys);
   if (exactCommands.length > 0) {
     commands.push(...exactCommands);
@@ -73,7 +95,7 @@ export function entryRouting({
     testPath &&
     ![...exactCommands, ...directOwners].some((command) => commandCoversTest(command, testPath))
   ) {
-    const command = focusedTestCommand(testPath, entry.path);
+    const command = focusedConsumer(testPath);
     commands.push(command);
     ownerKeys.add(command.key);
   }
@@ -87,11 +109,11 @@ export function entryRouting({
     removalCommands.forEach((command) => ownerKeys.add(command.key));
     hasExactOwner = true;
   }
-  for (const consumerTest of explicitTestConsumerRegistry.get(entry.path) ?? []) {
+  for (const consumerTest of configuration.testConsumers[entry.path] ?? []) {
     if (!existsSync(path.join(repositoryRoot, ...consumerTest.split("/")))) continue;
     const registered = selectCommands(
       available,
-      exactConsumerRegistry.get(consumerTest) ?? [],
+      configuration.exactConsumers[consumerTest] ?? [],
     ).filter((command) => commandCoversTest(command, consumerTest));
     if (registered.length) {
       commands.push(...registered);
@@ -99,7 +121,7 @@ export function entryRouting({
       hasExactOwner = true;
       continue;
     }
-    const command = focusedTestCommand(consumerTest, entry.path);
+    const command = focusedConsumer(consumerTest);
     commands.push(command);
     ownerKeys.add(command.key);
     hasExactOwner = true;
@@ -150,10 +172,20 @@ export function entryRouting({
     const manifestPath = manifestPathForPackageContract(entry.path);
     if (manifestPath && existsSync(path.join(repositoryRoot, ...manifestPath.split("/")))) {
       const manifestCommand = focusedManifestCommand(manifestPath);
+      const complete = available.get("package-manifests");
+      if (
+        complete?.executable === manifestCommand.executable &&
+        complete.args.length === 1 &&
+        complete.args[0] === manifestCommand.args[0] &&
+        !complete.artifactOwners?.length &&
+        !complete.outputs?.length
+      )
+        manifestCommand.coveredBy = complete.key;
       commands.push(manifestCommand);
       ownerKeys.add(manifestCommand.key);
     }
-    for (const key of ["dependencies", "repository-smoke"]) {
+    // Bind complete-check inputs without widening the focused development execution.
+    for (const key of ["dependencies", "repository-smoke", "package-manifests"]) {
       if (available.has(key)) ownerKeys.add(key);
     }
   }
@@ -169,6 +201,7 @@ export function entryRouting({
   );
   const ownerWorkspaceCommands = workspaceLifecycleCommands(selectedWorkspaceManifests, {
     mode: "changed",
+    dependencyManifests: workspaceManifests,
   });
   if (
     categories.some((category) =>
@@ -183,7 +216,9 @@ export function entryRouting({
   }
 
   return {
-    categories,
+    categories: hasExactOwner
+      ? categories.filter((category) => category !== "unknown or incomplete change scope")
+      : categories,
     ownerKeys: [...ownerKeys].sort(),
     readOnlyCommands: commands,
     workspaceDirectories: selectedWorkspaceManifests.map((manifest) => manifest.directory),
@@ -205,8 +240,10 @@ export function buildFocusedVerification({
     categories: effectiveCategories(entry, { verifyOnlyRootManifest }),
   }));
   const workspaceCommands = workspaceLifecycleCommands(
-    selectChangedWorkspaceManifests(workspaceManifests, effectiveEntries, { repositoryRoot }),
-    { mode: "changed" },
+    effectiveEntries.some((entry) => defaultConfiguration.sharedInputs?.includes(entry.path))
+      ? workspaceManifests
+      : selectChangedWorkspaceManifests(workspaceManifests, effectiveEntries, { repositoryRoot }),
+    { mode: "changed", dependencyManifests: workspaceManifests },
   );
   let hasRoutablePath = false;
 

@@ -135,7 +135,12 @@ test("implemented files require exactly one real current module owner", (t) => {
 
   assert.deepEqual(
     projectManifestFindings({
-      content: manifest(moduleEntry("Orders", "src/orders")),
+      content: manifest(
+        moduleEntry("Orders", "src/orders").replace(
+          "Owns the Orders capability.",
+          "Validates each candidate order and rejects a proposed order without authorization.",
+        ),
+      ),
       relativePaths,
       root,
     }),

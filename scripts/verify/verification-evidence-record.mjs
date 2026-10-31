@@ -101,7 +101,7 @@ export function fullVerificationEvidenceRecord(inputs, gitBasis, now = new Date(
     },
     kind: evidenceKind,
     recordedAt: now,
-    schemaVersion: 4,
+    schemaVersion: 5,
     transitionCount: 0,
   });
 }
@@ -131,7 +131,7 @@ export function checkpointVerificationEvidenceRecord(record, checks, sourceFiles
           current: null,
           foundation: null,
           kind: evidenceKind,
-          schemaVersion: 4,
+          schemaVersion: 5,
           transitionCount: 0,
         }),
     checks,
@@ -154,7 +154,7 @@ export function validateVerificationEvidenceRecord(record) {
       "transitionCount",
     ]) ||
     record.kind !== evidenceKind ||
-    record.schemaVersion !== 4 ||
+    record.schemaVersion !== 5 ||
     !validDigest(record.recordDigest) ||
     !validTimestamp(record.recordedAt) ||
     !Number.isSafeInteger(record.transitionCount) ||
@@ -163,9 +163,20 @@ export function validateVerificationEvidenceRecord(record) {
     record.checks.length > 2000 ||
     record.checks.some(
       (item, index) =>
-        !exactKeys(item, ["key", "fingerprint"]) ||
+        !exactKeys(item, [
+          "key",
+          "fingerprint",
+          "completedAt",
+          "elapsedMs",
+          ...(item.outputFingerprint === undefined ? [] : ["outputFingerprint"]),
+        ]) ||
+        (item.outputFingerprint !== undefined && !validDigest(item.outputFingerprint)) ||
         !/^[a-z0-9][a-z0-9:_-]*$/u.test(item.key) ||
         !validDigest(item.fingerprint) ||
+        !validTimestamp(item.completedAt) ||
+        Date.parse(item.completedAt) > Date.parse(record.recordedAt) ||
+        !Number.isSafeInteger(item.elapsedMs) ||
+        item.elapsedMs < 0 ||
         record.checks.findIndex((entry) => entry.key === item.key) !== index,
     ) ||
     !Array.isArray(record.observedFiles) ||

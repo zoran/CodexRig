@@ -9,56 +9,35 @@ description:
 
 # Security Review
 
-Review the implemented change and report findings; do not edit files.
+Review only; report defects and uncertainty without editing or widening authority. Select relevant
+lanes from the changed inputs, principals, data flows and operational powers; do not audit unrelated
+account lifecycles for a shell-only change.
 
-## Review
+- Authentication and authorization are separate: inspect enrollment/binding/recovery/revocation and
+  deny-by-default server-side action/resource decisions, horizontal/vertical access and role scope.
+  Token presence, UI state and caller claims are not authorization. Follow
+  [permission design](../../../instructions.md#permission-design), including operational role cost.
+- Account lifecycle and domain profiles are separate: review linking, suspension/deletion,
+  retention, administration/impersonation, provider reconciliation and orphan prevention where
+  affected.
+- Sessions/tokens need appropriate issuance, binding, protected storage, rotation/expiry, logout,
+  replay/refresh and CSRF handling. Secrets and sensitive identity must not enter URLs, logs,
+  analytics, client-readable storage or errors. Inspect outage/recovery behavior.
+- Tenant context comes from verified membership/domain or signed integration/job/control-plane
+  sources. Trace immutable request/job context through authorization, queries, caches, files,
+  messages, jobs, quotas and data lifecycle. Test cross-tenant and asynchronous denial paths;
+  authentication, RLS or network separation alone is insufficient. Global access needs explicit
+  purpose, ownership and audit.
+- Keep identity-provider SDKs and foreign models behind narrow adapters. Inspect actual trust at
+  shell arguments, filesystem/symlink/archive boundaries, hooks, dependencies/install scripts, CI
+  and network errors. Infrastructure review includes state/plan exposure, locks, environment
+  credentials and destructive/uncertain-change recovery.
+- Assess relevant private-data retention/disclosure, encoding, abuse controls and resource
+  exhaustion. For evidence stores examine incomplete/tampered/aborted records, identity and
+  freshness as well as ordinary success. Local same-user caches are not external cryptographic
+  attestations.
 
-1. Map the changed inputs, outputs, principals, data flows, trust boundaries and operational powers.
-   Select only the relevant lanes below. Identity/account/session and tenant review applies when
-   those boundaries or their consumers changed; a shell-only change does not require an unrelated
-   full account-lifecycle audit. Trace any shared-boundary effect before ruling a lane out.
-2. Review authentication independently from authorization. Check authenticator enrollment, binding,
-   recovery, reset, revocation, step-up/reauthentication, throttling and enumeration resistance;
-   then check deny-by-default server-side policy decisions for every protected action and resource,
-   horizontal and vertical access, tenant/relationship context, role scope, and revocation. Apply
-   [Permission Design](../../../instructions.md#permission-design) to infrastructure and application
-   roles; require a concrete risk benefit before recommending finer permission granularity. Never
-   accept token presence, UI state, caller-supplied user/tenant/role, or network location as the
-   authorization decision.
-3. Review principal/account and user-management lifecycle separately from domain-specific profile
-   data. Check creation, linking, suspension, deletion, retention, impersonation/admin paths, audit,
-   provider reconciliation, orphan prevention, and cross-tenant isolation.
-4. Review session and token issuance, binding, storage, rotation, expiry, inactivity/absolute
-   limits, logout, global/device revocation, refresh/replay handling, CSRF where applicable, and
-   failure under provider outage. Credential, token, session-secret, recovery, assertion, and
-   sensitive identity values must not enter logs, URLs, client-readable storage, analytics, or error
-   output.
-5. Confirm provider SDKs and foreign identity models stay in Identity and Access adapters; UI/web,
-   public API transports, domain modules, and infrastructure consume narrow public contracts and do
-   not deep-import credential, grant, policy, session, persistence, or provider internals.
-6. Review tenant isolation as a distinct trust boundary. Confirm tenant context comes only from a
-   verified membership/domain or signed integration/job/control-plane source, stays immutable and
-   request/job scoped, and is combined with principal, action, and resource authorization. Trace it
-   through queries and uniqueness, migrations, cache keys, files/search, events/messages/jobs,
-   quotas, observability, integrations, onboarding/offboarding, export/deletion, and backup/restore.
-   Test horizontal identifier guessing and asynchronous/cache paths in both directions. Reject raw
-   caller tenant IDs, ambient mutable or default tenants, unscoped admin queries, unaudited
-   cross-tenant operations, and reliance on authentication, row-level security, network, or siloed
-   infrastructure alone. Require explicit ownership, least privilege, and audit for global or
-   control-plane behavior.
-7. Check remaining secret/private-data exposure, input validation, encoding, retention, logging,
-   telemetry, and error disclosure where relevant.
-8. Check shell argument handling, paths, symlinks, permissions, archive extraction, hooks, CI,
-   dependency provenance, install scripts, and network failure semantics where relevant. For
-   infrastructure, apply [Infrastructure As Code](../../../instructions.md#infrastructure-as-code):
-   inspect state/plan exposure, backend access and locking, environment credentials, executable
-   preview/check paths and destructive-change recovery at the actual tool owner.
-9. For public endpoints, assess abuse controls and resource exhaustion as well as ordinary access
-   control.
-10. Distinguish exploitable defects from hardening ideas and unsupported hypothetical risks.
-11. Confirm security-sensitive assumptions are durable where operators or future changes depend on
-    them.
-
-Order findings by severity and include the affected boundary, realistic failure or abuse path,
-preconditions, root-cause fix, and smallest proving check. If no material issue remains, state the
-reviewed surfaces and residual risks. Do not create an open-ended review loop.
+Distinguish realistic exploitable defects from optional hardening or hypothetical risk. Return
+severity, location, boundary, concrete failure/abuse preconditions, owner-level remedy and smallest
+proving check. State inspected scope and remaining evidence limits when no material issue remains;
+do not create an open-ended loop or a new security report file.

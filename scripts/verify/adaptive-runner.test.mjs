@@ -1,8 +1,9 @@
 /** Verifies adaptive runner behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import process from "node:process";
 import test from "node:test";
 import {
   buildPlan,
@@ -10,6 +11,294 @@ import {
   workspaceLifecycleCommands,
 } from "./adaptive-runner.mjs";
 import { internalDependencies, writeManifest } from "./adaptive-runner-test-helpers.mjs";
+import {
+  pendingVerificationPlan,
+  verificationExecutionUnits,
+  verificationCheckFingerprints,
+} from "./verification-check-inputs.mjs";
+import { runPlan } from "./verification-executor.mjs";
+import { withVerificationSessionLock } from "./verification-session-lock.mjs";
+
+test("acyclic workspace lifecycles reuse independent units and retain output prerequisites", () => {
+  const manifests = [
+    {
+      directory: "apps/app",
+      name: "app",
+      internalDependencyNames: internalDependencies(["core"]),
+      scripts: { build: "build", lint: "lint" },
+    },
+    {
+      directory: "packages/core",
+      name: "core",
+      internalDependencyNames: internalDependencies(),
+      scripts: { build: "build", lint: "lint" },
+    },
+    {
+      directory: "apps/other",
+      name: "other",
+      internalDependencyNames: internalDependencies(),
+      scripts: { build: "build", lint: "lint" },
+    },
+  ];
+  const complete = workspaceLifecycleCommands(manifests);
+  const selected = workspaceLifecycleCommands(manifests.slice(0, 2));
+  for (const command of complete) {
+    const units = verificationExecutionUnits(command);
+    assert.deepEqual(
+      units.map((unit) => unit.workspaceDirectories[0]),
+      ["packages/core", "apps/app", "apps/other"],
+    );
+    assert.deepEqual(
+      verificationExecutionUnits(selected.find((entry) => entry.key === command.key)).map(
+        (unit) => unit.key,
+      ),
+      units.slice(0, 2).map((unit) => unit.key),
+    );
+    assert.ok(units.every((unit) => unit.serialGroup === command.key));
+  }
+  const build = complete.find((command) => command.key === "workspace:build");
+  const units = verificationExecutionUnits(build);
+  const fingerprints = new Map(units.map((unit) => [unit.key, "a".repeat(64)]));
+  const checks = [units[0], units[2]].map((unit) => ({
+    key: unit.key,
+    fingerprint: fingerprints.get(unit.key),
+    completedAt: new Date().toISOString(),
+    elapsedMs: 2,
+  }));
+  const pending = pendingVerificationPlan(
+    { readOnlyCommands: [], workspaceCommands: [build] },
+    fingerprints,
+    checks,
+  );
+  assert.deepEqual(
+    pending.workspaceCommands.map((unit) => unit.workspaceDirectories[0]),
+    ["apps/app"],
+  );
+  assert.equal(pending.evidence.prerequisites.length, 1);
+  assert.match(
+    pending.evidence.blockedPrerequisites[0],
+    /Missing output contract.*packages\/core/u,
+  );
+  const cyclic = manifests
+    .slice(0, 2)
+    .map((manifest) =>
+      manifest.name === "core"
+        ? { ...manifest, internalDependencyNames: internalDependencies(["app"]) }
+        : manifest,
+    );
+  assert.ok(
+    workspaceLifecycleCommands(cyclic).every(
+      (command) => verificationExecutionUnits(command).length === 1,
+    ),
+  );
+});
+
+test("missing or changed producer outputs rerun only that producer and its actual consumers", async (t) => {
+  const repositoryRoot = mkdtempSync(path.join(tmpdir(), "workspace-output-reuse-"));
+  t.after(() => rmSync(repositoryRoot, { force: true, recursive: true }));
+  const commands = ["core", "app", "independent"].map((name) => ({
+    key: `build-${name}`,
+    phase: "workspace-build",
+    executable: process.execPath,
+    args: [
+      "--eval",
+      `const fs = require('node:fs'); ${name === "app" ? "if(fs.readFileSync('core.out','utf8') !== 'valid') throw Error('invalid core artifact');" : ""} fs.writeFileSync('${name}.out','valid'); fs.appendFileSync('dispatch.log','${name}\\n');`,
+    ],
+    workspaceDirectories: [name],
+    buildPrerequisites: name === "app" ? ["core"] : [],
+    outputs: [`${name}.out`],
+    artifactOwners: ["fixture-builds"],
+  }));
+  const fingerprints = new Map(commands.map((command) => [command.key, "a".repeat(64)]));
+  let checks = [];
+  const base = {
+    options: { mode: "full", printPlan: false, simulatedPaths: [] },
+    admission: { mode: "full", reason: "output fixture" },
+    classifiedPaths: [],
+    verificationScope: "fixture",
+    readOnlyCommands: [],
+    workspaceCommands: commands,
+  };
+  async function execute(expected, selected = commands) {
+    const before = checks;
+    const pending = pendingVerificationPlan(
+      {
+        ...base,
+        workspaceCommands: selected,
+        options: { ...base.options, mode: selected === commands ? "full" : "repo" },
+        admission: { ...base.admission, mode: selected === commands ? "full" : "targeted" },
+      },
+      fingerprints,
+      checks,
+      {
+        completeCommands: commands,
+        repositoryRoot,
+      },
+    );
+    assert.deepEqual(
+      pending.workspaceCommands.map((unit) => unit.key),
+      expected.map((name) => `build-${name}`),
+    );
+    writeFileSync(path.join(repositoryRoot, "dispatch.log"), "");
+    const evidence = new Map(checks.map((check) => [check.key, check]));
+    for (const key of pending.evidence.invalidatedKeys) evidence.delete(key);
+    await withVerificationSessionLock(
+      () =>
+        runPlan(pending, {
+          repositoryRoot,
+          onResult(result) {
+            assert.equal(result.status, 0);
+            evidence.set(result.command.key, {
+              key: result.command.key,
+              fingerprint: fingerprints.get(result.command.key),
+              completedAt: new Date().toISOString(),
+              elapsedMs: result.elapsedMs,
+              ...(result.outputFingerprint ? { outputFingerprint: result.outputFingerprint } : {}),
+            });
+          },
+        }),
+      { repositoryRoot },
+    );
+    checks = [...evidence.values()];
+    assert.deepEqual(
+      readFileSync(path.join(repositoryRoot, "dispatch.log"), "utf8")
+        .trim()
+        .split("\n")
+        .filter(Boolean),
+      expected,
+    );
+    if (!expected.includes("independent") && before.length)
+      assert.deepEqual(
+        checks.find((check) => check.key === "build-independent"),
+        before.find((check) => check.key === "build-independent"),
+      );
+  }
+  await execute(["core", "app", "independent"]);
+  await execute([]);
+  rmSync(path.join(repositoryRoot, "core.out"));
+  await execute(["core", "app"]);
+  writeFileSync(path.join(repositoryRoot, "core.out"), "corrupt");
+  await execute(["core", "app"]);
+  const manifests = [
+    {
+      directory: "core",
+      name: "core",
+      scripts: { build: "build" },
+      internalDependencyNames: internalDependencies(),
+    },
+    {
+      directory: "app",
+      name: "app",
+      scripts: { build: "build", "test:unit": "test" },
+      internalDependencyNames: internalDependencies(["core"]),
+    },
+  ];
+  const actualChangedUnit = workspaceLifecycleCommands([manifests[1]], {
+    mode: "changed",
+    dependencyManifests: manifests,
+  }).flatMap(verificationExecutionUnits)[0];
+  assert.equal(actualChangedUnit.phase, "workspace-test");
+  assert.deepEqual(actualChangedUnit.buildPrerequisites, ["core", "app"]);
+  const consumer = {
+    ...actualChangedUnit,
+    key: "build-test",
+    executable: process.execPath,
+    args: [
+      "--eval",
+      "const fs=require('node:fs'); for(const file of ['core.out','app.out']) if(fs.readFileSync(file,'utf8') !== 'valid') throw Error('bad prerequisite'); fs.appendFileSync('dispatch.log','test\\n');",
+    ],
+  };
+  commands.push(consumer);
+  fingerprints.set(consumer.key, "a".repeat(64));
+  await execute(["test"], [consumer]);
+  rmSync(path.join(repositoryRoot, "core.out"));
+  await execute(["core", "app", "test"], [consumer]);
+  writeFileSync(path.join(repositoryRoot, "core.out"), "corrupt");
+  await execute(["core", "app", "test"], [consumer]);
+  rmSync(path.join(repositoryRoot, "core.out"));
+  symlinkSync("missing-output", path.join(repositoryRoot, "core.out"));
+  assert.throws(
+    () =>
+      pendingVerificationPlan(base, fingerprints, checks, {
+        completeCommands: commands,
+        repositoryRoot,
+      }),
+    /non-symlink/u,
+  );
+  rmSync(path.join(repositoryRoot, "core.out"));
+  writeFileSync(path.join(repositoryRoot, "core.out"), "valid");
+  const undeclared = commands.map((command) =>
+    command.key === "build-core" ? { ...command, outputs: undefined } : command,
+  );
+  const changed = new Map(fingerprints).set("build-app", "b".repeat(64));
+  const blocked = pendingVerificationPlan(
+    { ...base, workspaceCommands: undeclared },
+    changed,
+    checks,
+    { completeCommands: undeclared, repositoryRoot },
+  );
+  assert.match(
+    blocked.evidence.blockedPrerequisites[0],
+    /Missing output contract.*core.*workspaceOutputs/u,
+  );
+  writeFileSync(path.join(repositoryRoot, "dispatch.log"), "");
+  await assert.rejects(runPlan(blocked, { repositoryRoot }), /Missing output contract/u);
+  assert.equal(readFileSync(path.join(repositoryRoot, "dispatch.log"), "utf8"), "");
+  t.diagnostic(
+    "Output lifecycle: full [3,0,2,2]; changed App test [1,3,3] after intact/deleted/corrupt Core outputs. Repairs order core before app before test; unrelated producer reused; missing contract dispatched 0.",
+  );
+});
+
+test("shared workspace resolution inputs invalidate workspace units without native test fan-out", () => {
+  const manifests = [
+    {
+      directory: "packages/product",
+      name: "product",
+      scripts: { "test:unit": "test" },
+      internalDependencyNames: internalDependencies(),
+    },
+  ];
+  const native = {
+    key: "native",
+    executable: process.execPath,
+    args: ["--test", "scripts/native.test.mjs"],
+    phase: "preflight",
+  };
+  const commands = [native, ...workspaceLifecycleCommands(manifests)];
+  const configuration = {
+    commands: [native],
+    risks: [],
+    exactConsumers: {},
+    testConsumers: {},
+    ownedCategories: {},
+  };
+  for (const file of [
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    ".codex/mise.toml",
+    ".codex/mise.lock",
+  ]) {
+    const capture = (value) =>
+      verificationCheckFingerprints({
+        commands,
+        configuration,
+        workspaceManifests: manifests,
+        repositoryRoot: process.cwd(),
+        inputs: {
+          runtimeDigest: "stable",
+          sourceFiles: [{ path: file, fingerprint: value, semanticFingerprint: value }],
+        },
+      });
+    const before = capture("a".repeat(64));
+    const after = capture("b".repeat(64));
+    for (const unit of commands.flatMap(verificationExecutionUnits))
+      assert.equal(
+        before.get(unit.key) !== after.get(unit.key),
+        Boolean(unit.workspaceDirectories),
+        `${file}: ${unit.key}`,
+      );
+  }
+});
 
 test("pnpm graph discovery includes root and arbitrary workspace layouts", (t) => {
   const root = mkdtempSync(path.join(tmpdir(), "workspace-graph-"));
@@ -218,7 +507,7 @@ test("workspace lifecycle retains package-local verification product checks", ()
   }
 });
 
-test("changed packages select direct owners and immediate internal graph neighbors", () => {
+test("changed packages select prerequisites and transitive integration consumers", () => {
   const productLayout = {
     findings: [],
     sourceRoots: [
@@ -308,6 +597,12 @@ test("changed packages select direct owners and immediate internal graph neighbo
           internalDependencyNames: internalDependencies(),
         },
         {
+          directory: "packages/gamma",
+          name: "gamma",
+          scripts: lifecycleScripts,
+          internalDependencyNames: internalDependencies(["beta"]),
+        },
+        {
           directory: "packages/unrelated",
           name: "unrelated",
           scripts: lifecycleScripts,
@@ -325,25 +620,32 @@ test("changed packages select direct owners and immediate internal graph neighbo
   );
   assert.deepEqual(
     plan.workspaceCommands.map((command) => command.key),
-    ["workspace:lint", "workspace:typecheck", "workspace:verify:preflight", "workspace:test:unit"],
+    [
+      "workspace:lint",
+      "workspace:typecheck",
+      "workspace:verify:preflight",
+      "workspace:test:unit",
+      "workspace:test:integration",
+    ],
   );
   assert.deepEqual(
     plan.workspaceCommands.map((command) => command.phase),
-    ["preflight", "preflight", "preflight", "preflight"],
+    ["preflight", "preflight", "preflight", "workspace-test", "workspace-test"],
   );
   for (const command of plan.workspaceCommands) {
     assert.equal(command.args.includes("./packages/alpha"), true);
     assert.equal(command.args.includes("./packages/beta"), true);
+    assert.equal(command.args.includes("./packages/gamma"), true);
     assert.equal(command.args.includes("./packages/core"), true);
     assert.equal(command.args.includes("./packages/unrelated"), false);
     assert.equal(command.args.includes("."), false);
   }
   assert.equal(
-    [...plan.readOnlyCommands, ...plan.workspaceCommands].every(
-      (command) => command.phase === "preflight",
+    [...plan.readOnlyCommands, ...plan.workspaceCommands].every((command) =>
+      ["preflight", "workspace-test"].includes(command.phase),
     ),
     true,
-    "changed package feedback must not contain broad, build, or full-test phases",
+    "changed package feedback contains only selected preflight and test units",
   );
   assert.deepEqual(
     workspaceLifecycleCommands([

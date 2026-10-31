@@ -1,6 +1,6 @@
 /** Owns setup regression fixtures behavior for the setup, launch, and portable project boundary. */
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,7 @@ import {
   copyStableRepositoryFile,
 } from "../repository/stable-file-snapshot.mjs";
 import { nonPortableSnapshotPathReason } from "../framework/portable-project-contract.mjs";
+import { parsePortableToml } from "../contracts/portable-toml.mjs";
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const temporaryRoots = [];
@@ -59,8 +60,10 @@ export function run(executable, args, options = {}) {
   });
 }
 
-export const validPrimaryInstructions = `Act as the primary orchestrator. Apply Maintenance Scope And Verification before selecting commands. Follow Delegated Release. Retain exactly one current internal contract per concern. Default to four useful concurrent subagents. After each handoff, promptly accept, reject or preserve it and close its scope. Before unrelated primary work or waiting for peers, recheck admission and immediately assign the next ready bounded task to the same agent. Apply this loop to all admitted agents, including additional user-started agents. Record concrete dependencies and their next checkpoint or close unneeded threads; never invent work. Keep at most twelve live agents and never pass a model or reasoning override; all use the exact GPT Astra model with max reasoning. Register every owned subagent and background task and leave foreign or ambiguous processes untouched. Treat role sandboxes as requested defaults because live parent permission overrides can be reapplied; require each child to report effective runtime permissions before tool work. Read-only roles stop on a broader override; a writer may accept this primary's already-authorized YOLO override only for its exact disjoint repository write set. After every completed slice, run pnpm worktree:status -- --json as the worktree settlement trigger; preservation is a safety state, never completion. Historical reserve estimates are not binding. Follow Capacity Admission And Monitoring before classifying account-window exhaustion; retain rateLimitResetCredits and ordinaryUsageAllowed, resolve needed supported free resets and refresh binding capacity. At unresolved 5% or less, perform the exact Critical Budget Drain and run pnpm handover:create -- --critical as the final repository action. After a successful seal, stop completely and never permit automatic continuation.
-`;
+// Exercise the shipped policy, not a separately maintained prose fixture.
+export const validPrimaryInstructions = parsePortableToml(
+  readFileSync(path.join(root, ".codex/config.toml"), "utf8"),
+).developer_instructions;
 
 export const validPortableConfig = `# Portable policy; assignments in comments do not count.
 developer_instructions = """

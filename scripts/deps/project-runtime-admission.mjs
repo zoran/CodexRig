@@ -18,20 +18,26 @@ export function assertInstalledProjectTools({
   );
   if (configured.errors.length)
     throw new Error(`Project tool configuration is invalid: ${configured.errors.join("; ")}.`);
-  const result = spawnSyncWithBoundedIo(miseExecutable, ["ls", "--current", "--json", "--locked"], {
-    cwd: configurationRoot,
-    env: environment,
-    encoding: "utf8",
-    input: "",
-    stdio: "pipe",
-    timeout: 20_000,
-    maxBuffer: 1024 * 1024,
-  });
-  if (result.error || result.status !== 0)
-    throw new Error("Project runtime inventory failed; run canonical maintenance before retrying.");
+  const query = (args) => {
+    const result = spawnSyncWithBoundedIo(miseExecutable, args, {
+      cwd: configurationRoot,
+      env: environment,
+      encoding: "utf8",
+      input: "",
+      stdio: "pipe",
+      timeout: 20_000,
+      maxBuffer: 1024 * 1024,
+    });
+    if (result.error || result.signal || result.status !== 0)
+      throw new Error(
+        `Project runtime ${args[0]} failed; run canonical maintenance before retrying.`,
+      );
+    return result.stdout;
+  };
+  const inventory = query(["ls", "--current", "--json", "--locked"]);
   let actual;
   try {
-    actual = JSON.parse(result.stdout);
+    actual = JSON.parse(inventory);
   } catch {
     throw new Error("Project runtime inventory is not valid JSON.");
   }
@@ -47,6 +53,8 @@ export function assertInstalledProjectTools({
     Object.keys(actual).sort().join("\n") !== Object.keys(configured.versionLists).sort().join("\n")
   )
     missing();
+  const storage = userToolPaths(environment);
+  const installations = new Map();
   for (const [tool, pins] of Object.entries(configured.versionLists)) {
     const entries = actual[tool];
     if (
@@ -55,7 +63,7 @@ export function assertInstalledProjectTools({
       new Set(entries.map((entry) => entry?.requested_version)).size !== pins.length
     )
       missing();
-    const parent = path.join(userToolPaths(environment).miseData, "installs", tool);
+    const parent = path.join(storage.miseData, "installs", tool);
     for (const pin of pins) {
       const entry = entries.find((entry) => entry?.requested_version === pin);
       if (
@@ -68,14 +76,50 @@ export function assertInstalledProjectTools({
       )
         missing();
       try {
-        assertUserToolParents(
-          userToolPaths(environment).root,
-          path.join(entry.install_path, "entry"),
-        );
-        if (realpathSync.native(entry.install_path) !== entry.install_path) missing();
+        assertUserToolParents(storage.root, path.join(entry.install_path, "entry"));
+        if (
+          realpathSync.native(entry.install_path) !== entry.install_path ||
+          installations.has(entry.install_path)
+        )
+          missing();
+        installations.set(entry.install_path, `${tool}@${pin}`);
       } catch {
         missing();
       }
     }
   }
+  // Successful inventory alone is insufficient: plugin resolution can warn, omit a tool's
+  // bin directory, and still exit zero. Every pin must contribute a real contained path.
+  const output = query(["bin-paths", "--locked"]);
+  const bins = output.replace(/\r\n/gu, "\n").split("\n");
+  if (bins.pop() !== "" || !bins.length || bins.length > 256 || new Set(bins).size !== bins.length)
+    throw new Error("Project runtime bin paths are incomplete or ambiguous.");
+  const covered = new Set();
+  for (const bin of bins) {
+    if (
+      !path.isAbsolute(bin) ||
+      path.resolve(bin) !== bin ||
+      /[\x00-\x1f]/u.test(bin) ||
+      bin.includes(path.delimiter)
+    )
+      missing();
+    const installation = [...installations.keys()].find(
+      (directory) => bin === directory || bin.startsWith(`${directory}${path.sep}`),
+    );
+    if (!installation) missing();
+    try {
+      assertUserToolParents(storage.root, path.join(bin, "entry"));
+      if (realpathSync.native(bin) !== bin) missing();
+    } catch {
+      missing();
+    }
+    covered.add(installation);
+  }
+  const omitted = [...installations]
+    .filter(([directory]) => !covered.has(directory))
+    .map(([, pin]) => pin);
+  if (omitted.length)
+    throw new Error(
+      `Project runtime bin paths are missing for ${omitted.join(", ")}; host fallback is forbidden.`,
+    );
 }

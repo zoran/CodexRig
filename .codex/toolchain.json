@@ -1,28 +1,28 @@
 {
   "schemaVersion": 2,
-  "reviewedOn": "2026-10-17",
+  "reviewedOn": "2026-10-31",
   "ci": {
     "codexNpmPackage": "@openai/codex",
     "codexNpmPlatformIntegrities": {
-      "linux-x64": "sha512-uwRaOsrYogLQhcxAM/GoeWrw0QIWEMRo7c9gM8sKAviVkZQHlu9kRLJ5PkufbV+ABGjyZgIwiFdJ0LCJ0N6e8w==",
-      "linux-arm64": "sha512-IH2/R+4OarjGvsAf1ll3fdyLwrPgYLl3uzp6u9CyD9sj2Lw+ViDSe3QBZVHdcHJs0eIiZFg6Wprcuy4CRZaUGw==",
-      "darwin-arm64": "sha512-i7Dzk2a5aGmuGM9aNZgaUVTojZ/4bc5lRfosz++Y7X2BGhDkz+cySgbD+NYS1pOxfm0VEbLi9PZ3pAulI4kchw==",
-      "win32-x64": "sha512-QQGQ/q9dCJ5C5jqhgFrwycpWG3szIyFNThMiKl6hYtu6N/eM3Qd7StesgnCFAfzVED8IkE3N3oH71szzcludqw=="
+      "linux-x64": "sha512-CxDm3+D1cpbGJeHrdzINoG+3wn9BVncP4qpZaaNYkxe8iPtRJOYyCJnnPoVjWRIBvI9vPKbRoifsMSA5xDaUpw==",
+      "linux-arm64": "sha512-w0ScAsBr9aZKtIFrh6HN6KU2yjKKeSCzYfbb7DB0Ccj4BYPzeZtUeQprbycLCwuX3AFQdbdjapmLho2iot74jQ==",
+      "darwin-arm64": "sha512-5fWH6qqUInACcRADIewjlnRxDb4QLe0uriwehiZz0+viuAAB8I+WWefqw4xwHvyKaxeiGX4uK56+vrgfvFk3FQ==",
+      "win32-x64": "sha512-NS8Ps5oG5r19pCrMCUXwUqOui6odnUIoBlQkrjCJ+h1k6KiwCzC/+mI9d3nSZCqFoVONPBTmqyq8NYq3YaFGyA=="
     },
-    "codexVersion": "0.163.0",
-    "miseVersion": "2026.10.13",
+    "codexVersion": "0.166.0",
+    "miseVersion": "2026.10.25",
     "miseBinarySha256": {
-      "linux-x64": "94c45523c7b6760b7da704f16051171ca32e8447a849a02266a439a4455e9a12",
-      "linux-arm64": "983fabf36625566f216400b907b33b4daca99adb5bc3d3cdab123b5e791575b2",
-      "linux-x64-musl": "6766ee30f68cea686dae555ea999c8e11abb1dc2acc50c41fcf5c0442b5eb9fb",
-      "linux-arm64-musl": "600bfc6f10542455aae93b3780627b5301e6e688779f09f4ef42852c54ce11df",
-      "macos-arm64": "92fd6898dc213808d1c81f0bead9668dbea036e5946c94c0e82554603205a3aa",
-      "windows-x64": "f36344847831b37b56d681fcac6d61cb3cc02eba4cec11cfd39960e5dca2c143"
+      "linux-x64": "5d362ecc578dc7c146679b841dda949d6472cbf86ff5635db7afdca1b6b3fd87",
+      "linux-arm64": "bb09e88b13164ca90691a5cc042726d079f0ba26ab55527344cb173c2e83c998",
+      "linux-x64-musl": "9ab24871281d46383d13a1ad4334fd7a707be033f08d5005c928a2db8601f34b",
+      "linux-arm64-musl": "561db7a5003f2c4fd89c20244d320099857ecff0d19e9438bfaa856156dec797",
+      "macos-arm64": "8a3ef00765b009278197aba627ac00d6e9c63f6aeb04d4f4b2cfe0e59ddc2fd6",
+      "windows-x64": "dd293220cb8c53fb97ba81378b43062d34047881d57a15bec8b1d53aae35108e"
     }
   },
   "stable": {
     "node": {
-      "version": "24.22.0",
+      "version": "24.22.2",
       "range": ">=24.21.0 <25.0.0",
       "channel": "lts"
     },
@@ -32,7 +32,7 @@
       "channel": "latest-11"
     },
     "codex": {
-      "minimumVersion": "0.163.0",
+      "minimumVersion": "0.166.0",
       "channel": "latest"
     }
   }

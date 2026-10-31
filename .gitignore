@@ -49,6 +49,7 @@ backups/
 /installation_id
 /models_cache.json
 /session_index.jsonl
+/session_index.jsonl.lock
 /version.json
 /goals_*.sqlite*
 /logs_*.sqlite*

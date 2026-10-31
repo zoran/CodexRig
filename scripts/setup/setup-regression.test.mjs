@@ -233,9 +233,9 @@ test("Codex config parser accepts only the complete typed portable policy", () =
       /orchestration marker additional user-started agents/u,
     ],
     [
-      "missing immediate bounded follow-up dispatch",
-      validPortableConfig.replace("immediately assign the next ready bounded task", ""),
-      /orchestration marker immediately assign the next ready bounded task/u,
+      "missing canonical dispatch policy binding",
+      validPortableConfig.replace("instructions.md#agent-lifecycle-and-idle-cleanup", ""),
+      /orchestration marker instructions.md#agent-lifecycle-and-idle-cleanup/u,
     ],
     [
       "missing current-reserve boundary",
@@ -330,20 +330,16 @@ test("Codex config parser accepts only the complete typed portable policy", () =
   }
 });
 
-// Regression: required dispatch clauses were not checked before policy reached startup/export.
-// This guards the wording contract; it does not prove lifecycle semantics or model obedience.
-test("primary policy requires each continuous-dispatch clause", () => {
+// The bootstrap binds shared policy instead of duplicating its wording in every prompt.
+// This validates routing, not model obedience.
+test("primary policy requires canonical task and dispatch routing", () => {
   assert.equal(
     parsePortableCodexConfig(validPortableConfig).developer_instructions,
     validPrimaryInstructions,
   );
   for (const fragment of [
-    "accept, reject or preserve",
-    "close its scope",
-    "Before unrelated primary work",
-    "recheck admission",
-    "to the same agent",
-    "dependencies and their next checkpoint",
+    "Task Reading Routes",
+    "instructions.md#agent-lifecycle-and-idle-cleanup",
   ]) {
     const incomplete = validPortableConfig.replace(fragment, "");
     assert.notEqual(incomplete, validPortableConfig, `Fixture must contain ${fragment}.`);
@@ -675,23 +671,20 @@ test("startup attestation binds the complete preloaded controller closure", (t) 
 test("project roles enforce exact Astra/max parity with the primary", () => {
   const defaultAgent = readFileSync(path.join(root, ".codex", "agents", "default.toml"), "utf8");
   const parsedDefault = parseProjectAgentConfig(defaultAgent, "default");
-  assert.throws(
-    () =>
-      parseProjectAgentConfig(
-        defaultAgent.replace(/State readiness for another\s+bounded assignment/u, ""),
-        "default",
-      ),
-    /orchestration marker State readiness for another bounded assignment/u,
-  );
-  const withoutHistoricalReserveGuard = defaultAgent.replace(
-    /Historical\s+reserve\s+estimates\s+are\s+not\s+binding/iu,
-    "",
-  );
-  assert.notEqual(withoutHistoricalReserveGuard, defaultAgent);
-  assert.throws(
-    () => parseProjectAgentConfig(withoutHistoricalReserveGuard, "default"),
-    /orchestration marker historical reserve estimates are not binding/u,
-  );
+  for (const fragment of [
+    "instructions.md#task-reading-routes",
+    "instructions.md#subagent-orchestration-and-integration-authority",
+    "effective runtime sandbox",
+    "live parent override",
+    "start no further tool or task",
+  ]) {
+    const incomplete = defaultAgent.replace(fragment, "");
+    assert.notEqual(incomplete, defaultAgent);
+    assert.throws(
+      () => parseProjectAgentConfig(incomplete, "default"),
+      (error) => error.message.includes(`orchestration marker ${fragment}`),
+    );
+  }
   assert.equal(parsedDefault.model, "gpt-6-astra");
   assert.equal(parsedDefault.model_reasoning_effort, sharedAgentIntelligencePolicy.reasoningEffort);
   assert.equal(
@@ -725,39 +718,6 @@ test("project roles enforce exact Astra/max parity with the primary", () => {
       ),
     /project agent policy for sandbox_mode/,
   );
-  assert.throws(
-    () =>
-      parseProjectAgentConfig(
-        defaultAgent.replace("manifest-led discovery", "unbounded-discovery"),
-        "default",
-      ),
-    /orchestration marker manifest-led discovery/,
-  );
-  assert.throws(
-    () =>
-      parseProjectAgentConfig(defaultAgent.replace("matched source", "search result"), "default"),
-    /orchestration marker matched source/,
-  );
-  assert.throws(
-    () =>
-      parseProjectAgentConfig(
-        defaultAgent.replace(
-          "Before every assigned slice begins",
-          "After every assigned slice begins",
-        ),
-        "default",
-      ),
-    /orchestration marker Before every assigned slice begins/,
-  );
-  assert.throws(
-    () =>
-      parseProjectAgentConfig(
-        defaultAgent.replace(/newest relevant primary or official\s+sources/u, "available sources"),
-        "default",
-      ),
-    /orchestration marker newest relevant primary or official sources/,
-  );
-
   const fixture = configFixture();
   rmSync(path.join(fixture, ".codex", "agents", "worker.toml"));
   assert.throws(

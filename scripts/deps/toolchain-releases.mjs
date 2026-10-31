@@ -41,7 +41,10 @@ export async function releaseBytes(url, maximumBytes, fetchImpl = globalThis.fet
     signal: AbortSignal.timeout(180_000),
   });
   if (!response.ok)
-    throw new Error(`Release lookup failed: ${address.hostname} returned HTTP ${response.status}.`);
+    throw Object.assign(
+      new Error(`Release lookup failed: ${address.hostname} returned HTTP ${response.status}.`),
+      { status: response.status, redirected: response.redirected },
+    );
   const chunks = [];
   let size = 0;
   for await (const chunk of response.body) {
@@ -109,14 +112,46 @@ async function nativeArtifactAvailable(tool, url, fetchImpl) {
   throw new Error(`Native ${tool} artifact lookup exceeded its redirect bound.`);
 }
 
+async function missingNodeChecksums(artifacts, fetchImpl) {
+  const manifests = Map.groupBy(artifacts, ([, url]) => new URL("SHASUMS256.txt", url).href);
+  const results = await Promise.allSettled(
+    [...manifests].map(async ([url, entries]) => {
+      let content;
+      try {
+        content = (await releaseBytes(url, 128 * 1024, fetchImpl)).toString("utf8");
+      } catch (error) {
+        if (error.status === 404 && !error.redirected) return entries.map(([platform]) => platform);
+        throw error;
+      }
+      const files = new Set();
+      for (const line of content.split(/\r?\n/u).filter(Boolean)) {
+        const match = line.match(/^[a-f0-9]{64} [ *]([^\s]+)$/iu);
+        if (!match || files.has(match[1]))
+          throw new Error(`Node checksum manifest is malformed or ambiguous: ${url}.`);
+        files.add(match[1]);
+      }
+      if (!files.size) throw new Error(`Node checksum manifest is empty: ${url}.`);
+      return entries
+        .filter(([, artifact]) => !files.has(new URL(artifact).pathname.split("/").at(-1)))
+        .map(([platform]) => platform);
+    }),
+  );
+  for (const result of results) if (result.status === "rejected") throw result.reason;
+  return new Set(results.flatMap((result) => result.value));
+}
+
 async function missingNativePlatforms(tool, version, fetchImpl) {
   const urls = tool === "node" ? nativeNodeArtifactUrls(version) : nativePnpmArtifactUrls(version);
   const artifacts = Object.entries(urls);
-  const results = await Promise.allSettled(
-    artifacts.map(([, url]) => nativeArtifactAvailable(tool, url, fetchImpl)),
-  );
+  const results = await Promise.allSettled([
+    ...artifacts.map(([, url]) => nativeArtifactAvailable(tool, url, fetchImpl)),
+    tool === "node" ? missingNodeChecksums(artifacts, fetchImpl) : Promise.resolve(new Set()),
+  ]);
   for (const result of results) if (result.status === "rejected") throw result.reason;
-  return artifacts.filter((_, index) => !results[index].value).map(([platform]) => platform);
+  const missingChecksums = results.at(-1).value;
+  return artifacts
+    .filter(([platform], index) => !results[index].value || missingChecksums.has(platform))
+    .map(([platform]) => platform);
 }
 
 async function latestCompatibleNativeVersion(
@@ -141,7 +176,7 @@ async function latestCompatibleNativeVersion(
     const missing = await missingNativePlatforms(tool, version, fetchImpl);
     if (missing.length) {
       onProgress(
-        `Skipping ${tool} ${version}: official native artifacts missing for ${missing.join(", ")}.`,
+        `Skipping ${tool} ${version}: official native artifacts or checksums missing for ${missing.join(", ")}.`,
       );
       skipped = true;
       continue;

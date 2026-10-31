@@ -241,11 +241,14 @@ test("generated validators reject primary policy without the maintenance scope b
   await assert.rejects(validateGeneratedProject(target), expected);
 });
 
-test("generation refuses a missing canonical maintenance scope policy without publishing a child", async () => {
+test("generation refuses a missing portable policy boundary without publishing a child", async () => {
   const incompleteSource = isolatedTrackedFrameworkSource("stage-missing-scope-");
   const instructionsPath = path.join(incompleteSource, "instructions.md");
   const current = readFileSync(instructionsPath, "utf8");
-  const incomplete = current.replace("## Maintenance Scope And Verification", "## Removed Policy");
+  const incomplete = current.replace(
+    "<!-- codexrig:portable-policy:start -->",
+    "<!-- missing-portable-policy -->",
+  );
   assert.notEqual(incomplete, current);
   writeFileSync(instructionsPath, incomplete);
   const target = path.join(temporaryRoot("stage-rejected-scope-"), "project");
@@ -256,7 +259,7 @@ test("generation refuses a missing canonical maintenance scope policy without pu
       projectName: "Missing Scope",
       includeUntracked: true,
     }),
-    /Shared policy Maintenance Scope And Verification needs one canonical owner and one projection/u,
+    /Portable policy needs one nonempty block with unique ordered markers/u,
   );
   assert.equal(existsSync(target), false);
 });

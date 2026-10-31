@@ -36,7 +36,16 @@ import {
   applyHousekeepingWrites,
   recoverInterruptedHousekeepingWrites,
 } from "../repository/repository-housekeeping-transaction.mjs";
-import { runRepositoryHousekeeping } from "./repository-housekeeping.mjs";
+import {
+  runRepositoryHealthChecks,
+  runRepositoryHousekeeping,
+} from "./repository-housekeeping.mjs";
+import { acquireVerificationSessionLock } from "../verify/verification-session-lock.mjs";
+import {
+  readSuccessfulVerificationBasis,
+  readVerificationCheckpoint,
+} from "../verify/verification-evidence.mjs";
+import { runtimeIdentity } from "../verify/verification-evidence-test-helpers.mjs";
 import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
 import {
   createProjectTemporaryScope,
@@ -281,6 +290,75 @@ function write(root, relativePath, content) {
   mkdirSync(path.dirname(target), { recursive: true });
   writeFileSync(target, content, "utf8");
 }
+
+test("housekeeping reuses actual check dispatches across failure, repair and a new lock", async (t) => {
+  const root = fixture(t);
+  write(root, "package.json", '{"name":"health-fixture","private":true}\n');
+  write(root, "pnpm-workspace.yaml", "packages: []\n");
+  write(root, ".gitignore", "/.codex/runtime/\n/.auth/\n/tmp/\n");
+  const registry = JSON.parse(
+    readFileSync(new URL("../../.codex/verification.json", import.meta.url), "utf8"),
+  );
+  for (const command of registry.commands) {
+    command.executable = "$node";
+    command.args = ["scripts/health-fixture.mjs", command.key];
+    command.coveredTestPaths = [];
+    delete command.coveredBy;
+  }
+  write(root, ".codex/verification.json", `${JSON.stringify(registry)}\n`);
+  write(
+    root,
+    "scripts/health-fixture.mjs",
+    `
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
+const key = process.argv[2];
+appendFileSync(".codex/runtime/health-dispatches", key + "\\n");
+if (existsSync(".codex/runtime/health-fail") && readFileSync(".codex/runtime/health-fail", "utf8") === key)
+  process.exit(17);
+`,
+  );
+  write(root, ".codex/runtime/health-fail", "format");
+  const stateChecks = [];
+  const run = async (online = false) => {
+    const lock = acquireVerificationSessionLock({ repositoryRoot: root });
+    try {
+      await runRepositoryHealthChecks({
+        root,
+        online,
+        runtimeIdentity,
+        checkState: (script, args) => stateChecks.push([script, args]),
+      });
+    } finally {
+      lock.release();
+    }
+  };
+  const dispatches = () =>
+    readFileSync(path.join(root, ".codex/runtime/health-dispatches"), "utf8").trim().split("\n");
+  await assert.rejects(run(), /checks failed/u);
+  assert.equal(dispatches().length, 14, "all independent health commands actually dispatched once");
+  assert.equal(readVerificationCheckpoint({ root }).checks.length, 13);
+  rmSync(path.join(root, ".codex/runtime/health-fail"));
+  await run();
+  const repaired = dispatches();
+  assert.equal(repaired.length, 15, "repair dispatches only the failed command");
+  assert.equal(repaired.filter((key) => key === "format").length, 2);
+  assert.equal(readVerificationCheckpoint({ root }).checks.length, 14);
+  await run(true);
+  assert.deepEqual(dispatches(), repaired, "unchanged inputs dispatch no cached health checks");
+  assert.equal(readSuccessfulVerificationBasis({ root }).trusted, false);
+  assert.match(readSuccessfulVerificationBasis({ root }).reason, /not yet been completed/u);
+  assert.deepEqual(
+    stateChecks,
+    [
+      ["scripts/setup/validate-codex-model-policy.mjs", []],
+      ["scripts/setup/tooling-doctor.mjs", []],
+      ["scripts/setup/validate-codex-model-policy.mjs", []],
+      ["scripts/setup/tooling-doctor.mjs", ["--online"]],
+      ["scripts/deps/report.mjs", []],
+    ],
+    "actual-state and requested online observations are never replaced by cached tests",
+  );
+});
 
 test("apply rejects unsafe worktrees before recovering interrupted writes", () => {
   const source = readFileSync(new URL("./repository-housekeeping.mjs", import.meta.url), "utf8");

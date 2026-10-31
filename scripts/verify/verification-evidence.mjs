@@ -25,7 +25,12 @@ import {
   fullVerificationEvidenceRecord,
   refreshedVerificationEvidenceRecord,
   checkpointVerificationEvidenceRecord,
+  validateVerificationEvidenceRecord,
 } from "./verification-evidence-record.mjs";
+import {
+  verificationExecutionUnits,
+  verificationOutputFingerprint,
+} from "./verification-check-inputs.mjs";
 import { canonicalJson, digest } from "./verification-record-helpers.mjs";
 import { executableFingerprint } from "./verification-source-inputs.mjs";
 import { failVerificationEvidence as fail } from "./verification-evidence-error.mjs";
@@ -90,6 +95,10 @@ function normalizedBroadPlan(broadPlan) {
       diagnosticAfterMs = 300000,
       cancellable = false,
       coveredTestPaths = [],
+      reuseMaxAgeMs = null,
+      outputs = [],
+      inputScope,
+      workspaceUnits,
     } = command;
     if (
       typeof key !== "string" ||
@@ -99,9 +108,21 @@ function normalizedBroadPlan(broadPlan) {
       executable.length > 1_024 ||
       /[\0\r\n]/.test(executable) ||
       !allowedPlanPhases.has(phase) ||
+      (inputScope !== undefined && !["repository", "owners"].includes(inputScope)) ||
       !Number.isSafeInteger(diagnosticAfterMs) ||
       diagnosticAfterMs <= 0 ||
       typeof cancellable !== "boolean" ||
+      !Array.isArray(outputs) ||
+      outputs.length > 10_000 ||
+      outputs.some((file) => typeof file !== "string" || /[\0\r\n]/u.test(file)) ||
+      (workspaceUnits !== undefined &&
+        (!Array.isArray(workspaceUnits) ||
+          workspaceUnits.length > 1000 ||
+          workspaceUnits.some((unit) => unit.workspaceUnits !== undefined))) ||
+      (reuseMaxAgeMs !== null &&
+        (!Number.isSafeInteger(reuseMaxAgeMs) ||
+          reuseMaxAgeMs < 1 ||
+          reuseMaxAgeMs > 2592000000)) ||
       !Array.isArray(coveredTestPaths) ||
       coveredTestPaths.some((file) => typeof file !== "string" || /[\0\r\n]/u.test(file)) ||
       !Array.isArray(args) ||
@@ -132,6 +153,14 @@ function normalizedBroadPlan(broadPlan) {
       diagnosticAfterMs,
       cancellable,
       coveredTestPaths,
+      reuseMaxAgeMs,
+      outputs,
+      ...(inputScope === undefined ? {} : { inputScope }),
+      workspaceUnits: workspaceUnits
+        ? normalizedBroadPlan(
+            workspaceUnits.map((unit, unitIndex) => ({ ...unit, key: `unit-${unitIndex}` })),
+          )
+        : [],
     });
   });
   const uniqueKeys = new Set();
@@ -313,6 +342,36 @@ function currentBasisToken(record) {
   return digest(canonicalJson(record.current));
 }
 
+function staleObservationFindings(broadPlan, checks) {
+  const successful = new Map(checks.map((check) => [check.key, check]));
+  const now = Date.now();
+  return broadPlan.flatMap((command) =>
+    command.reuseMaxAgeMs === undefined
+      ? []
+      : verificationExecutionUnits(command).flatMap((unit) => {
+          const completed = Date.parse(successful.get(unit.key)?.completedAt);
+          return !Number.isFinite(completed) ||
+            completed > now ||
+            now - completed >= command.reuseMaxAgeMs
+            ? [`external observation expired or missing: ${unit.testFile ?? unit.key}`]
+            : [];
+        }),
+  );
+}
+
+function staleOutputFindings(broadPlan, checks, repositoryRoot) {
+  const successful = new Map(checks.map((check) => [check.key, check]));
+  return broadPlan
+    .flatMap(verificationExecutionUnits)
+    .filter(
+      (unit) =>
+        unit.outputs?.length &&
+        verificationOutputFingerprint(unit, { repositoryRoot }) !==
+          successful.get(unit.key)?.outputFingerprint,
+    )
+    .map((unit) => `declared output state changed or missing: ${unit.key}`);
+}
+
 function publishEvidence({
   root,
   record,
@@ -324,6 +383,7 @@ function publishEvidence({
   artifactManifest,
 }) {
   assertVerificationSessionLockOwned({ repositoryRoot: root });
+  validateVerificationEvidenceRecord(record);
   writeEvidence(root, record);
   const publishedInputs = currentVerificationEvidenceInputs({
     root,
@@ -438,6 +498,7 @@ export function recordSuccessfulFullEvidence({
   expectedInputs,
   expectedGitBasis,
   successfulCommandKeys,
+  checks,
 } = {}) {
   if (!expectedInputs || !expectedGitBasis) {
     fail("Full verification evidence requires its pre-gate snapshots.");
@@ -458,12 +519,18 @@ export function recordSuccessfulFullEvidence({
   if (!sameInputs(current, expectedInputs) || !sameGitBasis(gitBasis, expectedGitBasis)) {
     fail("Repository, Git basis, plan, or runtime changed during complete verification.");
   }
-  const checkpoint = readVerificationCheckpoint({ root });
+  const checkpoint = checks ?? readVerificationCheckpoint({ root }).checks;
+  const stale = [
+    ...staleObservationFindings(broadPlan, checkpoint),
+    ...staleOutputFindings(broadPlan, checkpoint, root),
+  ];
+  if (stale.length)
+    fail("Full verification evidence requires current external observations.", stale);
   publishEvidence({
     root,
     record: checkpointVerificationEvidenceRecord(
       fullVerificationEvidenceRecord(current, gitBasis),
-      checkpoint.checks,
+      checkpoint,
       current.sourceFiles,
     ),
     inputs: current,
@@ -551,7 +618,10 @@ export function validateExactCurrentEvidence({
     artifactManifest,
   });
   const gitBasis = captureVerificationGitBasis({ repositoryRoot: root });
-  const findings = [];
+  const findings = [
+    ...staleObservationFindings(broadPlan, record.checks),
+    ...staleOutputFindings(broadPlan, record.checks, root),
+  ];
   if (record.current.broadFingerprint !== current.broadFingerprint) {
     findings.push("broad verification inputs changed");
   }

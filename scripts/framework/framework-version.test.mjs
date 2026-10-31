@@ -12,6 +12,7 @@ import { applyHousekeepingWrites } from "../repository/repository-housekeeping-t
 import { trustedPnpmCommand } from "../deps/trusted-pnpm-command.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
 import { acquireVerificationSessionLock } from "../verify/verification-session-lock.mjs";
+import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycle-process.mjs";
 import {
   frameworkVersionEndMarker,
   frameworkVersionReconciliationPlan,
@@ -190,6 +191,39 @@ test("detached CI reviews the central baseline without gaining housekeeping writ
   );
 });
 
+test("pending dependency transactions block source version writes before any command", (t) => {
+  const root = fixture(t);
+  write(root, "README.md", "# Fixture\nChanged release content.\n");
+  const files = [".codexrig/framework.json", "package.json", "docs/project.md"];
+  const before = files.map((file) => readFileSync(path.join(root, file)));
+  assert.equal(frameworkVersionReconciliationPlan({ root }).writes.length, files.length);
+  let dispatches = 0;
+  for (const name of ["plan.json", "journal.json"]) {
+    const pending = `.project-state/dependency-update/${name}`;
+    write(root, pending, "{}\n");
+    assert.throws(
+      () =>
+        reconcileHousekeepingVersion({
+          root,
+          apply: true,
+          runCommand: () => {
+            dispatches += 1;
+            throw new Error("Unexpected command dispatch");
+          },
+        }),
+      /reviewed dependency update transaction.*housekeeping is incomplete/su,
+    );
+    assert.deepEqual(
+      files.map((file) => readFileSync(path.join(root, file))),
+      before,
+      `${name} must preserve all transaction-bound version metadata`,
+    );
+    assert.equal(dispatches, 0);
+    assert.equal(readFileSync(path.join(root, pending), "utf8"), "{}\n");
+    rmSync(path.join(root, pending));
+  }
+});
+
 for (const interrupted of [false, true]) {
   test(`housekeeping leaves guarded pnpm usable after ${interrupted ? "an interrupted" : "a new"} version change`, (t) => {
     const root = fixture(t);
@@ -202,7 +236,7 @@ for (const interrupted of [false, true]) {
     write(
       root,
       "pnpm-workspace.yaml",
-      "packages: []\nverifyDepsBeforeRun: error\nignorePnpmfile: true\npnpmfile: []\n",
+      "packages: []\nverifyDepsBeforeRun: false\nignorePnpmfile: true\npnpmfile: []\n",
     );
     const command = trustedPnpmCommand({ repositoryRoot: root });
     const pnpm = (args) =>
@@ -216,7 +250,8 @@ for (const interrupted of [false, true]) {
     assert.equal(initial.status, 0, initial.stderr);
     const originalLockfile = readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8");
     const plan = frameworkVersionReconciliationPlan({ root });
-    const probe = () => pnpm(["exec", "node", "-e", "process.exit(0)"]);
+    const probe = () =>
+      pnpm(["--config.verify-deps-before-run=error", "exec", process.execPath, "-e", ""]);
     assert.equal(probe().status, 0);
     if (interrupted) {
       applyHousekeepingWrites({ root, writes: plan.writes });
@@ -231,13 +266,18 @@ for (const interrupted of [false, true]) {
         "check mode must leave stale installation state unchanged",
       );
     }
-    const reconcile = () => {
+    const dispatches = [];
+    const reconcile = (runCommand = spawnRuntimeLifecycleCommandSync) => {
       const lock = acquireVerificationSessionLock({ repositoryRoot: root });
       try {
         reconcileHousekeepingVersion({
           root,
           apply: true,
           lifecycleCapability: lock.lifecycleCapability,
+          runCommand: (invocation) => {
+            dispatches.push(invocation.args);
+            return runCommand(invocation);
+          },
         });
       } finally {
         lock.release();
@@ -262,6 +302,48 @@ for (const interrupted of [false, true]) {
     );
     assert.deepEqual(frameworkVersionReconciliationPlan({ root }).writes, []);
     assert.equal(readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8"), originalLockfile);
+    const installations = () =>
+      dispatches.filter((args) => args.includes("--reproduce-locked")).length;
+    const beforeRepeat = installations();
+    const repeatStarted = performance.now();
+    reconcile();
+    t.diagnostic(
+      `unchanged repeat: ${installations() - beforeRepeat} installer dispatches, ${Math.round(performance.now() - repeatStarted)}ms`,
+    );
+    assert.equal(
+      installations(),
+      beforeRepeat,
+      "valid prepared state must not dispatch another installer",
+    );
+    for (const name of ["plan.json", "journal.json"]) {
+      const pending = `.project-state/dependency-update/${name}`;
+      write(root, pending, "{}\n");
+      const before = dispatches.length;
+      assert.throws(
+        reconcile,
+        /reviewed dependency update transaction.*housekeeping is incomplete/su,
+      );
+      assert.equal(
+        dispatches.length,
+        before,
+        "pending updates block even a valid prepared installation",
+      );
+      rmSync(path.join(root, pending));
+    }
+    const beforeUnknown = installations();
+    assert.throws(
+      () =>
+        reconcile((invocation) => {
+          assert.ok(invocation.args.includes("--config.verify-deps-before-run=error"));
+          return { status: 1, stdout: "", stderr: "Unexpected prepared-state failure" };
+        }),
+      /Unexpected prepared-state failure.*housekeeping is incomplete/su,
+    );
+    assert.equal(
+      installations(),
+      beforeUnknown,
+      "unknown guard errors must not trigger installation",
+    );
   });
 }
 

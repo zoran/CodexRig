@@ -71,6 +71,41 @@ export function printPlan(plan) {
 
   const phases = commandsByExecutionPhase(plan);
   const commands = executionPhaseOrder.flatMap((phase) => phases.get(phase));
+  if (plan.admission.coverageBlockedReason)
+    console.log(safeField(plan.admission.coverageBlockedReason));
+  if (plan.evidence) {
+    const {
+      reused,
+      required,
+      missingCoverage,
+      prerequisites = [],
+      blockedPrerequisites = [],
+    } = plan.evidence;
+    const measured = required.filter((entry) => Number.isSafeInteger(entry.elapsedMs));
+    console.log(
+      `Evidence: ${reused.length} reused; ${required.length} required; ${missingCoverage.length} missing for complete coverage.`,
+    );
+    console.log(
+      `Previous unit duration sum: ${measured.reduce((total, entry) => total + entry.elapsedMs, 0)}ms; ${required.length - measured.length} unmeasured check(s).`,
+    );
+    if (plan.options.printPlan) {
+      for (const reason of blockedPrerequisites)
+        console.log(`Blocked prerequisite: ${safeField(reason)}`);
+      for (const entry of reused)
+        console.log(
+          `- Reuse ${safeField(entry.label)}: ${entry.reason}; ${entry.elapsedMs}ms previously.`,
+        );
+      for (const entry of required)
+        console.log(`- Required ${safeField(entry.label)}: ${entry.reason}.`);
+      if (missingCoverage.length)
+        console.log(
+          `Missing coverage: ${missingCoverage.slice(0, 12).map(safeField).join(", ")}${missingCoverage.length > 12 ? `; ${missingCoverage.length - 12} more (the full plan lists every unit)` : ""}`,
+        );
+      console.log(
+        `Prerequisites: ${prerequisites.length ? prerequisites.map(safeField).join("; ") : "admitted project tools; no additional artifact state inferred from test results"}`,
+      );
+    }
+  }
   if (!plan.options.printPlan) {
     console.log(
       `Selected ${commands.length} check(s) for ${plan.classifiedPaths.length} changed path(s).`,
@@ -122,7 +157,7 @@ export function printPlan(plan) {
 
   if (commands.length === 0) {
     console.log(
-      "\nSelected checks: none; paths are local/generated or no relevant current surface exists.",
+      "\nSelected checks: none; current results cover the selected scope or no current check is required.",
     );
     return;
   }
@@ -368,6 +403,7 @@ function parallelLimit() {
 function artifactOwnerSet(command) {
   return new Set([
     ...(command.artifactOwners ?? []),
+    ...(command.outputs ?? []).map((file) => `output:${file}`),
     ...(command.serialGroup ? [`serial-test-suite:${command.serialGroup}`] : []),
   ]);
 }
@@ -402,9 +438,18 @@ function artifactShards(commands) {
   return [...groups.values()].sort((left, right) => left[0] - right[0]);
 }
 
-async function runArtifactSafeCommands(commands, failurePrefix, repositoryRoot, onResult) {
+async function runArtifactSafeCommands(
+  commands,
+  failurePrefix,
+  repositoryRoot,
+  onResult,
+  completed,
+) {
   if (commands.length === 0) return [];
   const results = new Array(commands.length);
+  // Recovery and held commands need lifecycle locking before verification policy exists.
+  // Load policy-dependent output validation only when executing planned checks.
+  const { verificationOutputFingerprint } = await import("./verification-check-inputs.mjs");
   const shards = artifactShards(commands);
   let nextShard = 0;
   let phaseFailed = false;
@@ -415,9 +460,33 @@ async function runArtifactSafeCommands(commands, failurePrefix, repositoryRoot, 
         if (phaseFailed) break;
         const startedAt = performance.now();
         try {
+          for (const prerequisite of commands[index].outputPrerequisites ?? []) {
+            const produced = completed.get(prerequisite.key);
+            if (produced && !prerequisite.outputs?.length) continue;
+            const expected = produced?.outputFingerprint ?? prerequisite.outputFingerprint;
+            if (
+              !expected ||
+              verificationOutputFingerprint(prerequisite, { repositoryRoot }) !== expected
+            )
+              throw new Error(
+                `Build output prerequisite changed before ${commands[index].key}: ${prerequisite.key}. Replan this producer and its consumers.`,
+              );
+          }
           results[index] = await runCommand(commands[index], repositoryRoot, () => {
             phaseFailed = true;
           });
+          const result = results[index];
+          if (!result.error && result.status === 0 && !result.diagnosticRequired) {
+            const outputFingerprint = verificationOutputFingerprint(commands[index], {
+              repositoryRoot,
+            });
+            if (outputFingerprint === null)
+              throw new Error(
+                `Successful command ${commands[index].key} did not retain every declared output.`,
+              );
+            if (outputFingerprint !== undefined) result.outputFingerprint = outputFingerprint;
+            completed.set(commands[index].key, result);
+          }
         } catch (error) {
           results[index] = {
             command: commands[index],
@@ -461,10 +530,19 @@ async function runArtifactSafeCommands(commands, failurePrefix, repositoryRoot, 
 }
 
 export async function runPlan(plan, { repositoryRoot = root, onResult } = {}) {
+  if (!plan.options.printPlan && plan.evidence?.blockedPrerequisites?.length)
+    throw new Error(plan.evidence.blockedPrerequisites.join("\n"));
+  if (
+    !plan.options.printPlan &&
+    plan.admission.mode === "full" &&
+    plan.admission.coverageBlockedReason
+  )
+    throw new Error(plan.admission.coverageBlockedReason);
   printPlan(plan);
   if (plan.options.printPlan) return Object.freeze({ successfulCommandKeys: Object.freeze([]) });
 
   const phases = commandsByExecutionPhase(plan);
+  const completed = new Map();
   const successfulCommandKeys = await withVerificationSignalForwarding(async () => {
     const successful = [];
     successful.push(
@@ -473,6 +551,7 @@ export async function runPlan(plan, { repositoryRoot = root, onResult } = {}) {
         "Preflight verification checks failed",
         repositoryRoot,
         onResult,
+        completed,
       )),
     );
     successful.push(
@@ -481,6 +560,7 @@ export async function runPlan(plan, { repositoryRoot = root, onResult } = {}) {
         "Broad regression checks failed",
         repositoryRoot,
         onResult,
+        completed,
       )),
     );
     successful.push(
@@ -489,6 +569,7 @@ export async function runPlan(plan, { repositoryRoot = root, onResult } = {}) {
         "Workspace build failed",
         repositoryRoot,
         onResult,
+        completed,
       )),
     );
     successful.push(
@@ -497,6 +578,7 @@ export async function runPlan(plan, { repositoryRoot = root, onResult } = {}) {
         "Workspace test failed",
         repositoryRoot,
         onResult,
+        completed,
       )),
     );
     successful.push(
@@ -505,6 +587,7 @@ export async function runPlan(plan, { repositoryRoot = root, onResult } = {}) {
         "Target delivery verification failed",
         repositoryRoot,
         onResult,
+        completed,
       )),
     );
     return successful;

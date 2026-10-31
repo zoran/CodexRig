@@ -412,6 +412,40 @@ test("runtime storage inspection detects the actual executable without an open f
   );
 });
 
+test("process inspection tolerates proc entries disappearing during observation", (t) => {
+  if (process.platform !== "linux") return t.skip("Linux procfs observation");
+  const root = path.resolve("process-inspection-fixture");
+  for (const code of ["ENOENT", "ESRCH"]) {
+    for (const missing of ["stat", "cwd", "exe", "maps", "fd", "descriptor"]) {
+      const observe = (step, value) => {
+        if (step === missing) throw Object.assign(new Error("Process exited"), { code });
+        return value;
+      };
+      const result = inspectLinuxOpenRepositoryPaths({
+        root,
+        includeRuntimePaths: true,
+        matchesPath: () => false,
+        testHooks: {
+          readDirectory: (file) => (file === "/proc" ? ["123"] : observe("fd", ["1"])),
+          readStats: () => observe("stat", { uid: process.getuid() }),
+          readText: () => observe("maps", ""),
+          readLink: (file) =>
+            file.endsWith("/cwd")
+              ? observe("cwd", root)
+              : file.endsWith("/exe")
+                ? observe("exe", process.execPath)
+                : observe("descriptor", "pipe:[1]"),
+        },
+      });
+      assert.deepEqual(
+        result,
+        { observationComplete: true, status: "inactive" },
+        `${code}: ${missing}`,
+      );
+    }
+  }
+});
+
 test("startup composes native cleanup and migrates private pin tracking without downloads or runtime copies", async (t) => {
   const f = fixture(t);
   const root = f.roots[0];
@@ -498,7 +532,7 @@ test("startup composes native cleanup and migrates private pin tracking without 
     fetchImpl: () => {
       throw new Error("startup storage regression must not download");
     },
-    onProgress: (message) => progress.push(message),
+    onReleaseNotice: (message) => progress.push(message),
   });
   assert.deepEqual(retained.changedPaths, []);
   assert.ok(progress.some((message) => message.includes(sibling) && /writable/u.test(message)));

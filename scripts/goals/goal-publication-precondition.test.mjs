@@ -19,6 +19,7 @@ import path from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
+import { importSpecifiersForFile } from "../repository/source-import-specifiers.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const fixturePackageManager = JSON.parse(
@@ -54,67 +55,61 @@ function assertGit(cwd, ...args) {
 }
 
 function copyGoalGateRuntime(repository) {
-  const runtimeFiles = [
+  // Copy the tested public entries and their actual module closure. A second handwritten
+  // dependency list drifts whenever the production runtime gains an import.
+  const pending = [
     ".codex/tooling.json",
-    ".codex/verification.json",
-    "scripts/contracts/tooling-configuration.mjs",
-    "scripts/filesystem/repository-files.mjs",
-    "scripts/verify/verification-configuration.mjs",
-    "scripts/contracts/delivery-configuration.mjs",
-    "scripts/contracts/portable-toml.mjs",
-    "scripts/contracts/semver-contract.mjs",
-    "scripts/filesystem/owned-file-operations.mjs",
-    "scripts/filesystem/owned-path-safety.mjs",
     "scripts/goals/goal-publication-precondition.mjs",
-    "scripts/repository/git-runtime-isolation.mjs",
-    "scripts/repository/project-tool-environment.mjs",
-    "scripts/repository/project-temporary-storage.mjs",
-    "scripts/repository/pnpm-workspace-manifests.mjs",
-    "scripts/repository/product-roots.mjs",
-    "scripts/repository/runtime-lifecycle-mutex.mjs",
-    "scripts/repository/runtime-lifecycle-process.mjs",
-    "scripts/repository/runtime-lifecycle-schema.mjs",
-    "scripts/repository/runtime-owned-state.mjs",
-    "scripts/repository/runtime-process-cancellation.mjs",
-    "scripts/repository/runtime-process-identity.mjs",
-    "scripts/repository/runtime-process-io.mjs",
-    "scripts/repository/runtime-session-lease.mjs",
-    "scripts/repository/runtime-session-state.mjs",
-    "scripts/repository/sensitive-paths.mjs",
-    "scripts/repository/source-inventory.mjs",
-    "scripts/repository/source-inventory-policy.mjs",
-    "scripts/repository/stable-file-snapshot.mjs",
-    "scripts/repository/user-tool-storage.mjs",
-    "scripts/security/secret-patterns.mjs",
-    "scripts/terminal/terminal-output.mjs",
     "scripts/verify/adaptive.mjs",
-    "scripts/verify/adaptive-options.mjs",
-    "scripts/verify/adaptive-runner.mjs",
-    "scripts/verify/adaptive-state.mjs",
-    "scripts/verify/delivery-artifact.mjs",
-    "scripts/verify/verification-admission-commands.mjs",
-    "scripts/verify/verification-admission.mjs",
-    "scripts/verify/verification-admission-decision.mjs",
-    "scripts/verify/verification-admission-registry.mjs",
-    "scripts/verify/verification-check-inputs.mjs",
-    "scripts/verify/verification-evidence-error.mjs",
-    "scripts/verify/verification-evidence-store.mjs",
-    "scripts/verify/verification-evidence.mjs",
-    "scripts/verify/verification-evidence-record.mjs",
-    "scripts/verify/verification-record-helpers.mjs",
-    "scripts/verify/verification-executor.mjs",
-    "scripts/verify/verification-git-basis.mjs",
-    "scripts/verify/verification-risk-profile.mjs",
-    "scripts/verify/verification-runtime-identity.mjs",
-    "scripts/verify/verification-session-lock.mjs",
-    "scripts/verify/verification-source-inputs.mjs",
-    "scripts/verify/workspace-verification.mjs",
   ];
-  for (const relativePath of runtimeFiles) {
-    const target = path.join(repository, ...relativePath.split("/"));
+  const copied = new Set();
+  while (pending.length) {
+    const relativePath = pending.pop();
+    if (copied.has(relativePath)) continue;
+    assert.ok(!path.isAbsolute(relativePath) && !relativePath.split("/").includes(".."));
+    copied.add(relativePath);
+    const source = path.join(root, relativePath);
+    const target = path.join(repository, relativePath);
     mkdirSync(path.dirname(target), { recursive: true });
-    copyFileSync(path.join(root, ...relativePath.split("/")), target);
+    copyFileSync(source, target);
+    if (!relativePath.endsWith(".mjs")) continue;
+    for (const specifier of importSpecifiersForFile({
+      relativePath,
+      content: readFileSync(source, "utf8"),
+    })) {
+      if (specifier.startsWith("."))
+        pending.push(
+          path.posix.normalize(path.posix.join(path.posix.dirname(relativePath), specifier)),
+        );
+    }
   }
+  // Exercise the shipped evidence contract with a real fixture check, not a fabricated
+  // success for every source-framework command (including external observations).
+  writeFileSync(
+    path.join(repository, ".codex/verification.json"),
+    JSON.stringify({
+      schemaVersion: 1,
+      commands: [
+        {
+          key: "fixture-source",
+          label: "goal fixture source",
+          reason: "verify the tracked goal fixture input",
+          executable: "$node",
+          args: [
+            "--eval",
+            "require('node:assert/strict').notEqual(require('node:fs').readFileSync('tracked.txt', 'utf8').trim(), '');",
+          ],
+          phase: "preflight",
+          reuseMaxAgeMs: 300_000,
+        },
+      ],
+      prePushChecks: [],
+      risks: [],
+      exactConsumers: { "tracked.txt": ["fixture-source"] },
+      testConsumers: {},
+      ownedCategories: {},
+    }),
+  );
 }
 
 function recordFixtureEvidence(repository) {
@@ -129,8 +124,14 @@ function recordFixtureEvidence(repository) {
   const lockUrl = pathToFileURL(
     path.join(repository, "scripts/verify/verification-session-lock.mjs"),
   ).href;
+  const checkInputsUrl = pathToFileURL(
+    path.join(repository, "scripts/verify/verification-check-inputs.mjs"),
+  ).href;
+  const configurationUrl = pathToFileURL(
+    path.join(repository, "scripts/verify/verification-configuration.mjs"),
+  ).href;
   const source = `
-    const { buildPlan } = await import(${JSON.stringify(runnerUrl)});
+    const { buildPlan, runPlan } = await import(${JSON.stringify(runnerUrl)});
     const { broadEvidencePlan } = await import(${JSON.stringify(adaptiveUrl)});
     const {
       currentVerificationEvidenceInputs,
@@ -138,6 +139,8 @@ function recordFixtureEvidence(repository) {
     } = await import(${JSON.stringify(evidenceUrl)});
     const { captureVerificationGitBasis } = await import(${JSON.stringify(basisUrl)});
     const { acquireVerificationSessionLock } = await import(${JSON.stringify(lockUrl)});
+    const { verificationCheckFingerprints } = await import(${JSON.stringify(checkInputsUrl)});
+    const { readVerificationConfiguration } = await import(${JSON.stringify(configurationUrl)});
     const plan = buildPlan({ mode: "full", printPlan: false, simulatedPaths: [] });
     const broadPlan = broadEvidencePlan(plan);
     const expectedInputs = currentVerificationEvidenceInputs({ broadPlan });
@@ -145,8 +148,28 @@ function recordFixtureEvidence(repository) {
     const lock = acquireVerificationSessionLock({ repositoryRoot: ${JSON.stringify(repository)} });
     try {
       const commands = [...plan.readOnlyCommands, ...plan.workspaceCommands];
+      const fingerprints = verificationCheckFingerprints({
+        commands,
+        inputs: expectedInputs,
+        configuration: readVerificationConfiguration(),
+        repositoryRoot: ${JSON.stringify(repository)},
+        workspaceManifests: [],
+      });
+      const checks = [];
+      await runPlan(plan, {
+        repositoryRoot: ${JSON.stringify(repository)},
+        onResult(result) {
+          if (result.status === 0 && !result.error && !result.diagnosticRequired)
+            checks.push({
+              key: result.command.key,
+              fingerprint: fingerprints.get(result.command.key),
+              completedAt: new Date().toISOString(),
+              elapsedMs: result.elapsedMs,
+            });
+        },
+      });
       recordSuccessfulFullEvidence({
-        broadPlan, expectedGitBasis, expectedInputs,
+        broadPlan, expectedGitBasis, expectedInputs, checks,
         successfulCommandKeys: commands.map((command) => command.key)
       });
     } finally {

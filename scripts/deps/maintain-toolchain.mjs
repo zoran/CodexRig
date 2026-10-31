@@ -15,6 +15,10 @@ import { toolingRoot, serializeCanonicalJson } from "../filesystem/repository-fi
 import { verifyInputRecords } from "../deps/dependency-inputs.mjs";
 import { stageDependencyInstallationInputs } from "../deps/install-compatible.mjs";
 import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
+import {
+  projectManagedToolLayout,
+  verifyProjectToolBundle,
+} from "../repository/project-tool-executables.mjs";
 import { prepareUserToolDirectories, userToolPaths } from "../repository/user-tool-storage.mjs";
 import { runStorageHousekeeping } from "../repository/repository-storage.mjs";
 import {
@@ -39,7 +43,7 @@ import {
   applyHousekeepingWrites,
   recoverInterruptedHousekeepingWrites,
 } from "../repository/repository-housekeeping-transaction.mjs";
-import { formatContextError } from "../terminal/terminal-output.mjs";
+import { formatContextError, sanitizeForTerminal } from "../terminal/terminal-output.mjs";
 import { showStartupIntro, startupStatus } from "../terminal/startup-presentation.mjs";
 import { ciAdapterContractViolations } from "./ci-toolchain-contract.mjs";
 import { resolveToolchainReleases, refreshGithubActions } from "./toolchain-releases.mjs";
@@ -87,6 +91,43 @@ function assertCandidateLock(stage, candidate) {
     throw new Error(`Candidate toolchain lock is invalid: ${findings.join("; ")}.`);
 }
 
+function compatibleMise(
+  root,
+  current,
+  candidate,
+  bootstrap,
+  admitProjectTools,
+  environment,
+  onNotice,
+) {
+  if (current.ci.miseVersion === candidate.ci.miseVersion) return { candidate, bootstrap };
+  const previous = projectManagedToolLayout(root, current).mise;
+  const baseline = () => {
+    verifyProjectToolBundle(root, previous);
+    admitProjectTools({ root, miseExecutable: previous.executable, environment });
+  };
+  try {
+    baseline();
+  } catch {
+    // A first install or broken baseline cannot establish a safe retained version.
+    return { candidate, bootstrap };
+  }
+  try {
+    admitProjectTools({ root, miseExecutable: bootstrap.mise, environment });
+    return { candidate, bootstrap };
+  } catch (error) {
+    // A candidate probe may expose concurrent/plugin changes. Revalidate before retaining.
+    baseline();
+    const selected = structuredClone(candidate);
+    selected.ci.miseVersion = current.ci.miseVersion;
+    selected.ci.miseBinarySha256 = structuredClone(current.ci.miseBinarySha256);
+    onNotice(
+      `Retaining mise ${current.ci.miseVersion}: candidate ${candidate.ci.miseVersion} cannot resolve the complete locked toolchain (${formatContextError(error, root)}).`,
+    );
+    return { candidate: selected, bootstrap: { ...bootstrap, mise: previous.executable } };
+  }
+}
+
 function commandRunner(root, capability, temporaryDirectory) {
   return (command, args, { cwd = root, delegation, env = {} } = {}) => {
     const environment = {
@@ -113,10 +154,24 @@ function commandRunner(root, capability, temporaryDirectory) {
         maxBuffer: 16 * 1024 * 1024,
       },
     });
-    if (result.error || result.status !== 0)
-      throw new Error(
-        `${path.basename(command)} ${args[0]} failed: ${result.error?.message || result.stderr || result.stdout || result.status}`,
-      );
+    if (result.error || result.signal || result.status !== 0) {
+      const lines = [result.stderr, result.stdout].filter(Boolean).join("\n").split(/\r?\n/u);
+      const fatal = lines.findIndex((line) => {
+        const message = sanitizeForTerminal(line).trim();
+        return (
+          !/^mise\s+WARN\b/iu.test(message) &&
+          /^(?:mise\s+ERROR\b|ERR_[A-Z_]+\b|(?:Error|Fatal(?: error)?):|[A-Za-z][\w -]{0,80} failed:)/iu.test(
+            message,
+          )
+        );
+      });
+      const detail =
+        result.error?.message ||
+        lines.slice(Math.max(0, fatal)).join("\n").trim() ||
+        result.signal ||
+        result.status;
+      throw new Error(`${path.basename(command)} ${args[0]} failed: ${detail}`);
+    }
     return result.stdout.trim();
   };
 }
@@ -244,12 +299,12 @@ export async function maintainToolchain({
         ? "Reproducing reviewed tool pins and the existing dependency lockfile."
         : "Checking official tool releases, CI action pins and workspace dependencies.",
     );
-    const candidate =
+    let candidate =
       locked && candidateResolver === resolveToolchainReleases
         ? current
         : await candidateResolver(current, {
             fetchImpl,
-            onProgress: startup ? () => {} : onReleaseNotice,
+            onProgress: onReleaseNotice,
           });
     const projected = projectToolchainConfiguration(inputs.contents, current, candidate);
     if (!locked)
@@ -275,13 +330,27 @@ export async function maintainToolchain({
     });
     assertMaintenanceInventory(inspectRepositoryWorktrees({ root }), { startup });
     verifyInputRecords(root, allInputs);
-    const bootstrap = await installBootstrapTools({
+    let bootstrap = await installBootstrapTools({
       root,
       matrix: candidate,
       run,
       fetchImpl,
       installationOwner,
     });
+    const selected = compatibleMise(
+      root,
+      current,
+      candidate,
+      bootstrap,
+      admitProjectTools,
+      temporaryEnvironment(pnpmHooksDisabledEnvironment(process.env, root), stage),
+      onReleaseNotice,
+    );
+    Object.assign(
+      projected,
+      projectToolchainConfiguration(projected, candidate, selected.candidate),
+    );
+    ({ candidate, bootstrap } = selected);
     for (const relativePath of toolchainConfigurationPaths)
       stageWrite(stage, relativePath, projected[relativePath]);
     const packageJson = JSON.parse(readFileSync(path.join(stage, "package.json"), "utf8"));
@@ -366,7 +435,7 @@ export async function maintainToolchain({
         owner: capability,
         installationOwner,
       });
-      for (const reason of storage.deferred) onProgress(`Tool storage retained: ${reason}.`);
+      for (const reason of storage.deferred) onReleaseNotice(`Tool storage retained: ${reason}.`);
     }
     return { changedPaths: writes.map((entry) => entry.relativePath), matrix: candidate };
   } finally {
@@ -406,7 +475,7 @@ async function main() {
       if (startup) startupStatus(`${++phase}/5`, message);
       else console.log(message);
     },
-    onReleaseNotice: (message) => console.log(message),
+    onReleaseNotice: (message) => (startup ? startupStatus("info", message) : console.log(message)),
     onLifecycleWait: (message) => startupStatus("wait", message),
   });
   const completed = `Toolchain ready; ${result.changedPaths.length} project input(s) updated.`;

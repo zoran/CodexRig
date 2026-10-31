@@ -1,8 +1,33 @@
 /** Owns project-selected verification commands and their explicit consumer bindings. */
 import process from "node:process";
-import { parseJsonFile, toolingRoot } from "../filesystem/repository-files.mjs";
+import {
+  normalizeRepositoryPath,
+  parseJsonFile,
+  toolingRoot,
+} from "../filesystem/repository-files.mjs";
 
 export const verificationConfigurationPath = ".codex/verification.json";
+
+function validateOutputs(outputs) {
+  if (
+    !Array.isArray(outputs) ||
+    !outputs.length ||
+    outputs.length > 128 ||
+    new Set(outputs).size !== outputs.length ||
+    outputs.some(
+      (file) =>
+        typeof file !== "string" ||
+        file.length > 4096 ||
+        /[*?\[\]{}]/u.test(file) ||
+        /^[A-Za-z]:/u.test(file) ||
+        normalizeRepositoryPath(file) !== file ||
+        file.split("/").some((part) => [".", "..", ".git", ".auth"].includes(part)),
+    )
+  )
+    throw new Error(
+      "Verification outputs require bounded unique exact file paths within their owner.",
+    );
+}
 
 function nodeTestRuntime(args) {
   return args.filter(
@@ -16,10 +41,54 @@ export function readVerificationConfiguration(root = toolingRoot) {
   if (
     !value ||
     value.schemaVersion !== 1 ||
-    Object.keys(value).sort().join(",") !==
+    Object.keys(value)
+      .filter((key) => !["sharedInputs", "workspaceOutputs"].includes(key))
+      .sort()
+      .join(",") !==
       "commands,exactConsumers,ownedCategories,prePushChecks,risks,schemaVersion,testConsumers"
   )
     throw new Error("Unsupported verification configuration.");
+  if (value.workspaceOutputs !== undefined) {
+    const outputs = value.workspaceOutputs;
+    if (
+      !outputs ||
+      Array.isArray(outputs) ||
+      typeof outputs !== "object" ||
+      Object.keys(outputs).length > 128
+    )
+      throw new Error("Invalid workspace output declarations.");
+    for (const [directory, lifecycles] of Object.entries(outputs)) {
+      if (directory !== ".") validateOutputs([`${directory}/output`]);
+      if (
+        (directory !== "." &&
+          (normalizeRepositoryPath(directory) !== directory ||
+            directory.split("/").includes(".."))) ||
+        !lifecycles ||
+        typeof lifecycles !== "object" ||
+        Array.isArray(lifecycles) ||
+        Object.keys(lifecycles).length > 16
+      )
+        throw new Error("Invalid workspace output owner.");
+      for (const [script, files] of Object.entries(lifecycles)) {
+        if (!/^[a-z][a-z0-9:-]*$/u.test(script))
+          throw new Error("Invalid workspace output lifecycle.");
+        validateOutputs(files);
+      }
+    }
+  }
+  if (
+    value.sharedInputs !== undefined &&
+    (!Array.isArray(value.sharedInputs) ||
+      value.sharedInputs.length > 64 ||
+      new Set(value.sharedInputs).size !== value.sharedInputs.length ||
+      value.sharedInputs.some(
+        (file) =>
+          typeof file !== "string" ||
+          !/^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/u.test(file) ||
+          file.split("/").some((part) => part === "." || part === ".."),
+      ))
+  )
+    throw new Error("Invalid shared verification execution inputs; use exact repository paths.");
   if (!Array.isArray(value.commands) || !value.commands.length || value.commands.length > 100)
     throw new Error("Verification requires a bounded nonempty command plan.");
   if (
@@ -47,6 +116,18 @@ export function readVerificationConfiguration(root = toolingRoot) {
     throw new Error("Invalid verification risk owners.");
   const keys = new Set();
   for (const command of value.commands) {
+    if (command?.outputs !== undefined) validateOutputs(command.outputs);
+    if (
+      command?.inputScope !== undefined &&
+      (!["repository", "owners"].includes(command.inputScope) ||
+        (command.inputScope === "owners" &&
+          (command.executable !== "$node" ||
+            !Array.isArray(command.args) ||
+            typeof command.args[0] !== "string" ||
+            !command.args[0].endsWith(".mjs") ||
+            normalizeRepositoryPath(command.args[0]) !== command.args[0])))
+    )
+      throw new Error("Scoped verifier inputs require a native module command and known scope.");
     if (
       !command ||
       !/^[a-z][a-z0-9-]*$/u.test(command.key) ||
@@ -64,7 +145,11 @@ export function readVerificationConfiguration(root = toolingRoot) {
         (!Number.isSafeInteger(command.diagnosticAfterMs) ||
           command.diagnosticAfterMs < 1_000 ||
           command.diagnosticAfterMs > 3_600_000)) ||
-      (command.cancellable !== undefined && typeof command.cancellable !== "boolean")
+      (command.cancellable !== undefined && typeof command.cancellable !== "boolean") ||
+      (command.reuseMaxAgeMs !== undefined &&
+        (!Number.isSafeInteger(command.reuseMaxAgeMs) ||
+          command.reuseMaxAgeMs < 1 ||
+          command.reuseMaxAgeMs > 30 * 24 * 60 * 60 * 1000))
     )
       throw new Error(`Invalid verification execution limit: ${command.key}.`);
   }
@@ -77,6 +162,7 @@ export function readVerificationConfiguration(root = toolingRoot) {
       !parent ||
       parent === command ||
       parent.coveredBy !== undefined ||
+      JSON.stringify(command.outputs ?? []) !== JSON.stringify(parent.outputs ?? []) ||
       command.executable !== process.execPath ||
       !command.args.includes("--test") ||
       !tests.length ||

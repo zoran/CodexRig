@@ -17,6 +17,8 @@ function commandSignature(command) {
     command.coveredBy ?? null,
     command.diagnosticAfterMs ?? null,
     command.cancellable ?? false,
+    command.reuseMaxAgeMs ?? null,
+    command.inputScope ?? null,
   ]);
 }
 
@@ -144,6 +146,7 @@ export function focusedManifestCommand(relativePath) {
     artifactOwners: [],
     executable: process.execPath,
     key: `focused-manifest:${identity}`,
+    inputScope: "owners",
     label: `whole package manifest owner for ${relativePath}`,
     phase: "preflight",
     reason: `${relativePath} owns its complete identity, scripts, dependencies, and export registry`,

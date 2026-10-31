@@ -9,101 +9,33 @@ description:
 
 # System Coherence
 
-This skill owns code-quality and system-integration review together. Inspect the changed behavior
-through actual consumers; do not start a speculative whole-repository rewrite.
+Review changed code and assembled-system behavior together. Explicit review/audit stays read-only;
+repair only within an existing authorized implementation and writer scope. General authority,
+planning and closure live in [instructions](../../../instructions.md).
 
-## Authority Mode
+Read relevant requirements/design, manifest, diff and real producers/consumers. Trace one meaningful
+entry-to-result/failure flow, including state ownership and concurrent changes. Future candidates,
+configured adapters and observed deployment are different facts.
 
-A review, audit, diagnosis or status request is read-only: report findings without editing files,
-planning state or accepting risk. During authorized implementation, repair material findings only
-inside the declared scope and writer ownership. A review does not grant implementation authority.
-Materially new boundaries use `$architecture-evolution` before dependent repair.
+Inspect for actual defects in correctness, error/lifecycle/resource handling, stack conventions,
+shared mutable data, deep imports/cycles, stale contracts and consumers. Find duplicate semantics or
+competing owners; similar text alone does not justify merging distinct concerns. The replacement
+test asks whether changing an implementation stays at composition/local code or an explicit
+migration, rather than spreading knowledge through consumers. Include affected infrastructure/state
+owners, identity/tenant boundaries, UI intent and declaration headers.
 
-## Reconstruct The Slice In Context
+Keep one current contract, migrate consumers and remove superseded paths. Material topology changes
+use `$architecture-evolution`. Executable modules stay within 700 physical lines; tests, schemas,
+styles, context carriers and generated artifacts are exempt. Splits must represent real ownership.
 
-1. Read relevant `docs/project.md` entries, the diff, affected source/tests, public contracts and
-   composition points. Identify the intended invariant, real producers/consumers, data/lifecycle
-   owner and selected delivery/surface constraints. Read established requirements and separate
-   design-reference owners under
-   [Documentation Ownership](../../../instructions.md#documentation-ownership); distinguish
-   configured policy, implemented adapters, deployment and observed testing. Future candidates are
-   not active capabilities.
-2. Follow [Context And Skills](../../../instructions.md#context-and-skills): scoped exact searches,
-   direct matched-source reads, and a representative assembled flow from entry through owned
-   behavior/state or adapter to result and failure handling.
-3. Compare concurrent and upstream changes against the declared scope. Preserve other changes;
-   uncertain overlap goes to the primary under the canonical coordination rules.
+Evaluate meaningful regression/assembled-flow evidence under
+[test strategy](../../../instructions.md#test-strategy). Reuse valid results; review alone is not a
+rerun trigger. Route trust risks to `$security-review` and actual interactive changes to
+`$ui-ux-review`, avoiding duplicate review. Assess total outcome, maintenance and verification cost
+under [efficiency](../../../instructions.md#repository-efficiency-and-effectiveness). Static policy
+checks do not prove model effectiveness.
 
-## Review Code And System Together
-
-Inspect the changed neighborhood for material defects:
-
-- correctness at the producer or invariant, rather than caller guards masking the same defect;
-  naming, layout, error handling, resource ownership and test conventions that disagree with the
-  existing stack or conceal behavior;
-- semantic duplication of rules, validators, state machines, types, configuration, adapters,
-  transformations or fixtures; competing truth and new abstractions beside existing extension
-  points;
-- missing module ownership, catch-all placement, deep imports, cycles, cross-module data writes,
-  shared mutable state or provider/storage/transport types leaking through public contracts;
-- incompatible lifecycle/failure semantics, partial state transitions, stale consumers, hidden
-  coupling, environment or tenant drift, and an assembled flow broken despite local green tests;
-- mixed domain/application, presentation, interface, Identity and Access or infrastructure concerns,
-  and physical files or source/declaration headers that still describe the former owner;
-- infrastructure drift, competing resource managers, copied environment implementations or missing
-  state/recovery ownership under
-  [Infrastructure As Code](../../../instructions.md#infrastructure-as-code);
-- unrequested UI/navigation/interaction changes or shared component/token effects. Route actual
-  interactive changes to `$ui-ux-review`; do not duplicate its visual review or claim rendered
-  acceptance from source. Route changed trust surfaces to `$security-review`;
-- missing meaningful regression evidence or tests that merely mirror implementation. Apply the
-  [Test Strategy](../../../instructions.md#test-strategy): require a concrete material-risk
-  invariant, prefer an existing realistic lifecycle scenario, and justify narrow tests by
-  reliability or cost;
-- maintained executable modules above 700 physical lines or splits without cohesive responsibility.
-  Context carriers, styles, schemas, generated artifacts and test corpora are outside that quota.
-
-Apply the replacement test: replacing an implementation should require composition/configuration,
-replacement-local work or an explicit contract/data migration, not scattered consumer knowledge.
-Distinguish intentional duplication (independent trust checks, generated views, surface-local
-presentation) from identical semantics. Similar text alone does not justify centralization.
-
-## Repair At The Owning Boundary
-
-In authorized repair mode:
-
-1. Correct the producer, invariant, contract, composition or state owner; preserve unrelated work.
-2. For equivalent duplicate concepts, select one narrow owner, migrate every real consumer, and
-   remove superseded implementations, configuration, exports, fixtures and docs. For distinct
-   semantics, name and separate them rather than forcing reuse.
-3. Move files and update purpose/owner and public-type descriptions with the boundary. Material
-   topology or contract/data migrations use `$architecture-evolution`; the manifest changes only
-   when the new shape actually integrates.
-4. Follow [Current Contracts](../../../instructions.md#current-contracts-only): leave exactly one
-   current interpretation, not an old internal reader or dormant bridge.
-5. Reuse valid owner and assembled-flow evidence; run checks only for changed relevant inputs or
-   unresolved findings, then search again for superseded concepts. Review material repairs to zero
-   relevant findings before the fresh audit.
-
-In read-only mode return these remedies as findings, without applying them. Dev scheduling and slice
-acceptance follow
-[Slice Acceptance](../../../instructions.md#best-available-engineering-not-quick-fixes); the latest
-developer deploy retains priority, but an unreviewed slice is not a stable dependency.
-
-Every audit applies
-[Repository Efficiency And Effectiveness](../../../instructions.md#repository-efficiency-and-effectiveness):
-assess repository-wide outcome preservation, context/runtime/verification/maintenance cost and
-coherence from the bounded map and affected consumers. Fix only evidenced in-scope regressions;
-report limits and preserve requirements. Static byte checks do not establish model effectiveness.
-
-## Report
-
-The primary owns whole-project acceptance. A delegated review ends at the assigned question and
-returns affected documentation owners/corrections under
-[Documentation Currency](../../../instructions.md#documentation-currency); it does not start another
-repository-wide audit or optional optimization pass.
-
-Return material findings by severity with a file reference, concrete failure mode, root-cause remedy
-and smallest proving check. Name the inspected assembled flow, retained intentional duplication,
-actual evidence and untested risks. If none remain, say so within that inspected scope. Keep the
-result in the conversation; `$task-quality` coordinates acceptance without a second code review.
+Return material findings by severity with location, failure path, root-cause remedy and smallest
+proving check. Name inspected integration, intentional duplication and evidence limits. Report
+protected-document corrections to the primary. Stop at the assigned question; `$task-quality`
+composes acceptance without a second code review or speculative rewrite.

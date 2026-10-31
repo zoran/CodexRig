@@ -69,6 +69,7 @@ export const repositoryCodexHomeRuntimeFileNames = Object.freeze([
   "installation_id",
   "models_cache.json",
   "session_index.jsonl",
+  "session_index.jsonl.lock",
   "version.json",
 ]);
 export const repositoryCodexHomeRuntimeDatabasePrefixes = Object.freeze([

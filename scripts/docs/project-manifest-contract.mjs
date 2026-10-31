@@ -111,11 +111,6 @@ export function parseActiveModuleInventory(content) {
     };
   }
   const section = lines.join("\n").trim();
-  if (futureOnlyLanguage.test(section)) {
-    findings.push(
-      "docs/project.md active module inventory contains future-only language; move the candidate to docs/future-modules.md",
-    );
-  }
   const headingIndexes = [];
   for (const [index, line] of lines.entries()) {
     if (/^####\s+\S/u.test(line)) headingIndexes.push(index);
@@ -146,6 +141,12 @@ export function parseActiveModuleInventory(content) {
       .replace(/^####\s+/u, "")
       .trim()
       .replace(/^`|`$/gu, "");
+    // Planning labels describe module identity, not operational terms such as release candidates.
+    if (futureOnlyLanguage.test(name)) {
+      findings.push(
+        `module ${name} uses future-only language; move the candidate to docs/future-modules.md`,
+      );
+    }
     const parsed = parsedFieldBlock(lines.slice(start + 1, end), name);
     if (parsed.duplicate) {
       findings.push(`module ${name} duplicates field ${parsed.duplicate}`);

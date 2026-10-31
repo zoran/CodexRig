@@ -25,6 +25,7 @@ import { readToolchainConfiguration } from "../contracts/toolchain-configuration
 import {
   validateMinimalMiseTools,
   miseLockFindings,
+  nativeNodeArtifactUrls,
 } from "../contracts/mise-toolchain-configuration.mjs";
 import { toolingRoot, serializeCanonicalJson } from "../filesystem/repository-files.mjs";
 import { applyHousekeepingWrites } from "../repository/repository-housekeeping-transaction.mjs";
@@ -194,6 +195,18 @@ function registry({ tamper = false, newerNode = false } = {}) {
       };
       if (tamper && architecture)
         data.dist.integrity = `sha512-${Buffer.alloc(64).toString("base64")}`;
+    } else if (
+      /^https:\/\/(?:nodejs\.org\/dist|unofficial-builds\.nodejs\.org\/download\/release)\/v([^/]+)\/SHASUMS256\.txt$/u.test(
+        decoded,
+      )
+    ) {
+      const version = decoded.match(/\/v([^/]+)\//u)[1];
+      return new Response(
+        Object.values(nativeNodeArtifactUrls(version))
+          .filter((artifact) => new URL("SHASUMS256.txt", artifact).href === decoded)
+          .map((artifact) => `${"1".repeat(64)}  ${artifact.split("/").at(-1)}`)
+          .join("\n") + "\n",
+      );
     } else if (decoded === "https://mise.jdx.dev/VERSION") {
       return new Response(matrix.ci.miseVersion + "\n");
     } else if (decoded.endsWith("/SHASUMS256.txt")) {
@@ -267,7 +280,7 @@ test("official checksum lookup survives an exhausted REST quota and rejects corr
       resolveToolchainReleases(matrix, {
         fetchImpl: async (url) => {
           const response = await official(url);
-          return url.endsWith("SHASUMS256.txt")
+          return url.startsWith("https://github.com/jdx/mise/") && url.endsWith("SHASUMS256.txt")
             ? new Response(corrupt(await response.text()))
             : response;
         },
@@ -713,7 +726,7 @@ test("disposable compatibility preparation preserves dependencies and passes the
         mkdirSync(path.dirname(tool.executable), { recursive: true, mode: 0o700 });
         const executable =
           tool.name === "mise"
-            ? `#!${process.execPath}\nif (process.argv[2] === 'ls') console.log(${JSON.stringify(JSON.stringify(inventory))});\n`
+            ? `#!${process.execPath}\nif (process.argv[2] === 'ls') console.log(${JSON.stringify(JSON.stringify(inventory))});\nif (process.argv[2] === 'bin-paths') console.log(${JSON.stringify([layout.node, layout.pnpm].map((entry) => path.dirname(entry.executable)).join("\n"))});\n`
             : "#!/bin/sh\nexit 0\n";
         writeFileSync(tool.executable, executable, { mode: 0o755 });
         sealProjectToolBundle(root, tool.directory, tool);

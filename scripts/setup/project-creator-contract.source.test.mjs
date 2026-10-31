@@ -5,7 +5,6 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { documentContextSections } from "../docs/document-context.mjs";
 import {
   currentProjectInstructions,
   initialProjectAgents,
@@ -47,59 +46,36 @@ test("the project creator accepts a bounded detailed requirements draft without 
   assert.throws(() => normalizedProjectDescription("x".repeat(24_001)), /24,000-character/u);
 });
 
-// Navigation and orchestration must retain their full canonical policy subtrees in child output.
+// One source block carries every portable policy; source-only policy never leaks into a child.
 test("generated routing and agent policies follow canonical changes and reject ambiguous projections", (t) => {
   const fixture = mkdtempSync(path.join(os.tmpdir(), "project-agent-policy-"));
   t.after(() => rmSync(fixture, { recursive: true, force: true }));
-  const templatePath = "scripts/framework/templates/project-instructions.md";
-  mkdirSync(path.dirname(path.join(fixture, templatePath)), { recursive: true });
   const source = readFileSync(path.join(root, "instructions.md"), "utf8");
-  const template = readFileSync(path.join(root, templatePath), "utf8");
-  const save = (candidateSource, candidateTemplate) => {
-    writeFileSync(path.join(fixture, "instructions.md"), candidateSource);
-    writeFileSync(path.join(fixture, templatePath), candidateTemplate);
-  };
-  const policyBody = (document, expectedHeading) => {
-    const sections = documentContextSections("instructions.md", document).filter(
-      ({ heading }) => heading === expectedHeading,
-    );
-    assert.equal(sections.length, 1, `${expectedHeading} must have one owner.`);
-    const { start, end } = sections[0];
-    return document.split(/\r?\n/u).slice(start, end).join("\n").trim();
-  };
-
-  for (const [heading, marker, level] of [
-    ["Task Reading Routes", "<!-- current-task-reading-routes -->", 2],
-    ["Admission, Intelligence, And Provenance", "<!-- current-agent-admission-policy -->", 3],
-    ["Agent Lifecycle And Idle Cleanup", "<!-- current-agent-lifecycle-policy -->", 3],
-    ["Peer Coordination", "<!-- current-peer-coordination-policy -->", 3],
-    [
-      "Intelligence Parity And Integration Authority",
-      "<!-- current-integration-authority-policy -->",
-      3,
-    ],
+  const start = "<!-- codexrig:portable-policy:start -->";
+  const end = "<!-- codexrig:portable-policy:end -->";
+  const amendment = "A revised source-owned policy with its descendant detail.\n";
+  const amended = source.replace(end, `${amendment}\n${end}`);
+  const save = (candidate) => writeFileSync(path.join(fixture, "instructions.md"), candidate);
+  save(`Framework-only introduction.\n${amended}\nFramework-only appendix.\n`);
+  const generated = currentProjectInstructions(fixture);
+  assert.equal(
+    generated,
+    `# Project Instructions\n\n${amended.split(start)[1].split(end)[0].trim()}\n`,
+  );
+  assert.match(generated, /A revised source-owned policy with its descendant detail/u);
+  assert.doesNotMatch(generated, /Framework-only|codexrig:portable-policy/u);
+  for (const candidate of [
+    source.replace(start, ""),
+    source.replace(end, ""),
+    `${source}\n${start}\n`,
+    `${source}\n${end}\n`,
+    `${end}\nMisordered body.\n${start}\n`,
+    `${start}\n \n${end}\n`,
   ]) {
-    const prefix = "#".repeat(level);
-    const headingLine = `${prefix} ${heading}\n`;
-    const amendment = `A revised source-owned ${heading.toLowerCase()} rule.\n\n${prefix}# Projected ${heading} Detail\n\nPreserve this descendant rule.`;
-    const amendedSource = source.replace(headingLine, `${headingLine}\n${amendment}\n`);
-    assert.notEqual(amendedSource, source, "The fixture must change the canonical owner.");
-    save(amendedSource, template);
-    const generated = currentProjectInstructions(fixture);
-    assert.equal(policyBody(generated, heading), policyBody(amendedSource, heading));
-    assert.equal(generated.includes(marker), false, "The projection marker must be consumed.");
-
-    for (const [candidateSource, candidateTemplate] of [
-      [amendedSource.replace(headingLine, `${prefix} Renamed ${heading}\n`), template],
-      [`${amendedSource}\n${headingLine}\nA competing policy owner.\n`, template],
-      [amendedSource, template.replace(marker, "")],
-      [amendedSource, template.replace(marker, `${marker}\n${marker}`)],
-    ]) {
-      save(candidateSource, candidateTemplate);
-      assert.throws(() => currentProjectInstructions(fixture), {
-        message: `Shared policy ${heading} needs one canonical owner and one projection.`,
-      });
-    }
+    save(candidate);
+    assert.throws(() => currentProjectInstructions(fixture), {
+      message: "Portable policy needs one nonempty block with unique ordered markers.",
+    });
   }
 });
 

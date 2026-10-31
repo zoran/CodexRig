@@ -9,7 +9,7 @@ stages: [verify, compatibility]
 variables:
   GIT_DEPTH: "0"
 default:
-  image: node:24.22.0-bookworm
+  image: node:24.22.2-bookworm
   interruptible: true
 verify:
   stage: verify

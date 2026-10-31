@@ -93,6 +93,10 @@ test("focused ownership never treats filtered or different executions as complet
     () => dedupeCommands([suite, { ...suite, coveredTestPaths: [] }]),
     /conflicting definitions/u,
   );
+  assert.throws(
+    () => dedupeCommands([suite, { ...suite, inputScope: "owners" }]),
+    /conflicting definitions/u,
+  );
 });
 
 test("complete verification covers installed framework suites including source-only boundaries", () => {
@@ -108,14 +112,14 @@ test("complete verification covers installed framework suites including source-o
   assert.deepEqual([...new Set(selected)].sort(), installed.sort());
 });
 
-test("a registered contract group stays focused and runs once inside its complete owner", () => {
+test("a shared executor change reaches each complete execution owner once", () => {
   const source = "scripts/verify/verification-executor.mjs";
   const testPath = "scripts/verify/verification-executor.test.mjs";
   const narrow = route([source, testPath]);
   assert.equal(narrow.admission.mode, "targeted");
   const keys = narrow.readOnlyCommands.map((command) => command.key);
-  assert.equal(keys.filter((key) => key === "verification-executor-regressions").length, 1);
-  assert.equal(keys.includes("verification-orchestration-regressions"), false);
+  assert.equal(keys.filter((key) => key === "verification-orchestration-regressions").length, 1);
+  assert.equal(keys.includes("verification-executor-regressions"), false);
   assert.equal(
     narrow.readOnlyCommands.some(
       (command) => command.key.startsWith("focused-test:") && command.args.includes(testPath),
@@ -139,7 +143,7 @@ test("complete-owner declarations reject filtered coverage, changed runtime and 
   const file = "src/contract.test.mjs";
   const parent = { key: "complete", executable: "$node", args: ["--test", file], phase: "broad" };
   const child = { ...parent, key: "focused", phase: "preflight", coveredBy: "complete" };
-  const read = (commands) => {
+  const read = (commands, overrides = {}) => {
     writeFileSync(
       path.join(root, ".codex/verification.json"),
       JSON.stringify({
@@ -150,11 +154,37 @@ test("complete-owner declarations reject filtered coverage, changed runtime and 
         testConsumers: {},
         exactConsumers: {},
         ownedCategories: {},
+        ...overrides,
       }),
     );
     return readVerificationConfiguration(root);
   };
   assert.equal(read([parent, child]).commands.length, 2);
+  assert.deepEqual(read([parent], { sharedInputs: ["scripts/runner.mjs"] }).sharedInputs, [
+    "scripts/runner.mjs",
+  ]);
+  for (const sharedInputs of [["scripts/*"], ["../foreign.mjs"], ["a", "a"], "a"])
+    assert.throws(() => read([parent], { sharedInputs }), /shared verification execution inputs/u);
+  for (const reuseMaxAgeMs of [0, -1, 2592000001, "1000"])
+    assert.throws(() => read([{ ...parent, reuseMaxAgeMs }]), /execution limit/u);
+  assert.equal(read([{ ...parent, reuseMaxAgeMs: 1000 }]).commands[0].reuseMaxAgeMs, 1000);
+  const scoped = { ...parent, args: ["scripts/check.mjs"], inputScope: "owners" };
+  assert.equal(read([scoped]).commands[0].inputScope, "owners");
+  for (const command of [
+    { ...scoped, inputScope: "unknown" },
+    { ...scoped, executable: "bash" },
+    { ...scoped, args: ["--eval", "scripts/check.mjs"] },
+    { ...scoped, args: ["../outside.mjs"] },
+    { ...scoped, args: ["--test", "scripts/check.test.mjs"] },
+  ])
+    assert.throws(() => read([command]), /Scoped verifier inputs|safe repository-relative/u);
+  assert.deepEqual(read([{ ...parent, outputs: ["dist/result.json"] }]).commands[0].outputs, [
+    "dist/result.json",
+  ]);
+  const workspaceOutputs = { "packages/core": { build: ["dist/index.js"] } };
+  assert.deepEqual(read([parent], { workspaceOutputs }).workspaceOutputs, workspaceOutputs);
+  for (const outputs of [["../outside"], ["C:/outside"], [".auth/token"], ["dist/*"], []])
+    assert.throws(() => read([{ ...parent, outputs }]));
   for (const commands of [
     [{ ...parent, args: ["--test-name-pattern=one", ...parent.args] }, child],
     [parent, { ...child, args: ["--conditions=other", ...child.args] }],
@@ -162,18 +192,10 @@ test("complete-owner declarations reject filtered coverage, changed runtime and 
     [{ ...parent, coveredBy: "focused" }, child],
   ])
     assert.throws(() => read(commands), /Invalid complete verification owner/u);
-  assert.equal(commandCoversTest({ ...parent, executable: process.execPath }, file), true);
-  assert.equal(
-    commandCoversTest(
-      {
-        ...parent,
-        executable: process.execPath,
-        args: ["--test-name-pattern=one", ...parent.args],
-      },
-      file,
-    ),
-    false,
-  );
+  const runtimeParent = { ...parent, executable: process.execPath };
+  assert.equal(commandCoversTest(runtimeParent, file), true);
+  const filtered = { ...runtimeParent, args: ["--test-name-pattern=one", ...parent.args] };
+  assert.equal(commandCoversTest(filtered, file), false);
   assert.equal(commandCoversTest({ ...parent, args: ["scripts/verify/docs.mjs"] }, file), false);
 });
 
@@ -195,7 +217,7 @@ test("successful basis plus a fully owned product delta stays targeted even at t
   assert.ok(plan.admission.focusedCommandOwners[0].ownerKeys.includes("workspace:test:unit"));
   assert.equal(
     [...plan.readOnlyCommands, ...plan.workspaceCommands].some((command) =>
-      ["broad", "workspace-build", "workspace-test"].includes(command.phase),
+      ["broad", "workspace-build"].includes(command.phase),
     ),
     false,
   );
@@ -226,23 +248,28 @@ test("unowned and unknown development paths retain concrete pending publication 
   assert.deepEqual(unowned.admission.uncoveredFullRelevantPaths, ["src/unowned.ts"]);
   assert.match(unowned.admission.reason, /src\/unowned\.ts/u);
 
-  // Shared process foundations require complete publication coverage. Stale focused-owner
-  // expectations must not reintroduce narrower ownership or evidence invalidation.
-  for (const source of [
-    "scripts/repository/runtime-process-io.mjs",
-    "scripts/repository/runtime-process-identity.mjs",
-  ]) {
-    const admission = route([source]).admission;
-    assert.equal(admission.mode, "targeted", source);
-    assert.deepEqual(admission.focusedCommandOwners, [], source);
-    assert.deepEqual(admission.uncoveredFullRelevantPaths, [source], source);
-    assert.match(admission.reason, /publication coverage pending/u, source);
-  }
-
   const unknown = route(["unexpected/new-surface.bin"]);
   assert.equal(unknown.admission.mode, "targeted");
   assert.deepEqual(unknown.admission.unknownPaths, ["unexpected/new-surface.bin"]);
   assert.match(unknown.admission.reason, /unknown changed paths/u);
+});
+
+test("shared process foundations select all complete execution owners without coverage gaps", () => {
+  const expectedKeys = completeVerificationCommands()
+    .filter((command) => !command.coveredBy)
+    .map((command) => command.key)
+    .sort();
+  for (const source of [
+    "scripts/repository/runtime-process-io.mjs",
+    "scripts/repository/runtime-process-identity.mjs",
+  ]) {
+    const { admission, readOnlyCommands } = route([source]);
+    assert.equal(admission.mode, "targeted", source);
+    assert.deepEqual(admission.focusedCommandOwners, [{ path: source, ownerKeys: expectedKeys }]);
+    assert.deepEqual(readOnlyCommands.map((command) => command.key).sort(), expectedKeys, source);
+    assert.deepEqual(admission.uncoveredFullRelevantPaths, [], source);
+    assert.equal(admission.coverageBlockedReason, "", source);
+  }
 });
 
 test("removed framework sources use current baseline and lifecycle owners without path tombstones", () => {
@@ -302,6 +329,15 @@ test("package-local export contracts route through their manifest owner", (t) =>
     "--path",
     "packages/widget/package.json",
   ]);
+  const complete = completeVerificationCommands().find(
+    (command) => command.key === "package-manifests",
+  );
+  assert.deepEqual(
+    consolidateFocusedTestOwners({ commands: [manifestCommand, complete], ownersByPath: [] })
+      .readOnlyCommands,
+    [complete],
+    "an already-selected complete manifest check covers the focused one without duplicate dispatch",
+  );
 });
 
 test("ordinary package manifests use their exact whole-manifest owner", (t) => {

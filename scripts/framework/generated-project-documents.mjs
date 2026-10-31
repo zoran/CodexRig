@@ -18,7 +18,6 @@ import {
   initialLocalizationConfiguration,
   localizationConfigurationPath,
 } from "../contracts/localization-configuration.mjs";
-import { documentContextSections } from "../docs/document-context.mjs";
 import { initialProjectManifest } from "../docs/initial-project-manifest.mjs";
 import { initialFutureModulesDocument } from "../docs/project-manifest-contract.mjs";
 import { initialRequirementsPath } from "../docs/project-document-policy.mjs";
@@ -32,48 +31,19 @@ import {
 /** Projects canonical shared policies into new and updated independent projects. */
 export function currentProjectInstructions(sourceRoot) {
   const source = readFileSync(path.join(sourceRoot, "instructions.md"), "utf8");
-  const sections = documentContextSections("instructions.md", source);
-  let template = readFileSync(
-    path.join(sourceRoot, "scripts/framework/templates/project-instructions.md"),
-    "utf8",
-  );
-  for (const [heading, marker] of [
-    ["Task Reading Routes", "<!-- current-task-reading-routes -->"],
-    ["Interpreting Examples And Scope", "<!-- current-examples-and-scope-policy -->"],
-    [
-      "Repository-Local Tool And Account Isolation",
-      "<!-- current-tool-account-isolation-policy -->",
-    ],
-    ["Repository Efficiency And Effectiveness", "<!-- current-repository-efficiency-policy -->"],
-    ["Task Scope And Completion", "<!-- current-task-scope-policy -->"],
-    ["Planning, Goals, Slices, Review Loops, And Audits", "<!-- current-planning-policy -->"],
-    ["Maintenance Scope And Verification", "<!-- current-maintenance-scope-policy -->"],
-    ["Temporary Data And Storage Housekeeping", "<!-- current-temporary-storage-policy -->"],
-    ["Long-Session Course Checks", "<!-- current-course-check-policy -->"],
-    ["Verification Selection And Runtime", "<!-- current-verification-runtime-policy -->"],
-    ["Delegated Release", "<!-- current-delegated-release-policy -->"],
-    ["Test Strategy", "<!-- current-test-strategy-policy -->"],
-    ["Deployment And Qualification Failure Recovery", "<!-- current-delivery-failure-policy -->"],
-    ["Documentation Currency", "<!-- current-documentation-currency-policy -->"],
-    ["Documentation Ownership", "<!-- current-documentation-ownership-policy -->"],
-    ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
-    ["Admission, Intelligence, And Provenance", "<!-- current-agent-admission-policy -->"],
-    ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
-    ["Agent Lifecycle And Idle Cleanup", "<!-- current-agent-lifecycle-policy -->"],
-    ["Peer Coordination", "<!-- current-peer-coordination-policy -->"],
-    [
-      "Intelligence Parity And Integration Authority",
-      "<!-- current-integration-authority-policy -->",
-    ],
-  ]) {
-    const matches = sections.filter((section) => section.heading === heading);
-    if (matches.length !== 1 || template.split(marker).length !== 2)
-      throw new Error(`Shared policy ${heading} needs one canonical owner and one projection.`);
-    const section = matches[0];
-    const body = source.split(/\r?\n/u).slice(section.start, section.end).join("\n").trim();
-    template = template.replace(marker, body);
-  }
-  return template;
+  const startMarker = "<!-- codexrig:portable-policy:start -->";
+  const endMarker = "<!-- codexrig:portable-policy:end -->";
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker);
+  const body = source.slice(start + startMarker.length, end).trim();
+  if (
+    source.split(startMarker).length !== 2 ||
+    source.split(endMarker).length !== 2 ||
+    start >= end ||
+    !body
+  )
+    throw new Error("Portable policy needs one nonempty block with unique ordered markers.");
+  return `# Project Instructions\n\n${body}\n`;
 }
 
 /** Identity-independent safe-entry projection, shared by generation and reviewed updates. */
@@ -119,12 +89,12 @@ export function writeIdentityDocs(sourceRoot, targetRoot, projectName, descripti
     "README.md",
     `# ${escapeMarkdownText(projectName)}
 
-This repository owns its product and a bounded set of inspectable development tools.
+This repository owns its product and a selected set of inspectable development tools.
 
 ## Setup And Start
 
-Provide Node.js, Git, Bash, ripgrep, ShellCheck and the system archive tool. Linux verification also
-requires Python 3 with \`ctypes\` for owned-process cancellation tests.
+Provide Node.js, Git, Bash, ripgrep, ShellCheck and the system archive tool. Linux process-cancellation
+tests also use Python 3 with \`ctypes\`. For initial preparation:
 
 \`\`\`bash
 env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs
@@ -132,183 +102,100 @@ bash -p scripts/setup/run-project.sh pnpm setup
 bash -p scripts/setup/start-codex.sh
 \`\`\`
 
-Use \`--yolo\` only for an explicitly authorized Dev session; use \`--no-alt-screen\` when needed.
-Enter prompts after native session selection. Restart through the launcher after runtime-tool changes.
+The launcher uses \`--startup\` maintenance to discover compatible releases; \`--locked\` separately
+prepares frozen inputs for CI. Do not repeat preparation when its required state is already valid.
+\`node --test scripts/setup/codex-launcher.test.mjs\` checks the invocation without installation.
+Only an explicitly authorized Dev session may add \`--yolo\`; prompts follow native session selection.
+Restart through the launcher after runtime changes. Waiting startup reports live lifecycle owners;
+never remove a lock or interrupt another owner to bypass admission.
 
-The launcher invokes \`maintain-toolchain.mjs --startup\` to discover new releases before admission.
-Use \`--locked\` separately for frozen preparation or CI; replacing the launcher call with it disables
-updates. \`node --test scripts/setup/codex-launcher.test.mjs\` checks the actual launcher invocation
-without refreshing tools or dependencies and is included in affected checks and publication.
-
-If verification or another lifecycle operation is still running, startup waits at both the project
-and shared-tool installation boundaries, for up to ten minutes per boundary. It reports which
-boundary is busy, the operation, coordinator PID and start time. Ctrl-C cancels only the waiting
-startup. After waiting, startup rechecks session ownership and staged source inputs before
-installation. A timeout preserves the running owner; uncertain ownership still blocks startup.
-Never remove a live lock or terminate an unrelated process to bypass it.
-
-If startup reports an invalid or unsupported private session lease, exit all sessions using this
-project. Its maintenance/update owner must reconstruct the installed runtime and restore the current
-contract through a reviewed, quiescent regeneration. Preserve product changes, accounts and native
-history. Do not delete \`.codex/runtime\` manually or run source-framework reset commands in this
-independent project. Retry the canonical launcher only after recovery has been validated.
-
-After a critical handover, exit Codex completely with \`/quit\`, then run
-\`bash -p scripts/setup/start-codex.sh\` from this root in your terminal. Accept the preserved handover
-when the new session announces it. \`/new\` and \`/resume\` inside the running CLI retain the old
-launcher and cannot replace this restart. Keep the handover and runtime files intact.
-The receiving session reassesses current capacity under the
-[capacity policy](instructions.md#capacity-admission-and-monitoring); an old reserve or seal proves
-neither current exhaustion nor renewed account capacity.
+After critical handover exit with \`/quit\`, relaunch from this root's terminal and accept the announced
+prompt before reading it. \`/new\` and \`/resume\` do not replace the controller. Preserve private
+runtime/history/recovery; unsupported state needs the current owner's quiescent recovery. See
+[session lifecycle](instructions.md#session-start) and [capacity](instructions.md#capacity-admission-and-monitoring).
 
 ## First Prompt: Define The Project
 
-Read the current definition and any linked specification with Codex. Refine and confirm users,
-workflows, boundaries and acceptance before implementation. Preserve separate UI approval gates.
+Refine the current definition with Codex: users, workflows, boundaries and acceptance before product
+implementation. Requirements remain at their owner; the manifest records implemented reality.
+Preserve separate UI approval gates.
 
 ## Documentation
 
 - [Workflow and safety](instructions.md)
-- [Infrastructure as Code: tools, layout and lifecycle](instructions.md#infrastructure-as-code)
+- [Infrastructure lifecycle](instructions.md#infrastructure-as-code)
 - [Current technical inventory](docs/project.md)
 - [Deferred module candidates](docs/future-modules.md)
 - [Native session configuration](.codex/README.md)
 ${description ? "- [Requirements intake draft](docs/requirements.md)\n" : ""}
-## Project Commands
+## Essential Commands
 
-Use \`pnpm context:map\` for repository navigation and task reading routes.
-\`pnpm context:read -- <document> --outline\` lists sections;
-\`pnpm context:read -- <document> --section "<heading>"\` reads the direct body and lists
-unread children. Follow applicable children; add \`--subtree\` only when all descendants are
-relevant and fit the output bound. Run \`pnpm context:check\` for instruction growth.
-Use \`bash -p scripts/setup/run-project.sh <command> [arguments]\` from a host shell to execute
-through \`mise exec --locked\` with repository-local
-home and mutable state. Pins and artifact locks live in \`.codex/mise.toml\` and \`.codex/mise.lock\`,
-loaded explicitly so the outer host shell does not activate project tools after Codex exits.
-The launcher selects native embedded mode (\`--no-daemon\`) for its session-only hooks and settings.
-Follow the tool/account isolation policy before any authenticated use.
-Platform-policy apply reads the private \`.auth/git-platform.json\` file with exact fields
-\`schemaVersion\` (1), \`provider\`, \`hostname\`, \`repository\` (remote slug), and \`token\`;
-it never inherits a host token. Keep this file and its parent private and outside source control.
-The configurator locks original-state reads and dependent mutations together. Mutation failures
-retain their request stage and recovery state; an uncertain GitHub creation is inspected before another write.
-See [failure recovery](instructions.md#deployment-and-qualification-failure-recovery) before retrying.
-Use \`pnpm tooling:doctor\` for local tool diagnosis, \`pnpm worktree:status -- --json\` for session
-inventory and \`pnpm verify:changed -- --print-plan\` for development evidence. The publisher bundles
-\`pnpm verify\` once before push on the finished integrated state.
-\`pnpm repo:housekeeping -- --apply\` reconciles local repository facts. Apply
-[Maintenance Scope And Verification](instructions.md#maintenance-scope-and-verification) before
-these commands; inspect their side effects and selected checks against the accepted task.
-Use \`bash -p scripts/setup/run-project.sh pnpm repo:housekeeping -- --storage-only\` for disk growth;
-see [Tool Storage And Accounts](#tool-storage-and-accounts) for locations and cleanup.
-Unmarked scratch, mutable devices and recovery records require their real owner's reconciliation.
-See [temporary storage](instructions.md#temporary-data-and-storage-housekeeping).
-Publication and deployment require their own explicit authority.
+Use \`bash -p scripts/setup/run-project.sh <command> [arguments]\` from a host shell for the pinned,
+locked and isolated environment. Mise inputs live explicitly in \`.codex/mise.toml\` and
+\`.codex/mise.lock\`; host-shell discovery does not activate them after exit.
+
+| Purpose | Command |
+| --- | --- |
+| Ownership and recovery | \`pnpm worktree:status -- --json\` |
+| Navigate owners/policy | \`pnpm context:map\` |
+| Read a bounded section | \`pnpm context:read <document> --section "<heading>"\` |
+| Check instruction structure | \`pnpm context:check\` |
+| Diagnose local tools | \`pnpm tooling:doctor\` |
+| Preview necessary verification | \`pnpm verify:changed -- --print-plan\` |
+| Run affected checks | \`pnpm verify:changed\` |
+| Inspect storage | \`pnpm repo:housekeeping -- --storage-only\` |
+
+## Verification
+
+The single \`.codex/verification.json\` contract selects commands and actual consumers. Plans show
+required/reused units, prerequisites, gaps and observed/unknown costs. Development runs only necessary
+checks; missing full evidence, review, resume or a new commit does not start a full suite. Independent
+successes survive failure. Unknown input ownership needs a concrete mapping repair.
+
+\`pnpm verify:changed -- --check <key>\` reproduces one unresolved check without recording acceptance;
+Node cases may use \`--test-name-pattern\`. Publication assembles complete coverage once from valid
+and fresh units. External observations need declared freshness; build evidence does not prove that
+required output files still exist. Consumers must validate actual artifact/state prerequisites.
+See [verification policy](instructions.md#verification-selection-and-runtime).
 
 ## Publish Source Changes
 
-Review all non-ignored changes and authorize publication. Run from the owning Codex session or
-from the terminal:
+After reviewing all non-ignored changes and authorizing commit/push:
 
 \`\`\`bash
 bash -p scripts/setup/run-project.sh pnpm project:publish --message "<commit message>"
 \`\`\`
 
-This explicitly authorizes committing all non-ignored changes on the current branch and pushing
-that exact verified commit to its configured upstream. The eight-phase display shows the current
-task and elapsed time; add \`--verbose\` for sanitized check output. Failed checks stop publication;
-a rejected push preserves the local commit for retry without an empty commit. No branch switch,
-automatic merge, force push, native-session reset or direct deployment is performed. Existing Git
-hooks, branch protections and any CI/deployment approvals still apply. A missing upstream must be
-configured explicitly before publication. The calling canonical session is admitted through exact
-Linux process ancestry; competing or unverified writers in its clone block publication. Follow
-[Delegated Release](instructions.md#delegated-release) to keep independent development running, bind
-the prepared candidate with \`--candidate <HEAD>:<tree>\`, and assess the authorized deploy at each
-push. If process ancestry cannot be proven, publish after that clone's sessions exit.
-
-## Verification
-
-Development never starts the complete suite because a test or plan was added or a full basis is
-missing. Verification retains successful individual checks after failure and reuses them for
-unchanged relevant source, commands, dependencies and execution conditions. Manual verification,
-publisher retries and pre-push share one evidence store. Reviews, audits, handoffs and resume are
-not test triggers. Documentation and parser-proven comment/format changes use lightweight checks.
-Use \`pnpm verify:changed -- --print-plan\` to inspect the selected checks and admission reason
-without executing checks.
-For an unresolved failure, \`pnpm verify:changed -- --check <key>\` reproduces one check without recording
-acceptance; native Node checks also accept \`--test-name-pattern <pattern>\`. Changed relevant source,
-tests, dependencies, controls or tools invalidate evidence. Use the project wrapper consistently.
+The publisher prepares and verifies the exact state, commits all non-ignored changes on the current
+branch and pushes to its configured upstream. Failed gates stop; rejected push preserves the local
+commit for retry. Protections and independent CI remain. No force push, automatic merge or deployment
+is implied. A proven canonical caller may publish in-session; competing/unknown writers block it.
+[Delegated release](instructions.md#delegated-release) uses independent Git metadata and an accepted
+\`--candidate <HEAD>:<tree>\`. Deployment needs its own authority and observed target acceptance.
 
 ## Tool Storage And Accounts
 
-Manifests, lockfiles, exact tool pins and checksums stay in the repository. Installed runtimes,
-native tool bundles and pnpm package graphs use the OS user's \`~/.local/share/project-tools/\`;
-reusable download caches use \`~/.cache/project-tools/\`. The project retains package resolution links
-and metadata. \`PROJECT_TOOL_STORAGE_HOME\` relocates only tool storage. Accounts remain isolated
-under \`.auth/project-tools/\`. Mise's native references are shared while trust/account
-state stays private.
+Pins/locks stay in source; tools/package graphs use \`~/.local/share/project-tools/\`, downloads use
+\`~/.cache/project-tools/\`. \`PROJECT_TOOL_STORAGE_HOME\` relocates only tool storage. Accounts remain
+under private \`.auth/project-tools/\`. Housekeeping collectors preserve referenced/live tools and
+uncertain recovery; add \`--apply\` only for the inspected owned cleanup. Never delete runtime or
+unmarked product state manually.
 
-\`repo:housekeeping -- --storage-only\` reports allocated bytes, including \`.auth/\` and tool
-subdirectories, without reading credentials or running product tests. Add \`--apply\` to reclaim
-abandoned managed scratch and invoke the native tool/package/cache collectors. Canonical startup
-uses the same collectors. Registered projects' pins, package graphs and running runtimes are retained;
-verified legacy installations retire through the dependency owner after session/runtime quiescence.
-Tracked private Mise configurations retain shared runtime versions without being read or evaluated
-by another project's collector. A registered project root with a noncanonical path, a different owner,
-or group/other write access also retains shared runtimes and tool bundles. Startup reports the path
-and reason and continues without changing that project's permissions or references. Independent
-package, cache and scratch collectors continue.
+Prepare required SDKs/browsers through their owner once; verification does not install them. Public
+Mise defaults belong in \`.auth/project-tools/config/mise/config.toml\`; profiles/cookies stay private.
+Git HTTPS credentials are stored owner-only by repository path. For configured GitHub/GitLab hosts,
+the shared adapter may use an existing host Git helper or CLI login when project credentials are
+missing; it never logs in automatically or mutates host accounts. Other providers, SSH and sibling
+accounts remain isolated. Missing public author metadata may use validated global name/email only.
+See [account isolation](instructions.md#repository-local-tool-and-account-isolation).
 
-For storage migration with unchanged versions and lockfiles, use
-\`env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs --locked\`. Its online stage prepares the final
-destination's required rebuild before reproducing the same graph offline.
-
-Before staging or downloads, maintenance checks for at least 2 GiB available on each affected
-repository, installation and package-cache filesystem. Percentages are informational. Below the
-minimum, one native Docker build-cache collection targets 3 GiB; reaching the 2 GiB minimum admits
-work even if the additional cleanup target is not reached. Account and recovery data stay protected.
-
-Load tests invoke installed Node/Python/SDK and browser paths directly, including replicas. Per-command
-scratch is removed after completion or recovered after interruption. Resume retains compact checkpoints
-and runtime references, not tool copies.
-The environment sets \`PLAYWRIGHT_BROWSERS_PATH\` and \`PUPPETEER_CACHE_DIR\` to shared user caches.
-Profiles and account state stay private. Browser managers own version retirement; housekeeping never
-downloads browsers or guesses which versions a project needs.
-Unmarked scratch and emulator state require their existing owner's reconciliation.
-
-Persistent public tool settings belong in the project-private Mise configuration at
-\`.auth/project-tools/config/mise/config.toml\`. The normal project wrapper loads them before
-verification and publication. Prepare required SDKs or test runtimes once through their product
-setup owner; use defaults that preserve explicit tool selections. Verification never installs them.
-
-Commit author names and email addresses use project Git configuration first. When a value is
-missing, publication reads only \`user.name\` and \`user.email\` from the operating-system user's
-standard global Git configuration, without includes. It validates the resulting author and
-committer before repository verification and rechecks them before staging. Global hooks, signing
-settings and credentials are not imported; existing project signing remains in effect. No Git
-configuration is changed. If neither configuration supplies a complete identity, the error shows
-project-local \`git config\` commands.
-
-Git remembers successful HTTPS sign-in in \`.auth/project-tools/home/.git-credentials\`, scoped to
-the protocol, host and repository path. Enter a personal access token at Git's password prompt on
-the first successful sign-in or after expiration/revocation. If no project credential is available
-for a GitHub or GitLab host configured in \`.codex/tooling.json\`, the shared adapter tries global
-Git helpers and then the matching existing CLI login (\`gh\` or \`glab\`), including self-hosted
-instances. Native helpers resolve their user-home configuration and keyring. It never initiates login or sends global
-credential store/erase requests. Git can cache an approved fallback account in the project store.
-After a confirmed authentication rejection, publication tries remaining global credentials in up
-to two automatic retries without another prompt, skipping already rejected credentials. Other Git
-failures still stop the affected phase; global accounts remain unchanged.
-The file is unencrypted, protected by owner-only permissions and excluded from source control and
-generation. It survives housekeeping. Other providers, SSH and sibling accounts remain isolated.
-A browser-only session does not authenticate Git; use \`gh auth login --hostname github.com\` or
-\`glab auth login --hostname gitlab.com\` in a normal host terminal (substitute your configured host
-for self-hosted instances). Never put a token in a command or a chat.
+Provider-policy preview is read-only. Explicit apply reads \`.auth/git-platform.json\` with
+\`schemaVersion\` 1, \`provider\`, \`hostname\`, \`repository\` and \`token\`; no ambient token fallback.
+Keep the file/parent private and reconcile uncertain remote mutations before retrying.
 
 ## Project Licensing
 
-No public project license is selected. The project owner chooses the terms before distribution;
-third-party dependencies retain their applicable licenses.
+The project owner chooses licensing before distribution; third-party dependencies retain their terms.
 `,
   );
   writeRelative(
@@ -316,45 +203,27 @@ third-party dependencies retain their applicable licenses.
     ".codex/README.md",
     `# Project Session Configuration
 
-This directory owns inspectable native Codex policy and local tooling configuration.
-\`config.toml\` and \`agents/\` select the exact GPT Astra/max policy and requested permissions.
-Four concurrent subagents are the default, excluding the primary.
-\`agents.max_concurrent_threads_per_session = 12\` is the native capacity ceiling, not the default
-team size. More than four requires an explicit user request or user-started agents and fresh
-[admission](../instructions.md#admission-intelligence-and-provenance). After each accepted handoff,
-the primary immediately assigns the next useful authorized task; the same continuous assignment
-applies to provenance-verified user-added agents under
-[Agent Lifecycle And Idle Cleanup](../instructions.md#agent-lifecycle-and-idle-cleanup).
-\`tooling.json\` owns startup and provider settings; \`toolchain.json\` owns reviewed stable pins and
-archive integrity; \`verification.json\` declares this project's checks.
+Tracked \`config.toml\`, \`agents/*.toml\` and \`hooks.json\` own native role, permission and
+lifecycle-hook configuration. \`tooling.json\` selects startup/providers; \`toolchain.json\`,
+\`mise.toml\` and \`mise.lock\` pin tools; \`verification.json\` declares checks and consumers.
+Exact schemas belong to validators. Configuration validation does not prove model obedience.
 
-## Start And Isolation
+Use the canonical [README commands](../README.md#essential-commands). Policy/runtime changes need
+full launcher restart, not chat reload. The controller binds trusted session-only hooks;
+[session policy](../instructions.md#session-start) owns admission and recovery.
 
-Run \`bash -p scripts/setup/start-codex.sh\` from this root. Private native memories, transcripts and
-credentials belong only in this root's ignored CODEX_HOME; leases and recovery stay in
-\`.codex/runtime/\`. Generation transfers none of them. The controller proves exactly two trusted
-session-only hooks before binding a writer. A native side conversation neither reads work context
-nor renews the persistent session's startup proof. See [Project Instructions](../instructions.md).
+This project owns its ignored repository-root CODEX_HOME: authentication, transcripts, memory and
+plugins. Framework coordination/evidence live in \`.codex/runtime/\`; external accounts use private
+\`.auth/project-tools/\`. Generation transfers no native runtime or accounts. Reusable public tool,
+package and browser payloads may use the admitted shared store; credentials and device state stay
+private. Active runtime and pending recovery are not disposable scratch.
 
-External tool accounts use the project's private \`.auth/project-tools/\`; reusable tool, package
-and browser payloads use the admitted user tool store. See
-[tool/account isolation](../instructions.md#repository-local-tool-and-account-isolation) and
-[storage housekeeping](../instructions.md#temporary-data-and-storage-housekeeping). Active runtime,
-accounts and pending operation recovery are not disposable scratch.
-The [verification policy](../instructions.md#verification-selection-and-runtime) uses one result
-store for targeted development and complete publication coverage; resume adds no test trigger.
-
-## Recovery And Authority
-
-Accept a reported handover before reading it. A valid active work marker can request continuation
-only of the authorized project task, once per unchanged state in the session, including later user
-turns. Apply [Task Scope And Completion](../instructions.md#task-scope-and-completion) before acting;
-the hook cannot infer current intent. Invalid state reports a diagnostic without inventing work.
-Explicit pauses and implementation approval gates remain authoritative. Preserve active runtime;
-exit and restart after changing runtime tools.
-Handover receipt adds the current capacity boundary without changing captured bytes or their digest.
-Historical reserve estimates are not binding; size the reserve for the next bounded step under
-[Capacity Admission And Monitoring](../instructions.md#capacity-admission-and-monitoring).
+Follow the canonical policies for [account isolation](../instructions.md#repository-local-tool-and-account-isolation),
+[agent admission and permissions](../instructions.md#subagent-orchestration-and-integration-authority),
+[capacity and terminal drain](../instructions.md#capacity-admission-and-monitoring),
+[continuation](../instructions.md#compact-project-memory),
+[verification reuse](../instructions.md#verification-selection-and-runtime), and
+[isolated release](../instructions.md#delegated-release).
 `,
   );
   writeRelative(

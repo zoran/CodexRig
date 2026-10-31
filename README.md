@@ -1,67 +1,27 @@
 # CodexRig Framework
 
-CodexRig is a reusable, production-ready, code-first framework for isolated Codex projects. It
-provides portable policy, compatible dependency maintenance, durable context recovery, modular
-architecture guardrails, provider-neutral Git automation, and risk-based verification without
-imposing a product stack.
+CodexRig provides isolated Codex sessions, portable project policy, dependency maintenance, durable
+context recovery and modular verification without prescribing a product stack.
 
 ## Start
 
 Provide a current Node.js bootstrap, Git, Bash, ripgrep, ShellCheck and the system archive tool.
-Linux verification also requires Python 3 with `ctypes` for owned-process cancellation tests. The
-launcher installs reviewed Mise, Codex and locked project runtimes in managed user storage, with
-project-private accounts and tracked tool pins. Run from the repository root:
+Linux verification also needs Python 3 with `ctypes`. From the repository root:
 
 ```bash
 bash -p scripts/setup/start-codex.sh
 ```
 
-To start an explicitly authorized Dev session with no approval prompts, unrestricted command network
-access, and no filesystem sandbox, you must exit the current Codex session and launch it through the
-canonical entry point with `--yolo`:
-
-```bash
-bash -p scripts/setup/start-codex.sh --yolo
-```
-
-The Bash `-p` option blocks inherited executable shell configuration before the launcher runs; it
-does not grant additional OS or Codex permissions. Keep it in host-shell invocations. Only
-`--no-alt-screen` and `--yolo` are launcher controls. Enter prompts after selecting a session. For
-permission boundaries, session recovery and agent inheritance, see
+Startup maintains compatible tools/dependencies before native Codex resume. Defaults are
+workspace-write, on-request approvals and disabled command network access. Explicitly authorized Dev
+sessions use `bash -p scripts/setup/start-codex.sh --yolo` for unrestricted access without approval
+prompts; task scope stays unchanged. Keep `bash -p` to block inherited shell startup code. Only
+`--yolo` and `--no-alt-screen` are launcher controls; enter prompts after session selection.
 [Session Start](instructions.md#session-start) and
-[Effective Permissions](instructions.md#effective-permissions-and-write-isolation).
+[Effective Permissions](instructions.md#effective-permissions-and-write-isolation) own these
+boundaries.
 
-The launcher runs `maintain-toolchain.mjs --startup` to discover releases and maintain compatible
-tools and dependencies before opening native Codex resume. `--locked` belongs to separate frozen
-preparation and CI; replacing the launcher's call with it disables update discovery. The portable
-`node --test scripts/setup/codex-launcher.test.mjs` check exercises the actual launcher invocation
-without refreshing tools or dependencies. See
-[Dependency Installation And Freshness](instructions.md#dependency-installation-and-freshness) for
-maintenance behavior and failure handling, and
-[Startup Repository Reconstruction](instructions.md#startup-repository-reconstruction) for recovery.
-
-If a framework defect prevents startup, update the source clone with `git pull --ff-only` from a
-normal terminal, then retry the launcher. The updated source can also preview and reconcile a child
-without starting it; follow [Update Generated Projects](#update-generated-projects) and stop all
-target sessions before applying the update.
-
-Startup omits routine notices about skipped Node.js/pnpm releases and sufficient free storage.
-Progress, storage pressure, recovery and failures remain visible. Direct toolchain maintenance
-without `--startup` retains those diagnostic details.
-
-If verification or another lifecycle operation is still running, startup waits at both the project
-and shared-tool installation boundaries, for up to ten minutes per boundary. It reports which
-boundary is busy, the operation, coordinator PID and start time. Ctrl-C cancels only the waiting
-startup. After waiting, startup rechecks session ownership and staged source inputs before
-installation. A timeout preserves the running owner; uncertain ownership still blocks startup. Never
-remove a live lock or terminate an unrelated process to bypass it.
-
-Use `/side` inside a running session for a separate temporary conversation. After a framework
-update, exit and restart through the canonical launcher so the updated lifecycle code takes effect.
-
-For noninteractive initial preparation, the same maintenance owner can install the toolchain and
-compatible dependencies without opening Codex. Every subsequent project command uses the common
-repository-local entry:
+For initial preparation without opening Codex:
 
 ```bash
 env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs
@@ -69,317 +29,179 @@ bash -p scripts/setup/run-project.sh pnpm setup
 bash -p scripts/setup/run-project.sh pnpm framework:doctor -- --online
 ```
 
-CI and reproducible setup use
-`env -u NODE_OPTIONS -u NODE_PATH node scripts/deps/maintain-toolchain.mjs --locked` to install only
-the reviewed tool pins and frozen dependency graph. For storage migration, its online stage prepares
-the final destination's required rebuild before reproducing the unchanged graph offline. CI runs in
-disposable containers; source-only compatibility experiments explicitly prepare a declared candidate
-in their disposable checkout. They retain the full verification and release checks.
+Frozen setup and CI add `--locked` to the maintenance command; normal startup retains release
+discovery. [Dependency maintenance](instructions.md#dependency-installation-and-freshness) owns
+installation, migration and freshness. Busy lifecycle owners are reported and waited for; cancelling
+the wait preserves the owner. Never bypass a live or uncertain lock.
 
-If startup reports an invalid or unsupported private session lease, exit every Codex session using
-this framework. Run the reset owner directly with the read-only Node bootstrap, because the normal
-command entry correctly refuses an unsafe lease. Never delete `.codex/runtime` manually:
+After framework changes, `/quit` and relaunch from the terminal; `/new` and `/resume` retain the
+running launcher. `/side` opens an independent temporary conversation. For startup defects, update
+the source with `git pull --ff-only`, or use its [child update path](#update-generated-projects).
+[Startup recovery](instructions.md#startup-repository-reconstruction) owns other failures. An
+invalid private lease requires exiting all affected sessions, then preview, apply and repeated
+preview with the reset below before relaunch. Never delete runtime files manually.
 
 ```bash
 env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/reset-framework.mjs
 env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/reset-framework.mjs --apply
 env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/reset-framework.mjs
-bash -p scripts/setup/start-codex.sh
 ```
-
-## Current Contracts Only
-
-See [Current Contracts Only](instructions.md#current-contracts-only) for the supported contract
-boundary and regeneration of non-current installations.
 
 ## Create A Project
 
-### First Prompt: Define The Project
-
-Tell Codex: `Create a new project called <Project Name>.` Provide a detailed project description in
-ordinary language, or explicitly defer it and develop the requirements with Codex during intake. The
-new project is created at `<apps>/<Project Name>/code`; generation does not initialize Git, commit
-or push.
-
-Follow [Project Definition Intake](instructions.md#first-prompt-project-definition-intake) to
-develop and confirm the scope. The
-[creation skill](.agents/skills/create-project-from-framework/SKILL.md) owns generation, transfer
-boundaries and handling of an optional creation brief.
+Tell Codex: `Create a new project called <Project Name>.` Supply an ordinary-language project brief,
+or explicitly defer it and develop requirements during
+[project intake](instructions.md#first-prompt-project-definition-intake). The
+[creation skill](.agents/skills/create-project-from-framework/SKILL.md) creates
+`<apps>/<Project Name>/code` without initializing Git, committing or pushing.
 
 ## Documentation
 
-- [Current technical inventory](docs/project.md)
-- [Deferred module candidates](docs/future-modules.md)
-- [Workflow and safety policy](instructions.md)
-- [Project definition intake](instructions.md#first-prompt-project-definition-intake)
-- [Documentation ownership and discovery](instructions.md#documentation-ownership)
-- [Architecture and product boundaries](instructions.md#modular-architecture-parallel-ownership-and-integration)
-- [Four-agent default and continued task assignment](instructions.md#admission-intelligence-and-provenance)
-- [Delegated release, candidate isolation and deploy handoff](instructions.md#delegated-release)
-- [Delivery and verification](instructions.md#delivery-environments)
-- [Infrastructure as Code: tool selection, repository layout and lifecycle](instructions.md#infrastructure-as-code)
-- [Infrastructure and application permission design](instructions.md#permission-design)
-- [Session and agent configuration](.codex/README.md)
+- [AGENTS.md](AGENTS.md): safe entry; [instructions](instructions.md): workflow and safety policy.
+- [Project manifest](docs/project.md): current owners and technical inventory;
+  [future modules](docs/future-modules.md): confirmed deferred candidates.
+- [Documentation ownership](instructions.md#documentation-ownership) and
+  [currency](instructions.md#documentation-currency): discovery and maintenance.
+- [Architecture](instructions.md#modular-architecture-parallel-ownership-and-integration),
+  [agent admission](instructions.md#admission-intelligence-and-provenance) and
+  [delegated release](instructions.md#delegated-release).
+- [Delivery environments](instructions.md#delivery-environments),
+  [Infrastructure as Code](instructions.md#infrastructure-as-code) and
+  [permission design](instructions.md#permission-design).
+- [Codex configuration](.codex/README.md): session, agent and private runtime settings.
+
+`.codexrig/` owns source release identity, compatibility experiments and project-tool selection.
+`.codex/tooling.json`, `.codex/toolchain.json` and `.codex/verification.json` own runtime settings,
+tool pins and the canonical verification contract. Use
+[current contracts](instructions.md#current-contracts-only).
 
 ## Essential Commands
 
-Run these commands inside the canonical session. From a host shell, prefix them with
-`bash -p scripts/setup/run-project.sh`. Project pins and locks live under `.codex/` and are loaded
-explicitly, so the host shell does not activate them after Codex exits. The launcher explicitly uses
-Codex's embedded mode (`--no-daemon`) for its trusted session-only hooks and settings. An ASCII name
-reveal introduces five startup phases. The launcher name is owned by `startup.displayName` in
-`.codex/tooling.json`; generated projects receive their supplied project name. Logs, CI, `TERM=dumb`
-and `NO_COLOR` use static text without motion or terminal escapes.
+Inside a canonical session, run project commands directly. From a host terminal, prefix them with
+`bash -p scripts/setup/run-project.sh`; the wrapper loads project pins and private accounts without
+activating them in the host shell.
 
 ```bash
 pnpm framework:doctor -- --online
 pnpm framework:version
-pnpm platform:detect
-pnpm platform:configure                 # preview
-pnpm platform:configure -- --apply      # mutate the detected remote
 pnpm compatibility:matrix
+pnpm platform:detect
+pnpm platform:configure                 # preview; add -- --apply for an authorized remote change
 pnpm worktree:status -- --json
-bash -p scripts/setup/run-project.sh <command> [arguments] # project environment, then mise exec --locked
 pnpm verify:changed -- --print-plan
-pnpm verify                             # explicit complete verification; publication invokes it
-pnpm handover:create -- --critical       # terminal critical-capacity seal
+pnpm verify:changed
+pnpm verify                             # explicit complete coverage
 pnpm project:export -- --name "<Project Name>"
-pnpm framework:reset
-pnpm framework:reset --apply
-pnpm framework:publish --message "<commit message>"  # authorized publication, including inside Codex
+pnpm framework:reset                    # preview; add --apply after sessions exit
+pnpm handover:create -- --critical       # terminal seal after a confirmed critical-capacity decision
 ```
 
-`verify:changed` runs development checks only; a new test, changed plan or missing complete basis
-never starts a full suite. The publisher bundles complete coverage once on the finished integrated
-state. A manual `pnpm verify`, publisher retries and pre-push reuse the same existing evidence.
-Successful individual checks survive failure and bind relevant source, commands, dependencies and
-the effective toolchain. Documentation and proven comment/format-only edits select lightweight
-checks. Reviews, audits, handoffs and resume do not trigger test repetition.
-`verify:changed -- --print-plan` reports the selected checks and the reason without executing them.
-For an unresolved failure, `pnpm verify:changed -- --check <key>` reproduces one registered check
-without recording acceptance; native Node checks also accept `--test-name-pattern <pattern>`. The
-runner reports each active check and its duration. Changed relevant source, tests, dependencies,
-controls or tools invalidate evidence. Use the project wrapper to keep the toolchain consistent.
+Plan before running checks. Development selects affected units; missing full evidence, a review or
+resumption does not start a full suite. Valid results survive independent failures and session or
+commit changes; relevant inputs, commands, dependencies and environment determine reuse. Unknown
+dependencies need a contract correction before claiming coverage. `--print-plan` explains selection,
+reuse, prerequisites, remaining coverage and observed or unknown cost without executing checks.
+`pnpm verify:changed -- --check <key>` reproduces one registered check without recording acceptance;
+native Node checks also accept `--test-name-pattern <pattern>`.
 
-The handover command requires a current critical-capacity decision under
-[Capacity Admission And Monitoring](instructions.md#capacity-admission-and-monitoring); historical
-reserves and unknown costs alone cannot trigger it. After it reports a sealed path, the Codex
-session must stop without another action. To continue from that handover, exit Codex completely with
-`/quit`, then run `bash -p scripts/setup/start-codex.sh` from the project root in your terminal.
-Accept the handover when the new session announces it. `/new` and `/resume` inside the running CLI
-retain its existing launcher; they cannot replace this restart. Keep the handover and runtime files
-intact. The receiving session reassesses capacity; restarting proves neither renewed account
-capacity nor continued exhaustion. Receipt adds current guidance while preserving the exact captured
-artifact.
-
-To finish framework work, the existing `framework:publish` script runs the complete cleanup,
-verification, commit and push sequence. After reviewing all source changes and authorizing
-publication, run this command from the owning Codex session or from the terminal:
+Publication composes complete candidate coverage from valid and newly required results; manual
+verification, publisher retries and the managed pre-push hook share evidence. After reviewing and
+authorizing the source changes, publish through the existing owner:
 
 ```bash
 bash -p scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"
 ```
 
-The wrapper selects the isolated project environment. The publisher performs source cleanup,
-housekeeping, complete verification, commit and push through the managed hook, then confirms the
-remote commit. It preserves a verified calling session; full runtime reset requires quiescence.
-Failures preserve source and any local commit. The eight-phase display shows task and elapsed time;
-`--verbose` shows sanitized check output, and `NO_COLOR` disables color. Existing project identity,
-signing and GitHub/GitLab credential fallback remain effective.
+This authorizes cleanup, verification, commit and push of reviewed non-ignored source on `main`,
+followed by remote confirmation. Failures preserve source and local commits. A verified calling
+session may remain active; full runtime reset requires stopped sessions. `--verbose` shows sanitized
+check output. Generated projects use `project:publish` on their configured branch/upstream,
+retaining history and accounts without framework reset. Neither publisher deploys. Candidate pinning
+and isolated release clones follow [Delegated Release](instructions.md#delegated-release); see
+[publication gates](instructions.md#verification-and-publication-gates) for authority and evidence.
 
-Running the command explicitly authorizes publication of the reviewed non-ignored source on `main`.
-Without that authority, leave it unexecuted. Follow
-[Delegated Release](instructions.md#delegated-release) for publication by a worker while independent
-development continues. The current isolation boundary is a separate ordinary clone: linked worktrees
-share hooks and configuration and remain blocked when another writer is active.
-
-For a delegated release, finish existing source preparation before handoff, stage the accepted files
-in the release clone, and obtain full HEAD/tree IDs with `git rev-parse HEAD` and `git write-tree`.
-Append `--candidate "<HEAD>:<tree>"` to the same publisher invocation. It rejects a changed source,
-index or HEAD, including preparation drift; the flag is an integrity constraint, not authorization.
-Later development stays in its independent clone. The canonical rule owns CI/deploy assessment,
-serialization, result handoff and scope closure before agent reuse.
-
-Generated projects use `project:publish --message "<commit message>"` through the same wrapper and
-support the same candidate flag. They publish the current branch to its configured upstream,
-preserve history/accounts and omit framework reset. In this source repository `project:publish`
-aliases `framework:publish`. These commands do not themselves deploy. Use existing authorized target
-commands and environment gates. Active callers require observable Linux process ancestry; without
-that proof, publish after that clone's sessions exit.
+A sealed critical handover is terminal: stop, exit Codex, relaunch and accept the announced
+handover. Keep its files intact; restart alone proves no capacity recovery.
+[Capacity policy](instructions.md#capacity-admission-and-monitoring) owns admission and recovery.
 
 ## Project Accounts
 
-[Repository-local isolation](instructions.md#repository-local-tool-and-account-isolation) owns the
-account boundary and future tool admission. Private account home/configuration and temporary command
-state live under `.auth/project-tools/`; native Codex state remains in the root `CODEX_HOME`.
-Reusable installations use separate user storage; see
-[Repository Housekeeping](#repository-housekeeping) for locations and retention. Private state is
-excluded from Git, context, generation and transfer. Login commands run through
-`bash -p scripts/setup/run-project.sh` with the project's private accounts.
+[Repository-local isolation](instructions.md#repository-local-tool-and-account-isolation) owns tool
+and account boundaries. Private state uses `.auth/project-tools/`; native Codex keeps root
+`CODEX_HOME`. Private state is excluded from generation/transfer. Use the project wrapper for
+logins; public tool settings use `.auth/project-tools/config/mise/config.toml`. Product setup
+prepares SDKs once; verification does not install them.
 
-Persistent public tool settings belong in the project-private Mise configuration at
-`.auth/project-tools/config/mise/config.toml`. The normal project wrapper loads them before
-verification and publication. Prepare required SDKs or test runtimes once through their product
-setup owner; separate shared payloads from private accounts/device state and preserve explicit tool
-selections. Verification never installs them. Installation migration and retirement use the existing
-dependency and storage owners below; login state is not part of that cleanup.
+Publication uses project Git identity/signing; missing `user.name`/`user.email` may use global
+config without includes. HTTPS credentials use owner-only
+`.auth/project-tools/home/.git-credentials`, scoped to protocol, host and repository, **unencrypted
+on disk** and preserved across reset. Missing credentials may use global Git helpers or existing
+`gh`/`glab` accounts for configured hosts; ambient tokens are ignored. The adapter neither logs in
+nor changes global accounts, and bounds retries.
 
-Commit author names and email addresses use project Git configuration first. When a value is
-missing, publication reads only `user.name` and `user.email` from the operating-system user's
-standard global Git configuration, without includes. It validates the resulting author and committer
-before repository verification and rechecks them before staging. Global hooks, signing settings and
-credentials are not imported; existing project signing remains in effect. No Git configuration is
-changed. If neither configuration supplies a complete identity, the error shows project-local
-`git config` commands.
+A browser login does not authenticate Git. Establish a host account in a normal terminal with
+`gh auth login --hostname github.com` or `glab auth login --hostname gitlab.com` (substitute your
+configured host), or enter a personal access token at Git's password prompt. Never put tokens in
+commands, history or chat. The platform API instead uses owner-only `.auth/git-platform.json` with
+`schemaVersion: 1`, `provider`, `hostname`, `repository` and `token`, read only for explicit
+platform apply. SSH uses the private home's `.ssh/id_ed25519` and `.ssh/known_hosts`, without host
+SSH config or agents.
 
-Git HTTPS authentication uses Git's built-in `credential-store`, explicitly bound to
-`.auth/project-tools/home/.git-credentials`. Git remembers a successfully authenticated username and
-token there and removes rejected credentials through its normal credential lifecycle. The store is
-scoped by protocol, host and repository path, has owner-only file permissions, and survives reset.
-It is **unencrypted on disk** and excluded from Git and generated projects. If no project credential
-is available, the adapter tries the user's global Git helpers and then the matching existing CLI
-login: `gh` for GitHub or `glab` for GitLab. This applies equally to the provider hosts declared in
-`.codex/tooling.json`, including configured self-hosted instances. Native helpers resolve their
-user-home configuration and keyring; ambient token variables are not imported. The adapter never
-requests global credential storage/deletion or starts a login. Git may cache an approved fallback
-credential in the project store. Other providers and SSH accounts remain project-local.
-
-If Git rejects a credential during publication, the publisher tries the remaining available global
-credentials in up to two automatic retries, without another prompt. It skips already rejected
-credentials and preserves global accounts. This recovery applies only to confirmed authentication
-rejections; other Git failures still stop the affected phase.
-
-A browser-only session does not authenticate Git. If no local or global credential exists, establish
-one in a normal host terminal with `gh auth login --hostname github.com` or
-`glab auth login --hostname gitlab.com` (use your configured host for self-hosted instances), or
-enter a personal access token at Git's password prompt. For GitHub HTTPS, enter your GitHub username
-at `Username` and your personal access token (PAT) at `Password`. The native Git prompt still says
-`Password`, but GitHub requires a token instead of your account password. See
-[GitHub's token instructions](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#using-a-personal-access-token-on-the-command-line).
-Never put a token in a command, shell history or chat.
-
-The platform-policy API uses `.auth/git-platform.json`, with private owner-only permissions and
-exact fields `schemaVersion` (1), `provider`, `hostname`, `repository` (the selected remote's slug),
-and `token`. It reads this file only for explicit `platform:configure -- --apply`; inherited host
-tokens are ignored. Configure this private file locally without putting its contents into prompts,
-command history or source control. Git's SSH transport uses the project home's `.ssh/id_ed25519` and
-`.ssh/known_hosts`, with host SSH configuration and agents disabled. Other authentication adapters
-must meet the same boundary before use.
-
-Platform-policy apply locks original-state inventory and its dependent writes together. A failed
-mutation preserves reconciliation state and reports its request stage. On an explicit retry, GitHub
-recovery validates the complete original ruleset before another write; a still-unknown creation
-blocks a duplicate create. Follow
-[failure recovery](instructions.md#deployment-and-qualification-failure-recovery); an HTTP 503 or
-lost response alone does not establish that a write failed to apply.
-
-If an obsolete or indeterminate local platform lock blocks configuration, first confirm that no
-platform configuration process is still running. Preview the lock with
-`pnpm platform:configure -- --recover-lock --json`. After reviewing its fingerprint and
-independently confirming quiescence, retire that exact lock with
+A failed remote mutation may already have applied: preserve its reconciliation journal and follow
+[failure recovery](instructions.md#deployment-and-qualification-failure-recovery). For an obsolete
+local platform lock, preview `pnpm platform:configure -- --recover-lock --json`. After independently
+confirming stopped writers, use
 `pnpm platform:configure -- --recover-lock --apply --confirm-quiescent --expected-lock-fingerprint <sha256>`.
-Recovery rejects a changed lock or a proven live owner and preserves the reconciliation journal.
-These recovery commands are local; they do not read credentials or call the provider. Retry provider
-configuration separately with its normal authority and read-back requirements.
+This local recovery preserves the journal, rejects changed locks/live owners and makes no provider
+request; retry remote configuration separately with its normal authority.
 
 ## Repository Housekeeping
 
-Run `bash -p scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply` for repository
-maintenance. See
-[closure and housekeeping](instructions.md#completed-goal-closure-and-repository-housekeeping) for
-its required order, preservation boundaries and source-version reconciliation.
+Use `bash -p scripts/setup/run-project.sh pnpm repo:housekeeping -- --apply` for owned maintenance.
+For a storage report without product checks, use `pnpm repo:housekeeping -- --storage-only`; add
+`--apply` for safe collection.
+[Closure](instructions.md#completed-goal-closure-and-repository-housekeeping) and
+[storage policy](instructions.md#temporary-data-and-storage-housekeeping) own ordering, free-space
+admission, migration, retention and uncertain ownership. Never empty `.tmp/` or `.auth/` wholesale.
 
-Manifests, lockfiles, tool pins and checksums stay tracked in the repository. Installed Node.js,
-pnpm, Mise runtimes and native bundles use the OS user's `~/.local/share/project-tools/`; download
-and browser caches use `~/.cache/project-tools/`. pnpm shares package graphs in user storage, with
-resolution links and metadata in `node_modules` (CI may use pnpm's disposable local layout).
-`PROJECT_TOOL_STORAGE_HOME` relocates only tool storage, never accounts.
-
-Toolchain startup and pinned maintenance require at least 2 GiB available on each filesystem used
-for the repository, shared installations and package caches before staging or downloads. Filesystem
-percentages are informational. Below that minimum, the existing storage owner collects unused local
-Docker build cache once toward 3 GiB, then measures again. Restoring the 2 GiB minimum admits work;
-the higher cleanup target is not a startup gate. Failed collection or a still insufficient reserve
-stops installation. Full housekeeping first reclaims safe managed scratch and unused tool storage.
-
-For disk growth, use
-`bash -p scripts/setup/run-project.sh pnpm repo:housekeeping -- --storage-only`. It reports
-allocated bytes in scratch, `.auth/` and its tool subdirectories, native history/cache and operation
-state without reading credential contents or running product checks. Add `--apply` to recover
-abandoned managed scratch, collect unreferenced shared tool/package versions and expire native
-caches through their existing owners. Canonical startup runs the same tool collectors. Native
-Mise/pnpm project references preserve other projects' pins and package graphs. Shared references
-accept exact native and `npm:pnpm` pins; each project retains its own executable admission. Tracked
-private Mise configurations retain shared runtime versions without being read or evaluated by
-another project's collector. A registered project root with a noncanonical path, a different owner,
-or group/other write access also retains shared runtimes and tool bundles. Startup reports the path
-and reason and continues without changing that project's permissions or references. Independent
-package, cache and scratch collectors continue. Framework and generated children use the same
-installation lifecycle lock. Quiescence and observed runtime use gate retirement of replaced
-repository installations. Migration repairs permissive legacy tool-directory modes only below
-verified private parents. Large unmanaged scratch and unresolved ownership remain visible failures;
-the command never empties `.tmp/` or `.auth/` wholesale. The wrapper, verifier commands and
-canonical sessions clean their own temporary scopes on exit and recover safe abandoned scopes on
-later runs. Load tests invoke installed runtimes instead of copying Node/Python or browser
-distributions for each run or replica; recovery retains compact checkpoints and runtime references.
-Playwright/Puppeteer browser payloads use shared user caches via the common environment, while
-profiles and account state stay private. Browser managers own version retirement; housekeeping does
-not download browsers or guess which versions a project needs. Existing unmarked output and mutable
-device/operation data require their producer's reconciliation; see
-[temporary storage](instructions.md#temporary-data-and-storage-housekeeping).
+Pins/checksums stay tracked. Shared installations use `~/.local/share/project-tools/`;
+downloads/browser caches use `~/.cache/project-tools/`. pnpm shares graphs with project metadata in
+`node_modules`. `PROJECT_TOOL_STORAGE_HOME` relocates tools only; accounts/device state stays
+private. Native references and observed use protect other projects. Runtime/browser owners retire
+payloads; disposable checks reuse installations and clean their own managed scratch.
 
 ## Documentation Context Economy
 
-Use `pnpm context:map` for the binding task routes and owner navigation. Read a section with
-`pnpm context:read -- instructions.md --section "Task Reading Routes"`; the reader returns its
-direct body and lists unread child sections. Read every applicable child before dependent work. Use
-`--outline` to discover headings or add `--subtree` to read a relevant complete section within the
-16 KiB output bound. `pnpm context:check` checks automatic instruction budgets, direct
-policy-section sizes and work-marker structure. Large references remain available without loading
-them all. The byte budgets are repository guardrails, not native model limits or proof of quality.
-They complement outcome-based review. The design follows
-[OpenAI context guidance](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)
-and [progressive skill disclosure](https://learn.chatgpt.com/docs/build-skills). The
-[repository-context study, revision 2](https://arxiv.org/html/2602.11988v2) found no general success
-improvement from added context files and higher costs in its tested settings; that is motivation to
-measure actual tasks, not an Astra-specific performance guarantee.
-
-See [Documentation Ownership](instructions.md#documentation-ownership) for where content belongs and
-how README links are maintained when documents are added, moved or retired.
-[Documentation Currency](instructions.md#documentation-currency) defines the update point for each
-change; [Task Scope And Completion](instructions.md#task-scope-and-completion) defines acceptance.
+Use `pnpm context:map` for task routes and owners, then
+`pnpm context:read -- instructions.md --section "Task Reading Routes"` for bounded reading.
+`--outline` discovers sections; `--subtree` includes their children within the output limit.
+`pnpm context:check` checks instruction budgets and structure, not task quality or acceptance; those
+follow [Task Scope And Completion](instructions.md#task-scope-and-completion).
 
 ## Update Generated Projects
 
-Use [Update Project from Framework](.agents/skills/update-project-from-framework/SKILL.md). From
-this source, preview the current generated tools and policy against an explicit target:
+Use the [update skill](.agents/skills/update-project-from-framework/SKILL.md) from the reviewed
+source release (`pnpm framework:version`). Preview does not install tools or modify the target:
 
 ```bash
 pnpm framework:upgrade -- --target <project-root>
 pnpm framework:upgrade -- --target <project-root> --reconcile <reviewed-decisions.json>
 ```
 
-Creation and current-output review use the source's installed pinned formatter and
-`.prettierrc.json` to compare the same policy bytes. A preview neither installs tools nor formats
-target files.
+Review the write/delete plan and hash/mode-bound decisions for every divergent file, preserving
+product identity, documents and custom checks. Add `--apply` only with target sessions stopped; the
+target runtime enforces exclusion. A real pristine generated ancestor may supply `--baseline`. Older
+targets without that runtime owner require a fresh generated comparison and explicit
+`--regenerate --confirm-quiescent --apply`; independently confirm quiescence because a new lock
+cannot fence an old launcher. Interrupted ordinary updates use `--recover`; regeneration uses
+`--regenerate --confirm-quiescent --recover` with the exact admitted source runtime.
 
-Every divergent existing file needs a reasoned decision bound to its current and desired hashes and
-modes. Review the write/delete plan and intentional product deviations before adding `--apply`. All
-target sessions must be stopped; its own runtime owner enforces exclusion. For an old target without
-that owner, prepare a small fresh generated candidate and reconcile it before using explicit
-`--regenerate --confirm-quiescent --apply`. Confirm stopped writers independently: a new lock cannot
-fence an old launcher. Interrupted regeneration uses `--regenerate --confirm-quiescent --recover`
-and requires the exact admitted source runtime; ordinary recovery uses `--recover`. The single
-current journal covers public policy, tools and explicitly named `--project-path <path>` document or
-configuration owners; private runtime is never a migration input. A real pristine ancestor may
-additionally support `--baseline <pristine-generated-reference>` for a three-way comparison. Never
-substitute a customized checkout for that reference. Maintained product documents, identity and
-custom verification require local reconciliation, not blind replacement. Generated projects contain
-no self-updater or installation receipt. See
-[Framework Lifecycle](instructions.md#framework-lifecycle-compatibility-and-git-platforms) and
-[Repository Update Scope](instructions.md#repository-update-scope). Select acceptance commands under
-[Maintenance Scope And Verification](instructions.md#maintenance-scope-and-verification): an update
-does not start product development, refresh product dependencies or require broad product execution.
+One journal covers public tools/policy and named `--project-path` owners, excluding private runtime.
+Children have no self-updater or installation receipt.
+[Lifecycle](instructions.md#framework-lifecycle-compatibility-and-git-platforms) and
+[update scope](instructions.md#repository-update-scope) own reconciliation.
+[Targeted acceptance](instructions.md#maintenance-scope-and-verification) ends the update without
+product development, dependency refresh or broad product tests.
 
 ## License And Attribution
 
@@ -394,15 +216,3 @@ license obligations. [NOTICE](NOTICE) owns this additional permission and its sc
 projects contain no CodexRig license/notice files or references and start with no public product
 license selected; their owner chooses product licensing. Third-party components retain their
 applicable terms.
-
-## Project Authority
-
-- [Project Instructions](instructions.md) own complete workflow and safety policy.
-- [AGENTS.md](AGENTS.md) is the short safe-entry bootstrap.
-- [Project Manifest](docs/project.md) is the current technical inventory.
-- [Future Modules](docs/future-modules.md) owns confirmed deferred candidates only.
-- [.codex/README](.codex/README.md) explains portable Codex configuration and private runtime.
-- `.codexrig/` owns source release identity, future compatibility experiments and explicit
-  project-tool selection.
-- `.codex/tooling.json`, `.codex/toolchain.json` and `.codex/verification.json` own local runtime,
-  stable tool pins and selected verification respectively.

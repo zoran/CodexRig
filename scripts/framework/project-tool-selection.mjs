@@ -132,12 +132,13 @@ export function selectedProjectVerification(source, selection) {
       .filter(([file]) => files.has(file))
       .map(([file, values]) => [file, values.filter((value) => files.has(value))]),
   );
-  for (const file of files)
-    if (file.startsWith("scripts/") && file.endsWith(".mjs"))
-      tests[file] = [...new Set([...(tests[file] ?? []), "scripts/setup/runtime-safety.test.mjs"])];
   return {
     schemaVersion: 1,
     prePushChecks: [],
+    ...(source.sharedInputs === undefined
+      ? {}
+      : { sharedInputs: source.sharedInputs.filter((file) => files.has(file)) }),
+    ...(source.workspaceOutputs === undefined ? {} : { workspaceOutputs: source.workspaceOutputs }),
     risks: source.risks.filter((entry) => files.has(entry.path)),
     commands,
     testConsumers: tests,

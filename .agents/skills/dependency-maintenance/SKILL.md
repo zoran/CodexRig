@@ -9,91 +9,39 @@ description:
 
 # Dependency Maintenance
 
-## Rules
+Apply [maintenance scope](../../../instructions.md#maintenance-scope-and-verification). Reports stay
+read-only; framework updates do not authorize product dependency refresh. Distinguish deterministic
+manifest/lock consistency from network-dependent freshness.
 
-- First apply
-  [Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification).
-  A report stays read-only; framework updates do not authorize product dependency refresh. Select
-  only commands within the accepted dependency scope, and stop at its acceptance condition.
+1. Read root/workspace manifests, lockfile, tool pins and policy. Preserve workspace, section,
+   current spec and resolved version identity; never collapse recommendations by package name.
+2. Use `pnpm deps:report` or preview `pnpm deps:update:patch`. Patches stay on each current
+   major/minor line. Minor changes need user selection; majors additionally need migration review
+   and targeted consumer evidence. Apply a reviewed preview with
+   `pnpm deps:update -- --level patch --yes --plan-hash <sha256>`.
+3. Registry/advisory uncertainty leaves inputs unchanged. Check current primary release/migration
+   information. Versioned `patchedDependencies` declares applicability, not a resolution pin:
+   preserve reviewed patches and compatible SDK/native constraints; inspect duplicate unpatched
+   versions and retire patches only with evidence.
+4. Use the existing compatible installer for explicitly authorized graph refresh; frozen install
+   proves reproduction, not freshness. Reuse valid prepared state and verified immutable bundles.
+   Resolve with scripts disabled unless a reviewed package requires a build step; inspect unexpected
+   transitive/native changes.
+5. Keep declarations/digests in source, shared installations/package graphs in the admitted tool
+   store and accounts private. Relocation tests use isolated `PROJECT_TOOL_STORAGE_HOME`. Existing
+   native collectors preserve referenced/live versions; quiescent owners retire legacy copies.
+6. Verify lock consistency and actually affected consumers. Use `verify:external` only for required
+   current registry/advisory observations; failed external lookups are not a clean result.
 
-- Keep deterministic manifest/lock consistency separate from network-dependent registry freshness.
-- Preserve workspace, manifest, dependency section, current spec, and current version identity for
-  every recommendation and update. Never collapse updates by package name alone.
-- A patch update must remain on that manifest's current major/minor line. Minor updates require user
-  selection; major updates require explicit selection, migration review, and targeted regression.
-- Registry or advisory lookup failure is indeterminate, not proof that no update or vulnerability
-  exists. Report it and leave manifests unchanged.
-- A versioned `patchedDependencies` selector declares patch applicability; it does not pin package
-  resolution. Before compatible refresh, reconcile the actual native version constraints for every
-  patched direct/transitive dependency and any owning SDK whose newer release requires a different
-  patched version. Preserve the reviewed patch until its owner migrates or retires it. Use
-  compatible native pins with an adjacent reason/review condition; do not force versions outside
-  consumer ranges, widen patch applicability without evidence, or allow unused patches to unblock
-  startup. Inspect the resulting graph for both lost patches and duplicate unpatched native
-  packages.
-- Use `bash -p scripts/setup/run-project.sh node scripts/deps/install-compatible.mjs` for initial
-  installation and dependency-graph refreshes. It resolves the newest stable versions allowed by
-  workspace ranges and explicit pins under strict peer and Node.js engine compatibility, then
-  installs the reviewed lockfile. A frozen install is a reproducibility command, not a freshness
-  check.
-- Canonical startup invokes `scripts/deps/maintain-toolchain.mjs --startup` before session
-  admission. It checks official releases and updates Node.js/pnpm within matrix ranges, stable mise
-  and Codex, CI tool pins and action pins within annotated majors, plus compatible project packages.
-  It verifies changed archives, stages the complete candidate, publishes unchanged inputs together,
-  and reproduces offline. Failed freshness or installation stops startup; side hooks never update.
-  Toolchain metadata is project-owned and independent of source release contracts. Use the same
-  command without `--startup` for explicitly authorized current-slice maintenance.
-- `--locked` skips release discovery and reproduces reviewed pins for CI or scoped preparation.
-  Invoke it separately; preserve `--startup` in the normal launcher. The portable launcher
-  regression checks this executable boundary without running dependency maintenance.
-- Keep dependency declarations, lockfiles, versions and digests in the repository; installed tools
-  and package graphs use `scripts/repository/user-tool-storage.mjs` and pnpm's global virtual store.
-  Test relocation with an isolated `PROJECT_TOOL_STORAGE_HOME`. Credentials/configuration remain
-  project-private. Reuse verified immutable bundles; startup and housekeeping compose native
-  reference-aware collectors through `tool-storage-housekeeping.mjs`. Mise's native public config
-  references are shared; trust and account state remain private. Preserve all registered projects'
-  pins and running runtimes. Retire legacy copies only through the quiescent installation owner;
-  preserve unknown scratch and mutable device/account data for their actual migration owner.
-- Pre-push is read-only. Apply dependency changes before commit through an explicit maintenance
-  command.
+Canonical startup uses `maintain-toolchain.mjs --startup` for official tool/CI releases and
+compatible packages, isolated validation, transactional publication and offline reproduction.
+Complete versioned archives/checksums and usable runtime bin paths are required. `--locked`
+separately prepares frozen CI inputs; do not substitute it into the normal launcher. Neither
+pre-push nor side hooks update inputs. See
+[dependency policy](../../../instructions.md#dependency-installation-and-freshness).
 
-## Workflow
-
-1. Read root and workspace manifests, lockfile, package-manager version, and dependency policy.
-2. Run the compact report:
-
-   ```bash
-   pnpm deps:report
-   ```
-
-3. Preview automatic patch/fix maintenance and inspect the exact per-workspace targets:
-
-   ```bash
-   pnpm deps:update:patch
-   ```
-
-   Apply that same reviewed plan explicitly:
-
-   ```bash
-   pnpm deps:update -- --level patch --yes --plan-hash <sha256-from-preview>
-   ```
-
-4. For selected minor/major work, name the package and affected workspace explicitly. Check official
-   upgrade notes and breaking changes before editing.
-5. Re-resolve the lockfile with scripts disabled unless an audited package requires a build step.
-   Inspect unexpected transitive/native changes.
-6. Run install/lock consistency plus the tests/builds for every affected consumer. Run
-   `pnpm verify:external` for a fresh registry/advisory result when required.
-
-## Supply-Chain Incident
-
-For a compromise or active advisory, do not choose a registry update automatically. Confirm the
-incident through a trusted primary source; identify direct and transitive resolved versions and
-actual use/exposure; independently verify a safe target or replacement; then contain with removal,
-replacement, override, or a documented pin. Run `$security-review` for the affected build/runtime
-boundary and record uncertainty when no trusted safe version is known.
-
-## Output
-
-Provide a compact per-workspace table of current, wanted, latest, delta, action, and uncertainty.
-Record pins with an owner/reason and review condition instead of leaving unexplained permanent pins.
+For an active supply-chain incident, confirm the source, affected direct/transitive versions and
+actual exposure before selecting a safe version/replacement. Contain through the existing pin,
+override, removal or replacement owner and use `$security-review`; state unresolved uncertainty.
+Return a compact per-workspace current/wanted/latest/action/uncertainty table and owner/review
+condition for consequential pins, not a new maintenance report file.

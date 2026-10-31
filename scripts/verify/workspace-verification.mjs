@@ -3,6 +3,8 @@ import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { discoverPnpmWorkspaceManifestPaths } from "../repository/pnpm-workspace-manifests.mjs";
 import { normalizePath, root } from "./adaptive-state.mjs";
+import { readVerificationConfiguration } from "./verification-configuration.mjs";
+const defaultWorkspaceOutputs = readVerificationConfiguration().workspaceOutputs ?? {};
 
 const dependencyFields = [
   "dependencies",
@@ -10,6 +12,12 @@ const dependencyFields = [
   "optionalDependencies",
   "peerDependencies",
 ];
+export const workspaceResolutionInputs = new Set([
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  ".codex/mise.toml",
+  ".codex/mise.lock",
+]);
 const fullLifecycleOrder = [
   "lint",
   "typecheck",
@@ -21,7 +29,13 @@ const fullLifecycleOrder = [
   "test:e2e",
   "test:tenant-isolation",
 ];
-const changedLifecycleOrder = ["lint", "typecheck", "verify:preflight", "test:unit"];
+const changedLifecycleOrder = [
+  "lint",
+  "typecheck",
+  "verify:preflight",
+  "test:unit",
+  "test:integration",
+];
 const lifecycleRoutingCategories = new Set([
   "app/package/service/runtime source",
   "dependency/package manager files",
@@ -184,15 +198,29 @@ function pureReexportBarrel(relativePath, repositoryRoot) {
   );
 }
 
-function lifecyclePhase(scriptName, mode) {
-  if (mode === "changed" || ["lint", "typecheck", "verify:preflight"].includes(scriptName)) {
+function lifecyclePhase(scriptName) {
+  if (["lint", "typecheck", "verify:preflight"].includes(scriptName)) {
     return "preflight";
   }
   return scriptName === "build" ? "workspace-build" : "workspace-test";
 }
 
-function workspaceTestCommands(owners, command, scriptName) {
-  if (!scriptName.startsWith("test")) return undefined;
+function buildPrerequisites(owners, scriptName, manifests) {
+  if (scriptName !== "build" && !scriptName.startsWith("test")) return [];
+  return manifests
+    .filter(
+      (candidate) =>
+        candidate.scripts?.build &&
+        owners.some(
+          (owner) =>
+            internalDependencyNames(owner).has(candidate.name) ||
+            (scriptName.startsWith("test") && candidate.directory === owner.directory),
+        ),
+    )
+    .map((candidate) => candidate.directory);
+}
+
+function workspaceUnits(owners, command, scriptName, manifests, outputDeclarations) {
   const byName = new Map(owners.filter((owner) => owner.name).map((owner) => [owner.name, owner]));
   const ordered = [];
   const visiting = new Set();
@@ -225,12 +253,20 @@ function workspaceTestCommands(owners, command, scriptName) {
     ],
     artifactOwners: [`workspace:${owner.directory}`],
     workspaceDirectories: [owner.directory],
+    outputs: outputDeclarations[owner.directory]?.[scriptName]?.map((file) =>
+      owner.directory === "." ? file : `${owner.directory}/${file}`,
+    ),
+    buildPrerequisites: buildPrerequisites([owner], scriptName, manifests),
   }));
 }
 
 export function workspaceLifecycleCommands(
   manifests = discoverWorkspaceManifests(),
-  { mode = "full" } = {},
+  {
+    mode = "full",
+    outputDeclarations = defaultWorkspaceOutputs,
+    dependencyManifests = manifests,
+  } = {},
 ) {
   if (!["full", "changed"].includes(mode)) {
     throw new Error(`Unsupported workspace verification mode: ${mode}`);
@@ -270,12 +306,26 @@ export function workspaceLifecycleCommands(
       ],
       artifactOwners: owners.map((manifest) => `workspace:${manifest.directory}`).sort(),
       workspaceDirectories: owners.map((manifest) => manifest.directory).sort(),
+      buildPrerequisites: buildPrerequisites(owners, scriptName, dependencyManifests),
+      outputs: owners.every((owner) => outputDeclarations[owner.directory]?.[scriptName]?.length)
+        ? owners.flatMap((owner) =>
+            outputDeclarations[owner.directory][scriptName].map((file) =>
+              owner.directory === "." ? file : `${owner.directory}/${file}`,
+            ),
+          )
+        : undefined,
       reason: `${owners.length} selected project(s) expose ${scriptName}; exact workspace filters avoid non-owners and recursive aggregators`,
-      phase: lifecyclePhase(scriptName, mode),
+      phase: lifecyclePhase(scriptName),
     };
     commands.push({
       ...command,
-      workspaceTestCommands: workspaceTestCommands(owners, command, scriptName),
+      workspaceUnits: workspaceUnits(
+        owners,
+        command,
+        scriptName,
+        dependencyManifests,
+        outputDeclarations,
+      ),
     });
   }
   return commands;
@@ -320,6 +370,7 @@ export function selectChangedWorkspaceManifests(
   classifiedPaths,
   { repositoryRoot = root } = {},
 ) {
+  if (classifiedPaths.some((entry) => workspaceResolutionInputs.has(entry.path))) return manifests;
   const directOwners = directChangedOwners(manifests, classifiedPaths);
   if (directOwners.length === 0) return [];
 
@@ -336,7 +387,31 @@ export function selectChangedWorkspaceManifests(
   }
 
   const selectedDirectories = new Set(directOwners.map((manifest) => manifest.directory));
-  const directOwnerNames = new Set(directOwners.map((manifest) => manifest.name).filter(Boolean));
+  const affectedNames = new Set(directOwners.map((manifest) => manifest.name).filter(Boolean));
+  // Reach consumers to a fixed point without selecting other consumers of a prerequisite.
+  let expanded;
+  do {
+    expanded = false;
+    for (const candidate of manifests) {
+      if (selectedDirectories.has(candidate.directory)) continue;
+      if ([...internalDependencyNames(candidate)].some((name) => affectedNames.has(name))) {
+        selectedDirectories.add(candidate.directory);
+        if (candidate.name) affectedNames.add(candidate.name);
+        expanded = true;
+      }
+    }
+  } while (expanded);
+  const prerequisites = new Set();
+  function includePrerequisites(owner) {
+    if (prerequisites.has(owner.directory)) return;
+    prerequisites.add(owner.directory);
+    for (const name of internalDependencyNames(owner)) {
+      const dependency = manifestsByName.get(name);
+      if (!dependency) continue;
+      selectedDirectories.add(dependency.directory);
+      includePrerequisites(dependency);
+    }
+  }
   for (const owner of directOwners) {
     const ownerPrefix = owner.directory === "." ? "" : `${owner.directory}/`;
     const ownerEntries = classifiedPaths.filter(
@@ -355,16 +430,7 @@ export function selectChangedWorkspaceManifests(
       ownerEntries.length > 0 &&
       ownerEntries.every((entry) => pureReexportBarrel(entry.path, repositoryRoot));
     if (barrelOnly) continue;
-    for (const dependencyName of internalDependencyNames(owner)) {
-      const upstream = manifestsByName.get(dependencyName);
-      if (upstream) selectedDirectories.add(upstream.directory);
-    }
-  }
-  for (const candidate of manifests) {
-    const dependencies = internalDependencyNames(candidate);
-    if ([...directOwnerNames].some((name) => dependencies.has(name))) {
-      selectedDirectories.add(candidate.directory);
-    }
+    includePrerequisites(owner);
   }
   return manifests.filter((manifest) => selectedDirectories.has(manifest.directory));
 }

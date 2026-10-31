@@ -69,7 +69,7 @@ export function captureProcessIdentity(pid) {
       startIdentity = `linux:${linuxBootId()}:${namespace.device}:${namespace.inode}:${linuxStartTicks(pid)}`;
     } catch (error) {
       if (signalStatus(pid) === "stale") return null;
-      if (!["EACCES", "ENOENT", "EPERM"].includes(error?.code)) throw error;
+      if (!["EACCES", "ENOENT", "EPERM", "ESRCH"].includes(error?.code)) throw error;
     }
   }
   if (signalStatus(pid) === "stale") return null;
@@ -100,7 +100,7 @@ export function inspectProcessIdentity(identity) {
     try {
       observerNamespace = linuxObserverPidNamespaceIdentity();
     } catch (error) {
-      if (["EACCES", "ENOENT", "EPERM"].includes(error?.code)) return "unknown";
+      if (["EACCES", "ENOENT", "EPERM", "ESRCH"].includes(error?.code)) return "unknown";
       throw error;
     }
     if (!sameNamespaceIdentity(parsedStartIdentity.namespace, observerNamespace)) return "unknown";
@@ -189,6 +189,8 @@ export function inspectLinuxOpenRepositoryPaths({
       matchesPath(path.relative(root, target).split(path.sep).join("/"))
     );
   };
+  // Linux can report either ENOENT or ESRCH when an observed process exits between reads.
+  // Permission failures remain unknown for a process bound to this repository.
   const processIsBoundToRoot = (processPath) => {
     try {
       return pathIsInside(
@@ -196,7 +198,7 @@ export function inspectLinuxOpenRepositoryPaths({
         readLink(path.join(processPath, "cwd")).replace(/ \(deleted\)$/u, ""),
       );
     } catch (error) {
-      if (["EACCES", "ENOENT", "EPERM"].includes(error?.code)) return false;
+      if (["EACCES", "ENOENT", "EPERM", "ESRCH"].includes(error?.code)) return false;
       throw error;
     }
   };
@@ -206,7 +208,7 @@ export function inspectLinuxOpenRepositoryPaths({
   try {
     processNames = readDirectory(procRoot);
   } catch (error) {
-    if (!["EACCES", "ENOENT", "EPERM"].includes(error?.code)) throw error;
+    if (!["EACCES", "ENOENT", "EPERM", "ESRCH"].includes(error?.code)) throw error;
     return Object.freeze({ observationComplete: false, status: "unknown" });
   }
   for (const name of processNames) {
@@ -245,8 +247,8 @@ export function inspectLinuxOpenRepositoryPaths({
         try {
           target = readLink(path.join(processPath, "fd", descriptor)).replace(/ \(deleted\)$/u, "");
         } catch (error) {
-          if (!["EACCES", "ENOENT", "EPERM"].includes(error?.code)) throw error;
-          if (error?.code !== "ENOENT" && processIsBoundToRoot(processPath)) {
+          if (!["EACCES", "ENOENT", "EPERM", "ESRCH"].includes(error?.code)) throw error;
+          if (!["ENOENT", "ESRCH"].includes(error?.code) && processIsBoundToRoot(processPath)) {
             observationComplete = false;
           }
           continue;
@@ -258,10 +260,10 @@ export function inspectLinuxOpenRepositoryPaths({
         }
       }
     } catch (error) {
-      if (!["EACCES", "ENOENT", "EPERM"].includes(error?.code)) throw error;
+      if (!["EACCES", "ENOENT", "EPERM", "ESRCH"].includes(error?.code)) throw error;
       // Account-wide PID visibility is discovery, not ownership provenance. Permission-obscured
       // processes become blockers only when their observable cwd binds them to this exact root.
-      if (error?.code !== "ENOENT" && processIsBoundToRoot(processPath)) {
+      if (!["ENOENT", "ESRCH"].includes(error?.code) && processIsBoundToRoot(processPath)) {
         observationComplete = false;
       }
     }
@@ -316,7 +318,7 @@ export function inspectGuardHolders(identity, { excludePids = [] } = {}) {
             break;
           }
         } catch (error) {
-          if (!["EACCES", "ENOENT", "EPERM"].includes(error?.code)) throw error;
+          if (!["EACCES", "ENOENT", "EPERM", "ESRCH"].includes(error?.code)) throw error;
           if (["EACCES", "EPERM"].includes(error?.code)) observationComplete = false;
         }
       }
@@ -328,7 +330,7 @@ export function inspectGuardHolders(identity, { excludePids = [] } = {}) {
         holders.push(processIdentity);
       }
     } catch (error) {
-      if (["EACCES", "ENOENT", "EPERM"].includes(error?.code)) {
+      if (["EACCES", "ENOENT", "EPERM", "ESRCH"].includes(error?.code)) {
         // A vanished process is harmless. Policy-obscured same-user descriptor tables are recorded
         // separately because an unresolved spawn witness may still refer to an inherited holder.
         if (["EACCES", "EPERM"].includes(error?.code)) observationComplete = false;

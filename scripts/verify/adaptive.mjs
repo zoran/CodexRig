@@ -62,6 +62,9 @@ export function broadEvidencePlan(plan) {
         diagnosticAfterMs,
         cancellable,
         coveredTestPaths,
+        reuseMaxAgeMs,
+        outputs,
+        workspaceUnits,
       }) => ({
         args,
         artifactOwners,
@@ -71,6 +74,9 @@ export function broadEvidencePlan(plan) {
         diagnosticAfterMs,
         cancellable,
         coveredTestPaths,
+        reuseMaxAgeMs,
+        outputs,
+        workspaceUnits,
       }),
     );
 }
@@ -263,43 +269,53 @@ async function main() {
         relativePaths: expectedInputs.sourceFiles.map((file) => file.path),
       }),
     });
-    const checks = new Map(
-      checkpoint.checks
-        .filter((check) => fingerprints.get(check.key) === check.fingerprint)
-        .map((check) => [check.key, check]),
-    );
+    const checks = new Map(checkpoint.checks.map((check) => [check.key, check]));
     const pending = pendingVerificationPlan(
       plan,
       fingerprints,
-      options.forceFull ? [] : [...checks.values()],
+      options.forceFull || options.simulatedPaths.length ? [] : [...checks.values()],
+      { completeCommands },
     );
     if (options.printPlan) {
-      await runPlan(options.simulatedPaths.length ? plan : pending);
+      await runPlan(pending);
       return;
     }
+    for (const key of pending.evidence.invalidatedKeys) checks.delete(key);
     let failure;
     try {
       await runPlan(pending, {
         onResult(result) {
           const key = result.command.key;
           if (result.status === 0 && !result.error && !result.diagnosticRequired)
-            checks.set(key, { key, fingerprint: fingerprints.get(key) });
+            checks.set(key, {
+              key,
+              fingerprint: fingerprints.get(key),
+              completedAt: new Date().toISOString(),
+              elapsedMs: result.elapsedMs,
+              ...(result.outputFingerprint ? { outputFingerprint: result.outputFingerprint } : {}),
+            });
           else checks.delete(key);
         },
       });
     } catch (error) {
       failure = error;
     }
-    recordVerificationCheckpoint({
-      checks: [...checks.values()].sort((a, b) => a.key.localeCompare(b.key)),
+    const currentChecks = [...checks.values()]
+      .filter((check) => fingerprints.get(check.key) === check.fingerprint)
+      .sort((a, b) => a.key.localeCompare(b.key));
+    const recording = {
+      checks: currentChecks,
       expectedInputs,
       expectedGitBasis,
       broadPlan: evidencePlan,
       deliveryEnvironment: options.targetEnvironment,
       artifactManifest: options.artifactManifest,
       failed: Boolean(failure),
-    });
-    if (failure) throw failure;
+    };
+    if (failure) {
+      recordVerificationCheckpoint(recording);
+      throw failure;
+    }
     const execution = {
       successfulCommandKeys: successfulVerificationCommands(selectedCommands, fingerprints, [
         ...checks.values(),
@@ -307,6 +323,7 @@ async function main() {
     };
     if (plan.admission.mode === "full") {
       recordSuccessfulFullEvidence({
+        ...recording,
         broadPlan: evidencePlan,
         expectedGitBasis,
         expectedInputs,
@@ -317,6 +334,12 @@ async function main() {
       console.log("Successful full verification basis recorded.");
       return;
     }
+    if (
+      pending.readOnlyCommands.length ||
+      pending.workspaceCommands.length ||
+      JSON.stringify(checkpoint.sourceFiles) !== JSON.stringify(expectedInputs.sourceFiles)
+    )
+      recordVerificationCheckpoint(recording);
     console.log(
       "Development results retained; complete acceptance belongs to publication verification.",
     );

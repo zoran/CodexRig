@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
+import { nativeNodeArtifactUrls } from "../contracts/mise-toolchain-configuration.mjs";
 import { resolveCompatibilityToolchain, resolveToolchainReleases } from "./toolchain-releases.mjs";
 
 function fixture({
@@ -9,6 +10,7 @@ function fixture({
   nodeVersions,
   artifact = () => 200,
   nodeArtifact = () => 200,
+  nodeChecksums = (_url, content) => new Response(content),
 } = {}) {
   const matrix = readToolchainConfiguration();
   matrix.stable.node.version = "24.22.0";
@@ -63,6 +65,18 @@ function fixture({
           integrity: matrix.ci.codexNpmPlatformIntegrities[platform ?? "linux-x64"],
         },
       };
+    } else if (
+      /^https:\/\/(?:nodejs\.org\/dist|unofficial-builds\.nodejs\.org\/download\/release)\/v([^/]+)\/SHASUMS256\.txt$/u.test(
+        decoded,
+      )
+    ) {
+      const version = decoded.match(/\/v([^/]+)\//u)[1];
+      const content =
+        Object.values(nativeNodeArtifactUrls(version))
+          .filter((artifact) => new URL("SHASUMS256.txt", artifact).href === decoded)
+          .map((artifact) => `${"1".repeat(64)}  ${artifact.split("/").at(-1)}`)
+          .join("\n") + "\n";
+      return nodeChecksums(decoded, content);
     } else if (decoded === "https://mise.jdx.dev/VERSION")
       return new Response(matrix.ci.miseVersion);
     else if (decoded.endsWith("/SHASUMS256.txt"))
@@ -88,6 +102,47 @@ function fixture({
 function probes(state, tool) {
   return state.calls.filter((call) => call.options.method === "HEAD" && call.tool === tool);
 }
+
+test("Node defers a release whose available binaries lack published checksum entries", async () => {
+  for (const missingManifest of [false, true]) {
+    const state = fixture({
+      versions: ["11.28.0"],
+      nodeVersions: ["24.22.0", "24.22.1"],
+      nodeChecksums: (url, content) =>
+        url.includes("unofficial-builds") && url.includes("/v24.22.1/")
+          ? new Response(
+              missingManifest ? null : `${"2".repeat(64)}  node-v24.22.1-headers.tar.gz\n`,
+              { status: missingManifest ? 404 : 200 },
+            )
+          : new Response(content),
+    });
+    assert.deepEqual(await resolveToolchainReleases(state.matrix, state.options), state.matrix);
+    assert.ok(
+      state.progress.some((line) => /24\.22\.1.*linux-arm64-musl, linux-x64-musl/u.test(line)),
+    );
+    assert.equal(probes(state, "node").length, 14);
+  }
+});
+
+test("Node checksum corruption or uncertainty cannot be treated as an absent release", async () => {
+  for (const failure of ["corrupt\n", "", "duplicate", 403, 429, 503, new Error("offline")]) {
+    const state = fixture({
+      nodeVersions: ["24.22.0", "24.22.1"],
+      nodeArtifact: (url) => (url.endsWith("-linux-arm64-musl.tar.gz") ? 404 : 200),
+      nodeChecksums: (_url, content) => {
+        if (failure instanceof Error) throw failure;
+        if (typeof failure === "number") return new Response(null, { status: failure });
+        return new Response(failure === "duplicate" ? content + content : failure);
+      },
+    });
+    await assert.rejects(
+      resolveToolchainReleases(state.matrix, state.options),
+      /checksum|HTTP|offline/iu,
+    );
+    assert.deepEqual(state.progress, []);
+    assert.equal(probes(state, "node").length, 7);
+  }
+});
 
 test("Node retains the current complete release when a newer musl binary is missing", async () => {
   const state = fixture({

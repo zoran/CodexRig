@@ -92,7 +92,9 @@ export function publicationFixture(t, { globalIdentity = false, configure } = {}
       env: { ...environment, ...extraEnvironment, GIT_ALLOW_PROTOCOL: "file" },
       encoding: "utf8",
       input: "",
-      timeout: 60000,
+      // A real eight-phase publication includes hooks and terminal cleanup. Its observed parallel
+      // duration can exceed a minute; ordinary fixture commands keep their shorter bound.
+      timeout: args.includes("project:publish") ? 120000 : 60000,
       maxBuffer: 4 * 1024 * 1024,
     });
   const run = (command, args, extraEnvironment = {}) => {
@@ -100,7 +102,7 @@ export function publicationFixture(t, { globalIdentity = false, configure } = {}
     assert.equal(
       result.status,
       0,
-      `${command} ${args.join(" ")}\n${result.stdout}\n${result.stderr}`,
+      `${command} ${args.join(" ")}\n${result.error?.message ?? ""}\n${result.stdout}\n${result.stderr}`,
     );
     return `${result.stdout}${result.stderr}`;
   };
@@ -224,6 +226,8 @@ await import(${JSON.stringify(pathToFileURL(path.join(root, "scripts/goals/publi
       commands: [
         {
           key: "product",
+          label: "fixture product",
+          reason: "verify the product source and execution environment",
           executable: "$node",
           args: ["fixture-product.mjs"],
           phase: "broad",
@@ -232,17 +236,40 @@ await import(${JSON.stringify(pathToFileURL(path.join(root, "scripts/goals/publi
       prePushChecks: [],
       risks: [],
       testConsumers: {},
-      exactConsumers: {},
+      exactConsumers: { "src/product.mjs": ["product"] },
       ownedCategories: {},
     }),
   );
   write(
     "fixture-product.mjs",
     `import {appendFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+import {product} from ${JSON.stringify("./src/product.mjs")};
+assert.ok(Number.isFinite(product));
 appendFileSync('.auth/product-checks.jsonl',JSON.stringify(Object.fromEntries(['NODE_ENV','VERIFY_MAX_CAPTURE_BYTES','VERIFY_MAX_PARALLEL','IMAGE_ASSET_MAX_BYTES'].map(key=>[key,process.env[key]])))+'\\n');\n`,
   );
   write("src/product.mjs", "export const product = 1;\n");
   configure?.({ root, copyModule, write });
+  // Every fixture retains a lightweight documentation owner, including the staged removal of
+  // previously tracked private context. Product-specific checks remain independently reusable.
+  const configuration = JSON.parse(
+    readFileSync(path.join(root, ".codex/verification.json"), "utf8"),
+  );
+  configuration.commands.push({
+    key: "docs",
+    label: "fixture documentation boundary",
+    reason: "private work context must remain excluded from publication",
+    executable: "$node",
+    args: ["fixture-docs.mjs"],
+    phase: "preflight",
+  });
+  write(".codex/verification.json", JSON.stringify(configuration));
+  write(
+    "fixture-docs.mjs",
+    `import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+assert.ok(readFileSync('.gitignore','utf8').split(/\\r?\\n/u).includes('/docs/project-context.md'));\n`,
+  );
   // Real projects have a committed lockfile before publication; first-use pnpm preparation must
   // not create unrelated source while the failure scenario checks preservation of dirty state.
   run("pnpm", ["install", "--lockfile-only", "--offline", "--ignore-scripts"]);

@@ -8,92 +8,41 @@ description:
 
 # Reset CodexRig Framework
 
-Apply [Task Scope And Completion](../../../instructions.md#task-scope-and-completion) and
-[Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification)
-before selecting cleanup. A local improvement task can finish without publication; this skill does
-not add commit/push, full runtime sanitation or another product phase to its scope. Preserve active
-runtime and unrelated work; use only the admitted source cleanup path when a live session owns it.
+Use [maintenance scope](../../../instructions.md#maintenance-scope-and-verification): local
+framework acceptance does not require publication or full runtime sanitation. Preserve
+active/private and unrelated work. Confirm this is the source framework and inspect Git/worktree
+state.
 
-For authorized source publication, follow
-[Delegated Release](../../../instructions.md#delegated-release) and use the existing orchestrator:
+For authorized publication use the existing combined owner:
 
 ```bash
 bash -p scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"
 ```
 
-This source-only composition binds central `main` and the existing reset, housekeeping,
-verification, hook and goal-publication owners. The canonical publication policy owns ordering,
-candidate checks, failure preservation and settlement. Preparation must be complete before freezing
-a delegated candidate; pass its `--candidate <HEAD>:<tree>` to the same command. Policy does not
-itself authorize execution, and this source publisher is excluded from generated projects.
+It owns source preparation, complete candidate coverage, exact commit/push and settlement. Follow
+[delegated release](../../../instructions.md#delegated-release) when assigned; display is not
+authority. The source publisher is excluded from children. Generation preserves source state and
+needs no reset.
 
-When publication guidance is part of the requested handoff, follow the command-selection rule in
-[Verification](../../../instructions.md#verification): confirm the current package script and README
-invocation, name its commit/push effects and ownership gate, and give the combined command. If
-publication is not authorized, explain that running it is the operator's explicit publication
-choice; do not silently substitute only reset steps. The project-command wrapper selects the
-declared runtime and isolated account environment.
-
-For an explicitly reset-only/local outcome or a diagnosed recovery need, use the deterministic reset
-boundary and explain why publication is outside that action:
+For explicit sanitation/recovery, preview before applying:
 
 ```bash
 env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/reset-framework.mjs
 env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/reset-framework.mjs --apply
-env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/reset-framework.mjs
 ```
 
-The first command is a read-only preview and exits non-zero while reset candidates exist. Review its
-exact list before using `--apply`, then require a clean preview. Runtime sanitation is allowed only
-after every Codex session for the repository has ended; the launcher-owned runtime lease makes the
-reset fail closed otherwise. Publication uses `--publication` internally: a proven calling session
-receives source-only cleanup while its private runtime is preserved; outside active sessions it
-performs the full reset.
+Full apply requires all sessions exited and proven runtime quiescence. Review exact candidates and
+require a clean final preview. The owner's publication mode allows source cleanup for a proven live
+caller; do not manually remove leases, runtime databases/WAL, worktrees or unknown recovery.
 
-Project generation preserves source state. Its positive file selection excludes private process and
-runtime state, so generation never invokes reset or requires the source work cache to be empty.
+[Source inventory](../../../scripts/repository/source-inventory-policy.mjs) owns the precise
+retained credential/runtime classification. Preserve Git/history, source, dependencies, portable
+policy, `.auth`, admitted configuration/installation identity and valid exact publication evidence.
+Remove only owner-classified process/generated/disposable state; incompatible private formats are
+discarded under quiescence, never interpreted through a legacy reader. Product source is removed
+only when explicitly in scope.
 
-## Workflow
-
-1. Confirm this is the CodexRig Framework and inspect Git status, branch, and remotes.
-2. Preview the reset. Do not broaden deletion beyond reported framework process/generated state.
-3. Use publication mode for completed framework source cleanup. Apply full reset when the user
-   requests runtime sanitation and the repository is quiescent. The script removes
-   goal/slice/planning/review/handoff artifacts, optional active project context, project
-   transaction state, generated exports, now-empty placeholder directories, disposable
-   repository-root Codex runtime, obsolete mutable entries below `.codex/`, and disposable state
-   below `.codex/runtime/`. Removal remains identity-bound and fails closed on unsafe content. Full
-   reset holds the lifecycle lock and proves repository-wide runtime quiescence. It validates only
-   the current lease schema; an incompatible private lease is discarded with disposable runtime
-   rather than interpreted.
-4. Preserve `.git`, source code, dependencies, portable `.codex` policy and repository-local account
-   state under `.auth`. The
-   [source inventory owner](../../../scripts/repository/source-inventory-policy.mjs) defines the
-   native credential files retained in root CODEX_HOME; use that current classification rather than
-   maintaining another credential list here. Preserve root `config.toml`, `installation_id` and
-   exact current-schema, digest-valid successful publication evidence. Non-current or corrupt
-   evidence and non-current identity copies are disposable state and are never interpreted or
-   migrated; credential stores are not disposable runtime. Reset removes sessions, history,
-   memories, logs, databases and WAL files, caches, downloaded plugins/skills, snapshots, temporary
-   files, startup attestations, and stale locks. Never rewrite Git history implicitly.
-5. Ensure `docs/project.md` remains the concise, product-neutral central truth. Remove
-   product-specific source manually only when the user explicitly placed it in scope; the reset
-   script never guesses. Framework verification uses the internal read-only
-   `--verification-source-baseline` only while its verification lock is active. It ignores contained
-   runtime state and the valid bounded unfinished work cache of an observably active repository
-   session, but rejects other process/planning residue. Publication cleanup removes the work cache
-   and source residue without deleting the verified calling session. Full reset still removes
-   private runtime only after sessions exit.
-6. Run the reset preview again. After applicable reviews, the publication workflow invokes adaptive
-   `pnpm verify` admission once on the finished integrated state. Do not run a preliminary full
-   suite for reset, review or handoff. Manual verification and publisher retries reuse the same
-   successful per-check evidence, including unaffected results from a failed attempt. The
-   publication orchestrator repeats the applicable cleanup and preview after verification while
-   retaining exact verification evidence. Source pre-push runs the read-only publication baseline:
-   live caller runtime is allowed, source residue and competing writers are not.
-7. Commit or push only when the user explicitly requested those mutations. Project generation never
-   performs them or clears source context. When an active Codex process owns runtime, do not delete
-   open SQLite databases or WAL files from inside that process.
-
-Keep the result in code and configuration. Do not create reset reports, completion docs, or
-archives.
+Keep the manifest product-neutral. Verification's lock-bound read-only source baseline may retain
+valid unfinished context for an active session; completed source cleanup removes it. Reuse evidence
+and fill relevant gaps, without a preliminary full run for reset/review/handoff. No reset reports,
+archives, implicit Git history changes or additional product phase.

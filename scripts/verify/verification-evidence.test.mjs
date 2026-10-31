@@ -1,7 +1,7 @@
 /** Verifies verification evidence behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { after, test } from "node:test";
 import {
@@ -29,8 +29,102 @@ import {
   changedPathsSinceVerificationBasis,
 } from "./verification-git-basis.mjs";
 import { acquireVerificationSessionLock } from "./verification-session-lock.mjs";
+import { checkpointVerificationEvidenceRecord } from "./verification-evidence-record.mjs";
+import { verificationOutputFingerprint } from "./verification-check-inputs.mjs";
 
 after(cleanupTemporaryEvidenceRoots);
+
+test("complete publication evidence binds declared output state separately from source inputs", () => {
+  const root = fixture();
+  mkdirSync(path.join(root, "cache"));
+  writeFileSync(path.join(root, "cache/artifact"), "accepted");
+  const command = {
+    key: "artifact-build",
+    executable: "node",
+    args: ["emit.mjs"],
+    phase: "broad",
+    outputs: ["cache/artifact"],
+  };
+  const lock = acquireVerificationSessionLock({ repositoryRoot: root });
+  try {
+    recordSuccessfulFullEvidence({
+      root,
+      broadPlan: [command],
+      runtimeIdentity,
+      expectedInputs: inputs(root, { broadPlan: [command] }),
+      expectedGitBasis: captureVerificationGitBasis({ repositoryRoot: root }),
+      successfulCommandKeys: [command.key],
+      checks: [
+        {
+          key: command.key,
+          fingerprint: "a".repeat(64),
+          elapsedMs: 5,
+          completedAt: new Date().toISOString(),
+          outputFingerprint: verificationOutputFingerprint(command, { repositoryRoot: root }),
+        },
+      ],
+    });
+    assert.equal(validate(root, { broadPlan: [command] }).valid, true);
+    writeFileSync(path.join(root, "cache/artifact"), "altered");
+    assert.throws(
+      () => validate(root, { broadPlan: [command] }),
+      (error) =>
+        error.findings?.some((finding) => finding.includes("declared output state changed")),
+    );
+  } finally {
+    lock.release();
+  }
+});
+
+test("publication and pre-push reject expired external observations without replaying local checks", () => {
+  const root = fixture();
+  const externalPlan = [
+    {
+      key: "external",
+      executable: "node",
+      args: ["observation.mjs"],
+      phase: "preflight",
+      reuseMaxAgeMs: 60_000,
+    },
+  ];
+  const check = {
+    key: "external",
+    fingerprint: "a".repeat(64),
+    completedAt: new Date().toISOString(),
+    elapsedMs: 12,
+  };
+  const lock = acquireVerificationSessionLock({ repositoryRoot: root });
+  try {
+    const invocation = {
+      root,
+      broadPlan: externalPlan,
+      runtimeIdentity,
+      checks: [check],
+      expectedInputs: inputs(root, { broadPlan: externalPlan }),
+      expectedGitBasis: captureVerificationGitBasis({ repositoryRoot: root }),
+      successfulCommandKeys: ["external"],
+    };
+    recordSuccessfulFullEvidence(invocation);
+    assert.equal(validate(root, { broadPlan: externalPlan }).valid, true);
+    const expired = { ...check, completedAt: new Date(Date.now() - 120_000).toISOString() };
+    assert.throws(
+      () => recordSuccessfulFullEvidence({ ...invocation, checks: [expired] }),
+      /current external observations/u,
+    );
+    const record = JSON.parse(readFileSync(verificationEvidenceCachePath(root), "utf8"));
+    overwriteEvidence(
+      root,
+      `${JSON.stringify(checkpointVerificationEvidenceRecord(record, [expired], record.observedFiles))}\n`,
+    );
+    assert.throws(
+      () => validate(root, { broadPlan: externalPlan }),
+      (error) =>
+        error.findings?.some((finding) => finding.includes("external observation expired")),
+    );
+  } finally {
+    lock.release();
+  }
+});
 
 test("full evidence requires every command in the admitted broad plan to succeed", () => {
   const root = fixture();

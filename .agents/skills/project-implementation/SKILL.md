@@ -9,130 +9,46 @@ description:
 
 # Project Implementation
 
-This skill owns implementation planning, owner-level changes and rendered UI evidence. The current
-[instructions](../../../instructions.md) own general workflow, authority, coordination, capacity,
-publication and cleanup; read those applicable sections through `pnpm context:read` instead of
-loading the complete reference. Use `pnpm context:map` for navigation; an outline never substitutes
-for relevant evidence.
-
-## Establish The Task
-
-Follow [Task Scope And Completion](../../../instructions.md#task-scope-and-completion): identify the
-accepted result, write scope, exclusions and stopping condition. Complete startup reconstruction and
-ownership checks before writes. Apply the canonical
-[Planning Entry Gate](../../../instructions.md#planning-entry-gate), including its visible plan and
-[review/audit](../../../instructions.md#plan-content-and-review), before implementation. For a
-delegated slice, reuse the accepted parent plan and return progress or missing material decisions to
-the primary; resolve those decisions before dependent writes. Keep decisions in the plan or sole
-bounded context cache. The primary makes ordinary reversible implementation choices and continues
-necessary in-scope steps without repeat approval. A delegated assignment ends at its result; the
-primary integrates that handoff and continues the accepted outcome. Escalate only demonstrated
-blockers under the task contract.
-
-Read applicable requirements/design and affected current owners through bounded context navigation.
-A pending product follows definition intake; framework tooling is not product evidence. Material
-architecture or ownership changes use `$architecture-evolution`. Declare one writer per surface and
-apply canonical orchestration/capacity admission for useful independent assignments.
+Own root-cause implementation and meaningful assembled-flow evidence. Use the
+[task routes](../../../instructions.md#task-reading-routes) for authority, planning, coordination
+and closure; a delegated task inherits its accepted parent plan.
 
 ## Implement At The Owner
 
-1. Trace the behavior through its public entry, composition, owning module, contract and data/state
-   transition to the real consumers. Establish the failed invariant and root cause before writing.
-   Compare viable approaches in whole-project context and choose the smallest durable solution that
-   meets the confirmed acceptance boundary. No symptom guard, speculative abstraction or local
-   workaround.
-2. Run `pnpm stack:detect` before selecting/changing a product stack. The root Node.js/pnpm/mise
-   toolchain is harness tooling, not product evidence. Apply
-   [Requirement-Driven Technology](../../../instructions.md#requirement-driven-technology-selection)
-   and the architecture skill; current ecosystem evidence matters only when it can change the
-   choice. Keep actual integrated `Runtime and technology` in the manifest, not an invented product
-   stack.
-3. Keep cohesive modules independently improvable or replaceable: narrow public ports, private
-   internals, owned data/migrations and acyclic dependencies. A consumer never deep-imports another
-   module, mutates its data or silently owns its behavior. Separate domain/application,
-   UI/presentation, web, Identity and Access, API contracts/transport, adapters and infrastructure.
-   Use the current Product Roots and `scripts/verify/path-hygiene.mjs`; move stale files with
-   changed ownership. Infrastructure work follows
-   [Infrastructure As Code](../../../instructions.md#infrastructure-as-code): implement the selected
-   tool's real directory/file structure, owned inputs/state and verification together.
-4. Read the existing typed owners for white-label identity and branding (`config/product.json`),
-   delivery (`config/delivery.json`), tenant context/isolation (`config/tenancy.json`) and locales
-   (`config/localization.json`). Resolve relevant pending product choices before implementation.
-   Preserve applicable third-party licenses and the project owner's confirmed licensing terms. Use
-   the
-   [architecture and product contracts](../../../instructions.md#modular-architecture-parallel-ownership-and-integration)
-   for detailed boundaries; do not copy their implementation into this skill.
-5. Implement the largest coherent unblocked slice within the declared write set. Match the owning
-   stack's naming, layout, error, dependency and test conventions. Keep maintained executable
-   modules at or below 700 physical lines, splitting only at real responsibility/lifecycle
-   boundaries. Update format-native purpose and owning-boundary headers and non-trivial public-type
-   invariants with each move or contract change.
-6. Migrate an owned contract, its state and every producer/consumer together, then remove the
-   superseded schema, path, alias, test and documentation. Keep exactly one current interpretation.
-   Update README discovery links when durable documents are added, moved or retired; keep their
-   substantive content at the canonical owner. Verify a representative assembled flow across actual
-   boundaries; a locally passing module is insufficient when consumers no longer agree.
+Read requirements/design and trace the public entry through composition, contract, state and actual
+consumers. Establish a falsifiable failure hypothesis and the smallest discriminating observation.
+Read the relevant diagnostic; compare a working case before adding a fix. Sanitize observations and
+remove temporary probes. Repeated disproven hypotheses require reassessment, not stacked guards.
 
-## Debug From Evidence
+Choose the smallest complete owner-level repair. Use `$architecture-evolution` for material boundary
+changes and `pnpm stack:detect` before product-stack decisions. Harness tools are not product
+requirements. Preserve typed product/delivery/tenancy/localization owners, third-party obligations
+and existing design intent. Match the owning stack's layout, errors and lifecycle conventions.
 
-For a bug or failing check, first reproduce the observed failure and read the complete relevant
-diagnostic. Trace inputs, configuration and state across the affected boundaries; use sanitized
-observations, never credential values or bulk environment dumps. Compare a nearby working case and
-recent changes before concluding which invariant failed.
+Keep narrow public ports and private data/migrations; consumers must not deep-import or mutate
+another module's internals. Migrate one current contract and all consumers together, remove obsolete
+paths and update purpose/owner headers. Maintain executable modules at most 700 physical lines,
+splitting only at real responsibilities; schemas, generated output and test corpora are exempt.
 
-State one falsifiable root-cause hypothesis and the smallest discriminating check. A failed
-hypothesis returns to investigation; do not stack speculative fixes. Once supported, correct the
-canonical owner and prove the original failure plus affected consumers. Repeated failures that
-expose coupling reopen the architecture decision, not a ritual permission request for an already
-authorized fix. Temporary probes do not become permanent infrastructure without a current owner and
-need; remove them after use.
+Use installed runtimes and shared browser payloads directly. Private profiles and mutable run data
+belong in owned scratch, with cleanup/recovery on failure as well as success. Preserve only compact
+checkpoints and required references, not copies of entire tool homes. Before repeating external or
+stateful work apply
+[failure recovery](../../../instructions.md#deployment-and-qualification-failure-recovery).
 
-Use the inherited system temporary directory for disposable fixtures and probes, with terminal
-cleanup. Follow
-[Temporary Storage](../../../instructions.md#temporary-data-and-storage-housekeeping) for execution
-scopes, interrupted-run recovery and retained evidence; do not accumulate bulk output in persistent
-`.tmp/`, `tmp/` or private account/tool state. Load/qualification runners use admitted installed
-Node/Python/SDK and browser paths directly, including replicas. Use the shared browser payload paths
-from the common tool environment, with profiles/cookies in private scratch or their explicit
-recovery owner. Keep only mutable run data in scratch and compact checkpoints at the existing
-recovery owner; never retain a complete runtime/tool-home copy merely to resume. Test cleanup on
-failure/abrupt exit as well as success when changing a run producer, and use the native
-reference-aware collectors for reusable payloads.
+## Select Evidence And Finish
 
-For deployment and qualification failures, follow
-[Failure Recovery](../../../instructions.md#deployment-and-qualification-failure-recovery).
-Reconcile the original state before repeating a mutation with an unknown outcome. Preserve failed
-status and notifications; local repair evidence does not establish live acceptance. Authorized
-publication uses [Delegated Release](../../../instructions.md#delegated-release); candidate handoff
-does not stop development in independent checkouts.
+For material defects prove the original failure and affected consumers through shipped code. Mocks
+may isolate external systems, not replace the invariant under test. Use realistic existing cases;
+editorial edits do not need implementation-mirroring tests. Distinguish fixture, rendered, native
+and real-target evidence.
 
-## Rendered UI Work
+Inspect `pnpm verify:changed -- --print-plan`, reuse valid results and run only necessary checks.
+Missing complete coverage does not start a development full run. Apply
+[documentation currency](../../../instructions.md#documentation-currency), report protected-owner
+corrections to the primary, and use `$system-coherence` plus relevant specialist review at
+acceptance. `$task-quality` composes that evidence without another blanket pass. Continue unfinished
+authorized work and stop when acceptance is met.
 
-For interactive surface work, read [Rendered UI Implementation](references/rendered-ui.md). Other
-work does not load that conditional workflow.
-
-## Verify And Accept
-
-Apply [Test Strategy](../../../instructions.md#test-strategy): for material behavior corrections,
-observe the original regression before the fix and cover it in the existing owner suite. Prefer
-realistic lifecycle evidence; justify narrow tests by a concrete boundary and proving value.
-Editorial changes need no implementation-mirroring test. Distinguish source, fixture, rendered,
-native and real-target evidence. Exercise critical internal contracts with the shipped code and
-complete consumer validator; simulate external boundaries without mocking the invariant to success.
-
-Apply [Documentation Currency](../../../instructions.md#documentation-currency) before slice
-handoff: reconcile changed claims, resolved tasks/blockers and scoped evidence at assigned owners;
-give the primary exact protected-document corrections or the diff-based no-impact reason. The
-primary integrates them before acceptance. Use `$system-coherence` for a non-trivial slice and
-`$task-quality` at the acceptance boundary; specialist reviews apply only to changed risks. Reuse
-their evidence in one primary review and fresh audit, including the canonical whole-repository
-effectiveness, efficiency and quality assessment.
-
-Apply
-[Maintenance Scope And Verification](../../../instructions.md#maintenance-scope-and-verification)
-before commands. Inspect `pnpm verify:changed -- --print-plan` and iterate with necessary focused
-checks. A missing complete basis or changed test plan never requests a full development run. Reuse
-successful unaffected results after repairs and handoffs; complete verification belongs once at the
-publication boundary on the integrated state. Preserve Dev scheduling and actual publication gates.
-Continue only unfinished accepted work; stop when its completion condition is satisfied. Canonical
-capacity, provenance, settlement and terminal-handover rules remain binding.
+For interactive surfaces read [Rendered UI Implementation](references/rendered-ui.md); other work
+does not load that conditional workflow.

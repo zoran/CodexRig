@@ -8,7 +8,13 @@ import { fileURLToPath } from "node:url";
 import { deliveryReconciliationPlan } from "../docs/delivery-manifest.mjs";
 import { formatContextError, sanitizeMultilineForTerminal } from "../terminal/terminal-output.mjs";
 import { verificationChildEnvironment } from "../verify/verification-runtime-identity.mjs";
-import { acquireVerificationSessionLock } from "../verify/verification-session-lock.mjs";
+import {
+  acquireVerificationSessionLock,
+  assertVerificationSessionLockOwned,
+} from "../verify/verification-session-lock.mjs";
+import { readVerificationConfiguration } from "../verify/verification-configuration.mjs";
+import { captureVerificationGitBasis } from "../verify/verification-git-basis.mjs";
+import { discoverProductLayout } from "../repository/product-roots.mjs";
 import { reconcileRepositoryWorktreeState } from "../repository/worktree-recovery.mjs";
 import { inspectRepositoryWorktrees } from "../repository/worktree-recovery.mjs";
 import { reconcileToolStorage } from "../deps/tool-storage-housekeeping.mjs";
@@ -75,27 +81,120 @@ function runNode(relativeScript, args = []) {
   if (output) console.log(output);
 }
 
-function runRepositoryHealthChecks({ online }) {
-  const checks = [
-    ["scripts/verify/delivery-environments.mjs", []],
-    ["scripts/verify/docs.mjs", []],
-    ["scripts/verify/identity-access.mjs", []],
-    ["scripts/verify/localization.mjs", []],
-    ["scripts/verify/tenant-isolation.mjs", []],
-    ["scripts/verify/white-label.mjs", []],
-    ["scripts/verify/path-hygiene.mjs", []],
-    ["scripts/verify/patterns.mjs", []],
-    ["scripts/verify/stack-standards.mjs", []],
-    ["scripts/verify/secrets.mjs", []],
-    ["scripts/verify/dependencies.mjs", []],
-    ["scripts/verify/skill-paths.mjs", []],
-    ["scripts/setup/validate-codex-model-policy.mjs", []],
-    ["scripts/setup/tooling-doctor.mjs", online ? ["--online"] : []],
-    ["scripts/verify/repository-smoke.mjs", []],
-    ["scripts/verify/format-project.mjs", ["--check"]],
-  ];
-  for (const [relativeScript, args] of checks) runNode(relativeScript, args);
-  if (online) runNode("scripts/deps/report.mjs");
+/** Composes partial health evidence under the caller's lock; never establishes full acceptance. */
+export async function runRepositoryHealthChecks({
+  online = false,
+  root = repositoryRoot,
+  runtimeIdentity,
+  checkState = runNode,
+} = {}) {
+  assertVerificationSessionLockOwned({ repositoryRoot: root });
+  // The verifier loads its registry at import time; storage-only recovery must stay independent.
+  const [evidence, checkInputs, executor, workspace] = await Promise.all([
+    import("../verify/verification-evidence.mjs"),
+    import("../verify/verification-check-inputs.mjs"),
+    import("../verify/verification-executor.mjs"),
+    import("../verify/workspace-verification.mjs"),
+  ]);
+  const {
+    currentVerificationEvidenceInputs,
+    readVerificationCheckpoint,
+    recordVerificationCheckpoint,
+  } = evidence;
+  const { pendingVerificationPlan, verificationCheckFingerprints } = checkInputs;
+  const { runPlan } = executor;
+  const { discoverWorkspaceManifests } = workspace;
+  const configuration = readVerificationConfiguration(root);
+  const selected = [
+    "delivery-environments",
+    "docs",
+    "identity-access",
+    "localization",
+    "tenant-isolation",
+    "white-label",
+    "path-hygiene",
+    "patterns",
+    "surface-quality",
+    "secrets",
+    "dependencies",
+    "skills",
+    "repository-smoke",
+    "format",
+  ].map((key) => {
+    const command = configuration.commands.find((entry) => entry.key === key);
+    if (!command)
+      throw new Error(`Housekeeping requires the canonical verification check: ${key}.`);
+    return command;
+  });
+  const expectedGitBasis = captureVerificationGitBasis({ repositoryRoot: root });
+  const evidenceOptions = { root, runtimeIdentity, broadPlan: selected };
+  const expectedInputs = currentVerificationEvidenceInputs(evidenceOptions);
+  const checkpoint = readVerificationCheckpoint({ root });
+  const relativePaths = expectedInputs.sourceFiles.map((file) => file.path);
+  const fingerprints = verificationCheckFingerprints({
+    commands: selected,
+    inputs: expectedInputs,
+    configuration,
+    repositoryRoot: root,
+    workspaceManifests: discoverWorkspaceManifests({ repositoryRoot: root, relativePaths }),
+    productLayout: discoverProductLayout({ repositoryRoot: root, relativePaths }),
+  });
+  // Other units remain available for their consumers to validate against their own inputs.
+  const checks = new Map(checkpoint.checks.map((check) => [check.key, check]));
+  const pending = pendingVerificationPlan(
+    {
+      options: { mode: "housekeeping", printPlan: false },
+      admission: { mode: "targeted", reason: "repository health after owned-state reconciliation" },
+      verificationScope: "housekeeping health only; publication coverage remains separate",
+      classifiedPaths: [],
+      readOnlyCommands: selected,
+      workspaceCommands: [],
+    },
+    fingerprints,
+    checkpoint.checks,
+    { repositoryRoot: root },
+  );
+  for (const key of pending.evidence.invalidatedKeys) checks.delete(key);
+  let failure;
+  try {
+    await runPlan(pending, {
+      repositoryRoot: root,
+      onResult(result) {
+        const key = result.command.key;
+        if (result.status === 0 && !result.error && !result.diagnosticRequired)
+          checks.set(key, {
+            key,
+            fingerprint: fingerprints.get(key),
+            completedAt: new Date().toISOString(),
+            elapsedMs: result.elapsedMs,
+            ...(result.outputFingerprint ? { outputFingerprint: result.outputFingerprint } : {}),
+          });
+        else checks.delete(key);
+      },
+    });
+  } catch (error) {
+    failure = error;
+  }
+  if (
+    failure ||
+    pending.readOnlyCommands.length ||
+    JSON.stringify(checkpoint.sourceFiles) !== JSON.stringify(expectedInputs.sourceFiles)
+  )
+    recordVerificationCheckpoint({
+      ...evidenceOptions,
+      expectedInputs,
+      expectedGitBasis,
+      failed: Boolean(failure),
+      checks: [...checks.values()].filter(
+        (check) =>
+          !fingerprints.has(check.key) || fingerprints.get(check.key) === check.fingerprint,
+      ),
+    });
+  if (failure) throw failure;
+  // Installation/model admission and external freshness observe actual state on every invocation.
+  await checkState("scripts/setup/validate-codex-model-policy.mjs", []);
+  await checkState("scripts/setup/tooling-doctor.mjs", online ? ["--online"] : []);
+  if (online) await checkState("scripts/deps/report.mjs", []);
 }
 
 function failFromPlan(plan) {
@@ -178,7 +277,7 @@ export async function runRepositoryHousekeeping(
     }
     failFromPlan(plan);
     if (options.apply) runNode("scripts/verify/format-project.mjs", ["--write"]);
-    runRepositoryHealthChecks({ online: options.online });
+    await runRepositoryHealthChecks({ online: options.online });
     runStorageHousekeeping({ root });
     console.log(
       `Repository housekeeping passed in ${options.apply ? "apply" : "check"} mode; no deployment or external environment was changed.`,

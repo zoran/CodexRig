@@ -249,24 +249,30 @@ test("publication explains a missing upstream before changing source or running 
 });
 
 test("portable publish preserves redundant native runtime excludes", async (t) => {
-  for (const pattern of ["session_index.jsonl", "/session_index.jsonl"])
+  for (const pattern of [
+    "session_index.jsonl",
+    "/session_index.jsonl",
+    "session_index.jsonl.lock",
+    "/session_index.jsonl.lock",
+  ])
     await t.test(pattern, async (t) => {
       const f = fixture(t);
+      const nativeFile = pattern.replace(/^\//u, "");
       const excludes = `# Native runtime exclusion\r\n${pattern}\r\n`;
-      f.write(".gitignore", ".codex/runtime/\nhistory.jsonl\n.auth/\n/session_index.jsonl\n");
+      f.write(".gitignore", `.codex/runtime/\nhistory.jsonl\n.auth/\n/${nativeFile}\n`);
       f.write(".git/info/exclude", excludes);
-      f.write("session_index.jsonl", "retained private native index\n");
+      f.write(nativeFile, "retained private native state\n");
       f.write("source.txt", "verified product\n");
       const result = await f.publish();
       assert.equal(
         f.git("ls-remote", "origin", "refs/heads/work/feature"),
         `${result.commit}\trefs/heads/work/feature`,
       );
-      assert.equal(f.git("ls-tree", "--name-only", "HEAD", "session_index.jsonl"), "");
+      assert.equal(f.git("ls-tree", "--name-only", "HEAD", nativeFile), "");
       assert.equal(readFileSync(path.join(f.root, ".git/info/exclude"), "utf8"), excludes);
       assert.equal(
-        readFileSync(path.join(f.root, "session_index.jsonl"), "utf8"),
-        "retained private native index\n",
+        readFileSync(path.join(f.root, nativeFile), "utf8"),
+        "retained private native state\n",
       );
     });
 });

@@ -201,6 +201,8 @@ test("empty generation excludes source capabilities, private markers and new uns
       "scripts/goals/publication-command.test.mjs",
       "scripts/goals/project-publication-integration.test.mjs",
       "scripts/goals/project-publication-verification.test.mjs",
+      "scripts/goals/project-publication-reuse.test.mjs",
+      "scripts/goals/project-publication-inputs.test.mjs",
       "scripts/goals/release-candidate.test.mjs",
       "scripts/repository/git-publication-identity.test.mjs",
       "scripts/repository/publication-session.test.mjs",
@@ -249,7 +251,6 @@ test("generated tools and selected checks operate after the source checkout beco
   seedPublicPackageCache(generated);
   for (const args of [
     ["--experimental-vm-modules", "scripts/setup/validate-static-module-imports.mjs"],
-    ["scripts/verify/repository-smoke.mjs"],
     ["scripts/verify/docs.mjs"],
     ["scripts/setup/tooling-doctor.mjs"],
     ["--test", "scripts/setup/runtime-safety.test.mjs"],
@@ -264,10 +265,9 @@ test("generated tools and selected checks operate after the source checkout beco
     "pnpm",
   );
   assert.equal(installed.status, 0, installed.stdout + installed.stderr);
-  // This exercises the complete generated suite, including portable publication regressions.
-  // Publication lifecycle and evidence scenarios run in independent files, allowing the existing
-  // scheduler to parallelize them within this unchanged nested-suite allowance.
-  const verified = run(generated, ["verify"], "pnpm", 240_000);
+  // Exercise the public generated entry without replaying the portable suites already owned by
+  // their regression files. This project intentionally has no Git/publication basis yet.
+  const verified = run(generated, ["verify:changed", "--", "--check", "repository-smoke"], "pnpm");
   assert.equal(
     verified.status,
     0,

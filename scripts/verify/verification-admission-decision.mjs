@@ -91,6 +91,12 @@ export function decideVerificationAdmission({
   const focusedCommandOwners = ownersByPath
     .filter((entry) => entry.ownerKeys.length > 0)
     .map((entry) => ({ ownerKeys: entry.ownerKeys, path: entry.path }));
+  const unresolvedPaths = uniqueSorted([...unknownPaths, ...uncoveredFullRelevantPaths]);
+  const coverageBlockedReason = unresolvedPaths.length
+    ? `Unmapped verification inputs: ${unresolvedPaths.join(", ")}. Add their exactConsumers or testConsumers binding in .codex/verification.json; no complete coverage can be claimed.`
+    : changed.incomplete
+      ? `Changed inputs cannot be reconstructed: ${changed.reason}. Repair the source/Git scope before requesting complete coverage.`
+      : "";
 
   let mode = "targeted";
   let reason = "all full-relevant delta paths have focused verifier owners";
@@ -139,6 +145,7 @@ export function decideVerificationAdmission({
 
   return {
     coveredBroadRisks,
+    coverageBlockedReason,
     focusedCommandOwners,
     fullRelevantPaths,
     mode,
