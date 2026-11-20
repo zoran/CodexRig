@@ -24,9 +24,9 @@ import test from "node:test";
 import { format } from "prettier";
 import {
   deliveryConfigurationPath,
-  initialDeliveryConfiguration,
   parseDeliveryConfiguration,
 } from "../contracts/delivery-configuration.mjs";
+import { initialDeliveryConfiguration } from "../framework/initial-project-configuration.mjs";
 import {
   deliveryManifestEndMarker,
   deliveryManifestStartMarker,

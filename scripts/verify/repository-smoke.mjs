@@ -9,6 +9,7 @@ import {
   candidateMiseLockFindings,
 } from "../contracts/mise-toolchain-configuration.mjs";
 import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
+import { readPnpmToolchainGraph } from "../deps/pnpm-toolchain-graph.mjs";
 import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 import { startupExecutableClosurePaths } from "../setup/startup-executable-closure.mjs";
 import { validateCodexConfig } from "../setup/validate-codex-config.mjs";
@@ -113,6 +114,11 @@ if (
 
 const miseLock = readRelative(".codex/mise.lock");
 failures.push(...candidateMiseLockFindings(miseLock, miseValidation.versionLists));
+try {
+  readPnpmToolchainGraph(root, miseLock, miseVersions.pnpm);
+} catch (error) {
+  failures.push(error.message);
+}
 
 if (failures.length) {
   console.error("Project tooling verification failed:");

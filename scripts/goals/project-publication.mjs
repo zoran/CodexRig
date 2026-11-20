@@ -69,6 +69,7 @@ async function runPublicationGate({ root, script, args = [], output }) {
     root,
     env: publicationEnvironment(root),
     output,
+    verificationProgress: script === "verify",
   });
 }
 

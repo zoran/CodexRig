@@ -2,11 +2,13 @@
 import { inputRecord, readOptionalFile } from "../deps/dependency-inputs.mjs";
 import { serializeCanonicalJson } from "../filesystem/repository-files.mjs";
 import { validateMinimalMiseTools } from "../contracts/mise-toolchain-configuration.mjs";
+import { pnpmGraphPaths } from "./pnpm-toolchain-graph.mjs";
 
 export const toolchainConfigurationPaths = [
   ".codex/toolchain.json",
   ".codex/mise.toml",
   ".codex/mise.lock",
+  ...pnpmGraphPaths,
   ".github/workflows/ci.yml",
   ".gitlab-ci.yml",
 ];

@@ -36,6 +36,7 @@ import {
   validCodexSessionId,
 } from "../repository/runtime-session-lease.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
+import { pnpmGraphPaths } from "../deps/pnpm-toolchain-graph.mjs";
 import { inspectProcessIdentity } from "../repository/runtime-process-identity.mjs";
 import { startupExecutableClosurePaths } from "./startup-executable-closure.mjs";
 import { validateStartupRuntimeExecutables } from "./startup-runtime-executables.mjs";
@@ -57,6 +58,7 @@ const fixedStartupAttestedInputs = Object.freeze([
   ".codex/tooling.json",
   ".codex/mise.lock",
   ".codex/mise.toml",
+  ...pnpmGraphPaths,
   "package.json",
   "pnpm-lock.yaml",
   "scripts/setup/tooling-doctor.mjs",

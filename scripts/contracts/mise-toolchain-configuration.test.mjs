@@ -4,7 +4,8 @@ import test from "node:test";
 import {
   candidateMiseLockFindings,
   nativeNodeArtifactUrls,
-  nativePnpmArtifactUrls,
+  validateMinimalMiseTools,
+  pnpmMiseAlias,
 } from "./mise-toolchain-configuration.mjs";
 
 const pins = { node: ["24.21.0"], pnpm: ["11.28.0"] };
@@ -36,7 +37,7 @@ function nativeBlock(tool, version, urls) {
 function candidate() {
   return (
     nativeBlock("node", pins.node[0], nodeArtifacts) +
-    nativeBlock("pnpm", pins.pnpm[0], nativePnpmArtifactUrls(pins.pnpm[0]))
+    `[[tools.pnpm]]\nversion = "${pins.pnpm[0]}"\nbackend = "npm:pnpm"\naube = { path = ".mise/locks/pnpm/current", digest = "${checksum}" }\n`
   );
 }
 
@@ -58,80 +59,26 @@ test("candidate admission rejects a Node source archive in place of a missing mu
   );
 });
 
-test("native pnpm release admission retains all six exact supported artifact URLs", () => {
-  const release = "https://github.com/pnpm/pnpm/releases/download/v11.28.0";
-  assert.deepEqual(nativePnpmArtifactUrls("11.28.0"), {
-    "linux-arm64": `${release}/pnpm-linux-arm64.tar.gz`,
-    "linux-arm64-musl": `${release}/pnpm-linux-arm64-musl.tar.gz`,
-    "linux-x64": `${release}/pnpm-linux-x64.tar.gz`,
-    "linux-x64-musl": `${release}/pnpm-linux-x64-musl.tar.gz`,
-    "macos-arm64": `${release}/pnpm-darwin-arm64.tar.gz`,
-    "windows-x64": `${release}/pnpm-win32-x64.zip`,
-  });
-  assert.ok(Object.isFrozen(nativePnpmArtifactUrls("11.28.0")));
-  assert.throws(() => nativePnpmArtifactUrls("11.28.0/other"), /version/iu);
-});
-
-test("candidate admission rejects absent and incomplete non-host pnpm platforms", () => {
+test("pnpm uses one portable backend and integrity-bound graph", () => {
   const content = candidate();
   assert.deepEqual(candidateMiseLockFindings(content, pins), []);
-  const armMusl = artifactBlock(
-    "pnpm",
-    "linux-arm64-musl",
-    nativePnpmArtifactUrls(pins.pnpm[0])["linux-arm64-musl"],
-  );
-  assert.match(
-    candidateMiseLockFindings(content.replace(armMusl, ""), pins).join("\n"),
-    /pnpm platforms must match/u,
-  );
-  const incomplete =
-    '[tools.pnpm."platforms.linux-arm64-musl"]\nprovenance = "github-attestations"\n';
-  const findings = candidateMiseLockFindings(content.replace(armMusl, incomplete), pins).join("\n");
-  assert.match(findings, /pnpm linux-arm64-musl.*SHA-256/u);
-  assert.match(findings, /pnpm linux-arm64-musl.*official versioned artifact/u);
-  assert.match(findings, /pnpm linux-arm64-musl.*official GitHub asset/u);
-});
-
-test("candidate admission preserves native artifact origin, integrity, provenance and uniqueness", () => {
-  const content = candidate();
-  const target = artifactBlock(
-    "pnpm",
-    "linux-arm64",
-    nativePnpmArtifactUrls(pins.pnpm[0])["linux-arm64"],
-  );
-  for (const [label, invalid] of [
-    ["checksum", target.replace(checksum, `sha512:${"1".repeat(64)}`)],
-    ["URL", target.replace("https://github.com/", "https://mirror.example/")],
-    ["provenance", target.replace('provenance = "github-attestations"\n', "")],
-    ["API", target.replace("/releases/assets/12345", "/releases/assets/0")],
-    ["platform ownership", target.replace("[tools.pnpm.", "[tools.node.")],
-    ["duplicate platform", target + target],
-    ...["checksum", "url", "url_api", "provenance"].map((field) => {
-      const line = target.split("\n").find((entry) => entry.startsWith(`${field} = `));
-      return [`duplicate ${field}`, target + line + "\n"];
-    }),
-  ]) {
-    assert.notDeepEqual(
-      candidateMiseLockFindings(content.replace(target, invalid), pins),
-      [],
-      label,
-    );
-  }
-  for (const field of ["version", "backend"]) {
-    const line = field === "version" ? 'version = "11.28.0"' : 'backend = "aqua:pnpm/pnpm"';
-    assert.notDeepEqual(
-      candidateMiseLockFindings(content.replace(line, `${line}\n${line}`), pins),
-      [],
-      `duplicate ${field}`,
-    );
-  }
-  assert.notDeepEqual(
-    candidateMiseLockFindings(
-      content.replace('backend = "aqua:pnpm/pnpm"', 'backend = "npm:pnpm"'),
-      pins,
-    ),
-    [],
-  );
+  for (const invalid of [
+    content.replace('backend = "npm:pnpm"', 'backend = "aqua:pnpm/pnpm"'),
+    content.replace('path = ".mise/locks/pnpm/current"', 'path = "../../foreign"'),
+    content.replace(`digest = "${checksum}"`, 'digest = "unchecked"'),
+    content + artifactBlock("pnpm", "linux-x64", "https://example.test/pnpm"),
+    content.replace('backend = "npm:pnpm"', 'backend = "npm:pnpm"\nbackend = "npm:pnpm"'),
+    content.replace('version = "11.28.0"', 'version = "11.28.0"\nversion = "11.28.0"'),
+  ])
+    assert.notDeepEqual(candidateMiseLockFindings(invalid, pins), [], invalid);
+  const config = `[tools]\nnode = "24.21.0"\npnpm = "11.28.0"\n${pnpmMiseAlias}\n`;
+  assert.deepEqual(validateMinimalMiseTools(config).errors, []);
+  for (const invalid of [
+    config.replace("npm:pnpm", "npm:other"),
+    config + pnpmMiseAlias,
+    config.replace('backend = "npm:pnpm"', 'backend = "npm:pnpm"\npostinstall = "payload"'),
+  ])
+    assert.notDeepEqual(validateMinimalMiseTools(invalid).errors, []);
 });
 
 test("candidate admission preserves secondary runtimes and product tool lock ownership", () => {

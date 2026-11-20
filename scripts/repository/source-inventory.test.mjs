@@ -99,6 +99,9 @@ test("Git-less inventory excludes private root Codex state before directory desc
   write(root, ".codex/config.toml", "portable config\n");
   write(root, ".codex/auth.json", "private auth\n");
   write(root, "auth.json", "private auth\n");
+  write(root, "auth.json.lock", "private auth lock\n");
+  write(root, "auth.lock", "private auth lock\n");
+  write(root, "tui-thread-reference-capabilities/current-thread", "private capability\n");
   write(root, "sessions/deep/private-thread.jsonl", "private session\n");
   write(root, "cache/private.bin", "private cache\n");
   write(root, "tui-luna-reserve/capacity.json", "private native capacity\n");
@@ -318,18 +321,23 @@ test("root runtime directory rules also ignore same-name symlinks", () => {
 
 test("Codex runtime names are reserved only at root and remain valid inside product source", () => {
   const root = temporaryRoot("source-profile-inventory-");
+  const productPaths = [
+    ...["cache", "plugins", "rules", "sessions", "skills"].map((name) => `src/${name}/index.ts`),
+    "src/auth.json.lock",
+    "src/auth.lock",
+    "src/tui-thread-reference-capabilities/current-thread",
+  ];
   write(root, ".gitignore", readFileSync(path.join(repositoryRoot, ".gitignore"), "utf8"));
   write(root, "README.md", "portable\n");
-  for (const name of ["cache", "plugins", "rules", "sessions", "skills"]) {
-    write(root, `src/${name}/index.ts`, `export const ${name}ProductPath = true;\n`);
+  for (const relativePath of productPaths) {
+    write(root, relativePath, "export const productPath = true;\n");
   }
   initializeGit(root);
   const added = git(root, ["add", "."]);
   assert.equal(added.status, 0, added.stderr);
   const active = listActiveFiles({ root });
   const portable = listPortableTransferFiles({ root });
-  for (const name of ["cache", "plugins", "rules", "sessions", "skills"]) {
-    const relativePath = `src/${name}/index.ts`;
+  for (const relativePath of productPaths) {
     assert.equal(isRepositoryCodexHomePath(relativePath), false, relativePath);
     assert.equal(active.includes(relativePath), true, relativePath);
     assert.equal(portable.includes(relativePath), true, relativePath);

@@ -142,7 +142,7 @@ async function main() {
   }
   const options = parseArgs(argv);
   const execute = async () => {
-    if (options.check) {
+    if (options.testNamePattern) {
       await runPlan(buildPlan(options));
       console.log("Reproduction completed; successful acceptance evidence was not changed.");
       return;

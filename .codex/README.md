@@ -8,6 +8,7 @@ Tracked configuration is portable; native runtime and account state are private.
 | `hooks.json`                               | Trusted lifecycle-hook admission; the canonical controller binds execution. |
 | `tooling.json`                             | Startup and Git-provider selection.                                         |
 | `toolchain.json`, `mise.toml`, `mise.lock` | Verified tool artifacts and pinned versions.                                |
+| `.mise/locks/pnpm/current/`                | Portable pnpm package graph bound by `mise.lock`.                           |
 | `verification.json`                        | Commands, input consumers, shared execution inputs and output contracts.    |
 
 Exact schemas belong to their validators. Configuration validation does not prove model obedience.

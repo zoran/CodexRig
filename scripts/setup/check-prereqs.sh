@@ -99,7 +99,7 @@ Canonical interactive startup performs maintenance before session selection:
   bash -p scripts/setup/start-codex.sh
 
 Locked runtime platforms: Linux x64/arm64 (glibc and musl), macOS arm64, and Windows x64.
-Intel macOS is not supported because pnpm 11 has no Darwin x64 standalone artifact.
+Intel macOS is outside the reviewed native bootstrap distribution matrix.
 EOF
   printf '\nRuntime issues:\n' >&2
   printf '  - %s\n' "${runtime_issues[@]}" >&2

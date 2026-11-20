@@ -1,5 +1,6 @@
 /** Verifies dependency policy behavior for the dependency and toolchain maintenance boundary. */
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -37,8 +38,16 @@ import {
 } from "../repository/pnpm-workspace-manifests.mjs";
 import { trustedPnpmCommand } from "./trusted-pnpm-command.mjs";
 import { inspectRuntimeLifecycleLock } from "../repository/runtime-session-lease.mjs";
+import {
+  projectManagedToolLayout,
+  sealProjectToolBundle,
+} from "../repository/project-tool-executables.mjs";
+import { toolingRoot } from "../filesystem/repository-files.mjs";
+import { pnpmGraphPaths } from "./pnpm-toolchain-graph.mjs";
 
 const transactionRoots = [];
+const installed = projectManagedToolLayout(toolingRoot);
+const installedPnpm = installed.pnpm.executable;
 const originalToolStorage = process.env.PROJECT_TOOL_STORAGE_HOME;
 const fixtureToolStorage = mkdtempSync(path.join(os.tmpdir(), "dependency-user-tools-"));
 transactionRoots.push(fixtureToolStorage);
@@ -55,6 +64,32 @@ const sourceToolchain = readFileSync(
 function writeCompatibility(root) {
   mkdirSync(path.join(root, ".codex"), { recursive: true });
   writeFileSync(path.join(root, ".codex", "toolchain.json"), sourceToolchain, "utf8");
+}
+
+// Exercise native resolution and real pnpm with isolated package storage, without copying runtimes.
+function prepareNativeTools(root) {
+  for (const file of [".codex/mise.toml", ".codex/mise.lock", ...pnpmGraphPaths]) {
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    writeFileSync(path.join(root, file), readFileSync(path.join(toolingRoot, file)));
+  }
+  const launcher = (executable) =>
+    `#!/bin/sh\nexec '${executable.replaceAll("'", "'\\''")}' "$@"\n`;
+  const write = (file, content) => {
+    mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    writeFileSync(file, content, { mode: 0o755 });
+  };
+  const matrix = JSON.parse(sourceToolchain);
+  const miseLauncher = launcher(installed.mise.executable);
+  const initial = projectManagedToolLayout(root, matrix);
+  matrix.ci.miseBinarySha256[path.basename(initial.mise.directory)] = createHash("sha256")
+    .update(miseLauncher)
+    .digest("hex");
+  writeFileSync(path.join(root, ".codex/toolchain.json"), JSON.stringify(matrix));
+  const layout = projectManagedToolLayout(root, matrix);
+  write(layout.mise.executable, miseLauncher);
+  sealProjectToolBundle(root, layout.mise.directory, layout.mise);
+  write(layout.node.executable, launcher(installed.node.executable));
+  write(layout.pnpm.executable, launcher(installedPnpm));
 }
 
 async function waitForLifecycle(predicate, label, timeoutMilliseconds = 5_000) {
@@ -112,7 +147,7 @@ function transactionFixture() {
   return root;
 }
 
-registerCompatibleInstallationTests(transactionFixture);
+registerCompatibleInstallationTests(transactionFixture, prepareNativeTools);
 
 test("trusted dependency paths reject executable pnpm configuration before pnpm can run", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "dependency-pnpmfile-boundary-"));
@@ -170,7 +205,15 @@ for (const candidate of [null, "12.0.0-beta.1"])
       "bin",
       "node",
     );
-    const trusted = path.join(toolRoot, "installs", "pnpm", current.pnpm.version, "pnpm");
+    const trusted = path.join(
+      toolRoot,
+      "installs",
+      "pnpm",
+      `${current.pnpm.version}~aube~fixture`,
+      "node_modules",
+      ".bin",
+      "pnpm",
+    );
     const magicPathDecoy = path.join(
       toolRoot,
       "external",
@@ -200,6 +243,7 @@ for (const candidate of [null, "12.0.0-beta.1"])
         COREPACK_HOME: path.join(root, "untrusted-corepack"),
       },
       nodeExecutable,
+      pnpmExecutable: trusted,
       spawn(executable, args, options) {
         calls.push({ executable, args, environment: options.env });
         return { status: 0, stdout: `${current.pnpm.version}\n`, stderr: "" };
@@ -688,6 +732,7 @@ test("dependency plans reject hash-valid output destinations outside the discove
 
 test("dependency preview isolates and freezes repository-local pnpm inputs", () => {
   const { root, patchContent, tarballPath } = localInputTransactionFixture();
+  prepareNativeTools(root);
   const manifestPath = path.join(root, "package.json");
   const lockfilePath = path.join(root, "pnpm-lock.yaml");
   const localDirectoryPath = path.join(root, "vendor/local-directory/index.js");

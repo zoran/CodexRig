@@ -12,6 +12,8 @@ Read instructions.md#task-reading-routes and
 instructions.md#subagent-orchestration-and-integration-authority for binding scope, capacity,
 peer coordination and handoff rules. Follow the parent's accepted assignment; report overlap
 or missing authority. Never delegate or spawn another agent.
+At least every two active minutes report the open acceptance condition, new evidence and next action
+to the primary under instructions.md#long-session-course-checks. Report drift or repeated work early.
 
 Return the result, evidence, changed files, document impact, risks and next action to the primary;
 then wait for scope closure or a bounded follow-up. A provenance-valid critical-drain request

@@ -61,7 +61,7 @@ export function projectToolPaths(root) {
 }
 
 /** Prepares private storage after the caller's inventory/admission, without resetting any account. */
-export function prepareProjectToolDirectories(root) {
+export function prepareProjectToolDirectories(root, { inherited = process.env } = {}) {
   const locations = projectToolPaths(root);
   for (const directory of [
     path.join(locations.root, projectAccountStateDirectory),
@@ -82,7 +82,7 @@ export function prepareProjectToolDirectories(root) {
       throw new Error("Project tool storage must be private and owned by the current developer.");
   }
   assertGitCredentialStore(locations);
-  prepareMiseTracking(root);
+  prepareMiseTracking(root, { inherited });
   // Umask is process state, not an environment variable. Installers and their descendants
   // must not inherit a host's group/other write allowance; retain stricter caller restrictions.
   process.umask(process.umask() | 0o022);

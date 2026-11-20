@@ -4,17 +4,17 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import {
-  deliveryConfigurationPath,
-  initialDeliveryConfiguration,
-} from "../contracts/delivery-configuration.mjs";
+import { deliveryConfigurationPath } from "../contracts/delivery-configuration.mjs";
+import { initialDeliveryConfiguration } from "../framework/initial-project-configuration.mjs";
 import { renderDeliveryManifestProjection } from "./delivery-manifest.mjs";
 import { projectDocumentOwners } from "./project-document-owners.mjs";
-import { initialProjectManifest } from "./initial-project-manifest.mjs";
+import {
+  initialProjectManifest,
+  initialFutureModulesDocument,
+} from "./initial-project-manifest.mjs";
 import {
   activeFutureModuleOverlapFindings,
   futureModulesDocumentFindings,
-  initialFutureModulesDocument,
   projectManifestFindings,
 } from "./project-manifest-contract.mjs";
 

@@ -16,3 +16,5 @@ backup/
 backups/
 *.bak
 *.bak.*
+# Native Mise graph bytes are bound by the digest in .codex/mise.lock.
+.codex/.mise/locks/pnpm/current/aube-lock.yaml

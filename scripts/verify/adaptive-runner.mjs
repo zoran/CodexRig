@@ -12,6 +12,7 @@ import {
   isForbiddenFocusedOwner,
 } from "./verification-admission.mjs";
 import { dedupeCommands } from "./verification-admission-commands.mjs";
+import { verificationExecutionUnits } from "./verification-check-inputs.mjs";
 import {
   discoverWorkspaceManifests,
   selectChangedWorkspaceManifests,
@@ -47,11 +48,21 @@ export function completeVerificationCommands() {
 
 export function buildPlan(options, dependencies = {}) {
   if (options.check) {
-    const command = readVerificationConfiguration(root).commands.find(
+    let command = readVerificationConfiguration(root).commands.find(
       (entry) => entry.key === options.check,
     );
     if (!command || isForbiddenFocusedOwner(command))
       throw new Error(`Unknown or recursive verification check: ${options.check}.`);
+    if (options.testFile) {
+      const unit = verificationExecutionUnits(command).find(
+        (candidate) => candidate.testFile === options.testFile,
+      );
+      if (!unit)
+        throw new Error(
+          `Check ${options.check} does not own an independent test file: ${options.testFile}.`,
+        );
+      command = { ...command, args: unit.args, coveredTestPaths: [] };
+    }
     if (
       options.testNamePattern &&
       (command.executable !== process.execPath || !command.args.includes("--test"))
@@ -70,15 +81,18 @@ export function buildPlan(options, dependencies = {}) {
             : command.args,
         },
       ],
-      verificationScope: "reproduction only; no acceptance evidence",
+      verificationScope: options.testNamePattern
+        ? "reproduction only; no acceptance evidence"
+        : "targeted",
       admission: {
-        mode: "reproduction",
+        mode: options.testNamePattern ? "reproduction" : "targeted",
         focusedCommandOwners: [],
         fullRelevantPaths: [],
         uncoveredFullRelevantPaths: [],
         unknownPaths: [],
-        reason:
-          "explicit registered check reproduction; final integration coverage remains required",
+        reason: options.testNamePattern
+          ? "filtered check reproduction; no complete unit evidence"
+          : "explicit registered check; retain complete unit results without broadening selection",
       },
     };
   }

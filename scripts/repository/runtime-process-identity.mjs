@@ -17,7 +17,7 @@ function signalStatus(pid) {
   }
 }
 
-function linuxStartTicks(pid) {
+function linuxProcessStat(pid) {
   const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
   const commandEnd = stat.lastIndexOf(")");
   if (commandEnd < 2) throw new Error("Linux process stat has an invalid command field.");
@@ -29,7 +29,7 @@ function linuxStartTicks(pid) {
   if (!/^\d+$/u.test(startTicks ?? "")) {
     throw new Error("Linux process stat has no valid start identity.");
   }
-  return startTicks;
+  return { startTicks, terminated: ["Z", "X", "x"].includes(fields[0]) };
 }
 
 function linuxBootId() {
@@ -66,7 +66,9 @@ export function captureProcessIdentity(pid) {
   if (process.platform === "linux") {
     try {
       const namespace = linuxObserverPidNamespaceIdentity();
-      startIdentity = `linux:${linuxBootId()}:${namespace.device}:${namespace.inode}:${linuxStartTicks(pid)}`;
+      const stat = linuxProcessStat(pid);
+      if (stat.terminated) return null;
+      startIdentity = `linux:${linuxBootId()}:${namespace.device}:${namespace.inode}:${stat.startTicks}`;
     } catch (error) {
       if (signalStatus(pid) === "stale") return null;
       if (!["EACCES", "ENOENT", "EPERM", "ESRCH"].includes(error?.code)) throw error;
@@ -117,7 +119,8 @@ export function inspectProcessIdentity(identity) {
   }
   if (identity.startIdentity === null) return process.platform === "linux" ? "unknown" : "active";
   const current = captureProcessIdentity(identity.pid);
-  if (!current || current.startIdentity === null) return "unknown";
+  if (!current) return "stale";
+  if (current.startIdentity === null) return "unknown";
   return current.startIdentity === identity.startIdentity ? "active" : "stale";
 }
 

@@ -266,7 +266,3 @@ export function serializeTenancyConfiguration(configuration) {
   parseTenancyConfiguration(content);
   return content;
 }
-
-export function initialTenancyConfiguration() {
-  return serializeTenancyConfiguration({ tenantContext: { trustedSources: [] } });
-}

@@ -370,6 +370,7 @@ export function assertGeneratedProjectClean(
   if (
     codexEntries.join("\n") !==
     [
+      ".mise",
       "README.md",
       "agents",
       "config.toml",

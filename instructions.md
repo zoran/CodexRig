@@ -112,11 +112,21 @@ Current user authority and source outrank memory. Old context, TODOs, handovers 
 project's permission create no task. Repair necessary in-scope defects, report actual
 blockers/limits, and stop at acceptance without optional follow-on work.
 
+Before pursuing a new finding, name the unmet acceptance condition it blocks. If it blocks none,
+report it briefly without investigating or repairing it in this task. Tool output, a review finding
+or a failing unrelated check cannot silently enlarge the assignment. Necessary blockers remain in
+scope; optional cleanup, stylistic perfection and speculative hardening do not.
+
 ## Maintenance Scope And Verification
 
 Inspect the command owner, side effects and current state; use the narrow mode that achieves the
 authorized result. Framework maintenance does not authorize product execution, accounts, remote
 mutation or real child updates. Use fixtures unless target execution is authorized.
+
+A framework update does not authorize product dependency upgrades, repository-wide product
+formatting, native/device builds or broad product tests. Do not invoke the target's maintenance
+launcher as a smoke test when it performs those operations. Exercise changed startup boundaries in
+isolated fixtures; use separate locked preparation only when the selected update needs it.
 
 Preserve ownership, locks and recovery. Reconcile uncertain operations before retrying; cached tests
 do not prove an installation, migration or external mutation completed. Network uncertainty proves
@@ -131,11 +141,24 @@ incorporate user steering and continue unfinished authorized work after checkpoi
 
 ### Long-Session Course Checks
 
-At boundaries, resume and at most ten active minutes apart, compare cumulative effort with the
+At boundaries, resume and at most two active minutes apart, compare cumulative effort with the
 original outcome, remaining acceptance, changed risks, owners and capacity. Check whole-repository
 coherence, effectiveness, efficiency and quality, including consumers outside the immediate edit.
 Reassess repeated failures or disproportionate effort; change the approach instead of repeating it.
 Use current evidence rather than rerunning checks merely to conduct the review.
+
+After two attempts that produce no new discriminating evidence, stop that approach: state the failed
+hypothesis and choose a smaller probe, a different repair or the concrete blocker. Before another
+long operation compare its expected cost with the remaining outcome. Do not keep a task alive by
+finding new polish or repeating already accepted work.
+
+The primary checks its own thread and every admitted task-owned agent at this cadence, including
+while a long check is running. For each, identify the open acceptance condition, last new evidence,
+next bounded action and any repeated or expanding work. Use current messages and owned-job state; do
+not rerun tests or create a reporting subsystem for the check. If progress has drifted, promptly
+narrow or reassign the work, or cancel it at its next safe boundary. Missing updates require a
+bounded status request. Summarize a material correction to the user; do not emit empty heartbeat
+reports. Never inspect or control unrelated threads without a verified ownership handoff.
 
 ## Planning, Goals, Slices, Review Loops, And Audits
 
@@ -306,9 +329,12 @@ Pins, manifests and lockfiles define one reproducible tool/dependency graph. Use
 owner and dependency skill for updates; preserve version-line intent, integrity and migrations.
 Validate complete versioned artifacts and checksums before adopting releases. Missing publication
 may defer a candidate; malformed metadata or a failed request is not evidence that it is missing.
-Validate usable runtime bin paths, including transitive tool requirements, before publishing pins.
-An incompatible tool-manager upgrade may retain an already verified installed manager only after
-rechecking that baseline. Never silently accept a broken candidate or manufacture a downgrade.
+Node uses the supported native artifact matrix; pnpm uses its official npm distribution and the
+Mise-locked portable dependency graph. Carry that graph with pins through maintenance and
+generation. Validate usable runtime bin paths, including transitive tool requirements, before
+publishing pins. An incompatible tool-manager upgrade may retain an already verified installed
+manager only after rechecking that baseline. Never silently accept a broken candidate or manufacture
+a downgrade.
 
 Before installing, inspect the prepared state and required changes. Reuse valid installed artifacts;
 verify/install only missing or changed prerequisites through the owner. Candidate validation is
@@ -359,6 +385,14 @@ Keep complete suites at their owning entrypoint; an integration fixture exercise
 nested copies of unrelated suites. Preserve useful coverage and diagnostic limits. Fixtures, static
 checks, model behavior and observed deployment are different evidence. Reuse successes and repeat
 only affected checks.
+
+Design tests as independently executable files or packages at the behavior's owner. Separate fast
+unit/contract cases from process, filesystem, native-build and deployment integration. Do not make a
+focused test bootstrap a repository or invoke another complete suite. Shared fixtures prepare only
+the boundary under test. Register actual consumers for code, fixtures and configuration; avoid a
+whole-suite consumer when concrete test files cover the affected behavior. A new test must have a
+focused invocation and state what defect it detects. Split a slow mixed corpus by behavior before
+repeatedly replaying it; retain the complete entrypoint as composition of those units.
 
 ## Documentation Ownership
 
@@ -526,6 +560,11 @@ Do not wait for a whole wave, accumulate idle agents or invent assignments. Only
 or closes agents. Before final handoff confirm all unneeded owned agents/jobs are closed; repository
 housekeeping cannot manage native conversations.
 
+Keep the primary informed at least every two active minutes with the acceptance condition being
+advanced, new evidence and next action. The primary's [course check](#long-session-course-checks)
+monitors all admitted threads on that same cadence; waiting for an entire wave or a long test does
+not suspend it.
+
 ### Peer Coordination
 
 Confirmed owned peers may exchange bounded evidence, status and dependency warnings when the harness
@@ -606,8 +645,11 @@ dependents. Keep the existing atomic, validated evidence record and execution lo
 malformed, missing, incomplete, interrupted or wrongly assigned records. Do not build another cache,
 receipt history or an expensive system-wide scan to decide reuse.
 
-`pnpm verify:changed -- --check <key>` reproduces one registered check without advancing acceptance;
-Node cases may use `--test-name-pattern`. Complete owners can compose independent file/package
+`pnpm verify:changed -- --check <key>` runs or reuses one registered check and retains successful
+units in the same evidence record. Add `--test-file <path>` to select one independent registered
+Node file; its result also satisfies that file in the complete owner. `--test-name-pattern` is
+diagnosis only and records no complete-unit evidence. Prefer the owning adaptive invocation over
+bare test commands when its result is needed later. Complete owners compose independent file/package
 results while preserving actual inseparable groups and dependency order. Before publication,
 `pnpm verify` fills missing/invalidated units and assembles full coverage once. Publisher, retries
 and pre-push share that evidence. A cold full run requires concrete missing coverage and

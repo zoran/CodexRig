@@ -78,6 +78,12 @@ const portableTables = new Set(["agents", "features", "sandbox_workspace_write",
 // here because canonical launch explicitly projects the tracked project model and effort.
 const runtimeModelPreferencePattern = /^[a-z0-9][a-z0-9._-]{0,127}$/u;
 const runtimeReasoningPreferencePattern = /^[a-z][a-z0-9_-]{0,63}$/u;
+// Native TUI metadata is private runtime state, never required portable project policy.
+const runtimeTerminalPreferences = new Map([
+  ["screen_reader_detection_done", { type: "boolean" }],
+  // Codex 0.171.0 config schema bounds the saved docked sidebar percentage to 1–99.
+  ["sidebar_width_percent", { type: "integer", minimum: 1, maximum: 99 }],
+]);
 const requiredAgentRoles = new Set(["default", "explorer", "worker"]);
 // Markers guard required wording, not semantic compliance, runtime isolation, or model obedience.
 const requiredAgentInstructionFragments = Object.freeze([
@@ -192,6 +198,8 @@ function valueMatchesSchema(actual, schema) {
   return (
     typeMatches &&
     valuesMatch(actual, schema.value) &&
+    (schema.minimum === undefined || actual >= schema.minimum) &&
+    (schema.maximum === undefined || actual <= schema.maximum) &&
     (!schema.values || schema.values.includes(actual)) &&
     (!schema.pattern || (typeof actual === "string" && schema.pattern.test(actual)))
   );
@@ -357,11 +365,7 @@ function validateRuntimeConfigDocument(value, root) {
         }
         continue;
       }
-      // Codex persists this one-time accessibility probe as metadata, not portable policy.
-      const schema =
-        key === "screen_reader_detection_done"
-          ? { type: "boolean" }
-          : portablePolicy.get(`tui.${key}`);
+      const schema = runtimeTerminalPreferences.get(key) ?? portablePolicy.get(`tui.${key}`);
       if (!schema || !valueMatchesSchema(entry, schema)) {
         throw new CodexConfigError(
           "Repository-local Codex runtime terminal preference is unsupported.",

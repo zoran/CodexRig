@@ -5,10 +5,20 @@ import path from "node:path";
 import process from "node:process";
 import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
 import {
+  validateMinimalMiseTools,
+  candidateMiseLockFindings,
+} from "../contracts/mise-toolchain-configuration.mjs";
+import { readRepositoryFile } from "../filesystem/repository-files.mjs";
+import {
   atomicWriteOwnedFile,
   readOptionalOwnedFile,
 } from "../filesystem/owned-file-operations.mjs";
 import { userToolPaths, assertUserToolParents } from "./user-tool-storage.mjs";
+import {
+  projectToolEnvironment,
+  prepareProjectToolDirectories,
+} from "./project-tool-environment.mjs";
+import { spawnSyncWithBoundedIo } from "./runtime-process-io.mjs";
 import {
   captureStableRepositoryFileIdentity,
   scanStableRepositoryFile,
@@ -42,6 +52,7 @@ export function projectManagedToolLayout(
   } = {},
 ) {
   const p = userToolPaths(environment);
+  const boundEnvironment = { ...environment };
   const target = `${platform}-${arch}`;
   const nativeTriple = nativeCodexTriples[target];
   if (!nativeTriple || (platform === "linux" && !["glibc", "musl"].includes(libc)))
@@ -61,7 +72,7 @@ export function projectManagedToolLayout(
     };
   };
   const installs = path.join(p.miseData, "installs");
-  return {
+  const layout = {
     mise: bundle(
       "mise",
       matrix.ci.miseVersion,
@@ -93,8 +104,56 @@ export function projectManagedToolLayout(
         platform === "win32" ? "node.exe" : "bin/node",
       ),
     },
-    pnpm: { executable: path.join(installs, "pnpm", matrix.stable.pnpm.version, `pnpm${suffix}`) },
+    pnpm: {
+      get executable() {
+        // Mise owns graph-dependent installation identities; never guess its hash suffix.
+        const config = validateMinimalMiseTools(readRepositoryFile(root, ".codex/mise.toml"));
+        if (
+          config.errors.length ||
+          config.versions.pnpm !== matrix.stable.pnpm.version ||
+          candidateMiseLockFindings(
+            readRepositoryFile(root, ".codex/mise.lock"),
+            config.versionLists,
+          ).length
+        )
+          throw new Error("Pinned pnpm resolution requires the safe current toolchain contract.");
+        prepareProjectToolDirectories(root, { inherited: boundEnvironment });
+        const result = spawnSyncWithBoundedIo(
+          verifyProjectToolBundle(root, layout.mise),
+          ["ls", "--current", "--json", "--locked"],
+          {
+            cwd: root,
+            env: projectToolEnvironment({ root, inherited: boundEnvironment }),
+            encoding: "utf8",
+            input: "",
+            stdio: "pipe",
+            timeout: 20_000,
+            maxBuffer: 1024 * 1024,
+          },
+        );
+        if (result.error || result.signal || result.status !== 0)
+          throw new Error("Pinned pnpm installation identity could not be resolved by Mise.");
+        const entries = JSON.parse(result.stdout).pnpm;
+        if (
+          !Array.isArray(entries) ||
+          entries.length !== 1 ||
+          entries[0].requested_version !== matrix.stable.pnpm.version ||
+          entries[0].source?.path !== path.join(root, ".codex/mise.toml") ||
+          path.dirname(entries[0].install_path ?? "") !== path.join(installs, "pnpm")
+        )
+          throw new Error(
+            "Pinned pnpm installation identity is outside its declared tool storage.",
+          );
+        return path.join(
+          entries[0].install_path,
+          "node_modules",
+          ".bin",
+          platform === "win32" ? "pnpm.cmd" : "pnpm",
+        );
+      },
+    },
   };
+  return layout;
 }
 
 function bundleFiles(root, directory) {

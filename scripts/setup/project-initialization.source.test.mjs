@@ -194,6 +194,7 @@ test("empty generation excludes source capabilities, private markers and new uns
   assert.deepEqual(
     selected.commands.flatMap((command) => command.args).filter((arg) => arg.endsWith(".test.mjs")),
     [
+      "scripts/terminal/terminal-output.test.mjs",
       "scripts/setup/runtime-safety.test.mjs",
       "scripts/setup/repository-storage.test.mjs",
       "scripts/goals/project-publication.test.mjs",
@@ -213,6 +214,7 @@ test("empty generation excludes source capabilities, private markers and new uns
       "scripts/deps/toolchain-releases.test.mjs",
       "scripts/deps/toolchain-maintenance.test.mjs",
       "scripts/deps/tool-storage-housekeeping.test.mjs",
+      "scripts/deps/pnpm-toolchain-graph.test.mjs",
     ],
   );
   for (const file of [".github/workflows/ci.yml", ".gitlab-ci.yml"])

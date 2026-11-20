@@ -1,24 +1,43 @@
 /** Owns portable exact-version mise configuration and native toolchain artifact admission. */
 import { parseSemver } from "./semver-contract.mjs";
+import { parsePortableToml } from "./portable-toml.mjs";
+
+export const pnpmMiseAlias = '[tool_alias.pnpm]\nbackend = "npm:pnpm"';
+
 export function validateMinimalMiseTools(content) {
   const versions = Object.create(null);
   const versionLists = Object.create(null);
   const errors = [];
   let toolsSectionCount = 0;
   let inToolsSection = false;
+  let aliasSection = false;
+  let aliases = 0;
 
   for (const [index, rawLine] of String(content).split(/\r?\n/u).entries()) {
     const line = rawLine.trim();
     if (!line || line.startsWith("#")) continue;
+    if (line === "[tool_alias.pnpm]") {
+      aliasSection = true;
+      inToolsSection = false;
+      aliases += 1;
+      if (aliases > 1) errors.push("pnpm backend must be declared exactly once");
+      continue;
+    }
     if (line === "[tools]") {
+      aliasSection = false;
       toolsSectionCount += 1;
       inToolsSection = true;
       if (toolsSectionCount > 1) errors.push("must declare [tools] exactly once");
       continue;
     }
     if (line.startsWith("[")) {
+      aliasSection = false;
       inToolsSection = false;
       errors.push(`line ${index + 1} declares a disallowed section or directive`);
+      continue;
+    }
+    if (aliasSection) {
+      if (line !== 'backend = "npm:pnpm"') errors.push("pnpm must use the official npm backend");
       continue;
     }
     if (!inToolsSection) {
@@ -67,6 +86,13 @@ export function validateMinimalMiseTools(content) {
   }
 
   if (toolsSectionCount !== 1) errors.push("must declare [tools] exactly once");
+  try {
+    const parsed = parsePortableToml(content);
+    if (parsed.tool_alias?.pnpm?.backend !== "npm:pnpm")
+      errors.push("pnpm must declare the official npm backend");
+  } catch {
+    errors.push("tool configuration must be unambiguous TOML");
+  }
   for (const tool of ["node", "pnpm"]) {
     if (!versions[tool]) errors.push(`must declare ${tool} exactly once`);
   }
@@ -105,6 +131,10 @@ export function miseLockFindings(content, versionLists) {
         /^\[tools\.[a-z0-9_-]+\."platforms\.([^"\r\n]+)"\]\r?\n([\s\S]*?)(?=^\[|$(?![\s\S]))/gmu,
       ),
     ];
+    if (tool === "pnpm") {
+      if (platforms.length) findings.push(`${label} must use the portable npm graph`);
+      continue;
+    }
     if (!platforms.length) findings.push(`${label} needs a locked platform artifact`);
     if (new Set(platforms.map((match) => match[1])).size !== platforms.length)
       findings.push(`${label} has duplicate platform artifacts`);
@@ -116,20 +146,6 @@ export function miseLockFindings(content, versionLists) {
     }
   }
   return findings;
-}
-
-/** Native pnpm releases must provide every retained framework platform before admission. */
-export function nativePnpmArtifactUrls(version) {
-  parseSemver(version, "Native pnpm version");
-  const release = `https://github.com/pnpm/pnpm/releases/download/v${version}`;
-  return Object.freeze({
-    "linux-arm64": `${release}/pnpm-linux-arm64.tar.gz`,
-    "linux-arm64-musl": `${release}/pnpm-linux-arm64-musl.tar.gz`,
-    "linux-x64": `${release}/pnpm-linux-x64.tar.gz`,
-    "linux-x64-musl": `${release}/pnpm-linux-x64-musl.tar.gz`,
-    "macos-arm64": `${release}/pnpm-darwin-arm64.tar.gz`,
-    "windows-x64": `${release}/pnpm-win32-x64.zip`,
-  });
 }
 
 /** Node binaries must cover every platform; a source-archive fallback is not equivalent. */
@@ -170,6 +186,23 @@ export function candidateMiseLockFindings(content, versionLists) {
     }
     const block =
       blocks.find((entry) => entry.tool === tool && entry.version === version)?.block ?? "";
+    if (tool === "pnpm") {
+      if (uniqueLockedField(block, "version") !== version)
+        findings.push("mise.lock pnpm must declare its exact version once");
+      if (uniqueLockedField(block, "backend") !== "npm:pnpm")
+        findings.push("mise.lock pnpm must use the official npm backend");
+      if (
+        !/^aube = \{ path = "\.mise\/locks\/pnpm\/current", digest = "sha256:[a-f0-9]{64}" \}$/mu.test(
+          block,
+        )
+      )
+        findings.push(
+          "mise.lock pnpm must bind the portable dependency graph and its SHA-256 digest",
+        );
+      if ([...block.matchAll(/^aube\s*=/gmu)].length !== 1)
+        findings.push("mise.lock pnpm must declare exactly one portable dependency graph");
+      continue;
+    }
     const platformBlocks = [
       ...block.matchAll(
         new RegExp(
@@ -178,11 +211,10 @@ export function candidateMiseLockFindings(content, versionLists) {
         ),
       ),
     ];
-    const urls =
-      tool === "pnpm" ? nativePnpmArtifactUrls(version) : nativeNodeArtifactUrls(version);
+    const urls = nativeNodeArtifactUrls(version);
     if (platformBlocks.map((match) => match[1]).join(",") !== Object.keys(urls).join(","))
       findings.push(`mise.lock ${tool} platforms must match the supported artifact matrix exactly`);
-    const backend = tool === "node" ? "core:node" : "aqua:pnpm/pnpm";
+    const backend = "core:node";
     for (const [field, expected] of Object.entries({ version, backend })) {
       if (uniqueLockedField(block, field) !== expected)
         findings.push(`mise.lock ${tool} entry must include exactly one ${field} = "${expected}"`);
@@ -194,15 +226,6 @@ export function candidateMiseLockFindings(content, versionLists) {
         findings.push(`${label} entry must include exactly one SHA-256 checksum`);
       if (uniqueLockedField(artifact, "url") !== expectedUrl)
         findings.push(`${label} URL must match its official versioned artifact exactly once`);
-      if (tool !== "pnpm") continue;
-      if (uniqueLockedField(artifact, "provenance") !== "github-attestations")
-        findings.push(`${label} entry must include exactly one GitHub attestation provenance`);
-      if (
-        !/^https:\/\/api\.github\.com\/repos\/pnpm\/pnpm\/releases\/assets\/[1-9]\d*$/u.test(
-          uniqueLockedField(artifact, "url_api"),
-        )
-      )
-        findings.push(`${label} URL API must identify exactly one official GitHub asset`);
     }
   }
   return findings;

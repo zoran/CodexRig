@@ -5,6 +5,139 @@ import { sanitizeMultilineForTerminal } from "./terminal-output.mjs";
 
 const frames = ["|", "/", "-", "\\"];
 
+/** Observes bounded verifier diagnostics; reported progress never establishes acceptance. */
+export function createPublicationVerificationProgress(report) {
+  const streams = new Map();
+  const active = new Map();
+  let completed = 0;
+  let required = null;
+  let failed = "";
+  let previous = "";
+  const keyPattern = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,159}$/u;
+  const boundedInteger = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 100_000;
+  const show = (message) => {
+    const safe = sanitizeMultilineForTerminal(message).replaceAll("\n", " ").slice(0, 320);
+    if (safe === previous) return;
+    previous = safe;
+    report(safe);
+  };
+  const render = (preferred) => {
+    const running = preferred ?? [...active.values()].findLast((entry) => entry.label !== failed);
+    const count =
+      required === null ? `${completed} completed` : `${completed}/${required} completed`;
+    if (failed) {
+      show(`Failed ${failed}${running ? `; waiting for ${running.label}` : ""}`);
+    } else if (running) {
+      show(`Verify ${running.label}${running.detail ? `: ${running.detail}` : ""}; ${count}`);
+    } else {
+      show(`Verification: ${count}`);
+    }
+  };
+  const start = (id, label, key) => {
+    if (active.has(id) || active.size >= 1024) return;
+    const entry = { label, key, detail: "" };
+    active.set(id, entry);
+    render(entry);
+  };
+  const finish = (id, status) => {
+    const entry = active.get(id);
+    if (!entry) return;
+    active.delete(id);
+    completed += 1;
+    if (status !== "passed") failed ||= entry.label;
+    render();
+  };
+  const line = (text) => {
+    const evidence =
+      /^Evidence: (\d+) reused; (\d+) required; \d+ missing for complete coverage\.$/u.exec(text);
+    if (evidence) {
+      if (![Number(evidence[1]), Number(evidence[2])].every(boundedInteger)) return;
+      required = Number(evidence[2]);
+      show(`Verification: ${evidence[1]} reused; ${required} required`);
+      return;
+    }
+    const started =
+      /^\[verification:start\] ([a-zA-Z0-9._:/-]+) \([a-z-]+\)(?: ([a-zA-Z0-9._/-]+))?$/u.exec(
+        text,
+      );
+    if (started && keyPattern.test(started[1])) {
+      start(`${started[1]}:${started[2] ?? ""}`, started[1], started[1]);
+      return;
+    }
+    const result = /^\[verification:(passed|failed)\] ([a-zA-Z0-9._:/-]+) \d+ms$/u.exec(text);
+    if (result) {
+      const entry = [...active].find(([, value]) => value.key === result[2]);
+      if (entry) finish(entry[0], result[1]);
+      return;
+    }
+    if (!text.startsWith("[verification] ")) return;
+    const value = JSON.parse(text.slice("[verification] ".length));
+    if (
+      !value ||
+      typeof value !== "object" ||
+      Array.isArray(value) ||
+      typeof value.key !== "string" ||
+      !keyPattern.test(value.key)
+    )
+      return;
+    if (value.event === "command-start") {
+      start(value.key, value.key, value.key);
+    } else if (value.event === "command-complete") {
+      if (["passed", "failed", "error"].includes(value.status)) finish(value.key, value.status);
+    } else if (
+      value.event === "product-step-start" ||
+      value.event === "product-native-phase-start"
+    ) {
+      const entry = active.get(value.key);
+      if (!entry || !boundedInteger(value.step) || value.step === 0) return;
+      if (
+        value.event === "product-native-phase-start" &&
+        (!boundedInteger(value.nativePhase) || value.nativePhase === 0)
+      )
+        return;
+      entry.detail = `step ${value.step}${value.event === "product-native-phase-start" ? `, native phase ${value.nativePhase}` : ""}`;
+      render(entry);
+    } else if (
+      value.event === "product-step-complete" &&
+      ["failed", "error"].includes(value.status)
+    ) {
+      const entry = active.get(value.key);
+      if (!entry) return;
+      failed ||= entry.label;
+      render();
+    }
+  };
+  return (chunk, name = "stdout") => {
+    if (!["stdout", "stderr"].includes(name)) return;
+    const stream = streams.get(name) ?? { pending: Buffer.alloc(0), discarding: false };
+    streams.set(name, stream);
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    for (let offset = 0; offset < bytes.length;) {
+      const newline = bytes.indexOf(10, offset);
+      const end = newline < 0 ? bytes.length : newline;
+      if (!stream.discarding) {
+        if (stream.pending.length + end - offset > 2048) {
+          stream.pending = Buffer.alloc(0);
+          stream.discarding = true;
+        } else {
+          stream.pending = Buffer.concat([stream.pending, bytes.subarray(offset, end)]);
+        }
+      }
+      if (newline < 0) break;
+      if (!stream.discarding) {
+        try {
+          line(stream.pending.toString("utf8").replace(/\r$/u, ""));
+        } catch {
+          // Malformed diagnostics and unavailable presentation cannot alter the command result.
+        }
+      }
+      stream.pending = Buffer.alloc(0);
+      stream.discarding = false;
+      offset = newline + 1;
+    }
+  };
+}
+
 /** Keeps redirected output readable and leaves credential prompts on their own terminal line. */
 export function createPublicationOutput({
   root,

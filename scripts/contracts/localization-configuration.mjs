@@ -137,7 +137,3 @@ export function serializeLocalizationConfiguration(configuration = {}) {
   parseLocalizationConfiguration(content);
   return content;
 }
-
-export function initialLocalizationConfiguration() {
-  return serializeLocalizationConfiguration();
-}

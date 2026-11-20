@@ -127,23 +127,6 @@ export function parseProductConfiguration(content) {
   return JSON.parse(String(content));
 }
 
-export function initialProductConfiguration(repositoryName) {
-  const value = {
-    schemaVersion: 1,
-    identity: {
-      displayName: null,
-      organizationName: null,
-      applicationIds: {},
-    },
-    brand: { assets: {}, theme: {} },
-    public: { contacts: {}, domains: {}, social: {}, urls: {} },
-  };
-  if (!String(repositoryName).trim()) throw new Error("Generated project name must be non-empty.");
-  const content = `${JSON.stringify(value, null, 2)}\n`;
-  parseProductConfiguration(content);
-  return content;
-}
-
 function collectStrings(value, values) {
   if (typeof value === "string" && value.length >= 4) values.add(value);
   else if (Array.isArray(value)) value.forEach((entry) => collectStrings(entry, values));

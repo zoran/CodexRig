@@ -1,5 +1,6 @@
 /** Resolves compatible stable tool and CI releases from their official distribution owners. */
 import { createHash } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { toolingRoot } from "../filesystem/repository-files.mjs";
 import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
 import {
@@ -26,10 +27,7 @@ import {
   miseBinaryPlatforms,
   validateToolchainConfiguration,
 } from "../contracts/toolchain-configuration.mjs";
-import {
-  nativeNodeArtifactUrls,
-  nativePnpmArtifactUrls,
-} from "../contracts/mise-toolchain-configuration.mjs";
+import { nativeNodeArtifactUrls } from "../contracts/mise-toolchain-configuration.mjs";
 
 /** Reads bounded public metadata or release bytes without credentials or cached fallback. */
 export async function releaseBytes(url, maximumBytes, fetchImpl = globalThis.fetch) {
@@ -84,18 +82,31 @@ export function latestCompatibleVersion(versions, range, current) {
 
 async function nativeArtifactAvailable(tool, url, fetchImpl) {
   let address = new URL(url);
+  let redirects = 0;
+  let retries = 0;
   const signal = AbortSignal.timeout(180_000);
-  for (let redirects = 0; redirects <= 4; redirects += 1) {
+  while (redirects <= 4) {
+    signal.throwIfAborted();
     if (address.protocol !== "https:" || address.username || address.password)
       throw new Error(`Native ${tool} artifact sources must use public HTTPS.`);
     const response = await fetchImpl(address.href, {
-      method: "HEAD",
+      method: "GET",
       redirect: "manual",
       credentials: "omit",
-      headers: { "User-Agent": "CodexRig-toolchain-maintenance" },
+      headers: {
+        "User-Agent": "CodexRig-toolchain-maintenance",
+        Range: "bytes=0-0",
+      },
       signal,
     });
+    // A server may ignore Range. Availability never requires downloading the archive.
+    await response.body?.cancel();
     if (response.status === 200) return true;
+    if (response.status === 206) {
+      if (!/^bytes 0-0\/[1-9]\d*$/u.test(response.headers.get("content-range") ?? ""))
+        throw new Error(`Native ${tool} artifact range response is invalid.`);
+      return true;
+    }
     // Only absence at the canonical release URL establishes a missing artifact. A stale
     // redirected CDN URL, rate limit or unavailable service cannot justify an older release.
     if (response.status === 404 && redirects === 0) return false;
@@ -103,6 +114,13 @@ async function nativeArtifactAvailable(tool, url, fetchImpl) {
       const location = response.headers.get("location");
       if (!location) throw new Error(`Native ${tool} artifact redirect has no location.`);
       address = new URL(location, address);
+      redirects += 1;
+      continue;
+    }
+    if ([502, 503, 504].includes(response.status) && retries < 2) {
+      retries += 1;
+      await delay(250 * retries, undefined, { signal });
+      address = new URL(url);
       continue;
     }
     throw new Error(
@@ -141,11 +159,11 @@ async function missingNodeChecksums(artifacts, fetchImpl) {
 }
 
 async function missingNativePlatforms(tool, version, fetchImpl) {
-  const urls = tool === "node" ? nativeNodeArtifactUrls(version) : nativePnpmArtifactUrls(version);
+  const urls = nativeNodeArtifactUrls(version);
   const artifacts = Object.entries(urls);
   const results = await Promise.allSettled([
     ...artifacts.map(([, url]) => nativeArtifactAvailable(tool, url, fetchImpl)),
-    tool === "node" ? missingNodeChecksums(artifacts, fetchImpl) : Promise.resolve(new Set()),
+    missingNodeChecksums(artifacts, fetchImpl),
   ]);
   for (const result of results) if (result.status === "rejected") throw result.reason;
   const missingChecksums = results.at(-1).value;
@@ -272,11 +290,7 @@ export async function resolveCompatibilityToolchain(
     !versionMatchesReleaseSelector(matrix.ci.codexVersion, track.codex)
   )
     throw new Error("Resolved compatibility release does not match its declared selector.");
-  const missing = await missingNativePlatforms("pnpm", pnpm.version, fetchImpl);
-  if (missing.length)
-    throw new Error(
-      `Compatibility pnpm ${pnpm.version} is missing official native artifacts for ${missing.join(", ")}.`,
-    );
+  await verifyArchive(pnpm, fetchImpl);
   matrix.stable.pnpm.version = pnpm.version;
   for (const tool of ["node", "pnpm"])
     matrix.stable[tool].range = `>=${matrix.stable[tool].version} <=${matrix.stable[tool].version}`;
@@ -305,13 +319,12 @@ export async function resolveToolchainReleases(
     current.stable.node.version,
     { fetchImpl, onProgress },
   );
-  matrix.stable.pnpm.version = await latestCompatibleNativeVersion(
-    "pnpm",
+  matrix.stable.pnpm.version = latestCompatibleVersion(
     Object.keys(pnpm.versions ?? {}),
     current.stable.pnpm.range,
     current.stable.pnpm.version,
-    { fetchImpl, onProgress },
   );
+  await verifyArchive(await npmRelease("pnpm", matrix.stable.pnpm.version, fetchImpl), fetchImpl);
   noDowngrade(matrix.ci.codexVersion, current.ci.codexVersion, "Codex");
   const miseVersion = mise.toString("utf8").trim();
   noDowngrade(miseVersion, current.ci.miseVersion, "Mise");

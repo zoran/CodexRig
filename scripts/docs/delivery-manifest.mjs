@@ -6,7 +6,6 @@ import {
   deliveryConfigurationFindings,
   deliveryConfigurationPath,
   effectiveDeliveryTargets,
-  initialDeliveryConfiguration,
   parseDeliveryConfiguration,
   reconcileDetectedDeliveryTargets,
 } from "../contracts/delivery-configuration.mjs";
@@ -107,8 +106,11 @@ export function deliveryReconciliationPlan({
   let expectedDeliveryContent = null;
   if (deliveryFile.content !== null || hasProductWorkspace({ root, relativePaths: activeFiles })) {
     const currentContent = deliveryFile.content;
-    const configurationContent = currentContent ?? initialDeliveryConfiguration();
-    const configurationFindings = deliveryConfigurationFindings(configurationContent);
+    const configurationContent = currentContent;
+    const configurationFindings =
+      currentContent === null
+        ? [`Delivery configuration is missing: ${deliveryConfigurationPath}`]
+        : deliveryConfigurationFindings(configurationContent);
     if (configurationFindings.length > 0) blockingFindings.push(...configurationFindings);
     else {
       configuration = parseDeliveryConfiguration(configurationContent);

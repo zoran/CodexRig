@@ -54,6 +54,7 @@ export const repositoryCodexHomeRuntimeDirectoryNames = Object.freeze([
   "thread-writer-locks",
   "tmp",
   "tui-luna-reserve",
+  "tui-thread-reference-capabilities",
 ]);
 // Current native account stores are private but survive ephemeral runtime reset.
 export const repositoryCodexHomeCredentialFileNames = Object.freeze([
@@ -63,6 +64,8 @@ export const repositoryCodexHomeCredentialFileNames = Object.freeze([
 export const repositoryCodexHomeRuntimeFileNames = Object.freeze([
   ...repositoryCodexHomeCredentialFileNames,
   ".sandbox_migration",
+  "auth.json.lock",
+  "auth.lock",
   "config.toml",
   "history.jsonl",
   "hooks.json",
@@ -94,6 +97,16 @@ export const portableCodexGitignorePatterns = Object.freeze([
   "!.codex/toolchain.json",
   "!.codex/mise.toml",
   "!.codex/mise.lock",
+  "!.codex/.mise/",
+  ".codex/.mise/*",
+  "!.codex/.mise/locks/",
+  ".codex/.mise/locks/*",
+  "!.codex/.mise/locks/pnpm/",
+  ".codex/.mise/locks/pnpm/*",
+  "!.codex/.mise/locks/pnpm/current/",
+  ".codex/.mise/locks/pnpm/current/*",
+  "!.codex/.mise/locks/pnpm/current/package.json",
+  "!.codex/.mise/locks/pnpm/current/aube-lock.yaml",
   "!.codex/verification.json",
   "!.codex/README.md",
   "!.codex/agents/",
@@ -128,6 +141,8 @@ export const repositoryCodexHomeProtectedGitignoreProbePaths = Object.freeze([
   ".codex/agents/nested/extra.toml",
 ]);
 export const portableCodexGitignoreProbePaths = Object.freeze([
+  ".codex/.mise/locks/pnpm/current/package.json",
+  ".codex/.mise/locks/pnpm/current/aube-lock.yaml",
   ".codex/mise.toml",
   ".codex/mise.lock",
   ".codex/README.md",
@@ -197,6 +212,12 @@ export function isPortableCodexPath(relativePath) {
       ".codex/toolchain.json",
       ".codex/mise.toml",
       ".codex/mise.lock",
+      ".codex/.mise",
+      ".codex/.mise/locks",
+      ".codex/.mise/locks/pnpm",
+      ".codex/.mise/locks/pnpm/current",
+      ".codex/.mise/locks/pnpm/current/package.json",
+      ".codex/.mise/locks/pnpm/current/aube-lock.yaml",
       ".codex/verification.json",
       ".codex/agents",
     ].includes(relativePath) || /^\.codex\/agents\/[a-z][a-z0-9_-]*\.toml$/u.test(relativePath)

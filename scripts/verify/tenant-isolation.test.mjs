@@ -5,8 +5,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { initialTenancyConfiguration } from "../framework/initial-project-configuration.mjs";
 import {
-  initialTenancyConfiguration,
   serializeTenancyConfiguration,
   tenancyConfigurationFindings,
 } from "../contracts/tenancy-configuration.mjs";

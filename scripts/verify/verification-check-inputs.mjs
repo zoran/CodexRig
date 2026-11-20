@@ -8,7 +8,7 @@ import {
   readStableRepositoryFile,
 } from "../repository/stable-file-snapshot.mjs";
 import { entryRouting } from "./verification-admission.mjs";
-import { commandCoversTest } from "./verification-admission-commands.mjs";
+import { commandCoversTest, isBoundedNodeTestTimeout } from "./verification-admission-commands.mjs";
 import { canonicalJson, digest, validDigest } from "./verification-record-helpers.mjs";
 import { importSpecifiersForFile } from "../repository/source-import-specifiers.mjs";
 import { discoverProductLayout } from "../repository/product-roots.mjs";
@@ -33,7 +33,11 @@ export function verificationExecutionUnits(command) {
     !command.artifactOwners?.length &&
     !command.outputs?.length &&
     command.args.every(
-      (arg) => arg === "--test" || presentationFlags.has(arg) || testFiles.includes(arg),
+      (arg) =>
+        arg === "--test" ||
+        presentationFlags.has(arg) ||
+        isBoundedNodeTestTimeout(arg) ||
+        testFiles.includes(arg),
     );
   if (!splittable) return [{ ...command, acceptanceKey: command.key }];
   return testFiles

@@ -10,6 +10,7 @@ import { cleanGitEnvironment } from "../repository/git-runtime-isolation.mjs";
 import { reconcileHousekeepingVersion } from "./source-housekeeping.mjs";
 import { applyHousekeepingWrites } from "../repository/repository-housekeeping-transaction.mjs";
 import { trustedPnpmCommand } from "../deps/trusted-pnpm-command.mjs";
+import { pnpmGraphPaths } from "../deps/pnpm-toolchain-graph.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
 import { acquireVerificationSessionLock } from "../verify/verification-session-lock.mjs";
 import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycle-process.mjs";
@@ -228,22 +229,36 @@ for (const interrupted of [false, true]) {
   test(`housekeeping leaves guarded pnpm usable after ${interrupted ? "an interrupted" : "a new"} version change`, (t) => {
     const root = fixture(t);
     write(root, ".gitignore", "node_modules/\n.codex/runtime/\n.project-state/\n");
-    write(
-      root,
+    for (const file of [
       ".codex/toolchain.json",
-      readFileSync(path.join(repositoryRoot, ".codex/toolchain.json"), "utf8"),
-    );
+      ".codex/mise.toml",
+      ".codex/mise.lock",
+      ...pnpmGraphPaths,
+    ]) {
+      write(root, file, readFileSync(path.join(repositoryRoot, file), "utf8"));
+    }
     write(
       root,
       "pnpm-workspace.yaml",
-      "packages: []\nverifyDepsBeforeRun: false\nignorePnpmfile: true\npnpmfile: []\n",
+      "packages: ['consumers/*']\nverifyDepsBeforeRun: false\nignorePnpmfile: true\npnpmfile: []\n",
+    );
+    // A version bump invalidates native pnpm state only when another workspace package resolves
+    // that version. Keep this a real local dependency so interrupted reconciliation needs repair.
+    write(
+      root,
+      "consumers/fixture/package.json",
+      serializeCanonicalJson({
+        name: "version-consumer",
+        private: true,
+        dependencies: { codexrig: "workspace:*" },
+      }),
     );
     const command = trustedPnpmCommand({ repositoryRoot: root });
     const pnpm = (args) =>
       spawnSync(command.executable, [...command.argsPrefix, ...args], {
         cwd: root,
         encoding: "utf8",
-        env: pnpmHooksDisabledEnvironment(process.env),
+        env: pnpmHooksDisabledEnvironment(process.env, root),
         timeout: 30_000,
       });
     const initial = pnpm(["install", "--offline", "--ignore-scripts", "--ignore-pnpmfile"]);

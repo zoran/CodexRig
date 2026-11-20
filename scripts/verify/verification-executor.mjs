@@ -321,6 +321,7 @@ function runCommand(command, repositoryRoot, requireDiagnosis) {
         );
         const child = spawnRuntimeLifecycleCommand({
           args: command.args,
+          cancelOnDisconnect: command.cancellable === true,
           command: command.executable,
           lifecycleCapability: verificationLifecycleCapability(repositoryRoot),
           options: {
@@ -532,11 +533,7 @@ async function runArtifactSafeCommands(
 export async function runPlan(plan, { repositoryRoot = root, onResult } = {}) {
   if (!plan.options.printPlan && plan.evidence?.blockedPrerequisites?.length)
     throw new Error(plan.evidence.blockedPrerequisites.join("\n"));
-  if (
-    !plan.options.printPlan &&
-    plan.admission.mode === "full" &&
-    plan.admission.coverageBlockedReason
-  )
+  if (plan.admission.mode === "full" && plan.admission.coverageBlockedReason)
     throw new Error(plan.admission.coverageBlockedReason);
   printPlan(plan);
   if (plan.options.printPlan) return Object.freeze({ successfulCommandKeys: Object.freeze([]) });

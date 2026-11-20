@@ -1,5 +1,6 @@
 /** Exercises retained project runtime trust boundaries in owned isolated fixtures. */
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { afterEach, test } from "node:test";
 import {
@@ -30,6 +31,7 @@ import {
   startupExecutableSearchPath,
 } from "./startup-runtime-executables.mjs";
 const roots = [];
+const installedMiseExecutable = projectManagedToolLayout(toolingRoot).mise.executable;
 const inheritedStorage = process.env.PROJECT_TOOL_STORAGE_HOME;
 afterEach(() => {
   if (inheritedStorage === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
@@ -111,6 +113,41 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
+test("native sidebar width survives startup validation without weakening runtime policy", () => {
+  const root = fixture();
+  const config = path.join(root, "config.toml");
+  for (const width of [1, 36, 99]) {
+    const content = `[tui]\nscreen_reader_detection_done = true\nsidebar_width_percent = ${width}\n`;
+    writeFileSync(config, content, { mode: 0o600 });
+    for (let launch = 0; launch < 2; launch += 1) {
+      assert.equal(validateRuntimeCodexConfig(root).status, "present");
+      assert.equal(readFileSync(config, "utf8"), content, "preserve the saved preference");
+    }
+  }
+  for (const invalid of ["0", "100", "255", '"36"', "true", "[]"]) {
+    writeFileSync(config, `[tui]\nsidebar_width_percent = ${invalid}\n`);
+    assert.throws(() => validateRuntimeCodexConfig(root), /terminal preference is unsupported/u);
+  }
+  for (const invalid of ["-1", "36.5", "{ columns = 36 }"]) {
+    writeFileSync(config, `[tui]\nsidebar_width_percent = ${invalid}\n`);
+    assert.throws(() => validateRuntimeCodexConfig(root), /must contain valid TOML/u);
+  }
+  for (const unsafe of [
+    '[tui]\nsidebar_width_percent = 36\ncommand = "run-project-code"\n',
+    '[tui.sidebar_width_percent]\ncommand = "run-project-code"\n',
+    'notify = ["sh", "-c", "run-project-code"]\n[tui]\nsidebar_width_percent = 36\n',
+  ]) {
+    writeFileSync(config, unsafe);
+    assert.throws(() => validateRuntimeCodexConfig(root), /unsupported/u);
+  }
+  const tracked = path.join(root, ".codex/config.toml");
+  writeFileSync(
+    tracked,
+    readFileSync(tracked, "utf8").replace("[tui]", "[tui]\nsidebar_width_percent = 36"),
+  );
+  assert.throws(() => validateCodexConfig(root), /unknown key tui\.sidebar_width_percent/u);
+});
+
 test("native voice preferences cannot introduce execution or transport configuration", () => {
   const root = fixture();
   const config = path.join(root, "config.toml");
@@ -188,10 +225,23 @@ test(
       ".codex/toolchain.json",
       "package.json",
       ".codex/mise.toml",
+      ".codex/mise.lock",
     ])
       cpSync(path.join(toolingRoot, file), path.join(root, file));
-    const layout = projectManagedToolLayout(root);
     const matrix = readToolchainConfiguration(root);
+    const launcher = `#!/bin/sh\nexec '${installedMiseExecutable.replaceAll("'", "'\\''")}' "$@"\n`;
+    const initial = projectManagedToolLayout(root);
+    matrix.ci.miseBinarySha256[path.basename(initial.mise.directory)] = createHash("sha256")
+      .update(launcher)
+      .digest("hex");
+    writeFileSync(path.join(root, ".codex/toolchain.json"), JSON.stringify(matrix));
+    cpSync(path.join(toolingRoot, ".codex/.mise"), path.join(root, ".codex/.mise"), {
+      recursive: true,
+    });
+    const layout = projectManagedToolLayout(root);
+    mkdirSync(path.dirname(layout.mise.executable), { recursive: true });
+    writeFileSync(layout.mise.executable, launcher, { mode: 0o755 });
+    sealProjectToolBundle(root, layout.mise.directory, layout.mise);
     for (const [executable, version] of [
       [layout.codex.executable, matrix.ci.codexVersion],
       [layout.pnpm.executable, matrix.stable.pnpm.version],

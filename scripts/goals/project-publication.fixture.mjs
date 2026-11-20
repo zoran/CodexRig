@@ -201,7 +201,9 @@ await import(${JSON.stringify(pathToFileURL(path.join(root, "scripts/goals/publi
   write(".codex/tooling.json", readFileSync(path.join(sourceRoot, ".codex/tooling.json"), "utf8"));
   write(".codex/mise.toml", "[tools]\n");
   write(".codex/mise.lock", "# Fixture has no provisioned tool dependencies.\n");
-  write("pnpm-workspace.yaml", "packages: []\n");
+  // Match the project hook policy: pnpm's dependency-status check needs an explicit empty list
+  // when the isolated environment disables pnpmfiles, even for dependency-free fixtures.
+  write("pnpm-workspace.yaml", "packages: []\npnpmfile: []\n");
   write(
     "package.json",
     JSON.stringify({

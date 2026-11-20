@@ -1,5 +1,5 @@
 /** Owns tool storage housekeeping through native collectors and quiescent legacy retirement. */
-import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync, mkdirSync, symlinkSync } from "node:fs";
 import path from "node:path";
 import { validateMinimalMiseTools } from "../contracts/mise-toolchain-configuration.mjs";
 import { readRepositoryFile } from "../filesystem/repository-files.mjs";
@@ -21,7 +21,10 @@ import {
 } from "../repository/user-tool-storage.mjs";
 import { inspectRepositoryWorktrees } from "../repository/worktree-recovery.mjs";
 import { inspectLinuxOpenRepositoryPaths } from "../repository/runtime-process-identity.mjs";
-import { reconcileProjectTemporaryStorage } from "../repository/project-temporary-storage.mjs";
+import {
+  createProjectTemporaryScope,
+  reconcileProjectTemporaryStorage,
+} from "../repository/project-temporary-storage.mjs";
 import {
   acquireRuntimeLifecycleLock,
   currentRuntimeLifecycleCapability,
@@ -32,6 +35,7 @@ import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycl
 import { assertTrustedPnpmConfiguration } from "../repository/pnpm-workspace-manifests.mjs";
 import { formatContextError, sanitizeForTerminal } from "../terminal/terminal-output.mjs";
 import { assertInstalledProjectTools } from "./project-runtime-admission.mjs";
+import { trustedPnpmCommand } from "./trusted-pnpm-command.mjs";
 import {
   retireReplacedProjectTools,
   retireUnreferencedUserBundles,
@@ -86,6 +90,11 @@ export function reconcileToolStorage({
       })
     : acquireRuntimeLifecycleLock({ root: shared.lifecycle, operation: "toolchain-maintenance" });
   const run = (command, args, overrides = {}) => {
+    if (process.platform === "win32" && command.endsWith("pnpm.cmd")) {
+      const pnpm = trustedPnpmCommand({ repositoryRoot: root, environment });
+      command = pnpm.executable;
+      args = [...pnpm.argsPrefix, ...args];
+    }
     const options = {
       cwd: root,
       env: { ...environment, ...overrides },
@@ -139,7 +148,25 @@ export function reconcileToolStorage({
       if (projects) {
         if (!projects.includes(root))
           throw new Error("Shared cleanup requires the current native Mise project reference.");
-        run(layout.mise.executable, ["prune", "--yes"]);
+        const collection = createProjectTemporaryScope({
+          root: shared.root,
+          parent: shared.temporary,
+        });
+        try {
+          const state = path.join(collection.directory, "state");
+          mkdirSync(state, { mode: 0o700 });
+          symlinkSync(shared.miseTrackedConfigs, path.join(state, "tracked-configs"), "dir");
+          run(layout.mise.executable, ["prune", "--yes"], {
+            MISE_STATE_DIR: state,
+            MISE_CONFIG_DIR: collection.directory,
+            MISE_SYSTEM_CONFIG_DIR: collection.directory,
+            MISE_GLOBAL_CONFIG_FILE: path.join(collection.directory, "global.toml"),
+            MISE_SYSTEM_CONFIG_FILE: path.join(collection.directory, "system.toml"),
+          });
+        } finally {
+          if (!collection.release())
+            report.deferred.push("native collection state has active consumers");
+        }
         report.actions.push("mise: unreferenced shared runtime versions");
         const bundles = retireUnreferencedUserBundles({ root, projects, owner: sharedOwner });
         report.actions.push(...bundles.removed.map((value) => `retired shared ${value}`));

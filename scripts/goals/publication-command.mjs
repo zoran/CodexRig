@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import process from "node:process";
 import { createOwnedProcessCancellation } from "../repository/runtime-process-cancellation.mjs";
 import { sanitizeMultilineForTerminal } from "../terminal/terminal-output.mjs";
+import { createPublicationVerificationProgress } from "../terminal/publication-output.mjs";
 
 const maximumOutputBytes = 64 * 1024 * 1024;
 
@@ -13,8 +14,12 @@ export async function runPublicationCommand({
   root,
   env,
   output,
+  verificationProgress = false,
   timeout = 60 * 60_000,
 }) {
+  const observe = verificationProgress
+    ? createPublicationVerificationProgress((message) => output?.task(message))
+    : null;
   const result = await new Promise((resolve, reject) => {
     const grouped = process.platform !== "win32";
     const child = spawn(command, args, {
@@ -45,6 +50,7 @@ export async function runPublicationCommand({
       else {
         chunks.push(chunk);
         stream.push(chunk);
+        observe?.(chunk, stream === stdout ? "stdout" : "stderr");
       }
     };
     child.stdout.on("data", (chunk) => capture(stdout, chunk));
@@ -90,27 +96,41 @@ export async function runPublicationCommand({
     // Each complete stream is sanitized before slicing, including credentials split across writes.
     // A credential can also span streams. Independent tails must not restore text removed from
     // the sanitized chronological capture; ambiguous interleaved fragments stay redacted.
-    const tail = (value, lines, characters) =>
-      sanitizeMultilineForTerminal(value, root)
-        .trim()
-        .split("\n")
-        .slice(-lines)
-        .join("\n")
-        .slice(-characters)
+    const excerpt = (value, lines, characters, preferFailure = false) => {
+      const sanitized = sanitizeMultilineForTerminal(value, root).trim().split("\n");
+      // Native test failures are written to stdout. Later successful peers must not displace the
+      // failed command and its first diagnostic, even when its stack trace exceeds the tail limit.
+      const failed = preferFailure
+        ? sanitized.findIndex((line) => /^\[verification:failed\] /u.test(line))
+        : -1;
+      const selected =
+        failed < 0
+          ? sanitized.slice(-lines).join("\n").slice(-characters)
+          : sanitized
+              .slice(failed, failed + lines)
+              .join("\n")
+              .slice(0, characters);
+      return selected
         .split("\n")
         .map((line) => (text.includes(line) ? line : "<redacted-interleaved-output>"))
         .join("\n")
         .slice(-characters);
-    const stdout = tail(result.stdout, result.stderr.trim() ? 20 : 55, 3000);
-    const stderr = tail(result.stderr, 35, 8000);
-    const excerpt = [
-      stdout ? `Command output (last lines):\n${stdout}` : "",
+    };
+    const stdout = excerpt(
+      result.stdout,
+      result.stderr.trim() ? 20 : 55,
+      3000,
+      verificationProgress,
+    );
+    const stderr = excerpt(result.stderr, 35, 8000);
+    const diagnostic = [
+      stdout ? `Command output (excerpt):\n${stdout}` : "",
       stderr ? `Command errors (last lines):\n${stderr}` : "",
     ]
       .filter(Boolean)
       .join("\n");
     throw new Error(
-      `${result.failure ?? `Command failed (${result.signal ?? result.status}).`}${excerpt ? `\n${excerpt}` : ""}`,
+      `${result.failure ?? `Command failed (${result.signal ?? result.status}).`}${diagnostic ? `\n${diagnostic}` : ""}`,
     );
   }
 }

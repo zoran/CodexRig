@@ -21,6 +21,10 @@ then stop. Keep one current contract and one writer per surface. Reuse valid evi
 resume are not test triggers. Reconcile documentation per slice; instruction/context edits require
 `pnpm context:check`.
 
+At most two active minutes apart, check the primary and every task-owned agent against the open
+acceptance condition. Correct drift and repeated work under
+[course checks](instructions.md#long-session-course-checks); do not adopt unrelated threads.
+
 Before child tools apply the
 [agent rules](instructions.md#subagent-orchestration-and-integration-authority): admission,
 effective permissions, current capacity, owned scope and lifecycle. The primary owns protected

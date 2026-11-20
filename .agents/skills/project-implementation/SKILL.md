@@ -39,16 +39,24 @@ stateful work apply
 ## Select Evidence And Finish
 
 For material defects prove the original failure and affected consumers through shipped code. Mocks
-may isolate external systems, not replace the invariant under test. Use realistic existing cases;
-editorial edits do not need implementation-mirroring tests. Distinguish fixture, rendered, native
-and real-target evidence.
+may isolate external systems, not replace the invariant under test. Exercise contracts directly with
+existing specimens; keep complete provisioning and recovery journeys at one explicit integration
+owner. A module check must not replay prerequisite domains. Editorial edits need no
+implementation-mirroring tests. Distinguish fixture, rendered, native and real-target evidence.
 
 Inspect `pnpm verify:changed -- --print-plan`, reuse valid results and run only necessary checks.
-Missing complete coverage does not start a development full run. Apply
+Use `--check <key>` and, for an independent Node file, `--test-file <path>` to retain focused
+successes for later composition. Filtered case diagnosis is not complete-file evidence. Place new
+tests at a small behavior owner; keep costly integration setup out of unrelated unit cases. Missing
+complete coverage does not start a development full run. Apply
 [documentation currency](../../../instructions.md#documentation-currency), report protected-owner
 corrections to the primary, and use `$system-coherence` plus relevant specialist review at
 acceptance. `$task-quality` composes that evidence without another blanket pass. Continue unfinished
 authorized work and stop when acceptance is met.
+
+Tie every additional investigation or repair to an unmet acceptance condition. Park unrelated
+findings in the handoff without adopting them; follow the course-check limit when attempts stop
+producing new evidence. A review is a bounded acceptance decision, not a search for more work.
 
 For interactive surfaces read [Rendered UI Implementation](references/rendered-ui.md); other work
 does not load that conditional workflow.

@@ -130,10 +130,6 @@ export function serializeDeliveryConfiguration(configuration) {
   return content;
 }
 
-export function initialDeliveryConfiguration() {
-  return serializeDeliveryConfiguration({ declaredTargets: [], detectedTargets: [] });
-}
-
 export function reconcileDetectedDeliveryTargets(configuration, detectedTargets) {
   return serializeDeliveryConfiguration({
     declaredTargets: configuration.declaredTargets,

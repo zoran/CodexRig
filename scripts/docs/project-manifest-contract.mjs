@@ -25,23 +25,6 @@ export const futureModulesIntentRule =
   "Record only explicitly confirmed future candidates. If current-versus-future intent is ambiguous, ask the developer; until clarified, do not implement the idea or change either inventory.";
 export const noFutureModulesStatement = "No future module candidates are currently recorded.";
 
-export function initialFutureModulesDocument() {
-  return `# Future Modules
-
-${futureModulesPreamble}
-
-${futureModulesActivationRule}
-
-${futureModulesIntentRule}
-
-Link detailed requirements at their established owner; this candidate/activation index does not duplicate a specification.
-
-## Candidates
-
-${noFutureModulesStatement}
-`;
-}
-
 const moduleFields = Object.freeze([
   "Root",
   "Responsibility",

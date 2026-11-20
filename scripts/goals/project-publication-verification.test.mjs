@@ -99,6 +99,7 @@ test('transport valid', () => { appendFileSync('.auth/product-checks.jsonl', '{"
   assert.equal(f.counter().filter((row) => row.case === "shared").length, 1);
   const output = run("project:publish", "--message", "Publish narrow verified repair", "--verbose");
   assert.match(output, /Pre-push verification passed/u);
+  assert.match(output, /> Verification: \d+ reused; \d+ required/u);
   assert.equal(f.counter().length, count, "publisher and downstream hook reuse the same evidence");
   f.write(
     transportTest,

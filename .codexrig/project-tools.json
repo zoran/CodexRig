@@ -51,7 +51,9 @@
       ".codex/mise.toml",
       "package.json",
       "pnpm-lock.yaml",
-      "pnpm-workspace.yaml"
+      "pnpm-workspace.yaml",
+      ".codex/.mise/locks/pnpm/current/package.json",
+      ".codex/.mise/locks/pnpm/current/aube-lock.yaml"
     ],
     "context": [
       "scripts/context/critical-budget-handover.mjs",
@@ -93,7 +95,9 @@
       "scripts/deps/update.mjs",
       "scripts/deps/verify-pnpm-execution-policy.mjs",
       "scripts/deps/tool-storage-housekeeping.mjs",
-      "scripts/deps/tool-storage-housekeeping.test.mjs"
+      "scripts/deps/tool-storage-housekeeping.test.mjs",
+      "scripts/deps/pnpm-toolchain-graph.mjs",
+      "scripts/deps/pnpm-toolchain-graph.test.mjs"
     ],
     "docs": [
       "scripts/docs/delivery-manifest.mjs",
@@ -103,13 +107,14 @@
       "scripts/docs/project-document-policy.mjs",
       "scripts/docs/project-manifest-contract.mjs",
       "scripts/docs/ensure-project-manifest.mjs",
-      "scripts/docs/initial-project-manifest.mjs",
       "scripts/docs/document-context.mjs",
       "scripts/docs/markdown-fences.mjs"
     ],
     "filesystem": [
       "scripts/filesystem/owned-file-operations.mjs",
-      "scripts/filesystem/owned-path-safety.mjs"
+      "scripts/filesystem/artifact-identity.mjs",
+      "scripts/filesystem/owned-path-safety.mjs",
+      "scripts/filesystem/owned-file-read.test.mjs"
     ],
     "git-hooks": ["scripts/git-hooks/pre-push"],
     "goals": [
@@ -207,7 +212,11 @@
       "scripts/setup/repository-storage.test.mjs"
     ],
     "stack": ["scripts/stack/stack-detector.mjs"],
-    "terminal": ["scripts/terminal/terminal-output.mjs", "scripts/terminal/publication-output.mjs"],
+    "terminal": [
+      "scripts/terminal/terminal-output.mjs",
+      "scripts/terminal/terminal-output.test.mjs",
+      "scripts/terminal/publication-output.mjs"
+    ],
     "verify": [
       "scripts/verify/a11y.mjs",
       "scripts/verify/adaptive-options.mjs",
@@ -336,6 +345,7 @@
     "api-security",
     "format",
     "runtime-safety",
+    "terminal-safety",
     "toolchain-admission",
     "module-imports",
     "project-publication"

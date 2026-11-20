@@ -26,6 +26,7 @@ const commandOperationVariable = "CODEXRIG_LIFECYCLE_COMMAND_OPERATION";
 const commandRoleVariable = "CODEXRIG_LIFECYCLE_COMMAND_ROLE";
 const guardDescriptorVariable = "CODEXRIG_LIFECYCLE_GUARD_FD";
 const witnessTokenVariable = "CODEXRIG_LIFECYCLE_WITNESS_TOKEN";
+const cancelOnDisconnectVariable = "CODEXRIG_LIFECYCLE_CANCEL_ON_DISCONNECT";
 const delegatedTokenVariable = "CODEXRIG_LIFECYCLE_DELEGATION_TOKEN";
 const delegatedOperationVariable = "CODEXRIG_LIFECYCLE_DELEGATION_OPERATION";
 const delegatedRoleVariable = "CODEXRIG_LIFECYCLE_DELEGATION_ROLE";
@@ -41,6 +42,7 @@ const privateVariables = [
   commandRoleVariable,
   guardDescriptorVariable,
   witnessTokenVariable,
+  cancelOnDisconnectVariable,
 ];
 const publicDelegationVariables = [
   delegatedTokenVariable,
@@ -182,6 +184,7 @@ function supervisedCommandRole(role) {
 /** Spawns an asynchronous command whose supervisor and process group remain lifecycle-visible. */
 export function spawnRuntimeLifecycleCommand({
   args = [],
+  cancelOnDisconnect = false,
   command,
   commandDelegation = null,
   lifecycleCapability,
@@ -189,6 +192,8 @@ export function spawnRuntimeLifecycleCommand({
   repositoryRoot,
   role,
 }) {
+  if (typeof cancelOnDisconnect !== "boolean")
+    throw new Error("Lifecycle owner-loss cancellation must be explicitly boolean.");
   supervisedCommandRole(role);
   const descriptor = runtimeLifecycleGuardDescriptor({
     root: repositoryRoot,
@@ -205,16 +210,21 @@ export function spawnRuntimeLifecycleCommand({
   try {
     child = spawn(process.execPath, supervisedArguments(command, args), {
       ...options,
-      detached: false,
-      env: childEnvironment({
-        commandDelegation: delegations.command,
-        environment: options.env ?? process.env,
-        guardIndex,
-        repositoryRoot,
-        role,
-        supervisor: delegations.supervisor,
-        witness: delegations.witness,
-      }),
+      // The coordinator's process-group termination must leave this owner alive long enough
+      // to drain its command. IPC, not membership in the caller's terminal group, owns lifetime.
+      detached: process.platform !== "win32",
+      env: {
+        ...childEnvironment({
+          commandDelegation: delegations.command,
+          environment: options.env ?? process.env,
+          guardIndex,
+          repositoryRoot,
+          role,
+          supervisor: delegations.supervisor,
+          witness: delegations.witness,
+        }),
+        [cancelOnDisconnectVariable]: String(cancelOnDisconnect),
+      },
       stdio: [...stdio, "ipc"],
     });
   } catch (error) {
@@ -346,6 +356,13 @@ async function supervise(command, args) {
     return cancelled;
   };
   const handlers = new Map();
+  const stop = (signal) => {
+    if (shutdownSignal) return;
+    shutdownSignal = signal;
+    cancel(signal);
+  };
+  const disconnected = () => stop("SIGTERM");
+  const cancelOnDisconnect = process.env[cancelOnDisconnectVariable] === "true";
   try {
     child = spawn(command, args, {
       cwd: process.cwd(),
@@ -364,13 +381,14 @@ async function supervise(command, args) {
       });
     }
     for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
-      const handler = () => {
-        if (shutdownSignal) return;
-        shutdownSignal = signal;
-        cancel(signal);
-      };
+      const handler = () => stop(signal);
       handlers.set(signal, handler);
       process.on(signal, handler);
+    }
+    if (cancelOnDisconnect) {
+      process.once("disconnect", disconnected);
+      // The caller can die before this supervisor arms IPC. Do not miss that startup race.
+      if (!process.connected) disconnected();
     }
     // Coordinator death closes IPC. Readiness is advisory; a lost notification must never
     // strand the registered command or prevent the supervisor's durable cleanup.
@@ -394,6 +412,7 @@ async function supervise(command, args) {
     await cancel("SIGTERM");
     throw error;
   } finally {
+    process.off("disconnect", disconnected);
     for (const [signal, handler] of handlers) process.off(signal, handler);
     if (!cancellationFailed && registration) {
       unregisterRuntimeLifecycleDescendant({

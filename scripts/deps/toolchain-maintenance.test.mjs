@@ -68,12 +68,9 @@ function fixture(t) {
   return root;
 }
 
-function omitForeignArtifact(lock) {
-  const altered = lock.replace(
-    /^\[tools\.pnpm\."platforms\.linux-arm64-musl"\]\r?\n[^[]*/mu,
-    '[tools.pnpm."platforms.linux-arm64-musl"]\nprovenance = "github-attestations"\n\n',
-  );
-  assert.notEqual(altered, lock, "fixture must contain the foreign-platform artifact");
+function omitForeignArtifact(content) {
+  const altered = content.replace(/^aube = .*\n/mu, "");
+  assert.notEqual(altered, content, "fixture must contain the portable pnpm graph");
   return altered;
 }
 
@@ -575,7 +572,7 @@ for (const scope of ["project", "shared"]) {
 }
 
 for (const [label, corruptLock] of [
-  ["an incomplete foreign pnpm platform", omitForeignArtifact],
+  ["an incomplete portable pnpm graph", omitForeignArtifact],
   ["a Node musl source fallback", nodeSourceFallback],
 ]) {
   for (const mutationAt of ["before-install", "after-dependencies"]) {
@@ -615,7 +612,7 @@ for (const [label, corruptLock] of [
             return "";
           },
         }),
-        /Candidate toolchain lock is invalid:.*linux-arm64-musl/u,
+        /Candidate toolchain lock is invalid:.*(?:linux-arm64-musl|pnpm)/u,
       );
       assert.equal(
         calls.some((args) => args.includes("--reproduce-toolchain")),

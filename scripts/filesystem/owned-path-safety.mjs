@@ -19,6 +19,13 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import {
+  readStableFileSnapshot,
+  safeArtifactStats,
+  sameObjectIdentity,
+  sameStableIdentity,
+} from "./artifact-identity.mjs";
+export { safeArtifactStats, sameObjectIdentity, sameStableIdentity } from "./artifact-identity.mjs";
 
 const maximumRemovalTreeEntries = 100_000;
 
@@ -67,12 +74,6 @@ function refusesNestedMount(rootPath, mountPoints, label) {
     return relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`));
   });
   if (nested) throw new Error(`Owned path safety refused mounted content in ${label}.`);
-}
-
-function artifactType(stats) {
-  if (stats.isDirectory()) return "directory";
-  if (stats.isFile()) return "file";
-  return "other";
 }
 
 function safeOwnedDirectory(directoryPath, label) {
@@ -266,7 +267,7 @@ export function openPrivateOwnedDirectory(ownedRootPath, directoryPath, label) {
   return binding;
 }
 
-export function ownedDirectoryChildPath(binding, basename, label) {
+function validateChildName(basename, label) {
   if (
     typeof basename !== "string" ||
     !basename ||
@@ -276,6 +277,10 @@ export function ownedDirectoryChildPath(binding, basename, label) {
   ) {
     throw new Error(`Repository path safety refused an invalid child name in ${label}.`);
   }
+}
+
+export function ownedDirectoryChildPath(binding, basename, label) {
+  validateChildName(basename, label);
   validateOwnedDirectoryBinding(binding, label);
   return path.join(binding.operationPath, basename);
 }
@@ -354,25 +359,37 @@ export function listOwnedDirectory(binding, label, options) {
 
 export function readStableOwnedFile(binding, basename, label, { maximumBytes } = {}) {
   const target = ownedDirectoryChildPath(binding, basename, label);
-  const initial = safeArtifactStats(target, "file", label);
-  if (maximumBytes !== undefined && initial.size > maximumBytes) {
-    throw new Error(`Repository path safety refused oversized ${label}.`);
-  }
-  const descriptor = openSync(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  const row = readStableFileSnapshot(target, label, maximumBytes);
+  validateOwnedDirectoryBinding(binding, label);
+  return row;
+}
+
+/** Reads a small synchronous sibling batch through one held inode; releases no data before revalidation. */
+export function readStableOwnedFiles(
+  binding,
+  basenames,
+  label,
+  { maximumBytes, optional = false } = {},
+) {
+  if (!Array.isArray(basenames) || basenames.length > 64 || typeof optional !== "boolean")
+    throw new Error(`Repository path safety refused an unbounded file batch in ${label}.`);
+  for (const basename of basenames) validateChildName(basename, label);
+  validateOwnedDirectoryBinding(binding, label);
   try {
-    const opened = fstatSync(descriptor);
-    if (!sameStableIdentity(initial, opened)) {
-      throw new Error(`Repository path safety detected an identity change in ${label}.`);
-    }
-    const buffer = readFileSync(descriptor);
-    const after = fstatSync(descriptor);
-    if (!sameStableIdentity(opened, after) || buffer.length !== after.size) {
-      throw new Error(`Repository path safety detected a content change in ${label}.`);
-    }
-    validateOwnedDirectoryBinding(binding, label);
-    return { buffer, stats: after };
+    return basenames.map((basename) => {
+      try {
+        return readStableFileSnapshot(
+          path.join(binding.operationPath, basename),
+          label,
+          maximumBytes,
+        );
+      } catch (error) {
+        if (optional && error.code === "ENOENT") return null;
+        throw error;
+      }
+    });
   } finally {
-    closeSync(descriptor);
+    validateOwnedDirectoryBinding(binding, label);
   }
 }
 
@@ -404,42 +421,6 @@ export function removeStableOwnedFile(binding, basename, expectedIdentity, label
     }
     throw error;
   }
-}
-
-export function sameObjectIdentity(left, right) {
-  return (
-    left.dev === right.dev &&
-    left.ino === right.ino &&
-    left.nlink === right.nlink &&
-    artifactType(left) === artifactType(right)
-  );
-}
-
-export function sameStableIdentity(left, right) {
-  return (
-    sameObjectIdentity(left, right) &&
-    left.size === right.size &&
-    left.mtimeMs === right.mtimeMs &&
-    left.ctimeMs === right.ctimeMs
-  );
-}
-
-export function safeArtifactStats(artifactPath, expectedType, label) {
-  const stats = lstatSync(artifactPath);
-  if (expectedType === "symlink") {
-    if (!stats.isSymbolicLink()) {
-      throw new Error(`Owned path safety refused malformed ${label}.`);
-    }
-    return stats;
-  }
-  const type = artifactType(stats);
-  if (stats.isSymbolicLink() || type !== expectedType) {
-    throw new Error(`Owned path safety refused malformed ${label}.`);
-  }
-  if (type === "file" && stats.nlink !== 1) {
-    throw new Error(`Owned path safety refused hardlinked ${label}.`);
-  }
-  return stats;
 }
 
 export function validateRemovalTree(

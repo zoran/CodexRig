@@ -3,23 +3,21 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
   initialProductConfiguration,
-  productConfigurationPath,
-} from "../contracts/product-configuration.mjs";
-import {
   initialDeliveryConfiguration,
+  initialTenancyConfiguration,
+  initialLocalizationConfiguration,
+} from "./initial-project-configuration.mjs";
+import { productConfigurationPath } from "../contracts/product-configuration.mjs";
+import {
   parseDeliveryConfiguration,
   deliveryConfigurationPath,
 } from "../contracts/delivery-configuration.mjs";
+import { tenancyConfigurationPath } from "../contracts/tenancy-configuration.mjs";
+import { localizationConfigurationPath } from "../contracts/localization-configuration.mjs";
 import {
-  initialTenancyConfiguration,
-  tenancyConfigurationPath,
-} from "../contracts/tenancy-configuration.mjs";
-import {
-  initialLocalizationConfiguration,
-  localizationConfigurationPath,
-} from "../contracts/localization-configuration.mjs";
-import { initialProjectManifest } from "../docs/initial-project-manifest.mjs";
-import { initialFutureModulesDocument } from "../docs/project-manifest-contract.mjs";
+  initialProjectManifest,
+  initialFutureModulesDocument,
+} from "../docs/initial-project-manifest.mjs";
 import { initialRequirementsPath } from "../docs/project-document-policy.mjs";
 import { renderDeliveryManifestProjection } from "../docs/delivery-manifest.mjs";
 import {
@@ -106,8 +104,10 @@ The launcher uses \`--startup\` maintenance to discover compatible releases; \`-
 prepares frozen inputs for CI. Do not repeat preparation when its required state is already valid.
 \`node --test scripts/setup/codex-launcher.test.mjs\` checks the invocation without installation.
 Only an explicitly authorized Dev session may add \`--yolo\`; prompts follow native session selection.
-Restart through the launcher after runtime changes. Waiting startup reports live lifecycle owners;
-never remove a lock or interrupt another owner to bypass admission.
+Restart through the launcher after runtime changes. Startup waits for live lifecycle coordinators;
+dead coordinators with surviving commands require owned recovery instead of a long wait.
+Cancellable verification checks drain when their caller exits; other operations retain their
+completion boundary. Never remove a lock or interrupt another owner to bypass admission.
 
 After critical handover exit with \`/quit\`, relaunch from this root's terminal and accept the announced
 prompt before reading it. \`/new\` and \`/resume\` do not replace the controller. Preserve private
@@ -132,7 +132,8 @@ ${description ? "- [Requirements intake draft](docs/requirements.md)\n" : ""}
 
 Use \`bash -p scripts/setup/run-project.sh <command> [arguments]\` from a host shell for the pinned,
 locked and isolated environment. Mise inputs live explicitly in \`.codex/mise.toml\` and
-\`.codex/mise.lock\`; host-shell discovery does not activate them after exit.
+\`.codex/mise.lock\`; host-shell discovery does not activate them after exit. pnpm uses the official
+npm distribution and its integrity-bound graph in \`.codex/.mise/locks/pnpm/current/\`.
 
 | Purpose | Command |
 | --- | --- |
@@ -151,9 +152,14 @@ The single \`.codex/verification.json\` contract selects commands and actual con
 required/reused units, prerequisites, gaps and observed/unknown costs. Development runs only necessary
 checks; missing full evidence, review, resume or a new commit does not start a full suite. Independent
 successes survive failure. Unknown input ownership needs a concrete mapping repair.
+\`pnpm verify -- --print-plan\` checks complete-coverage admission without executing tests. Unmapped
+inputs fail the command; missing results remain pending coverage.
 
-\`pnpm verify:changed -- --check <key>\` reproduces one unresolved check without recording acceptance;
-Node cases may use \`--test-name-pattern\`. Publication assembles complete coverage once from valid
+\`pnpm verify:changed -- --check <key>\` runs or reuses one check and retains its results. Add
+\`--test-file <path>\` for one independent Node file; its result counts in the complete suite.
+\`--test-name-pattern\` is diagnosis only and records no complete-file evidence.
+\`--test-timeout=<milliseconds>\` preserves independent Node file results and binds their execution limit.
+Publication assembles complete coverage once from valid
 and fresh units. External observations need declared freshness; build evidence does not prove that
 required output files still exist. Consumers must validate actual artifact/state prerequisites.
 See [verification policy](instructions.md#verification-selection-and-runtime).
@@ -170,6 +176,7 @@ The publisher prepares and verifies the exact state, commits all non-ignored cha
 branch and pushes to its configured upstream. Failed gates stop; rejected push preserves the local
 commit for retry. Protections and independent CI remain. No force push, automatic merge or deployment
 is implied. A proven canonical caller may publish in-session; competing/unknown writers block it.
+Verification progress shows reused results and active checks before completion.
 [Delegated release](instructions.md#delegated-release) uses independent Git metadata and an accepted
 \`--candidate <HEAD>:<tree>\`. Deployment needs its own authority and observed target acceptance.
 
@@ -205,7 +212,8 @@ The project owner chooses licensing before distribution; third-party dependencie
 
 Tracked \`config.toml\`, \`agents/*.toml\` and \`hooks.json\` own native role, permission and
 lifecycle-hook configuration. \`tooling.json\` selects startup/providers; \`toolchain.json\`,
-\`mise.toml\` and \`mise.lock\` pin tools; \`verification.json\` declares checks and consumers.
+\`mise.toml\` and \`mise.lock\` pin tools; \`.mise/locks/pnpm/current/\` carries the portable pnpm
+package graph. \`verification.json\` declares checks and consumers.
 Exact schemas belong to validators. Configuration validation does not prove model obedience.
 
 Use the canonical [README commands](../README.md#essential-commands). Policy/runtime changes need

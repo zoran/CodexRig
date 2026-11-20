@@ -1,59 +1,25 @@
-/** Owns ensure project manifest behavior for the durable documentation contract boundary. */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+/** Validates maintained project documents; creation belongs to the source generator. */
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import {
-  deliveryConfigurationPath,
-  initialDeliveryConfiguration,
-  parseDeliveryConfiguration,
-} from "../contracts/delivery-configuration.mjs";
 import { futureModulesPath, projectManifestPath } from "./document-scope.mjs";
-import { renderDeliveryManifestProjection } from "./delivery-manifest.mjs";
 import {
   activeFutureModuleOverlapFindings,
   futureModulesDocumentFindings,
-  initialFutureModulesDocument,
   projectManifestFindings,
 } from "./project-manifest-contract.mjs";
-
-import { initialProjectManifest } from "./initial-project-manifest.mjs";
-
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const manifestPath = path.join(root, ...projectManifestPath.split("/"));
 const futureModulesFile = path.join(root, ...futureModulesPath.split("/"));
-const checkOnly = process.argv.includes("--check");
-const deliveryPath = path.join(root, ...deliveryConfigurationPath.split("/"));
-const defaultDeliveryProjection = renderDeliveryManifestProjection({
-  configuration: existsSync(deliveryPath)
-    ? parseDeliveryConfiguration(readFileSync(deliveryPath, "utf8"))
-    : null,
-});
-
-const defaultManifest = initialProjectManifest({ deliveryProjection: defaultDeliveryProjection });
-
-if (!existsSync(manifestPath)) {
-  if (checkOnly) {
-    console.error("Project Manifest is missing: docs/project.md");
+for (const [file, label] of [
+  [manifestPath, "Project Manifest"],
+  [futureModulesFile, "Future Modules inventory"],
+]) {
+  if (!existsSync(file)) {
+    console.error(label + " is missing: " + path.relative(root, file));
     process.exit(1);
   }
-  mkdirSync(path.dirname(manifestPath), { recursive: true });
-  writeFileSync(manifestPath, defaultManifest, "utf8");
-  if (!existsSync(futureModulesFile)) {
-    writeFileSync(futureModulesFile, initialFutureModulesDocument(), "utf8");
-  }
-  console.log("Created docs/project.md Project Manifest.");
-  process.exit(0);
-}
-
-if (!existsSync(futureModulesFile)) {
-  if (checkOnly) {
-    console.error("Future Modules inventory is missing: docs/future-modules.md");
-    process.exit(1);
-  }
-  mkdirSync(path.dirname(futureModulesFile), { recursive: true });
-  writeFileSync(futureModulesFile, initialFutureModulesDocument(), "utf8");
-  console.log("Created docs/future-modules.md future candidate inventory.");
 }
 
 const current = readFileSync(manifestPath, "utf8");

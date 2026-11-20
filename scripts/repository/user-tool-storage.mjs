@@ -10,6 +10,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { createHash } from "node:crypto";
 import {
   ensureOwnedDirectoryChain,
   removeOwnedArtifact,
@@ -102,7 +103,16 @@ export function prepareUserToolDirectories(inherited = process.env) {
 function hasNonExecutingTrackedPins(content) {
   try {
     const parsed = parsePortableToml(content);
-    if (Object.keys(parsed).join() !== "tools" || !parsed.tools || Array.isArray(parsed.tools))
+    if (
+      Object.keys(parsed).some((key) => !["tools", "tool_alias"].includes(key)) ||
+      !parsed.tools ||
+      Array.isArray(parsed.tools)
+    )
+      return false;
+    if (
+      parsed.tool_alias &&
+      JSON.stringify(parsed.tool_alias) !== JSON.stringify({ pnpm: { backend: "npm:pnpm" } })
+    )
       return false;
     const entries = Object.entries(parsed.tools);
     if (!entries.length || entries.length > 64) return false;
@@ -126,7 +136,13 @@ function hasNonExecutingTrackedPins(content) {
   }
 }
 
-/** Shares native Mise references; trust, encrypted env and account state stay private. */
+function privateMiseConfig(root, config) {
+  return ["mise", "mise-system"].some(
+    (name) => config === path.join(root, ".auth/project-tools/config", name, "config.toml"),
+  );
+}
+
+/** Publishes only public pins into native tracking; each project's private tracker stays local. */
 export function prepareMiseTracking(root, { migrate = false, inherited = process.env } = {}) {
   if (!existsSync(path.join(root, ".codex/mise.toml"))) return false;
   if (!hasNonExecutingTrackedPins(readRepositoryFile(root, ".codex/mise.toml"))) return false;
@@ -141,38 +157,48 @@ export function prepareMiseTracking(root, { migrate = false, inherited = process
   if (existing?.isSymbolicLink()) {
     if (readlinkSync(directory) !== shared.miseTrackedConfigs)
       throw new Error("Mise tracking must bind the admitted user installation registry.");
-    return true;
-  }
-  if (existing) {
     if (!migrate) return false;
-    ensureOwnedPrivateDirectory(root, directory, "legacy Mise tracking");
-    assertUserToolParents(root, path.join(directory, "entry"));
-    for (const name of readdirSync(directory)) {
-      const source = path.join(directory, name);
-      if (!lstatSync(source).isSymbolicLink())
-        throw new Error("Mise tracking contains an unknown native entry.");
-      const target = readlinkSync(source);
-      const destination = path.join(shared.miseTrackedConfigs, name);
-      if (lstatSync(destination, { throwIfNoEntry: false })) {
-        if (!lstatSync(destination).isSymbolicLink() || readlinkSync(destination) !== target)
-          throw new Error("Mise tracking has conflicting native project references.");
-      } else symlinkSync(target, destination);
-      claimAndRemove({
-        ownedRootPath: root,
-        artifactPath: source,
-        expectedType: "symlink",
-        label: "migrated native Mise reference",
-        expectedIdentity: lstatSync(source),
-      });
-    }
-    removeOwnedArtifact(root, directory, "directory", "migrated native Mise tracking", {
-      expectedIdentity: lstatSync(directory),
+    removeOwnedArtifact(root, directory, "symlink", "legacy shared Mise tracker", {
+      expectedIdentity: existing,
     });
   }
+  ensureOwnedPrivateDirectory(root, directory, "private Mise tracking");
+  // A migration interrupted after detaching the link resumes here. Copy before retiring the
+  // caller's shared private references; foreign references and all configuration bytes survive.
+  if (migrate)
+    for (const name of readdirSync(shared.miseTrackedConfigs)) {
+      const source = path.join(shared.miseTrackedConfigs, name);
+      const identity = lstatSync(source);
+      if (!identity.isSymbolicLink())
+        throw new Error("Mise project reference is not a native link.");
+      const target = readlinkSync(source);
+      if (!privateMiseConfig(root, target)) continue;
+      const destination = path.join(directory, name);
+      const previous = lstatSync(destination, { throwIfNoEntry: false });
+      if (previous && (!previous.isSymbolicLink() || readlinkSync(destination) !== target))
+        throw new Error("Mise tracking has conflicting private project references.");
+      if (!previous) symlinkSync(target, destination);
+      claimAndRemove({
+        ownedRootPath: shared.root,
+        artifactPath: source,
+        expectedType: "symlink",
+        expectedIdentity: identity,
+        label: "migrated private Mise reference",
+      });
+    }
+  const config = path.join(root, ".codex/mise.toml");
+  const reference = path.join(
+    shared.miseTrackedConfigs,
+    `project-${createHash("sha256").update(config).digest("hex")}`,
+  );
   try {
-    symlinkSync(shared.miseTrackedConfigs, directory, "dir");
+    symlinkSync(config, reference);
   } catch (error) {
-    if (error.code !== "EEXIST" || readlinkSync(directory) !== shared.miseTrackedConfigs)
+    if (
+      error.code !== "EEXIST" ||
+      !lstatSync(reference).isSymbolicLink() ||
+      readlinkSync(reference) !== config
+    )
       throw error;
   }
   return true;
@@ -202,7 +228,10 @@ export function trackedToolProjects(inherited = process.env) {
     ) {
       // Native Mise also tracks private environment/settings files. Never read or execute those
       // through another project's collector, and do not discard references that may retain tools.
-      retentionReasons.add("private Mise configuration is tracked");
+      const project = config.slice(0, config.lastIndexOf(`${path.sep}.auth${path.sep}`));
+      retentionReasons.add(
+        `legacy private Mise configuration for ${JSON.stringify(project)}; run that project's updated startup to migrate its references`,
+      );
       continue;
     }
     if (

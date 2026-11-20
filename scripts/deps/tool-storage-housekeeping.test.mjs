@@ -10,6 +10,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   rmSync,
   symlinkSync,
@@ -19,7 +20,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
-import { miseLockBlocks } from "../contracts/mise-toolchain-configuration.mjs";
+import { pnpmMiseAlias, miseLockBlocks } from "../contracts/mise-toolchain-configuration.mjs";
 import { toolingRoot, serializeCanonicalJson } from "../filesystem/repository-files.mjs";
 import {
   projectManagedToolLayout,
@@ -44,6 +45,7 @@ import { maintainToolchain } from "./maintain-toolchain.mjs";
 import { toolchainConfigurationPaths } from "./toolchain-maintenance-inputs.mjs";
 
 const installed = projectManagedToolLayout(toolingRoot);
+const installedPnpm = installed.pnpm.executable;
 
 test("shared tracking accepts current native and npm package pins without admitting executable configuration", (t) => {
   const parent = mkdtempSync(path.join(os.tmpdir(), "shared-tool-pins-"));
@@ -92,6 +94,24 @@ test("shared tracking accepts current native and npm package pins without admitt
   );
   rmSync(linkedReference);
   assert.deepEqual(trackedToolProjects().sort(), roots.sort());
+  const privateConfig = path.join(roots[1], ".auth/project-tools/config/mise/config.toml");
+  const privateReference = path.join(shared.miseTrackedConfigs, "legacy-private");
+  const privateContent = '[env]\nPRIVATE_SENTINEL = "preserved"\n';
+  write(privateConfig, privateContent);
+  symlinkSync(privateConfig, privateReference);
+  prepareMiseTracking(roots[0], { migrate: true });
+  assert.equal(readlinkSync(privateReference), privateConfig, "another project retains ownership");
+  assert.throws(
+    () => trackedToolProjects(),
+    (error) =>
+      error.code === deferredMiseTrackingErrorCode &&
+      error.message.includes(roots[1]) &&
+      /updated startup/u.test(error.message),
+  );
+  prepareMiseTracking(roots[1], { migrate: true });
+  assert.equal(lstatSync(privateReference, { throwIfNoEntry: false }), undefined);
+  assert.equal(readFileSync(privateConfig, "utf8"), privateContent);
+  assert.deepEqual(trackedToolProjects().sort(), roots.sort());
   write(
     path.join(roots[0], ".codex/mise.toml"),
     '[tools]\nnode = "24.21.0"\n"npm:pnpm" = "11.28.0"\n[env]\nUNSAFE = "exec:payload"\n',
@@ -122,7 +142,7 @@ function fixture(t) {
   const matrix = structuredClone(readToolchainConfiguration());
   const roots = ["first", "second", "obsolete"].map((name) => path.join(parent, name));
   for (const root of roots) mkdirSync(root);
-  const layout = projectManagedToolLayout(roots[0], matrix);
+  let layout = projectManagedToolLayout(roots[0], matrix);
   matrix.ci.miseBinarySha256[path.basename(layout.mise.directory)] = createHash("sha256")
     .update(launcher(installed.mise.executable))
     .digest("hex");
@@ -136,9 +156,13 @@ function fixture(t) {
     write(path.join(root, ".codex/toolchain.json"), serializeCanonicalJson(matrix));
     write(
       path.join(root, ".codex/mise.toml"),
-      `[tools]\nnode = "${pins.node}"\npnpm = "${pins.pnpm}"\n`,
+      `${pnpmMiseAlias}\n[tools]\nnode = "${pins.node}"\npnpm = "${pins.pnpm}"\n`,
     );
-    write(path.join(root, ".codex/mise.lock"), lock);
+    write(path.join(root, ".codex/mise.lock"), "lockfile_version = 4\n" + lock);
+    for (const name of ["package.json", "aube-lock.yaml"]) {
+      const relative = `.codex/.mise/locks/pnpm/current/${name}`;
+      write(path.join(root, relative), readFileSync(path.join(toolingRoot, relative), "utf8"));
+    }
     write(
       path.join(root, "pnpm-workspace.yaml"),
       "packages: []\nvirtualStoreType: global\nignorePnpmfile: true\npnpmfile: []\n",
@@ -160,8 +184,9 @@ function fixture(t) {
   }
   // These tiny launchers invoke the actual shipped runtimes. No Node/Python installation is
   // copied for any fixture or run, and the native Mise resolver/uninstaller remains real.
+  layout = projectManagedToolLayout(roots[0], matrix);
   write(layout.node.executable, launcher(installed.node.executable), 0o755);
-  write(layout.pnpm.executable, launcher(installed.pnpm.executable), 0o755);
+  write(layout.pnpm.executable, launcher(installedPnpm), 0o755);
   return { parent, roots, shared, layout: projectManagedToolLayout(roots[0]) };
 }
 function native(root, executable, args) {
@@ -327,7 +352,7 @@ test("real housekeeping collects unused shared packages, retires legacy runtimes
   );
 });
 
-test("private Mise configuration retains shared runtimes while independent native collectors still run", (t) => {
+test("private Mise configuration stays local while shared native collection proceeds", (t) => {
   const f = fixture(t);
   const [first, second] = f.roots;
   const privateConfig = path.join(second, ".auth/project-tools/config/mise/config.toml");
@@ -352,10 +377,10 @@ test("private Mise configuration retains shared runtimes while independent nativ
   } finally {
     lock.release();
   }
-  assert.equal(calls.filter(({ args }) => args[0] === "prune").length, 0);
+  assert.equal(calls.filter(({ args }) => args[0] === "prune").length, 1);
   assert.equal(calls.filter(({ args }) => args[0] === "store" && args[1] === "prune").length, 1);
-  assert.ok(result.deferred.some((reason) => /private Mise configuration/u.test(reason)));
-  assert.ok(existsSync(retainedRuntime));
+  assert.ok(!result.deferred.some((reason) => /private Mise configuration/u.test(reason)));
+  assert.ok(!existsSync(retainedRuntime));
   assert.equal(readFileSync(privateConfig, "utf8"), content);
 });
 
@@ -465,10 +490,12 @@ test("startup composes native cleanup and migrates private pin tracking without 
     }),
   );
   const tracked = path.join(root, ".auth/project-tools/mise/tracked-configs");
-  rmSync(tracked);
-  mkdirSync(tracked, { mode: 0o700 });
+  rmSync(tracked, { recursive: true });
+  symlinkSync(f.shared.miseTrackedConfigs, tracked, "dir");
+  const privateConfig = path.join(root, ".auth/project-tools/config/mise/config.toml");
+  write(privateConfig, '[env]\nPRIVATE_SENTINEL = "preserved"\n');
+  symlinkSync(privateConfig, path.join(f.shared.miseTrackedConfigs, "legacy-private"));
   chmodSync(path.dirname(tracked), 0o775);
-  chmodSync(tracked, 0o775);
   symlinkSync(
     path.join(f.parent, "removed-project/.codex/mise.toml"),
     path.join(tracked, "dead-reference"),
@@ -502,7 +529,13 @@ test("startup composes native cleanup and migrates private pin tracking without 
   });
   assert.deepEqual(result.changedPaths, []);
   assert.equal(existsSync(legacy), false);
-  assert.ok(lstatSync(tracked).isSymbolicLink());
+  assert.ok(lstatSync(tracked).isDirectory());
+  assert.ok(existsSync(path.join(tracked, "legacy-private")));
+  assert.equal(
+    lstatSync(path.join(f.shared.miseTrackedConfigs, "legacy-private"), { throwIfNoEntry: false }),
+    undefined,
+  );
+  assert.equal(readFileSync(privateConfig, "utf8"), '[env]\nPRIVATE_SENTINEL = "preserved"\n');
   assert.equal(lstatSync(path.dirname(tracked)).mode & 0o777, 0o700);
   assert.equal(
     lstatSync(path.join(tracked, "dead-reference"), { throwIfNoEntry: false }),

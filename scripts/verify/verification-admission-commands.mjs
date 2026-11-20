@@ -34,6 +34,10 @@ export function dedupeCommands(commands) {
   return [...result.values()];
 }
 
+export const isBoundedNodeTestTimeout = (argument) =>
+  /^--test-timeout=[1-9][0-9]{0,6}$/u.test(argument) &&
+  Number(argument.slice("--test-timeout=".length)) <= 3_600_000;
+
 function unfilteredTestPaths(command) {
   if (
     command.executable !== process.execPath ||
@@ -47,6 +51,7 @@ function unfilteredTestPaths(command) {
   // Unknown flags (filters, loaders, conditions, isolation overrides) retain the separate run.
   for (const argument of command.args) {
     if (["--test", "--test-reporter=dot", "--test-concurrency=1"].includes(argument)) continue;
+    if (isBoundedNodeTestTimeout(argument)) continue;
     if (argument.startsWith("-") || !argument.endsWith(".test.mjs")) return new Set();
     files.push(argument);
   }

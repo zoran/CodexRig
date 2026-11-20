@@ -204,6 +204,7 @@ test("the installed hook cannot be skipped through BASH_ENV", () => {
     "scripts/repository/user-tool-storage.mjs",
     "scripts/filesystem/repository-files.mjs",
     "scripts/filesystem/owned-file-operations.mjs",
+    "scripts/filesystem/artifact-identity.mjs",
     "scripts/filesystem/owned-path-safety.mjs",
     "scripts/repository/runtime-process-io.mjs",
     "scripts/setup/install-git-hooks.mjs",

@@ -4,7 +4,10 @@ import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { readOptionalOwnedFile } from "../filesystem/owned-file-operations.mjs";
-import { isProjectManagedExecutable } from "../repository/project-tool-executables.mjs";
+import {
+  isProjectManagedExecutable,
+  projectManagedToolLayout,
+} from "../repository/project-tool-executables.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
 import { parseSemver } from "../contracts/semver-contract.mjs";
 
@@ -64,6 +67,7 @@ export function trustedPnpmCommand({
   environment = process.env,
   spawn = spawnSync,
   nodeExecutable = process.execPath,
+  pnpmExecutable,
 } = {}) {
   const root = realpathSync.native(path.resolve(repositoryRoot));
   const expected = expectedToolchain(root);
@@ -71,13 +75,19 @@ export function trustedPnpmCommand({
     throw new Error(`Trusted pnpm requires compatibility-owned Node.js ${expected.node}.`);
   }
   const installsRoot = lockedMiseInstallsRoot(nodeExecutable, expected.node);
-  const pnpmRoot = path.join(installsRoot, "pnpm", expected.pnpm);
-  const cacheKey = `${root}\0${expected.node}\0${expected.pnpm}\0${realpathSync.native(nodeExecutable)}`;
+  const pinnedPnpm =
+    pnpmExecutable ?? projectManagedToolLayout(root, undefined, { environment }).pnpm.executable;
+  const pnpmRoot = path.dirname(path.dirname(path.dirname(pinnedPnpm)));
+  if (pnpmExecutable && path.dirname(pnpmRoot) !== path.join(installsRoot, "pnpm"))
+    throw new Error("Trusted pnpm must share the locked Node.js installation owner.");
+  const cacheKey = `${root}\0${expected.node}\0${expected.pnpm}\0${realpathSync.native(nodeExecutable)}\0${pinnedPnpm}`;
   if (spawn === spawnSync && commandCache.has(cacheKey)) return commandCache.get(cacheKey);
 
-  const names = process.platform === "win32" ? ["pnpm.exe", "pnpm.cmd", "pnpm"] : ["pnpm"];
-  for (const name of names) {
-    const candidate = path.join(pnpmRoot, name);
+  const script =
+    process.platform === "win32"
+      ? path.join(pnpmRoot, "node_modules", "pnpm", "bin", "pnpm.mjs")
+      : pinnedPnpm;
+  for (const candidate of [script]) {
     if (!path.isAbsolute(candidate) || !existsSync(candidate)) continue;
     let executable;
     try {
@@ -95,7 +105,9 @@ export function trustedPnpmCommand({
     } catch {
       continue;
     }
-    const result = spawn(executable, ["--version"], {
+    const argsPrefix = process.platform === "win32" ? [executable] : [];
+    const commandExecutable = process.platform === "win32" ? nodeExecutable : executable;
+    const result = spawn(commandExecutable, [...argsPrefix, "--version"], {
       cwd: root,
       encoding: "utf8",
       env: pnpmHooksDisabledEnvironment(environment, root),
@@ -107,8 +119,8 @@ export function trustedPnpmCommand({
       continue;
     }
     const command = Object.freeze({
-      executable,
-      argsPrefix: Object.freeze([]),
+      executable: commandExecutable,
+      argsPrefix: Object.freeze(argsPrefix),
       version: expected.pnpm,
     });
     if (spawn === spawnSync) commandCache.set(cacheKey, command);

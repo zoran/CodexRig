@@ -9,6 +9,8 @@ export const generatedProjectDocuments = new Set(generatedProjectDocumentPaths);
 export const defaultUntrackedPortableContractFiles = new Set([
   ".codex/mise.lock",
   ".codex/mise.toml",
+  ".codex/.mise/locks/pnpm/current/package.json",
+  ".codex/.mise/locks/pnpm/current/aube-lock.yaml",
 ]);
 export { requiredPortableContractFiles };
 export function projectTransferExclusionReason(

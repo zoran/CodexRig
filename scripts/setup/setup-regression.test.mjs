@@ -856,6 +856,7 @@ test("hook installation is managed and never overwrites an unrelated hook", () =
     "scripts/repository/user-tool-storage.mjs",
     "scripts/filesystem/repository-files.mjs",
     "scripts/filesystem/owned-file-operations.mjs",
+    "scripts/filesystem/artifact-identity.mjs",
     "scripts/filesystem/owned-path-safety.mjs",
   ]) {
     mkdirSync(path.dirname(path.join(fixture, relative)), { recursive: true });

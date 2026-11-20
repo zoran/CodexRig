@@ -73,7 +73,9 @@ It supplies no application, public service, product data model, deployment targe
   their strict configuration validator. Generated policy follows the same source owners; packaging
   tests do not prove long-session model obedience.
 - Private internals: Session-local ownership registries, role prompt wording, and sandbox-specific
-  settings.
+  settings. The private root `config.toml` admits only validated non-executable metadata, including
+  Codex's saved sidebar width (integer 1–99); startup preserves these preferences. The generator
+  ships the same runtime validator.
 - Owned data and migrations: Tracked role configuration only; no mutable data or migrations.
 - Tenant isolation: Framework only; no product tenant data.
 - Allowed dependencies: `scripts/context`, `scripts/setup`.
@@ -124,27 +126,34 @@ It supplies no application, public service, product data model, deployment targe
   consuming workflows.
 - Runtime and technology: Node.js ESM.
 - Public contract: Exported owned-root bindings, stable reads, atomic file replacement, bounded tree
-  validation/removal, and identity-checked directory/file mutation helpers.
+  validation/removal, and identity-checked directory/file mutation helpers. Synchronous sibling
+  reads retain per-file identity checks and revalidate the held parent before returning each bounded
+  batch; they do not cache filesystem trust across calls.
 - Private internals: Descriptor/mount discovery, identity checks, claim naming and durable syscall
   ordering.
 - Owned data and migrations: No data; callers retain ownership of every state tree they pass in.
 - Tenant isolation: Framework only; no product tenant data.
 - Allowed dependencies: None.
-- Focused verifier:
-  `node --test scripts/setup/startup-state.test.mjs scripts/deps/dependency-policy.test.mjs`
+- Focused verifier: `pnpm verify:changed -- --check owned-file-reads`; lifecycle consumers retain
+  their own checks.
 - Steward: Framework filesystem safety maintainer.
 
 #### Dependency Management
 
 - Root: `scripts/deps`
 - Responsibility: Compatible dependency/tool/CI resolution, isolated candidate validation,
-  transactional pin publication and offline reproduction.
+  transactional pin publication and offline reproduction. pnpm uses the official portable npm
+  distribution through Mise; its integrity-bound graph lives under
+  `.codex/.mise/locks/pnpm/current/` and travels with the toolchain transaction and generator.
+  Native Node artifacts still cover the supported platform matrix.
 - Runtime and technology: Node.js ESM.
 - Public contract: `deps:install`, `deps:report`, `deps:update*` and `maintain-toolchain.mjs`;
   `--startup` discovers releases, `--locked` reproduces frozen CI inputs. Existing lockfiles
   reproduce offline through the same owner.
 - Private internals: Resolution/install journals, lifecycle locks, staged revalidation and rollback;
-  native collectors retain referenced, live or uncertain state.
+  native collectors retain referenced, live or uncertain state. Shared Mise references contain
+  public pin files only; private tracking stays in each project. Quiescent migration retires only
+  that project's legacy shared private references.
 - Owned data and migrations: Managed changes to `package.json`, `pnpm-lock.yaml`, and approved
   dependency policy inputs; transient transaction state is disposable.
 - Tenant isolation: Framework only; no product tenant data.
@@ -259,7 +268,9 @@ It supplies no application, public service, product data model, deployment targe
   release requires independent Git metadata. Git credential fallback is provider/repository-bound;
   public author metadata recovery grants no account authority.
 - Private internals: Leases, mutexes, process identity, bounded I/O/cancellation and recoverable
-  file batches; incomplete ownership preserves state.
+  file batches; incomplete ownership preserves state. Independent supervisors drain cancellable
+  checks on caller loss; terminated Linux processes cannot retain a live identity. Startup rejects
+  orphaned active operations for owned recovery instead of waiting on a dead coordinator.
 - Owned data and migrations: Ignored writer leases/latest-session markers under `.codex/runtime/`,
   current `.project-state/repository-housekeeping/` journal, private operation-bound credential
   recovery and temporary roots. Full runtime removal requires proven quiescence; no product data is
@@ -331,7 +342,8 @@ It supplies no application, public service, product data model, deployment targe
 - Owned data and migrations: No mutable data or migrations.
 - Tenant isolation: Framework only; no product tenant data.
 - Allowed dependencies: `scripts/security`.
-- Focused verifier: `node --test scripts/terminal/terminal-output.test.mjs`
+- Focused verifier: `pnpm verify:changed -- --check terminal-safety`; the same independent check
+  ships to generated projects.
 - Steward: Security boundary maintainer.
 
 #### Adaptive Verification
@@ -345,7 +357,8 @@ It supplies no application, public service, product data model, deployment targe
 - Private internals: One verification registry and atomic evidence store. Command/input/runtime
   fingerprints, freshness and declared output hashes control reuse; unknown owners stop coverage.
   Audited static checks bind owned data and executable imports. Independent successes survive
-  failure; workspace cycles stay grouped.
+  failure; workspace cycles stay grouped. Registered checks and individual Node files retain the
+  same reusable units as complete verification; filtered case diagnosis records no coverage.
 - Owned data and migrations: One atomic validated evidence record and verification lock under
   ignored `.codex/runtime/`; incompatible disposable evidence is rejected, without a parallel reader
   or receipt history.
@@ -375,7 +388,7 @@ It supplies no application, public service, product data model, deployment targe
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `7.0.0`.
+- Framework version: `7.1.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

@@ -31,8 +31,24 @@ bash -p scripts/setup/run-project.sh pnpm framework:doctor -- --online
 
 Frozen setup and CI add `--locked` to the maintenance command; normal startup retains release
 discovery. [Dependency maintenance](instructions.md#dependency-installation-and-freshness) owns
-installation, migration and freshness. Busy lifecycle owners are reported and waited for; cancelling
-the wait preserves the owner. Never bypass a live or uncertain lock.
+installation, migration and freshness. Startup waits for a live lifecycle coordinator; cancelling
+the wait preserves the owner. A dead coordinator with surviving commands fails promptly for owned
+recovery. Cancellable verification checks drain when their caller exits; other operations retain
+their completion boundary. Never bypass a live or uncertain lock.
+
+Startup checks official native downloads with a one-byte ranged GET and cancels each response body,
+including when the server ignores Range. This avoids gateways that fail or stall on HEAD probes.
+HTTP 502, 503 and 504 allow at most two retries of the canonical address within the original timeout
+and total redirect allowance. HTTPS and artifact checks remain binding; persistent failures still
+stop release selection and never justify a downgrade.
+
+pnpm uses the official npm distribution on the pinned Node runtime. Its native GitHub builds are not
+required for other platforms. Mise binds the portable graph under
+`.codex/.mise/locks/pnpm/current/`; generation and transactional updates carry it with the pins.
+Shared tool collection tracks public pins separately from private Mise configuration. The next
+quiescent startup migrates this project's older shared private references without reading accounts.
+Legacy references from other projects name their owning roots and await those projects' updated
+startup; their versions remain protected until that migration.
 
 After framework changes, `/quit` and relaunch from the terminal; `/new` and `/resume` retain the
 running launcher. `/side` opens an independent temporary conversation. For startup defects, update
@@ -101,8 +117,13 @@ resumption does not start a full suite. Valid results survive independent failur
 commit changes; relevant inputs, commands, dependencies and environment determine reuse. Unknown
 dependencies need a contract correction before claiming coverage. `--print-plan` explains selection,
 reuse, prerequisites, remaining coverage and observed or unknown cost without executing checks.
-`pnpm verify:changed -- --check <key>` reproduces one registered check without recording acceptance;
-native Node checks also accept `--test-name-pattern <pattern>`.
+`pnpm verify -- --print-plan` validates complete-coverage admission and fails on unmapped inputs
+without running tests; missing results remain listed as pending coverage.
+`pnpm verify:changed -- --check <key>` runs or reuses one registered check and retains its results.
+Add `--test-file <path>` for one independent Node test file. Its result also counts in the complete
+suite. `--test-name-pattern <pattern>` is diagnosis only and does not record complete-file evidence.
+Bounded Node commands retain independent file evidence with `--test-timeout=<milliseconds>`;
+changing that limit invalidates the affected execution identity.
 
 Publication composes complete candidate coverage from valid and newly required results; manual
 verification, publisher retries and the managed pre-push hook share evidence. After reviewing and
@@ -115,9 +136,10 @@ bash -p scripts/setup/run-project.sh pnpm framework:publish --message "<commit m
 This authorizes cleanup, verification, commit and push of reviewed non-ignored source on `main`,
 followed by remote confirmation. Failures preserve source and local commits. A verified calling
 session may remain active; full runtime reset requires stopped sessions. `--verbose` shows sanitized
-check output. Generated projects use `project:publish` on their configured branch/upstream,
-retaining history and accounts without framework reset. Neither publisher deploys. Candidate pinning
-and isolated release clones follow [Delegated Release](instructions.md#delegated-release); see
+check output. Verification progress shows reused results and the active checks before completion.
+Generated projects use `project:publish` on their configured branch/upstream, retaining history and
+accounts without framework reset. Neither publisher deploys. Candidate pinning and isolated release
+clones follow [Delegated Release](instructions.md#delegated-release); see
 [publication gates](instructions.md#verification-and-publication-gates) for authority and evidence.
 
 A sealed critical handover is terminal: stop, exit Codex, relaunch and accept the announced

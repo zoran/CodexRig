@@ -10,7 +10,47 @@ import test from "node:test";
 import { createPublicationOutput } from "../terminal/publication-output.mjs";
 import { runPublicationCommand } from "./publication-command.mjs";
 
-async function failedDiagnostic(source, { timeout = 5000, verbose = false } = {}) {
+test("publication exposes verification progress while the command is still running", async (t) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "publication-progress-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const observed = path.join(directory, "observed");
+  const lines = [];
+  const output = createPublicationOutput({
+    root: directory,
+    log(line) {
+      lines.push(line);
+      if (line.includes("Verify fixture-check")) fs.writeFileSync(observed, "observed");
+    },
+  });
+  await output.phase(4, "Verify source", () =>
+    runPublicationCommand({
+      command: process.execPath,
+      args: [
+        "--input-type=module",
+        "--eval",
+        `
+      import {existsSync} from 'node:fs';
+      process.stdout.write('[verification:start] fixture-check (preflight)\\n');
+      const deadline = Date.now() + 2000;
+      while (!existsSync(${JSON.stringify(observed)}) && Date.now() < deadline)
+        await new Promise(resolve => setTimeout(resolve, 10));
+      process.exitCode = existsSync(${JSON.stringify(observed)}) ? 0 : 9;
+    `,
+      ],
+      root: directory,
+      env: {},
+      output,
+      verificationProgress: true,
+      timeout: 5000,
+    }),
+  );
+  assert(lines.some((line) => line.includes("[OK] 4/8")));
+});
+
+async function failedDiagnostic(
+  source,
+  { timeout = 5000, verbose = false, verificationProgress = false } = {},
+) {
   const lines = [];
   const output = createPublicationOutput({
     root: process.cwd(),
@@ -26,6 +66,7 @@ async function failedDiagnostic(source, { timeout = 5000, verbose = false } = {}
       env: {},
       output,
       timeout,
+      verificationProgress,
     });
   } catch (error) {
     failure = error;
@@ -44,6 +85,31 @@ test("publication retains an earlier SDK failure after successful Terraform outp
   `);
   assert.match(diagnostic, /Wear verification requires ANDROID_SDK_ROOT or ANDROID_HOME/u);
   assert.match(diagnostic, /Command failed \(1\)/u);
+  assert.ok(diagnostic.length < 12_000);
+});
+
+test("publication retains a failed test's cause before later successful checks", async () => {
+  const diagnostic = await failedDiagnostic(
+    `
+    process.stdout.write('[verification:failed] framework-regressions 10ms\\n');
+    process.stdout.write('[Framework regressions] node --test scripts/framework/framework-version.test.mjs\\n');
+    process.stdout.write('Failed tests:\\n');
+    process.stdout.write('Error: Missing required repository file: .codex/mise.toml.\\n');
+    process.stdout.write('token=fixture-private-test-value\\n');
+    process.stdout.write('    at Test.run (node:internal/test_runner/test:1:1)\\n'.repeat(80));
+    await new Promise(resolve => setTimeout(resolve, 30));
+    process.stdout.write('[verification:passed] framework-regressions 100ms\\n');
+    process.stdout.write('Successful sibling output.\\n'.repeat(160));
+    process.stderr.write('Adaptive verification failed: Broad regression checks failed: Framework regressions\\n');
+    process.exitCode = 1;
+  `,
+    { verificationProgress: true },
+  );
+  assert.match(diagnostic, /scripts\/framework\/framework-version\.test\.mjs/u);
+  assert.match(diagnostic, /Missing required repository file: \.codex\/mise\.toml/u);
+  assert.match(diagnostic, /Broad regression checks failed: Framework regressions/u);
+  assert.doesNotMatch(diagnostic, /fixture-private-test-value/u);
+  assert.ok(diagnostic.split("\n").length <= 65);
   assert.ok(diagnostic.length < 12_000);
 });
 
@@ -88,13 +154,14 @@ test("publication retains merged redaction when credentials span both captured s
       for (const verbose of [false, true]) {
         const diagnostic = await failedDiagnostic(
           `
+            process.stdout.write('[verification:failed] fixture-check 1ms\\n');
             process.${first}.write(${JSON.stringify(prefix)});
             await new Promise(resolve => setTimeout(resolve, 20));
             process.${second}.write(${JSON.stringify(suffix)});
             process.${second}.write('Actual check failed: retained failure summary.\\n');
             process.exitCode = 1;
           `,
-          { verbose },
+          { verbose, verificationProgress: true },
         );
         assert.doesNotMatch(diagnostic, new RegExp(privateValue, "u"));
         assert.match(diagnostic, /retained failure summary/u);

@@ -28,6 +28,7 @@ import {
 import { installProjectBootstrapTools } from "./project-tool-installation.mjs";
 import { assertInstalledProjectTools } from "./project-runtime-admission.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
+import { projectPnpmToolchainGraph, readPnpmToolchainGraph } from "./pnpm-toolchain-graph.mjs";
 import {
   acquireRuntimeLifecycleLock,
   releaseRuntimeLifecycleLock,
@@ -89,6 +90,11 @@ function assertCandidateLock(stage, candidate) {
       findings.push(`mise.toml ${tool} must match the selected candidate version`);
   if (findings.length)
     throw new Error(`Candidate toolchain lock is invalid: ${findings.join("; ")}.`);
+  readPnpmToolchainGraph(
+    stage,
+    readFileSync(path.join(stage, ".codex/mise.lock"), "utf8"),
+    candidate.stable.pnpm.version,
+  );
 }
 
 function compatibleMise(
@@ -193,6 +199,14 @@ async function acquireMaintenanceCapability(
         error.lifecycle.status !== "active"
       )
         throw error;
+      if (error.lifecycle.coordinatorStatus !== "active") {
+        throw new Error(
+          `Cannot wait for ${scope}: ${error.lifecycle.operation}; its coordinator ` +
+            `PID ${error.lifecycle.pid} is ${error.lifecycle.coordinatorStatus}, but descendants or guard holders remain. ` +
+            "Reconcile the recorded operation through its owner before retrying startup. Its lock was preserved.",
+          { cause: error },
+        );
+      }
       const elapsed = performance.now() - started;
       const { operation, pid, startedAt } = error.lifecycle;
       const owner = `${scope}: ${operation} (coordinator PID ${pid}, started ${startedAt})`;
@@ -368,8 +382,10 @@ export async function maintainToolchain({
     if (
       current.stable.node.version !== candidate.stable.node.version ||
       current.stable.pnpm.version !== candidate.stable.pnpm.version
-    )
+    ) {
       run(bootstrap.mise, ["lock", "node", "pnpm"], stageOptions);
+      projectPnpmToolchainGraph(stage, candidate.stable.pnpm.version);
+    }
     assertCandidateLock(stage, candidate);
     onProgress("Installing and validating the isolated candidate toolchain and dependency graph.");
     run(bootstrap.mise, ["install", "--locked"], stageOptions);

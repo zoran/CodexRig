@@ -8,6 +8,10 @@ import {
   activeModuleInventoryHeading,
   manifestAuthorityPreamble,
   noActiveModulesStatement,
+  futureModulesPreamble,
+  futureModulesActivationRule,
+  futureModulesIntentRule,
+  noFutureModulesStatement,
 } from "./project-manifest-contract.mjs";
 import { initialRequirementsPath } from "./project-document-policy.mjs";
 
@@ -88,5 +92,22 @@ Keep current inventory facts and honest evidence limits only. Update the establi
 or design owner during intake; do not copy detailed future behavior into this inventory. A change that implements a module adds its active inventory entry and removes
 the matching candidate from \`docs/future-modules.md\` in the same change. Keep plans, progress,
 workflow rules, reviews, and history outside this manifest.
+`;
+}
+
+export function initialFutureModulesDocument() {
+  return `# Future Modules
+
+${futureModulesPreamble}
+
+${futureModulesActivationRule}
+
+${futureModulesIntentRule}
+
+Link detailed requirements at their established owner; this candidate/activation index does not duplicate a specification.
+
+## Candidates
+
+${noFutureModulesStatement}
 `;
 }

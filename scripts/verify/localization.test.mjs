@@ -4,8 +4,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { initialLocalizationConfiguration } from "../framework/initial-project-configuration.mjs";
 import {
-  initialLocalizationConfiguration,
   localizationConfigurationFindings,
   localizationConfigurationPath,
   serializeLocalizationConfiguration,

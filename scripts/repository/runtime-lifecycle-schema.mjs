@@ -32,6 +32,8 @@ export function createRuntimeLifecycleOwner(root, operation) {
 /** Exposes only safe contention metadata; capabilities and delegation tokens stay private. */
 export function runtimeLifecycleBusyError(owner, status) {
   const lifecycle = Object.freeze({
+    coordinatorStatus:
+      status === "reentrant" ? "active" : inspectProcessIdentity(owner.coordinator),
     operation: owner.operation,
     pid: owner.coordinator?.pid ?? process.pid,
     startedAt: owner.startedAt ?? null,
@@ -39,7 +41,7 @@ export function runtimeLifecycleBusyError(owner, status) {
   });
   const error = new Error(
     `Another Codex runtime lifecycle operation is active or unresolved. Operation: ${lifecycle.operation}; ` +
-      `coordinator PID: ${lifecycle.pid}; state: ${status}` +
+      `coordinator PID: ${lifecycle.pid} (${lifecycle.coordinatorStatus}); state: ${status}` +
       (lifecycle.startedAt ? `; started: ${lifecycle.startedAt}.` : "."),
   );
   error.code = runtimeLifecycleBusyErrorCode;

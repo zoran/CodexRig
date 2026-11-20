@@ -5,7 +5,9 @@
       "key": "syntax-lint",
       "label": "repository syntax and lint",
       "executable": "bash",
-      "args": ["scripts/verify/lint.sh"],
+      "args": [
+        "scripts/verify/lint.sh"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification always checks repository-owned shell, JavaScript, and JSON syntax",
@@ -15,7 +17,9 @@
       "key": "docs",
       "label": "documentation",
       "executable": "$node",
-      "args": ["scripts/verify/docs.mjs"],
+      "args": [
+        "scripts/verify/docs.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification always checks documentation structure, map, and links",
@@ -25,7 +29,10 @@
       "key": "context-policy",
       "label": "context policy structure",
       "executable": "$node",
-      "args": ["scripts/context/context-cli.mjs", "check"],
+      "args": [
+        "scripts/context/context-cli.mjs",
+        "check"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "Validate changed instruction structure without replaying context lifecycle regressions.",
@@ -35,7 +42,9 @@
       "key": "delivery-environments",
       "label": "delivery environment inventory",
       "executable": "$node",
-      "args": ["scripts/verify/delivery-environments.mjs"],
+      "args": [
+        "scripts/verify/delivery-environments.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification keeps declared and repository-detected delivery targets aligned with the current manifest",
@@ -45,7 +54,9 @@
       "key": "scripts",
       "label": "script inventory",
       "executable": "bash",
-      "args": ["scripts/verify/scripts.sh"],
+      "args": [
+        "scripts/verify/scripts.sh"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification always checks script inventory and executable entry points",
@@ -55,7 +66,9 @@
       "key": "repository-smoke",
       "label": "repository baseline",
       "executable": "$node",
-      "args": ["scripts/verify/repository-smoke.mjs"],
+      "args": [
+        "scripts/verify/repository-smoke.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification always checks the repository's minimum operational shape",
@@ -65,7 +78,9 @@
       "key": "white-label",
       "label": "white-label product configuration",
       "executable": "$node",
-      "args": ["scripts/verify/white-label.mjs"],
+      "args": [
+        "scripts/verify/white-label.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification keeps product identity, branding, and public settings replaceable and free of framework leakage",
@@ -75,7 +90,9 @@
       "key": "localization",
       "label": "source and user-facing language configuration",
       "executable": "$node",
-      "args": ["scripts/verify/localization.mjs"],
+      "args": [
+        "scripts/verify/localization.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification keeps English source conventions separate from explicit user-facing locale decisions",
@@ -85,7 +102,9 @@
       "key": "licensing",
       "label": "license and attribution",
       "executable": "$node",
-      "args": ["scripts/verify/licensing.mjs"],
+      "args": [
+        "scripts/verify/licensing.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification keeps CodexRig licensing and attribution in framework and generated-project upgrade contracts",
@@ -96,7 +115,9 @@
       "key": "identity-access",
       "label": "Identity and Access boundaries",
       "executable": "$node",
-      "args": ["scripts/verify/identity-access.mjs"],
+      "args": [
+        "scripts/verify/identity-access.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification separates authentication, authorization, identity lifecycle, sessions/tokens, and provider adapters behind public contracts",
@@ -106,7 +127,9 @@
       "key": "tenant-isolation",
       "label": "tenant-isolation boundaries",
       "executable": "$node",
-      "args": ["scripts/verify/tenant-isolation.mjs"],
+      "args": [
+        "scripts/verify/tenant-isolation.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification requires trusted tenant context and tenant-scoped authorization, data, cache, files, messages, and jobs",
@@ -116,7 +139,9 @@
       "key": "skills",
       "label": "skill boundaries",
       "executable": "$node",
-      "args": ["scripts/verify/skill-paths.mjs"],
+      "args": [
+        "scripts/verify/skill-paths.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification always checks repository-owned skill boundaries and metadata",
@@ -126,7 +151,9 @@
       "key": "codex-config",
       "label": "project Codex config",
       "executable": "$node",
-      "args": ["scripts/setup/validate-codex-config.mjs"],
+      "args": [
+        "scripts/setup/validate-codex-config.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification always validates the tracked project policy layer",
@@ -136,7 +163,9 @@
       "key": "dependencies",
       "label": "dependency policy and lockfile",
       "executable": "$node",
-      "args": ["scripts/verify/dependencies.mjs"],
+      "args": [
+        "scripts/verify/dependencies.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification always checks deterministic dependency policy and offline lockfile consistency",
@@ -147,7 +176,9 @@
       "key": "package-manifests",
       "label": "whole package manifests",
       "executable": "$node",
-      "args": ["scripts/verify/package-manifest.mjs"],
+      "args": [
+        "scripts/verify/package-manifest.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification checks package identity, scripts, dependencies, and every export registry entry",
@@ -158,7 +189,10 @@
       "key": "framework-version",
       "label": "source framework release version",
       "executable": "$node",
-      "args": ["scripts/framework/framework-version.mjs", "--check"],
+      "args": [
+        "scripts/framework/framework-version.mjs",
+        "--check"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification rejects a reusable framework release whose active changes are not covered by synchronized SemVer metadata",
@@ -168,7 +202,9 @@
       "key": "verification-entrypoints",
       "label": "root verification entry points",
       "executable": "$node",
-      "args": ["scripts/verify/verification-entrypoints.mjs"],
+      "args": [
+        "scripts/verify/verification-entrypoints.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification keeps root verify commands on adaptive admission and pre-push evidence validation",
@@ -196,7 +232,9 @@
       "key": "secrets",
       "label": "secret scan",
       "executable": "$node",
-      "args": ["scripts/verify/secrets.mjs"],
+      "args": [
+        "scripts/verify/secrets.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification always checks committable content for secret material",
@@ -206,7 +244,9 @@
       "key": "language",
       "label": "language hygiene",
       "executable": "$node",
-      "args": ["scripts/verify/language.mjs"],
+      "args": [
+        "scripts/verify/language.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification always checks active repository language policy",
@@ -217,7 +257,9 @@
       "key": "patterns",
       "label": "code-pattern policy",
       "executable": "$node",
-      "args": ["scripts/verify/patterns.mjs"],
+      "args": [
+        "scripts/verify/patterns.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification always checks maintainability and source-role policy",
@@ -280,12 +322,17 @@
         "scripts/setup/project-creator-contract.source.test.mjs",
         "scripts/setup/project-generator-state.test.mjs",
         "scripts/setup/staged-project-validator.test.mjs",
-        "scripts/terminal/startup-presentation.test.mjs"
+        "scripts/terminal/startup-presentation.test.mjs",
+        "scripts/setup/project-verification.source.test.mjs",
+        "scripts/setup/lifecycle-owner-loss.source.test.mjs"
       ],
       "artifactOwners": [],
-      "coveredTestPaths": [],
+      "coveredTestPaths": [
+        "scripts/setup/lifecycle-owner-loss.source.test.mjs"
+      ],
       "reason": "complete verification exercises runtime isolation, non-destructive hook installation, and clean project initialization",
-      "phase": "broad"
+      "phase": "broad",
+      "cancellable": true
     },
     {
       "key": "verification-boundary-regressions",
@@ -297,7 +344,6 @@
         "scripts/docs/document-scope.test.mjs",
         "scripts/docs/project-manifest-contract.test.mjs",
         "scripts/goals/repository-housekeeping.test.mjs",
-        "scripts/terminal/terminal-output.test.mjs",
         "scripts/repository/product-roots.test.mjs",
         "scripts/repository/source-inventory-git-environment.test.mjs",
         "scripts/repository/runtime-process-cancellation.test.mjs",
@@ -330,7 +376,9 @@
       "key": "path-hygiene",
       "label": "active-source path hygiene",
       "executable": "$node",
-      "args": ["scripts/verify/path-hygiene.mjs"],
+      "args": [
+        "scripts/verify/path-hygiene.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification checks active source paths without replaying unrelated commands",
@@ -340,7 +388,9 @@
       "key": "surface-quality",
       "label": "stack and product surfaces",
       "executable": "$node",
-      "args": ["scripts/verify/surface-quality.mjs"],
+      "args": [
+        "scripts/verify/surface-quality.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "one repository snapshot owns stack, web, accessibility, search, responsive, and image checks",
@@ -350,7 +400,9 @@
       "key": "source-baseline",
       "label": "clean reusable source baseline",
       "executable": "$node",
-      "args": ["scripts/framework/source-baseline.mjs"],
+      "args": [
+        "scripts/framework/source-baseline.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "source-framework verification refuses goals, slices, process history, generated exports, and project transactions",
@@ -360,7 +412,9 @@
       "key": "api-security",
       "label": "API static boundary heuristic",
       "executable": "$node",
-      "args": ["scripts/verify/api-security.mjs"],
+      "args": [
+        "scripts/verify/api-security.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification includes a static API boundary heuristic when API-like source exists",
@@ -386,22 +440,43 @@
         "scripts/verify/verification-evidence.test.mjs",
         "scripts/verify/verification-executor.test.mjs",
         "scripts/verify/verification-git-basis.test.mjs",
-        "scripts/verify/verification-session-lock.test.mjs"
+        "scripts/verify/verification-session-lock.test.mjs",
+        "scripts/verify/verification-scoped-inputs.test.mjs",
+        "scripts/verify/verification-reuse.test.mjs",
+        "scripts/verify/verification-policy-routing.test.mjs",
+        "scripts/verify/verification-selection.test.mjs"
       ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification checks routing and phase short-circuit behavior before broad regression suites",
-      "phase": "preflight"
+      "phase": "preflight",
+      "cancellable": true
     },
     {
       "key": "format",
       "label": "formatting",
       "executable": "$node",
-      "args": ["scripts/verify/format-project.mjs", "--check"],
+      "args": [
+        "scripts/verify/format-project.mjs",
+        "--check"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "reason": "complete verification checks project formatting without traversing private Codex runtime state",
       "phase": "preflight"
+    },
+    {
+      "key": "terminal-safety",
+      "label": "terminal diagnostics safety",
+      "executable": "$node",
+      "args": [
+        "--test",
+        "scripts/terminal/terminal-output.test.mjs"
+      ],
+      "artifactOwners": [],
+      "coveredTestPaths": [],
+      "phase": "preflight",
+      "reason": "credential and private-path redaction must remain independently verifiable in source and generated projects"
     },
     {
       "key": "runtime-safety",
@@ -468,7 +543,8 @@
         "scripts/contracts/mise-toolchain-configuration.test.mjs",
         "scripts/deps/toolchain-releases.test.mjs",
         "scripts/deps/toolchain-maintenance.test.mjs",
-        "scripts/deps/tool-storage-housekeeping.test.mjs"
+        "scripts/deps/tool-storage-housekeeping.test.mjs",
+        "scripts/deps/pnpm-toolchain-graph.test.mjs"
       ],
       "artifactOwners": [],
       "coveredTestPaths": [
@@ -478,16 +554,22 @@
         "scripts/contracts/mise-toolchain-configuration.test.mjs",
         "scripts/deps/toolchain-releases.test.mjs",
         "scripts/deps/toolchain-maintenance.test.mjs",
-        "scripts/deps/tool-storage-housekeeping.test.mjs"
+        "scripts/deps/tool-storage-housekeeping.test.mjs",
+        "scripts/deps/pnpm-toolchain-graph.test.mjs"
       ],
       "phase": "preflight",
-      "reason": "portable startup must invoke release maintenance before admission and reject unavailable releases and incomplete foreign-platform locks before publication"
+      "reason": "portable startup must invoke release maintenance before admission and reject unavailable releases and incomplete foreign-platform locks before publication",
+      "cancellable": true
     },
     {
       "key": "verification-executor-regressions",
       "label": "verification executor regressions",
       "executable": "$node",
-      "args": ["--test", "--test-reporter=dot", "scripts/verify/verification-executor.test.mjs"],
+      "args": [
+        "--test",
+        "--test-reporter=dot",
+        "scripts/verify/verification-executor.test.mjs"
+      ],
       "artifactOwners": [],
       "coveredTestPaths": [],
       "coveredBy": "verification-orchestration-regressions",
@@ -495,6 +577,17 @@
       "cancellable": true,
       "reason": "Own executor scheduling, output, failure and cancellation contracts; the measured suite takes less than 15 seconds, with a 60-second diagnosis limit.",
       "phase": "preflight"
+    },
+    {
+      "key": "owned-file-reads",
+      "label": "bounded owned file reads",
+      "executable": "$node",
+      "args": [
+        "--test",
+        "scripts/filesystem/owned-file-read.test.mjs"
+      ],
+      "phase": "preflight",
+      "reason": "Batch reads preserve per-file identity and parent replacement refusal without repeated ancestry walks."
     }
   ],
   "testConsumers": {
@@ -540,19 +633,40 @@
       "scripts/framework/framework-version.test.mjs",
       "scripts/setup/startup-state.test.mjs"
     ],
-    "LICENSE": ["scripts/verify/licensing.test.mjs"],
-    "NOTICE": ["scripts/verify/licensing.test.mjs"],
+    "LICENSE": [
+      "scripts/verify/licensing.test.mjs"
+    ],
+    "NOTICE": [
+      "scripts/verify/licensing.test.mjs"
+    ],
     "scripts/contracts/semver-contract.mjs": [
       "scripts/framework/framework-version.test.mjs",
-      "scripts/setup/startup-state.test.mjs"
+      "scripts/setup/startup-state.test.mjs",
+      "scripts/framework/compatibility-integrity.test.mjs",
+      "scripts/framework/toolchain-maintenance.test.mjs",
+      "scripts/framework/framework-upgrade.test.mjs",
+      "scripts/framework/framework-upgrade-identity.test.mjs",
+      "scripts/platform/platform-lifecycle.test.mjs",
+      "scripts/platform/platform-configuration-state.test.mjs",
+      ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
+      ".agents/skills/reset-framework/scripts/publish-framework.test.mjs",
+      ".agents/skills/reset-framework/scripts/publication-integration.test.mjs"
     ],
     "scripts/contracts/delivery-configuration.mjs": [
       "scripts/goals/repository-housekeeping.test.mjs"
     ],
-    "scripts/contracts/portable-toml.mjs": ["scripts/setup/setup-regression.test.mjs"],
-    "scripts/contracts/product-configuration.mjs": ["scripts/verify/white-label.test.mjs"],
-    "scripts/contracts/localization-configuration.mjs": ["scripts/verify/localization.test.mjs"],
-    "scripts/contracts/tenancy-configuration.mjs": ["scripts/verify/tenant-isolation.test.mjs"],
+    "scripts/contracts/portable-toml.mjs": [
+      "scripts/setup/setup-regression.test.mjs"
+    ],
+    "scripts/contracts/product-configuration.mjs": [
+      "scripts/verify/white-label.test.mjs"
+    ],
+    "scripts/contracts/localization-configuration.mjs": [
+      "scripts/verify/localization.test.mjs"
+    ],
+    "scripts/contracts/tenancy-configuration.mjs": [
+      "scripts/verify/tenant-isolation.test.mjs"
+    ],
     "scripts/filesystem/owned-file-operations.mjs": [
       ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
       "scripts/deps/dependency-policy.test.mjs",
@@ -566,9 +680,25 @@
       "scripts/repository/project-tool-environment.test.mjs",
       "scripts/setup/startup-state.test.mjs",
       "scripts/verify/verification-session-lock.test.mjs",
-      "scripts/platform/platform-configuration-state.test.mjs"
+      "scripts/platform/platform-configuration-state.test.mjs",
+      "scripts/filesystem/owned-file-read.test.mjs"
     ],
-    "scripts/deps/dependency-plan.mjs": ["scripts/deps/dependency-policy.test.mjs"],
+    "scripts/filesystem/artifact-identity.mjs": [
+      ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
+      "scripts/deps/dependency-policy.test.mjs",
+      "scripts/repository/project-tool-environment.test.mjs",
+      "scripts/setup/startup-state.test.mjs",
+      "scripts/verify/verification-session-lock.test.mjs",
+      "scripts/platform/platform-configuration-state.test.mjs",
+      "scripts/filesystem/owned-file-read.test.mjs",
+      "scripts/setup/setup-regression.test.mjs",
+      "scripts/verify/pre-push.test.mjs",
+      "scripts/setup/project-verification.source.test.mjs"
+    ],
+    "scripts/deps/dependency-plan.mjs": [
+      "scripts/deps/dependency-policy.test.mjs",
+      "scripts/deps/dependency-owner-normalization.test.mjs"
+    ],
     "scripts/repository/runtime-lifecycle-mutex.mjs": [
       ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
       "scripts/deps/dependency-policy.test.mjs",
@@ -582,13 +712,15 @@
       "scripts/verify/verification-executor.test.mjs",
       "scripts/verify/verification-session-lock.test.mjs",
       "scripts/repository/source-inventory-git-environment.test.mjs",
-      "scripts/repository/runtime-process-cancellation.test.mjs"
+      "scripts/repository/runtime-process-cancellation.test.mjs",
+      "scripts/setup/lifecycle-owner-loss.source.test.mjs"
     ],
     "scripts/repository/runtime-lifecycle-schema.mjs": [
       ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
       "scripts/deps/dependency-policy.test.mjs",
       "scripts/setup/startup-state.test.mjs",
-      "scripts/verify/verification-session-lock.test.mjs"
+      "scripts/verify/verification-session-lock.test.mjs",
+      "scripts/setup/lifecycle-owner-loss.source.test.mjs"
     ],
     "scripts/repository/runtime-owned-state.mjs": [
       ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
@@ -678,10 +810,15 @@
       "scripts/setup/project-initialization.source.test.mjs",
       "scripts/setup/project-creator-contract.source.test.mjs",
       "scripts/framework/framework-upgrade.test.mjs",
-      "scripts/framework/framework-upgrade-identity.test.mjs"
+      "scripts/framework/framework-upgrade-identity.test.mjs",
+      "scripts/setup/project-verification.source.test.mjs"
     ],
-    "scripts/docs/delivery-manifest.mjs": ["scripts/goals/repository-housekeeping.test.mjs"],
-    "scripts/docs/document-scope.mjs": ["scripts/docs/document-scope.test.mjs"],
+    "scripts/docs/delivery-manifest.mjs": [
+      "scripts/goals/repository-housekeeping.test.mjs"
+    ],
+    "scripts/docs/document-scope.mjs": [
+      "scripts/docs/document-scope.test.mjs"
+    ],
     "scripts/docs/document-references.mjs": [
       "scripts/docs/document-scope.test.mjs",
       "scripts/docs/project-manifest-contract.test.mjs",
@@ -705,16 +842,28 @@
       "scripts/docs/project-manifest-contract.test.mjs",
       "scripts/verify/tenant-isolation.test.mjs"
     ],
-    "scripts/git-hooks/pre-push": ["scripts/verify/pre-push.test.mjs"],
-    "scripts/verify/delivery-artifact.mjs": ["scripts/verify/verification-evidence.test.mjs"],
-    "scripts/verify/licensing.mjs": ["scripts/verify/licensing.test.mjs"],
+    "scripts/git-hooks/pre-push": [
+      "scripts/verify/pre-push.test.mjs"
+    ],
+    "scripts/verify/delivery-artifact.mjs": [
+      "scripts/verify/verification-evidence.test.mjs"
+    ],
+    "scripts/verify/licensing.mjs": [
+      "scripts/verify/licensing.test.mjs"
+    ],
     "scripts/verify/verification-admission-commands.mjs": [
       "scripts/verify/adaptive-runner-routing.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs"
     ],
     "scripts/verify/verification-admission-registry.mjs": [
       "scripts/verify/adaptive-runner-routing.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs"
     ],
     "scripts/goals/repository-housekeeping.mjs": [
       "scripts/goals/repository-housekeeping.test.mjs",
@@ -723,12 +872,19 @@
       "scripts/setup/staged-project-validator.test.mjs"
     ],
     "scripts/repository/repository-housekeeping-files.mjs": [
-      "scripts/goals/repository-housekeeping.test.mjs"
+      "scripts/goals/repository-housekeeping.test.mjs",
+      "scripts/framework/toolchain-maintenance.test.mjs",
+      "scripts/framework/framework-version.test.mjs"
     ],
     "scripts/repository/repository-housekeeping-transaction.mjs": [
-      "scripts/goals/repository-housekeeping.test.mjs"
+      "scripts/goals/repository-housekeeping.test.mjs",
+      "scripts/framework/toolchain-maintenance.test.mjs",
+      "scripts/framework/framework-version.test.mjs"
     ],
-    "scripts/framework/framework-version.mjs": ["scripts/framework/framework-version.test.mjs"],
+    "scripts/framework/framework-version.mjs": [
+      "scripts/framework/framework-version.test.mjs",
+      "scripts/framework/toolchain-maintenance.test.mjs"
+    ],
     "scripts/framework/compatibility-matrix.mjs": [
       "scripts/framework/compatibility-integrity.test.mjs",
       "scripts/setup/startup-state.test.mjs"
@@ -748,7 +904,11 @@
       "scripts/verify/adaptive-runner-routing.test.mjs",
       "scripts/verify/adaptive-runner.test.mjs"
     ],
-    "scripts/verify/adaptive-options.mjs": ["scripts/verify/adaptive-cli.test.mjs"],
+    "scripts/verify/adaptive-options.mjs": [
+      "scripts/verify/adaptive-cli.test.mjs",
+      "scripts/verify/verification-selection.test.mjs",
+      "scripts/setup/project-verification.source.test.mjs"
+    ],
     "scripts/verify/adaptive-state.mjs": [
       "scripts/verify/adaptive-cli.test.mjs",
       "scripts/verify/adaptive-runner-routing.test.mjs",
@@ -757,28 +917,59 @@
       "scripts/verify/pushed-object-scan.test.mjs",
       "scripts/verify/verification-git-basis.test.mjs",
       "scripts/verify/verification-session-lock.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs"
     ],
     "scripts/verify/adaptive-runner.mjs": [
       "scripts/verify/adaptive-runner-routing.test.mjs",
       "scripts/verify/adaptive-runner.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs",
+      "scripts/verify/verification-selection.test.mjs",
+      "scripts/setup/project-verification.source.test.mjs"
     ],
     "scripts/verify/adaptive-runner-test-helpers.mjs": [
       "scripts/verify/adaptive-runner-routing.test.mjs",
       "scripts/verify/adaptive-runner.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs"
     ],
-    "scripts/verify/git-remote-identity.mjs": ["scripts/verify/git-remote-identity.test.mjs"],
-    "scripts/verify/white-label.mjs": ["scripts/verify/white-label.test.mjs"],
-    "scripts/verify/identity-access.mjs": ["scripts/verify/api-security.test.mjs"],
-    "scripts/verify/source-evidence.mjs": ["scripts/verify/api-security.test.mjs"],
-    "scripts/verify/localization.mjs": ["scripts/verify/localization.test.mjs"],
-    "scripts/verify/tenant-isolation.mjs": ["scripts/verify/tenant-isolation.test.mjs"],
-    "scripts/verify/package-manifest.mjs": ["scripts/verify/package-manifest.test.mjs"],
-    "scripts/verify/pre-push.sh": ["scripts/verify/pre-push.test.mjs"],
-    "scripts/verify/pre-push-steps.sh": ["scripts/verify/pre-push.test.mjs"],
-    "scripts/verify/pushed-object-scan.mjs": ["scripts/verify/pushed-object-scan.test.mjs"],
+    "scripts/verify/git-remote-identity.mjs": [
+      "scripts/verify/git-remote-identity.test.mjs"
+    ],
+    "scripts/verify/white-label.mjs": [
+      "scripts/verify/white-label.test.mjs"
+    ],
+    "scripts/verify/identity-access.mjs": [
+      "scripts/verify/api-security.test.mjs"
+    ],
+    "scripts/verify/source-evidence.mjs": [
+      "scripts/verify/api-security.test.mjs"
+    ],
+    "scripts/verify/localization.mjs": [
+      "scripts/verify/localization.test.mjs"
+    ],
+    "scripts/verify/tenant-isolation.mjs": [
+      "scripts/verify/tenant-isolation.test.mjs"
+    ],
+    "scripts/verify/package-manifest.mjs": [
+      "scripts/verify/package-manifest.test.mjs"
+    ],
+    "scripts/verify/pre-push.sh": [
+      "scripts/verify/pre-push.test.mjs"
+    ],
+    "scripts/verify/pre-push-steps.sh": [
+      "scripts/verify/pre-push.test.mjs"
+    ],
+    "scripts/verify/pushed-object-scan.mjs": [
+      "scripts/verify/pushed-object-scan.test.mjs"
+    ],
     "scripts/security/secret-patterns.mjs": [
       "scripts/terminal/terminal-output.test.mjs",
       "scripts/verify/git-remote-identity.test.mjs",
@@ -794,14 +985,20 @@
       "scripts/verify/adaptive-runner-routing.test.mjs",
       "scripts/verify/adaptive-runner.test.mjs",
       "scripts/verify/verification-evidence-integrity.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs"
     ],
     "scripts/verify/verification-admission-decision.mjs": [
       "scripts/verify/adaptive-cli.test.mjs",
       "scripts/verify/adaptive-runner-routing.test.mjs",
       "scripts/verify/adaptive-runner.test.mjs",
       "scripts/verify/verification-evidence-integrity.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs"
     ],
     "scripts/verify/verification-evidence-error.mjs": [
       "scripts/verify/verification-evidence-integrity.test.mjs",
@@ -826,10 +1023,17 @@
     "scripts/verify/verification-record-helpers.mjs": [
       "scripts/verify/verification-evidence-integrity.test.mjs",
       "scripts/verify/verification-evidence.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs"
     ],
-    "scripts/verify/verification-executor.mjs": ["scripts/verify/verification-executor.test.mjs"],
-    "scripts/verify/verification-git-basis.mjs": ["scripts/verify/verification-git-basis.test.mjs"],
+    "scripts/verify/verification-executor.mjs": [
+      "scripts/verify/verification-executor.test.mjs"
+    ],
+    "scripts/verify/verification-git-basis.mjs": [
+      "scripts/verify/verification-git-basis.test.mjs"
+    ],
     "scripts/verify/verification-risk-profile.mjs": [
       "scripts/verify/verification-evidence.test.mjs"
     ],
@@ -870,7 +1074,10 @@
       "scripts/verify/path-hygiene.test.mjs",
       "scripts/verify/tenant-isolation.test.mjs",
       "scripts/goals/goal-publication-precondition.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs"
     ],
     "scripts/repository/product-roots.mjs": [
       "scripts/repository/product-roots.test.mjs",
@@ -878,7 +1085,10 @@
       "scripts/verify/path-hygiene.test.mjs",
       "scripts/verify/tenant-isolation.test.mjs",
       "scripts/goals/goal-publication-precondition.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs"
     ],
     "scripts/repository/runtime-session-lease.mjs": [
       ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
@@ -896,13 +1106,19 @@
     "scripts/repository/source-inventory-policy.mjs": [
       "scripts/repository/source-inventory-git-environment.test.mjs",
       "scripts/repository/source-inventory.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs"
     ],
     "scripts/repository/source-inventory.mjs": [
       "scripts/framework/framework-version.test.mjs",
       "scripts/repository/source-inventory-git-environment.test.mjs",
       "scripts/repository/source-inventory.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs"
     ],
     "scripts/repository/stable-file-snapshot.mjs": [
       "scripts/repository/stable-file-snapshot.test.mjs"
@@ -910,8 +1126,12 @@
     "scripts/repository/validate-transfer-source.mjs": [
       "scripts/repository/source-inventory.test.mjs"
     ],
-    "scripts/terminal/terminal-output.mjs": ["scripts/terminal/terminal-output.test.mjs"],
-    "scripts/verify/image-assets.mjs": ["scripts/verify/image-assets.test.mjs"],
+    "scripts/terminal/terminal-output.mjs": [
+      "scripts/terminal/terminal-output.test.mjs"
+    ],
+    "scripts/verify/image-assets.mjs": [
+      "scripts/verify/image-assets.test.mjs"
+    ],
     "scripts/platform/platform-lifecycle-harness.mjs": [
       "scripts/platform/platform-lifecycle.test.mjs",
       "scripts/platform/platform-configuration-state.test.mjs"
@@ -920,7 +1140,9 @@
       "scripts/context/document-context.test.mjs",
       "scripts/context/context-budget.test.mjs"
     ],
-    "scripts/context/context-cli.mjs": ["scripts/context/document-context.test.mjs"],
+    "scripts/context/context-cli.mjs": [
+      "scripts/context/document-context.test.mjs"
+    ],
     "scripts/docs/document-context.mjs": [
       "scripts/context/document-context.test.mjs",
       "scripts/context/context-budget.test.mjs",
@@ -936,7 +1158,9 @@
       "scripts/framework/framework-upgrade-identity.test.mjs"
     ],
     "scripts/framework/framework-upgrade-runtime.mjs": [
-      "scripts/framework/framework-upgrade.test.mjs"
+      "scripts/framework/framework-upgrade.test.mjs",
+      "scripts/framework/toolchain-maintenance.test.mjs",
+      "scripts/framework/framework-upgrade-identity.test.mjs"
     ],
     "scripts/repository/user-tool-storage.mjs": [
       "scripts/repository/project-tool-environment.test.mjs",
@@ -972,13 +1196,19 @@
       "scripts/repository/project-tool-environment.test.mjs",
       "scripts/setup/bootstrap-entry.test.mjs"
     ],
-    "scripts/setup/check-prereqs.sh": ["scripts/setup/check-prereqs.test.mjs"],
+    "scripts/setup/check-prereqs.sh": [
+      "scripts/setup/check-prereqs.test.mjs"
+    ],
     "scripts/setup/run-project.sh": [
       "scripts/repository/project-tool-environment.test.mjs",
       "scripts/setup/bootstrap-entry.test.mjs"
     ],
-    "scripts/setup/start-codex.sh": ["scripts/setup/codex-launcher.test.mjs"],
-    "scripts/setup/start-codex-session.sh": ["scripts/setup/codex-launcher.test.mjs"],
+    "scripts/setup/start-codex.sh": [
+      "scripts/setup/codex-launcher.test.mjs"
+    ],
+    "scripts/setup/start-codex-session.sh": [
+      "scripts/setup/codex-launcher.test.mjs"
+    ],
     "scripts/contracts/toolchain-configuration.mjs": [
       "scripts/framework/compatibility-integrity.test.mjs",
       "scripts/framework/toolchain-maintenance.test.mjs",
@@ -991,7 +1221,11 @@
     ],
     "scripts/verify/verification-configuration.mjs": [
       "scripts/verify/tenant-isolation.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs",
+      "scripts/verify/verification-selection.test.mjs"
     ],
     "scripts/deps/ci-toolchain-contract.mjs": [
       "scripts/framework/compatibility-integrity.test.mjs",
@@ -1002,7 +1236,8 @@
       "scripts/framework/toolchain-maintenance.test.mjs",
       "scripts/deps/toolchain-maintenance.test.mjs",
       "scripts/deps/tool-storage-housekeeping.test.mjs",
-      "scripts/setup/repository-storage.test.mjs"
+      "scripts/setup/repository-storage.test.mjs",
+      "scripts/setup/lifecycle-owner-loss.source.test.mjs"
     ],
     "scripts/deps/toolchain-releases.mjs": [
       "scripts/framework/toolchain-maintenance.test.mjs",
@@ -1011,7 +1246,9 @@
     "scripts/framework/prepare-compatibility-track.mjs": [
       "scripts/framework/toolchain-maintenance.test.mjs"
     ],
-    "scripts/terminal/startup-presentation.mjs": ["scripts/terminal/startup-presentation.test.mjs"],
+    "scripts/terminal/startup-presentation.mjs": [
+      "scripts/terminal/startup-presentation.test.mjs"
+    ],
     "scripts/goals/project-publication.mjs": [
       "scripts/goals/release-candidate.test.mjs",
       "scripts/goals/project-publication.test.mjs",
@@ -1026,6 +1263,7 @@
       ".agents/skills/reset-framework/scripts/publish-framework.test.mjs"
     ],
     "scripts/terminal/publication-output.mjs": [
+      "scripts/terminal/terminal-output.test.mjs",
       "scripts/goals/project-publication.test.mjs",
       ".agents/skills/reset-framework/scripts/publish-framework.test.mjs",
       "scripts/goals/publication-command.test.mjs"
@@ -1073,14 +1311,22 @@
       "scripts/goals/project-publication-verification.test.mjs",
       "scripts/goals/project-publication-reuse.test.mjs",
       "scripts/goals/project-publication-inputs.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs",
+      "scripts/verify/verification-selection.test.mjs",
+      "scripts/setup/project-verification.source.test.mjs"
     ],
     "scripts/verify/verification-source-inputs.mjs": [
       "scripts/goals/project-publication-integration.test.mjs",
       "scripts/goals/project-publication-verification.test.mjs",
       "scripts/goals/project-publication-reuse.test.mjs",
       "scripts/goals/project-publication-inputs.test.mjs",
-      "scripts/verify/verification-policy-inputs.test.mjs"
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-reuse.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs"
     ],
     "scripts/deps/tool-storage-housekeeping.mjs": [
       "scripts/deps/tool-storage-housekeeping.test.mjs"
@@ -1100,7 +1346,9 @@
       "scripts/goals/project-publication-reuse.test.mjs",
       "scripts/goals/project-publication-inputs.test.mjs"
     ],
-    "README.md": ["scripts/setup/bootstrap-entry.test.mjs"],
+    "README.md": [
+      "scripts/setup/bootstrap-entry.test.mjs"
+    ],
     "AGENTS.md": [
       "scripts/setup/project-creator-contract.source.test.mjs",
       "scripts/setup/staged-project-validator.test.mjs",
@@ -1135,7 +1383,9 @@
       "scripts/setup/project-initialization.source.test.mjs",
       "scripts/setup/project-initialization-boundaries.source.test.mjs",
       "scripts/setup/project-initialization-transfer.source.test.mjs",
-      "scripts/setup/staged-project-validator.test.mjs"
+      "scripts/setup/staged-project-validator.test.mjs",
+      "scripts/framework/toolchain-maintenance.test.mjs",
+      "scripts/setup/lifecycle-owner-loss.source.test.mjs"
     ],
     "scripts/framework/create-project-from-framework.mjs": [
       "scripts/framework/framework-upgrade-identity.test.mjs",
@@ -1170,7 +1420,9 @@
       "scripts/setup/setup-regression.test.mjs",
       "scripts/setup/startup-session-controller.test.mjs"
     ],
-    ".codex/tooling.json": ["scripts/framework/framework-upgrade-identity.test.mjs"],
+    ".codex/tooling.json": [
+      "scripts/framework/framework-upgrade-identity.test.mjs"
+    ],
     "scripts/docs/markdown-fences.mjs": [
       "scripts/context/document-context.test.mjs",
       "scripts/context/context-budget.test.mjs",
@@ -1193,14 +1445,27 @@
       "scripts/web/update-sitemap-lastmod.test.mjs",
       "scripts/verify/surface-quality.test.mjs"
     ],
-    "scripts/web/update-sitemap-lastmod.mjs": ["scripts/web/update-sitemap-lastmod.test.mjs"],
-    "scripts/framework/project-tool-selection.mjs": [
-      "scripts/framework/framework-upgrade-identity.test.mjs"
+    "scripts/web/update-sitemap-lastmod.mjs": [
+      "scripts/web/update-sitemap-lastmod.test.mjs"
     ],
-    "scripts/setup/validate-codex-config.mjs": ["scripts/setup/runtime-safety.test.mjs"],
-    "scripts/setup/startup-executable-closure.mjs": ["scripts/setup/runtime-safety.test.mjs"],
-    "scripts/setup/tooling-doctor.mjs": ["scripts/setup/runtime-safety.test.mjs"],
-    "scripts/context/session-stop-lifecycle.mjs": ["scripts/setup/runtime-safety.test.mjs"],
+    "scripts/framework/project-tool-selection.mjs": [
+      "scripts/framework/framework-upgrade-identity.test.mjs",
+      "scripts/setup/project-verification.source.test.mjs",
+      "scripts/setup/lifecycle-owner-loss.source.test.mjs"
+    ],
+    "scripts/setup/validate-codex-config.mjs": [
+      "scripts/setup/runtime-safety.test.mjs",
+      "scripts/setup/project-verification.source.test.mjs"
+    ],
+    "scripts/setup/startup-executable-closure.mjs": [
+      "scripts/setup/runtime-safety.test.mjs"
+    ],
+    "scripts/setup/tooling-doctor.mjs": [
+      "scripts/setup/runtime-safety.test.mjs"
+    ],
+    "scripts/context/session-stop-lifecycle.mjs": [
+      "scripts/setup/runtime-safety.test.mjs"
+    ],
     ".codex/toolchain.json": [
       "scripts/framework/framework-upgrade.test.mjs",
       "scripts/framework/framework-upgrade-identity.test.mjs",
@@ -1229,7 +1494,8 @@
       "scripts/deps/tool-storage-housekeeping.test.mjs",
       "scripts/framework/toolchain-maintenance.test.mjs",
       "scripts/setup/repository-storage.test.mjs",
-      "scripts/setup/runtime-safety.test.mjs"
+      "scripts/setup/runtime-safety.test.mjs",
+      "scripts/framework/framework-version.test.mjs"
     ],
     ".codex/mise.lock": [
       "scripts/framework/framework-upgrade.test.mjs",
@@ -1241,7 +1507,8 @@
       "scripts/deps/toolchain-maintenance.test.mjs",
       "scripts/deps/tool-storage-housekeeping.test.mjs",
       "scripts/framework/toolchain-maintenance.test.mjs",
-      "scripts/setup/repository-storage.test.mjs"
+      "scripts/setup/repository-storage.test.mjs",
+      "scripts/framework/framework-version.test.mjs"
     ],
     ".prettierrc.json": [
       "scripts/framework/framework-upgrade.test.mjs",
@@ -1272,13 +1539,80 @@
       "scripts/goals/project-publication-reuse.test.mjs",
       "scripts/goals/project-publication-inputs.test.mjs"
     ],
-    "scripts/framework/source-housekeeping.mjs": ["scripts/framework/framework-version.test.mjs"]
+    "scripts/framework/source-housekeeping.mjs": [
+      "scripts/framework/framework-version.test.mjs"
+    ],
+    "scripts/verify/verification-policy-test-helpers.mjs": [
+      "scripts/verify/verification-policy-inputs.test.mjs",
+      "scripts/verify/verification-scoped-inputs.test.mjs"
+    ],
+    "scripts/filesystem/owned-file-read.test.mjs": [
+      "scripts/filesystem/owned-file-read.test.mjs"
+    ],
+    ".codexrig/project-tools.json": [
+      "scripts/setup/project-verification.source.test.mjs"
+    ],
+    "scripts/framework/initial-project-configuration.mjs": [
+      "scripts/docs/project-manifest-contract.test.mjs",
+      "scripts/goals/repository-housekeeping.test.mjs",
+      "scripts/verify/tenant-isolation.test.mjs",
+      "scripts/verify/localization.test.mjs",
+      "scripts/verify/white-label.test.mjs",
+      "scripts/setup/project-verification.source.test.mjs"
+    ],
+    "scripts/repository/runtime-process-identity.mjs": [
+      "scripts/setup/lifecycle-owner-loss.source.test.mjs"
+    ],
+    "scripts/deps/pnpm-toolchain-graph.mjs": [
+      "scripts/deps/pnpm-toolchain-graph.test.mjs",
+      "scripts/deps/toolchain-maintenance.test.mjs",
+      "scripts/framework/toolchain-maintenance.test.mjs"
+    ],
+    ".codex/.mise/locks/pnpm/current/package.json": [
+      "scripts/framework/framework-upgrade.test.mjs",
+      "scripts/framework/framework-upgrade-identity.test.mjs",
+      "scripts/setup/project-initialization.source.test.mjs",
+      "scripts/setup/project-initialization-boundaries.source.test.mjs",
+      "scripts/setup/project-initialization-transfer.source.test.mjs",
+      "scripts/setup/staged-project-validator.test.mjs",
+      "scripts/deps/toolchain-maintenance.test.mjs",
+      "scripts/deps/tool-storage-housekeeping.test.mjs",
+      "scripts/framework/toolchain-maintenance.test.mjs",
+      "scripts/setup/repository-storage.test.mjs",
+      "scripts/deps/pnpm-toolchain-graph.test.mjs",
+      "scripts/framework/framework-version.test.mjs"
+    ],
+    ".codex/.mise/locks/pnpm/current/aube-lock.yaml": [
+      "scripts/framework/framework-upgrade.test.mjs",
+      "scripts/framework/framework-upgrade-identity.test.mjs",
+      "scripts/setup/project-initialization.source.test.mjs",
+      "scripts/setup/project-initialization-boundaries.source.test.mjs",
+      "scripts/setup/project-initialization-transfer.source.test.mjs",
+      "scripts/setup/staged-project-validator.test.mjs",
+      "scripts/deps/toolchain-maintenance.test.mjs",
+      "scripts/deps/tool-storage-housekeeping.test.mjs",
+      "scripts/framework/toolchain-maintenance.test.mjs",
+      "scripts/setup/repository-storage.test.mjs",
+      "scripts/deps/pnpm-toolchain-graph.test.mjs",
+      "scripts/framework/framework-version.test.mjs"
+    ]
   },
   "exactConsumers": {
-    ".gitattributes": ["path-hygiene", "repository-smoke"],
-    ".gitignore": ["codex-config", "path-hygiene", "repository-smoke"],
-    "LICENSE": ["licensing"],
-    "NOTICE": ["licensing"],
+    ".gitattributes": [
+      "path-hygiene",
+      "repository-smoke"
+    ],
+    ".gitignore": [
+      "codex-config",
+      "path-hygiene",
+      "repository-smoke"
+    ],
+    "LICENSE": [
+      "licensing"
+    ],
+    "NOTICE": [
+      "licensing"
+    ],
     "package.json": [
       "delivery-environments",
       "verification-entrypoints",
@@ -1287,16 +1621,38 @@
       "licensing",
       "language"
     ],
-    "config/delivery.json": ["delivery-environments", "docs"],
-    "config/localization.json": ["localization", "docs"],
-    "config/product.json": ["white-label"],
-    "config/tenancy.json": ["tenant-isolation"],
-    "scripts/contracts/delivery-configuration.mjs": ["delivery-environments"],
-    "scripts/contracts/mise-toolchain-configuration.mjs": ["repository-smoke"],
-    "scripts/contracts/localization-configuration.mjs": ["localization"],
-    "scripts/contracts/product-configuration.mjs": ["white-label"],
-    "scripts/contracts/semver-contract.mjs": ["framework-version", "framework-regressions"],
-    "scripts/contracts/tenancy-configuration.mjs": ["tenant-isolation"],
+    "config/delivery.json": [
+      "delivery-environments",
+      "docs"
+    ],
+    "config/localization.json": [
+      "localization",
+      "docs"
+    ],
+    "config/product.json": [
+      "white-label"
+    ],
+    "config/tenancy.json": [
+      "tenant-isolation"
+    ],
+    "scripts/contracts/delivery-configuration.mjs": [
+      "delivery-environments"
+    ],
+    "scripts/contracts/mise-toolchain-configuration.mjs": [
+      "repository-smoke"
+    ],
+    "scripts/contracts/localization-configuration.mjs": [
+      "localization"
+    ],
+    "scripts/contracts/product-configuration.mjs": [
+      "white-label"
+    ],
+    "scripts/contracts/semver-contract.mjs": [
+      "framework-version"
+    ],
+    "scripts/contracts/tenancy-configuration.mjs": [
+      "tenant-isolation"
+    ],
     "scripts/filesystem/owned-file-operations.mjs": [
       "dependency-regressions",
       "framework-regressions",
@@ -1308,20 +1664,39 @@
       "framework-regressions",
       "repository-smoke"
     ],
-    "scripts/deps/dependency-plan.mjs": ["dependency-regressions", "repository-smoke"],
-    "scripts/docs/delivery-manifest.mjs": ["delivery-environments", "docs"],
-    "scripts/docs/ensure-project-manifest.mjs": ["docs", "repository-smoke"],
-    "scripts/goals/repository-housekeeping.mjs": ["delivery-environments", "repository-smoke"],
-    "scripts/repository/repository-housekeeping-files.mjs": [
+    "scripts/filesystem/artifact-identity.mjs": [
+      "context-regressions",
+      "dependency-regressions",
       "framework-regressions",
+      "repository-smoke"
+    ],
+    "scripts/deps/dependency-plan.mjs": [
+      "repository-smoke"
+    ],
+    "scripts/docs/delivery-manifest.mjs": [
+      "delivery-environments",
+      "docs"
+    ],
+    "scripts/docs/ensure-project-manifest.mjs": [
+      "docs",
+      "repository-smoke"
+    ],
+    "scripts/goals/repository-housekeeping.mjs": [
+      "delivery-environments",
+      "repository-smoke"
+    ],
+    "scripts/repository/repository-housekeeping-files.mjs": [
       "repository-smoke"
     ],
     "scripts/repository/repository-housekeeping-transaction.mjs": [
-      "framework-regressions",
       "repository-smoke"
     ],
-    "scripts/framework/framework-version.mjs": ["framework-version", "framework-regressions"],
-    "scripts/repository/delivery-environment-discovery.mjs": ["delivery-environments"],
+    "scripts/framework/framework-version.mjs": [
+      "framework-version"
+    ],
+    "scripts/repository/delivery-environment-discovery.mjs": [
+      "delivery-environments"
+    ],
     "scripts/repository/runtime-lifecycle-mutex.mjs": [
       "context-regressions",
       "dependency-regressions",
@@ -1351,81 +1726,201 @@
       "repository-smoke",
       "setup-regressions"
     ],
-    "scripts/verify/a11y.mjs": ["surface-quality"],
-    "scripts/verify/adaptive-surfaces.mjs": ["surface-quality"],
-    "scripts/verify/responsive.mjs": ["surface-quality"],
-    "scripts/verify/repository-smoke.mjs": ["repository-smoke"],
-    "scripts/verify/delivery-environments.mjs": ["delivery-environments"],
-    "scripts/verify/delivery-artifact.mjs": ["repository-smoke"],
-    "scripts/verify/external.mjs": ["repository-smoke"],
-    "scripts/verify/identity-access.mjs": ["identity-access"],
-    "scripts/verify/image-assets.mjs": ["surface-quality"],
-    "scripts/verify/localization.mjs": ["localization"],
-    "scripts/verify/licensing.mjs": ["licensing"],
-    "scripts/verify/licensing.test.mjs": ["licensing"],
-    "scripts/verify/tenant-isolation.mjs": ["tenant-isolation"],
-    "scripts/verify/verification-admission-commands.mjs": ["verification-entrypoints"],
-    "scripts/verify/verification-admission-registry.mjs": ["verification-entrypoints"],
-    "scripts/verify/white-label.mjs": ["white-label"],
-    "scripts/verify/seo.mjs": ["surface-quality"],
-    "scripts/verify/stack-standards.mjs": ["surface-quality"],
-    "scripts/verify/web-stack.mjs": ["surface-quality"],
-    "scripts/context/context-budget.mjs": ["context-regressions", "docs"],
-    "scripts/context/context-cli.mjs": ["context-regressions", "docs"],
-    "scripts/docs/document-context.mjs": ["context-regressions", "docs"],
-    "scripts/framework/framework-upgrade-review.mjs": ["framework-regressions"],
-    "scripts/framework/framework-upgrade-runtime.mjs": ["framework-regressions"],
-    "scripts/verify/verification-executor.mjs": ["verification-executor-regressions"],
-    "scripts/verify/verification-executor.test.mjs": ["verification-executor-regressions"],
-    "scripts/docs/markdown-fences.mjs": ["docs"],
-    "scripts/web/sitemap-metadata.mjs": ["surface-quality"],
-    "scripts/framework/framework-upgrade.mjs": ["framework-version", "framework-regressions"],
+    "scripts/verify/a11y.mjs": [
+      "surface-quality"
+    ],
+    "scripts/verify/adaptive-surfaces.mjs": [
+      "surface-quality"
+    ],
+    "scripts/verify/responsive.mjs": [
+      "surface-quality"
+    ],
+    "scripts/verify/repository-smoke.mjs": [
+      "repository-smoke"
+    ],
+    "scripts/verify/delivery-environments.mjs": [
+      "delivery-environments"
+    ],
+    "scripts/verify/delivery-artifact.mjs": [
+      "repository-smoke"
+    ],
+    "scripts/verify/external.mjs": [
+      "repository-smoke"
+    ],
+    "scripts/verify/identity-access.mjs": [
+      "identity-access"
+    ],
+    "scripts/verify/image-assets.mjs": [
+      "surface-quality"
+    ],
+    "scripts/verify/localization.mjs": [
+      "localization"
+    ],
+    "scripts/verify/licensing.mjs": [
+      "licensing"
+    ],
+    "scripts/verify/licensing.test.mjs": [
+      "licensing"
+    ],
+    "scripts/verify/tenant-isolation.mjs": [
+      "tenant-isolation"
+    ],
+    "scripts/verify/verification-admission-commands.mjs": [
+      "verification-entrypoints"
+    ],
+    "scripts/verify/verification-admission-registry.mjs": [
+      "verification-entrypoints"
+    ],
+    "scripts/verify/white-label.mjs": [
+      "white-label"
+    ],
+    "scripts/verify/seo.mjs": [
+      "surface-quality"
+    ],
+    "scripts/verify/stack-standards.mjs": [
+      "surface-quality"
+    ],
+    "scripts/verify/web-stack.mjs": [
+      "surface-quality"
+    ],
+    "scripts/context/context-budget.mjs": [
+      "docs"
+    ],
+    "scripts/context/context-cli.mjs": [
+      "docs"
+    ],
+    "scripts/docs/document-context.mjs": [
+      "docs"
+    ],
+    "scripts/verify/verification-executor.mjs": [
+      "verification-executor-regressions"
+    ],
+    "scripts/verify/verification-executor.test.mjs": [
+      "verification-executor-regressions"
+    ],
+    "scripts/docs/markdown-fences.mjs": [
+      "docs"
+    ],
+    "scripts/web/sitemap-metadata.mjs": [
+      "surface-quality"
+    ],
+    "scripts/framework/framework-upgrade.mjs": [
+      "framework-version"
+    ],
     "scripts/framework/generated-project-tooling.mjs": [
-      "framework-version",
-      "framework-regressions"
+      "framework-version"
     ],
     "scripts/framework/project-output-projection.mjs": [
-      "framework-version",
-      "framework-regressions"
+      "framework-version"
     ],
     "scripts/framework/create-project-from-framework.mjs": [
+      "framework-version"
+    ],
+    "scripts/framework/prepare-project.mjs": [
+      "framework-version"
+    ],
+    ".codex/tooling.json": [
+      "codex-config"
+    ],
+    "scripts/web/update-sitemap-lastmod.mjs": [
+      "surface-quality"
+    ],
+    ".prettierrc.json": [
+      "format"
+    ],
+    ".prettierignore": [
+      "format"
+    ],
+    ".codex/toolchain.json": [
+      "repository-smoke"
+    ],
+    ".codex/mise.toml": [
+      "repository-smoke"
+    ],
+    ".codex/mise.lock": [
+      "repository-smoke"
+    ],
+    "pnpm-lock.yaml": [
+      "format",
+      "skills",
+      "licensing",
+      "verification-entrypoints",
+      "language"
+    ],
+    "README.md": [
+      "licensing"
+    ],
+    "pnpm-workspace.yaml": [
+      "licensing",
+      "verification-entrypoints",
+      "language"
+    ],
+    ".npmrc": [
+      "licensing",
+      "verification-entrypoints",
+      "language"
+    ],
+    "package.exports.json": [
+      "verification-entrypoints"
+    ],
+    "scripts/framework/initial-project-configuration.mjs": [
+      "framework-regressions"
+    ],
+    ".codex/.mise/locks/pnpm/current/package.json": [
+      "repository-smoke"
+    ],
+    ".codex/.mise/locks/pnpm/current/aube-lock.yaml": [
+      "repository-smoke"
+    ]
+  },
+  "ownedCategories": {
+    "active documentation": [
+      "docs"
+    ],
+    "project Codex config": [
+      "codex-config"
+    ],
+    "Codex runtime boundary": [
+      "codex-config"
+    ],
+    "repo-local skill source": [
+      "skills"
+    ],
+    "skill path boundary": [
+      "skills"
+    ],
+    "context workflow": [
+      "context-regressions"
+    ],
+    "dependency workflow": [
+      "dependency-regressions"
+    ],
+    "setup workflow": [
+      "setup-regressions"
+    ],
+    "CodexRig framework workflow": [
       "framework-version",
       "framework-regressions"
     ],
-    "scripts/framework/prepare-project.mjs": ["framework-version", "framework-regressions"],
-    "scripts/setup/check-prereqs.sh": ["setup-regressions"],
-    "scripts/setup/project-initialization-test-helpers.mjs": ["setup-regressions"],
-    "scripts/setup/setup-regression-test-helpers.mjs": ["setup-regressions"],
-    ".codex/tooling.json": ["codex-config"],
-    "scripts/web/update-sitemap-lastmod.mjs": ["surface-quality"],
-    ".prettierrc.json": ["format"],
-    ".prettierignore": ["format"],
-    ".codex/toolchain.json": ["repository-smoke"],
-    ".codex/mise.toml": ["repository-smoke"],
-    ".codex/mise.lock": ["repository-smoke"],
-    "pnpm-lock.yaml": ["format", "skills", "licensing", "verification-entrypoints", "language"],
-    "README.md": ["licensing"],
-    "pnpm-workspace.yaml": ["licensing", "verification-entrypoints", "language"],
-    ".npmrc": ["licensing", "verification-entrypoints", "language"],
-    "package.exports.json": ["verification-entrypoints"]
+    "stack workflow": [
+      "surface-quality"
+    ],
+    "web workflow": [
+      "surface-quality"
+    ],
+    "identity/access trust boundary": [
+      "identity-access"
+    ],
+    "tenant-isolation trust boundary": [
+      "tenant-isolation"
+    ],
+    "licensing and attribution contract": [
+      "licensing"
+    ]
   },
-  "ownedCategories": {
-    "active documentation": ["docs"],
-    "project Codex config": ["codex-config"],
-    "Codex runtime boundary": ["codex-config"],
-    "repo-local skill source": ["skills"],
-    "skill path boundary": ["skills"],
-    "context workflow": ["context-regressions"],
-    "dependency workflow": ["dependency-regressions"],
-    "setup workflow": ["setup-regressions"],
-    "CodexRig framework workflow": ["framework-version", "framework-regressions"],
-    "stack workflow": ["surface-quality"],
-    "web workflow": ["surface-quality"],
-    "identity/access trust boundary": ["identity-access"],
-    "tenant-isolation trust boundary": ["tenant-isolation"],
-    "licensing and attribution contract": ["licensing"]
-  },
-  "prePushChecks": [".agents/skills/reset-framework/scripts/publication-baseline.mjs"],
+  "prePushChecks": [
+    ".agents/skills/reset-framework/scripts/publication-baseline.mjs"
+  ],
   "risks": [
     {
       "path": "scripts/git-hooks/pre-push",

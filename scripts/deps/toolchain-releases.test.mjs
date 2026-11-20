@@ -1,5 +1,6 @@
-/** Verifies toolchain releases against every supported native Node and pnpm artifact. */
+/** Verifies toolchain releases against every supported native Node artifact and the portable pnpm archive. */
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
 import { nativeNodeArtifactUrls } from "../contracts/mise-toolchain-configuration.mjs";
@@ -9,6 +10,8 @@ function fixture({
   versions = ["11.28.0", "11.28.3"],
   nodeVersions,
   artifact = () => 200,
+  pnpmArchive = () => new Response("portable pnpm fixture"),
+  pnpmMetadata = (release) => release,
   nodeArtifact = () => 200,
   nodeChecksums = (_url, content) => new Response(content),
 } = {}) {
@@ -23,7 +26,12 @@ function fixture({
   const fetchImpl = async (url, options) => {
     const call = { url, options };
     calls.push(call);
-    if (options.method === "HEAD") {
+    if (
+      options.method === "HEAD" ||
+      (options.method === "GET" && options.headers.Range === "bytes=0-0")
+    ) {
+      assert.equal(options.method, "GET");
+      assert.equal(options.headers.Range, "bytes=0-0");
       assert.equal(options.redirect, "manual");
       assert.equal(options.credentials, "omit");
       const node =
@@ -31,7 +39,7 @@ function fixture({
         url.startsWith("https://unofficial-builds.nodejs.org/download/release/") ||
         nodeRedirects.has(url);
       call.tool = node ? "node" : "pnpm";
-      const result = await (node ? nodeArtifact : artifact)(url);
+      const result = await (node ? nodeArtifact : artifact)(url, options);
       const response = result instanceof Response ? result : new Response(null, { status: result });
       const location = response.headers.get("location");
       if (node && location) nodeRedirects.add(new URL(location, url).href);
@@ -45,15 +53,16 @@ function fixture({
       );
     else if (decoded === "https://registry.npmjs.org/pnpm")
       data = { versions: Object.fromEntries(versions.map((version) => [version, {}])) };
+    else if (decoded === "https://registry.npmjs.org/pnpm.tgz") return pnpmArchive();
     else if (decoded.startsWith("https://registry.npmjs.org/pnpm/"))
-      data = {
+      data = pnpmMetadata({
         name: "pnpm",
         version: decoded.split("/").at(-1),
         dist: {
           tarball: "https://registry.npmjs.org/pnpm.tgz",
-          integrity: matrix.ci.codexNpmPlatformIntegrities["linux-x64"],
+          integrity: `sha512-${createHash("sha512").update("portable pnpm fixture").digest("base64")}`,
         },
-      };
+      });
     else if (decoded.startsWith("https://registry.npmjs.org/@openai/codex/")) {
       const requested = decoded.split("/").at(-1);
       const platform = requested.match(/-(linux-x64|linux-arm64|darwin-arm64|win32-x64)$/u)?.[1];
@@ -100,7 +109,7 @@ function fixture({
 }
 
 function probes(state, tool) {
-  return state.calls.filter((call) => call.options.method === "HEAD" && call.tool === tool);
+  return state.calls.filter((call) => call.tool === tool);
 }
 
 test("Node defers a release whose available binaries lack published checksum entries", async () => {
@@ -217,7 +226,7 @@ test("Node never downgrades an incomplete current pin or trusts a stale index", 
 });
 
 test("Node artifact uncertainty outranks a missing binary and cannot retain an older release", async () => {
-  for (const failure of [403, 429, 500, 503, new Error("offline")]) {
+  for (const failure of [403, 429, 500, 502, 503, 504, new Error("offline")]) {
     const state = fixture({
       nodeVersions: ["24.22.0", "24.22.1"],
       nodeArtifact: (url) => {
@@ -228,8 +237,14 @@ test("Node artifact uncertainty outranks a missing binary and cannot retain an o
     });
     await assert.rejects(resolveToolchainReleases(state.matrix, state.options), /HTTP|offline/u);
     assert.deepEqual(state.progress, []);
-    assert.equal(probes(state, "node").length, 7);
-    assert.ok(probes(state, "node").every(({ url }) => url.includes("/v24.22.1/")));
+    const requests = probes(state, "node");
+    assert.equal(new Set(requests.map((call) => call.url)).size, 7);
+    assert.ok(requests.every(({ url }) => url.includes("/v24.22.1/")));
+    for (const url of new Set(requests.map((call) => call.url))) {
+      const maximum =
+        [502, 503, 504].includes(failure) && !url.endsWith("-linux-arm64-musl.tar.gz") ? 3 : 1;
+      assert.equal(requests.filter((call) => call.url === url).length, maximum);
+    }
   }
 });
 
@@ -264,62 +279,221 @@ test("Node compatibility tracks defer incomplete major releases but reject an in
   );
 });
 
-test("native selection skips incomplete releases and picks the newest complete compatible version", async () => {
+test("portable pnpm selects the latest compatible release without native platform probes", async () => {
   const state = fixture({
-    versions: ["11.28.0", "11.28.1", "11.28.2", "11.28.3", "11.29.0-beta.1", "12.0.0"],
-    artifact: (url) =>
-      url.includes("/v11.28.3/") && url.endsWith("pnpm-linux-arm64-musl.tar.gz") ? 404 : 200,
+    versions: ["11.28.0", "11.28.13", "11.29.0-beta.1", "12.0.0"],
+    artifact: () => {
+      throw new Error("native pnpm artifacts are absent");
+    },
   });
   const candidate = await resolveToolchainReleases(state.matrix, state.options);
-  assert.equal(candidate.stable.pnpm.version, "11.28.2");
-  assert.ok(state.progress.some((line) => /11\.28\.3.*linux-arm64-musl/u.test(line)));
-  const pnpmProbes = probes(state, "pnpm");
-  assert.equal(pnpmProbes.length, 12);
-  assert.ok(pnpmProbes.every(({ url }) => /\/v11\.28\.[23]\//u.test(url)));
-  assert.ok(state.calls.every(({ url }) => !url.startsWith("https://api.github.com/")));
-});
-
-test("a complete current pin is retained explicitly when newer releases lack required artifacts", async () => {
-  const state = fixture({
-    versions: ["11.28.0", "11.28.1", "11.28.2", "11.28.3"],
-    artifact: (url) =>
-      !url.includes("/v11.28.0/") && url.endsWith("pnpm-linux-arm64-musl.tar.gz") ? 404 : 200,
-  });
-  assert.deepEqual(await resolveToolchainReleases(state.matrix, state.options), state.matrix);
-  assert.equal(state.progress.filter((line) => /missing.*linux-arm64-musl/u.test(line)).length, 3);
-  assert.ok(state.progress.some((line) => /Retaining.*11\.28\.0/u.test(line)));
-});
-
-test("an incomplete current pin never falls back to an older available native release", async () => {
-  const state = fixture({ artifact: () => 404 });
-  state.matrix.stable.pnpm.version = "11.28.3";
-  await assert.rejects(resolveToolchainReleases(state.matrix, state.options), /downgrade/u);
-  assert.ok(probes(state, "pnpm").every(({ url }) => url.includes("/v11.28.3/")));
+  assert.equal(candidate.stable.pnpm.version, "11.28.13");
+  assert.equal(probes(state, "pnpm").length, 0);
+  assert.equal(
+    state.calls.filter(({ url }) => url === "https://registry.npmjs.org/pnpm.tgz").length,
+    1,
+  );
+  assert.deepEqual(state.progress, []);
   const stale = fixture({ versions: ["11.27.9"] });
   await assert.rejects(resolveToolchainReleases(stale.matrix, stale.options), /downgrade/u);
-  assert.equal(probes(stale, "pnpm").length, 0);
+});
+
+test("portable pnpm refuses missing, uncertain and altered official distributions", async () => {
+  for (const status of [404, 403, 429, 503]) {
+    const state = fixture({ pnpmArchive: () => new Response(null, { status }) });
+    await assert.rejects(resolveToolchainReleases(state.matrix, state.options), /HTTP/u);
+    assert.deepEqual(state.progress, []);
+  }
+  const altered = fixture({ pnpmArchive: () => new Response("tampered") });
+  await assert.rejects(resolveToolchainReleases(altered.matrix, altered.options), /integrity/u);
+  const wrongOrigin = fixture({
+    pnpmMetadata: (r) => ({
+      ...r,
+      dist: { ...r.dist, tarball: "https://mirror.invalid/pnpm.tgz" },
+    }),
+  });
+  await assert.rejects(
+    resolveToolchainReleases(wrongOrigin.matrix, wrongOrigin.options),
+    /origin/u,
+  );
+});
+
+test("native probes use one-byte ranges and cancel responses without changing releases", async () => {
+  for (const tool of ["node"]) {
+    const cancelled = [];
+    const artifact = (url) =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array([1]));
+          },
+          cancel() {
+            cancelled.push(url);
+          },
+        }),
+        { status: 206, headers: { "Content-Range": "bytes 0-0/16" } },
+      );
+    const state = fixture({
+      nodeVersions: ["24.22.0", "24.22.1"],
+      [tool === "node" ? "nodeArtifact" : "artifact"]: artifact,
+    });
+    const candidate = await resolveToolchainReleases(state.matrix, state.options);
+    assert.equal(candidate.stable[tool].version, tool === "node" ? "24.22.1" : "11.28.3");
+    const requests = probes(state, tool);
+    assert.equal(requests.length, tool === "node" ? 7 : 6);
+    assert.equal(new Set(requests.map((request) => request.url)).size, requests.length);
+    assert.equal(cancelled.length, requests.length);
+    assert.deepEqual(state.progress, []);
+  }
+});
+
+test("transient native gateway failures retry the same release within the original deadline", async () => {
+  for (const status of [502, 503, 504]) {
+    const attempts = new Map();
+    const state = fixture({
+      nodeArtifact: (url) => {
+        const count = (attempts.get(url) ?? 0) + 1;
+        attempts.set(url, count);
+        return count === 1
+          ? status
+          : new Response(null, {
+              status: 206,
+              headers: { "Content-Range": "bytes 0-0/16" },
+            });
+      },
+    });
+    const candidate = await resolveToolchainReleases(state.matrix, state.options);
+    assert.equal(candidate.stable.pnpm.version, "11.28.3");
+    for (const [url, count] of attempts) {
+      assert.equal(count, 2);
+      const requests = probes(state, "node").filter((call) => call.url === url);
+      assert.equal(new Set(requests.map((call) => call.options.signal)).size, 1);
+    }
+    assert.deepEqual(state.progress, []);
+  }
 });
 
 test("indeterminate artifact responses and transport errors cannot become compatible fallbacks", async () => {
-  for (const failure of [403, 429, 500, 503, new Error("offline")]) {
+  for (const failure of [403, 429, 500, 502, 503, 504, new Error("offline")]) {
     const state = fixture({
-      artifact: (url) => {
-        if (url.endsWith("pnpm-linux-arm64-musl.tar.gz")) return 404;
+      nodeArtifact: (url) => {
+        if (url.endsWith("node-v24.22.0-linux-arm64-musl.tar.gz")) return 404;
         if (failure instanceof Error) throw failure;
         return failure;
       },
     });
     await assert.rejects(resolveToolchainReleases(state.matrix, state.options), /HTTP|offline/u);
     assert.equal(state.progress.length, 0);
-    assert.ok(probes(state, "pnpm").every(({ url }) => url.includes("/v11.28.3/")));
+    const requests = probes(state, "node");
+    assert.ok(requests.every(({ url }) => url.includes("/v24.22.0/")));
+    for (const url of new Set(requests.map((call) => call.url))) {
+      const maximum =
+        [502, 503, 504].includes(failure) && !url.endsWith("node-v24.22.0-linux-arm64-musl.tar.gz")
+          ? 3
+          : 1;
+      assert.equal(requests.filter((call) => call.url === url).length, maximum);
+    }
   }
 });
 
-test("artifact HEAD redirects stay bounded and credential-free HTTPS", async () => {
+test("ranged probes cancel servers that ignore Range and preserve the redirect deadline", async () => {
+  const cancelled = [];
+  const state = fixture({
+    nodeArtifact: (url, options) => {
+      if (
+        !url.startsWith("https://release-assets.githubusercontent.com/") &&
+        !url.startsWith("https://cdn.example.test/")
+      )
+        return new Response(null, {
+          status: 302,
+          headers: {
+            location: `https://release-assets.githubusercontent.com/${options.method}/${url.split("/").at(-1)}`,
+          },
+        });
+      assert.ok(url.includes("/GET/"));
+      return new Response(
+        new ReadableStream({
+          cancel() {
+            cancelled.push(url);
+          },
+        }),
+      );
+    },
+  });
+  const candidate = await resolveToolchainReleases(state.matrix, state.options);
+  assert.equal(candidate.stable.pnpm.version, "11.28.3");
+  assert.equal(cancelled.length, 7);
+  const ranges = state.calls.filter(
+    (call) => call.tool === "node" && call.options.method === "GET",
+  );
+  const originals = ranges.filter(
+    ({ url }) =>
+      !url.startsWith("https://release-assets.githubusercontent.com/") &&
+      !url.startsWith("https://cdn.example.test/"),
+  );
+  assert.equal(originals.length, 7);
+  for (const original of originals) {
+    const redirected = ranges.find(
+      (call) =>
+        call.url ===
+        `https://release-assets.githubusercontent.com/GET/${original.url.split("/").at(-1)}`,
+    );
+    assert.ok(redirected);
+    assert.equal(redirected.options.signal, original.options.signal);
+  }
+  assert.deepEqual(state.progress, []);
+});
+
+test("ranged probes refuse malformed partial responses and unsafe redirects", async () => {
+  for (const contentRange of [null, "bytes 1-1/16", "bytes 0-0/0"]) {
+    const state = fixture({
+      nodeArtifact: () =>
+        new Response(null, {
+          status: 206,
+          headers: contentRange === null ? {} : { "Content-Range": contentRange },
+        }),
+    });
+    await assert.rejects(resolveToolchainReleases(state.matrix, state.options), /range response/u);
+    assert.deepEqual(state.progress, []);
+  }
+  for (const location of [
+    "http://example.invalid/asset",
+    "https://user:password@example.invalid/asset",
+  ]) {
+    const state = fixture({
+      nodeArtifact: () => new Response(null, { status: 302, headers: { location } }),
+    });
+    await assert.rejects(resolveToolchainReleases(state.matrix, state.options), /public HTTPS/u);
+  }
+});
+
+test("native gateway recovery cannot renew the redirect allowance", async () => {
+  const state = fixture({
+    nodeArtifact: (url) => {
+      const canonical =
+        !url.startsWith("https://release-assets.githubusercontent.com/") &&
+        !url.startsWith("https://cdn.example.test/");
+      const parts = new URL(url).pathname.split("/");
+      const hop = canonical ? 0 : Number(parts.at(-1));
+      const file = canonical ? parts.at(-1) : parts.at(-2);
+      return hop === 4
+        ? 503
+        : new Response(null, {
+            status: 302,
+            headers: { location: `https://cdn.example.test/${file}/${hop + 1}` },
+          });
+    },
+  });
+  await assert.rejects(resolveToolchainReleases(state.matrix, state.options), /redirect bound/u);
+  assert.deepEqual(state.progress, []);
+});
+
+test("artifact ranged GET redirects stay bounded and credential-free HTTPS", async () => {
   const state = fixture({
     versions: ["11.28.0"],
-    artifact: (url) =>
-      url.startsWith("https://github.com/")
+    nodeArtifact: (url) =>
+      !url.startsWith("https://release-assets.githubusercontent.com/") &&
+      !url.startsWith("https://cdn.example.test/")
         ? new Response(null, {
             status: 302,
             headers: {
@@ -329,23 +503,24 @@ test("artifact HEAD redirects stay bounded and credential-free HTTPS", async () 
         : 200,
   });
   assert.deepEqual(await resolveToolchainReleases(state.matrix, state.options), state.matrix);
-  assert.equal(probes(state, "pnpm").length, 12);
+  assert.equal(probes(state, "node").length, 14);
   for (const location of [
     "http://example.invalid/asset",
     "https://user:password@example.invalid/asset",
   ]) {
     const unsafe = fixture({
-      artifact: () => new Response(null, { status: 302, headers: { location } }),
+      nodeArtifact: () => new Response(null, { status: 302, headers: { location } }),
     });
     await assert.rejects(resolveToolchainReleases(unsafe.matrix, unsafe.options), /public HTTPS/u);
   }
   const loop = fixture({
-    artifact: (url) => new Response(null, { status: 302, headers: { location: url } }),
+    nodeArtifact: (url) => new Response(null, { status: 302, headers: { location: url } }),
   });
   await assert.rejects(resolveToolchainReleases(loop.matrix, loop.options), /redirect bound/u);
   const expired = fixture({
-    artifact: (url) =>
-      url.startsWith("https://github.com/")
+    nodeArtifact: (url) =>
+      !url.startsWith("https://release-assets.githubusercontent.com/") &&
+      !url.startsWith("https://cdn.example.test/")
         ? new Response(null, {
             status: 302,
             headers: { location: "https://release-assets.githubusercontent.com/expired" },
@@ -355,18 +530,7 @@ test("artifact HEAD redirects stay bounded and credential-free HTTPS", async () 
   await assert.rejects(resolveToolchainReleases(expired.matrix, expired.options), /HTTP 404/u);
 });
 
-test("explicit compatibility selectors require complete native artifacts before installation", async () => {
-  const state = fixture({
-    artifact: (url) => (url.endsWith("pnpm-linux-arm64-musl.tar.gz") ? 404 : 200),
-  });
-  await assert.rejects(
-    resolveCompatibilityToolchain(
-      state.matrix,
-      { node: state.matrix.stable.node.version, pnpm: "11.28.3", codex: "latest" },
-      state.options,
-    ),
-    /11\.28\.3.*linux-arm64-musl/u,
-  );
+test("explicit compatibility selectors verify the portable pnpm archive", async () => {
   const complete = fixture();
   const candidate = await resolveCompatibilityToolchain(
     complete.matrix,
@@ -374,4 +538,14 @@ test("explicit compatibility selectors require complete native artifacts before 
     complete.options,
   );
   assert.equal(candidate.stable.pnpm.version, "12.0.0-beta.1");
+  assert.equal(probes(complete, "pnpm").length, 0);
+  const invalid = fixture({ pnpmArchive: () => new Response("corrupt") });
+  await assert.rejects(
+    resolveCompatibilityToolchain(
+      invalid.matrix,
+      { node: invalid.matrix.stable.node.version, pnpm: "11.28.13", codex: "latest" },
+      invalid.options,
+    ),
+    /integrity/u,
+  );
 });

@@ -413,7 +413,7 @@ test("one-check reproduction cannot establish acceptance or request a broad fall
   ])
     assert.throws(
       () => parseArgs(["--check", "verification-executor-regressions", ...args]),
-      /reproduction only/u,
+      /development results only/u,
     );
   assert.throws(() => parseArgs(["--test-name-pattern", "case"]), /requires --check/u);
   assert.throws(() => buildPlan(parseArgs(["--check", "absent"])), /Unknown/u);

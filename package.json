@@ -1,10 +1,10 @@
 {
   "name": "codexrig",
-  "version": "7.0.0",
+  "version": "7.1.0",
   "private": true,
   "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
-  "packageManager": "pnpm@11.28.0",
+  "packageManager": "pnpm@11.28.13",
   "scripts": {
     "auth:check": "node scripts/verify/identity-access.mjs",
     "localization:check": "node scripts/verify/localization.mjs",

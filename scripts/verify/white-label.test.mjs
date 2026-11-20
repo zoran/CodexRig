@@ -4,8 +4,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { initialProductConfiguration } from "../framework/initial-project-configuration.mjs";
 import {
-  initialProductConfiguration,
   productConfigurationFindings,
   productConfigurationPath,
 } from "../contracts/product-configuration.mjs";

@@ -65,7 +65,10 @@ weakening validators.
 
 Check current policy/context and affected tool consumers. Inspect `verify:changed -- --print-plan`;
 prove selected actual dispatch/reuse and retained custom commands without broad product execution.
-Use isolated startup fixtures when real maintenance exceeds update authority. `--locked` may prepare
+Also run `pnpm verify -- --print-plan` through the target wrapper: require successful full admission
+with no unmapped inputs before accepting the update. This plans complete coverage without running
+checks; missing unit results are not an admission failure or a reason to start product suites. Use
+isolated startup fixtures when real maintenance exceeds update authority. `--locked` may prepare
 frozen inputs separately; preserve `--startup` in the normal launcher. Missing evidence, required
 restart and fixture-only claims remain explicit.
 

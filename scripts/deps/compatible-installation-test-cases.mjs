@@ -28,17 +28,23 @@ import {
   projectToolEnvironment,
 } from "../repository/project-tool-environment.mjs";
 import { trustedPnpmCommand } from "./trusted-pnpm-command.mjs";
+import { pnpmGraphPaths } from "./pnpm-toolchain-graph.mjs";
 
 function privateCandidate(target) {
   const root = mkdtempSync(
     path.join(prepareProjectToolDirectories(target).temporary, "candidate-"),
   );
   stageDependencyInstallationInputs({ projectRoot: target, stageRoot: root });
-  mkdirSync(path.join(root, ".codex"));
-  writeFileSync(
-    path.join(root, ".codex/toolchain.json"),
-    readFileSync(path.join(target, ".codex/toolchain.json")),
-  );
+  for (const file of [
+    ".codex/toolchain.json",
+    ".codex/mise.toml",
+    ".codex/mise.lock",
+    ...pnpmGraphPaths,
+  ]) {
+    if (!existsSync(path.join(target, file))) continue;
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    writeFileSync(path.join(root, file), readFileSync(path.join(target, file)));
+  }
   return root;
 }
 
@@ -117,7 +123,7 @@ function compatiblePnpmFixture(fixture, options = {}) {
   };
 }
 
-export function registerCompatibleInstallationTests(transactionFixture) {
+export function registerCompatibleInstallationTests(transactionFixture, prepareNativeTools) {
   for (const stagedInput of ["package.json", "pnpm-workspace.yaml"]) {
     test(`compatible resolution refuses staged ${stagedInput} edits before publishing or installing`, () => {
       const fixture = compatibleInstallFixture(transactionFixture);
@@ -153,6 +159,7 @@ export function registerCompatibleInstallationTests(transactionFixture) {
       if (previousStorage === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
       else process.env.PROJECT_TOOL_STORAGE_HOME = previousStorage;
     });
+    prepareNativeTools(target);
     const packageDirectory = path.join(target, "archive", "package");
     mkdirSync(packageDirectory, { recursive: true });
     const archives = {};
@@ -256,6 +263,7 @@ export function registerCompatibleInstallationTests(transactionFixture) {
     await once(registry, "message");
     rmSync(userToolPaths().pnpmCache, { recursive: true, force: true });
     const unbound = transactionFixture();
+    prepareNativeTools(unbound);
     stageDependencyInstallationInputs({ projectRoot: target, stageRoot: unbound });
     installLatestCompatibleDependencies({ projectRoot: unbound });
     writeFileSync(

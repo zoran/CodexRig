@@ -1,6 +1,7 @@
 /** Verifies terminal output behavior for the safe terminal diagnostics boundary. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { createPublicationVerificationProgress } from "./publication-output.mjs";
 import {
   formatContextError,
   sanitizeCommandForTerminal,
@@ -10,6 +11,60 @@ import {
 function privateKeyBoundary(kind, phase) {
   return ["-----", phase, " ", kind, " KEY-----"].join("");
 }
+
+test("publication progress exposes reused coverage and portable check starts before completion", () => {
+  const messages = [];
+  const observe = createPublicationVerificationProgress((value) => messages.push(value));
+  observe(
+    Buffer.from(
+      "Evidence: 8 reused; 2 required; 2 missing for complete coverage.\n[verification:sta",
+    ),
+  );
+  assert.deepEqual(messages, ["Verification: 8 reused; 2 required"]);
+  observe(Buffer.from("rt] alpha (preflight) scripts/alpha.test.mjs\n"));
+  assert.match(messages.at(-1), /Verify alpha; 0\/2 completed/u);
+  observe(Buffer.from("[verification:passed] alpha 12ms\n"));
+  observe(Buffer.from("[verification:start] beta (broad)\n[verification:passed] beta 8ms\n"));
+  assert.equal(messages.at(-1), "Verification: 2/2 completed");
+});
+
+test("publication progress shows a failed product while its admitted sibling finishes", () => {
+  const messages = [];
+  const observe = createPublicationVerificationProgress((value) => messages.push(value));
+  const event = (value) => observe(Buffer.from(`[verification] ${JSON.stringify(value)}\n`));
+  event({ event: "command-start", key: "product-mobile" });
+  event({ event: "command-start", key: "product-cloud" });
+  event({ event: "product-step-start", key: "product-cloud", step: 2 });
+  assert.match(messages.at(-1), /product-cloud: step 2/u);
+  event({ event: "product-step-complete", key: "product-cloud", step: 2, status: "failed" });
+  assert.equal(messages.at(-1), "Failed product-cloud; waiting for product-mobile");
+  event({ event: "command-complete", key: "product-cloud", status: "failed" });
+  assert.equal(messages.at(-1), "Failed product-cloud; waiting for product-mobile");
+  const count = messages.length;
+  event({ event: "command-complete", key: "product-cloud", status: "passed" });
+  assert.equal(messages.length, count, "duplicate completion cannot add coverage");
+  event({ event: "product-native-phase-start", key: "product-mobile", step: 4, nativePhase: 2 });
+  event({ event: "command-complete", key: "product-mobile", status: "passed" });
+  assert.equal(messages.at(-1), "Failed product-cloud");
+});
+
+test("publication progress ignores raw output, oversized frames and malformed identifiers", () => {
+  const messages = [];
+  const observe = createPublicationVerificationProgress((value) => messages.push(value));
+  for (const value of [
+    "Authorization: opaque-private-value\n",
+    '[verification] {"event":"command-start","key":"Authorization: opaque-private-value"}\n',
+    '[verification] {"event":"command-start","key":["array-key"]}\n',
+    "[verification] not-json\n",
+    `[verification] ${"x".repeat(100_000)}\n`,
+    "[verification] {\n",
+  ])
+    observe(Buffer.from(value));
+  assert.deepEqual(messages, []);
+  observe(Buffer.from('[verification] {"event":"command-start","key":"safe-check"}\n'));
+  assert.equal(messages.length, 1);
+  assert.match(messages[0], /safe-check/u);
+});
 
 test("terminal output redacts unknown absolute paths with spaces through the end of the line", () => {
   const value = "failure at /tmp/private workspace/secret-name/file.txt\nnext line";
@@ -147,9 +202,9 @@ test("verification failure headings preserve actionable findings and still redac
   const expected = [
     "Code pattern verification failed:",
     "- scripts/docs/markdown-fences.mjs: file header no longer names its responsibility",
-    "Session check failed: missing lease",
-    "Secret scan failed:",
-    "- scripts/example.mjs: credential found",
+    "Session check failed:<redacted-secret>",
+    "Secret scan failed:<redacted-secret>",
+    "<redacted-secret>",
     "Authorization code:<redacted-secret>",
     "code=<redacted-secret>",
     "code check failed=<redacted-secret>",
@@ -161,7 +216,34 @@ test("verification failure headings preserve actionable findings and still redac
   assert.equal(formatContextError(new Error(diagnostic)), expected.replaceAll("\n", " "));
   assert.equal(
     sanitizeMultilineForTerminal("Secret scan failed: token=opaque-inline-token"),
-    "Secret scan failed: token=<redacted-secret>",
+    "Secret scan failed:<redacted-secret>",
+  );
+});
+
+test("credential-bearing outcome labels cannot bypass redaction as diagnostic headings", () => {
+  const heading = "Code pattern verification failed:";
+  for (const name of [
+    "Password validation failed",
+    "Access token verification passed",
+    "Authorization check succeeded",
+    "Secret scan failed",
+  ]) {
+    assert.equal(
+      sanitizeMultilineForTerminal(`${heading}\n${name}: opaque-diagnostic-value`),
+      `${heading}\n${name}:<redacted-secret>`,
+    );
+    assert.equal(
+      sanitizeMultilineForTerminal(`${name}:\nopaque-continued-value`),
+      `${name}:<redacted-secret>\n<redacted-secret>`,
+    );
+    assert.equal(
+      sanitizeMultilineForTerminal(`${name}=opaque-assigned-value`),
+      `${name}=<redacted-secret>`,
+    );
+  }
+  assert.equal(
+    sanitizeMultilineForTerminal("Code pattern verification failed=opaque-diagnostic-value"),
+    "Code pattern verification failed=<redacted-secret>",
   );
 });
 

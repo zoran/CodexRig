@@ -30,6 +30,7 @@ import {
 } from "./source-inventory-policy.mjs";
 import { scanRepositorySecrets } from "../verify/secrets.mjs";
 import { inspectFrameworkReset } from "../../.agents/skills/reset-framework/scripts/reset-framework.mjs";
+import { pnpmMiseAlias } from "../contracts/mise-toolchain-configuration.mjs";
 
 function fixture(t) {
   const parent = mkdtempSync(path.join(os.tmpdir(), "project-tool-environment-"));
@@ -460,7 +461,7 @@ test("missing locked tools stop before a host runtime can execute the requested 
   writeFileSync(path.join(root, ".codex/toolchain.json"), "{}\n");
   writeFileSync(
     path.join(root, ".codex/mise.toml"),
-    '[tools]\nnode = "999.0.0"\npnpm = "999.0.0"\n',
+    `${pnpmMiseAlias}\n[tools]\nnode = "999.0.0"\npnpm = "999.0.0"\n`,
   );
   await assert.rejects(
     runProjectCommand({

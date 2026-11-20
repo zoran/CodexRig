@@ -26,6 +26,7 @@ import {
   validateMinimalMiseTools,
   miseLockFindings,
   nativeNodeArtifactUrls,
+  pnpmMiseAlias,
 } from "../contracts/mise-toolchain-configuration.mjs";
 import { toolingRoot, serializeCanonicalJson } from "../filesystem/repository-files.mjs";
 import { applyHousekeepingWrites } from "../repository/repository-housekeeping-transaction.mjs";
@@ -169,13 +170,15 @@ function registry({ tamper = false, newerNode = false } = {}) {
       /^https:\/\/unofficial-builds\.nodejs\.org\/download\/release\/v[^/]+\/node-v/u.test(decoded)
     )
       return new Response(null, { status: 200 });
+    else if (decoded === "https://registry.npmjs.org/pnpm.tgz")
+      return new Response("portable pnpm fixture");
     else if (decoded.startsWith("https://registry.npmjs.org/pnpm/"))
       data = {
         name: "pnpm",
         version: decoded.endsWith("/next-12") ? "12.0.0-beta.1" : decoded.split("/").at(-1),
         dist: {
           tarball: "https://registry.npmjs.org/pnpm.tgz",
-          integrity: matrix.ci.codexNpmPlatformIntegrities["linux-x64"],
+          integrity: `sha512-${createHash("sha512").update("portable pnpm fixture").digest("base64")}`,
         },
       };
     else if (decoded.startsWith("https://registry.npmjs.org/@openai/codex/")) {
@@ -412,7 +415,7 @@ test("configuration projection retains CI behavior and updates all stable pins",
 
 test("multi-runtime product pins survive primary maintenance and require every locked artifact", (t) => {
   const root = fixture(t);
-  const configuration = `[tools]\nnode = ["${matrix.stable.node.version}", "22.23.2"]\npnpm = "${matrix.stable.pnpm.version}"\njava = "temurin-21.0.12+101.0.LTS"\nterraform = "1.16.0"\n`;
+  const configuration = `${pnpmMiseAlias}\n[tools]\nnode = ["${matrix.stable.node.version}", "22.23.2"]\npnpm = "${matrix.stable.pnpm.version}"\njava = "temurin-21.0.12+101.0.LTS"\nterraform = "1.16.0"\n`;
   write(root, ".codex/mise.toml", configuration);
   const { contents } = toolchainMaintenanceInputs(root);
   const next = structuredClone(matrix);
@@ -423,7 +426,9 @@ test("multi-runtime product pins survive primary maintenance and require every l
   assert.deepEqual(parsed.versionLists.node, ["24.99.0", "22.23.2"]);
   assert.equal(parsed.versions.java, "temurin-21.0.12+101.0.LTS");
   const block = (tool, version) =>
-    `[[tools.${tool}]]\nversion = "${version}"\nbackend = "core:${tool}"\n[tools.${tool}."platforms.linux-x64"]\nchecksum = "sha256:${"1".repeat(64)}"\nurl = "https://example.test/artifact"\n`;
+    tool === "pnpm"
+      ? `[[tools.pnpm]]\nversion = "${version}"\nbackend = "npm:pnpm"\n`
+      : `[[tools.${tool}]]\nversion = "${version}"\nbackend = "core:${tool}"\n[tools.${tool}."platforms.linux-x64"]\nchecksum = "sha256:${"1".repeat(64)}"\nurl = "https://example.test/artifact"\n`;
   const locked = Object.entries(parsed.versionLists)
     .flatMap(([tool, pins]) => pins.map((pin) => block(tool, pin)))
     .join("\n");
@@ -703,12 +708,16 @@ test("disposable compatibility preparation preserves dependencies and passes the
       const reference = path.join(shared.miseTrackedConfigs, "fixture");
       if (!existsSync(reference)) symlinkSync(path.join(root, ".codex/mise.toml"), reference);
       const installs = path.join(shared.miseData, "installs");
+      const executables = {
+        node: layout.node.executable,
+        pnpm: path.join(installs, "pnpm", candidate.stable.pnpm.version, "node_modules/.bin/pnpm"),
+      };
       const inventory = Object.fromEntries(
         ["node", "pnpm"].map((name) => {
           const version = candidate.stable[name].version;
           const installPath = path.join(installs, name, version);
-          mkdirSync(path.dirname(layout[name].executable), { recursive: true, mode: 0o700 });
-          writeFileSync(layout[name].executable, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+          mkdirSync(path.dirname(executables[name]), { recursive: true, mode: 0o700 });
+          writeFileSync(executables[name], "#!/bin/sh\nexit 0\n", { mode: 0o755 });
           return [
             name,
             [
@@ -726,7 +735,11 @@ test("disposable compatibility preparation preserves dependencies and passes the
         mkdirSync(path.dirname(tool.executable), { recursive: true, mode: 0o700 });
         const executable =
           tool.name === "mise"
-            ? `#!${process.execPath}\nif (process.argv[2] === 'ls') console.log(${JSON.stringify(JSON.stringify(inventory))});\nif (process.argv[2] === 'bin-paths') console.log(${JSON.stringify([layout.node, layout.pnpm].map((entry) => path.dirname(entry.executable)).join("\n"))});\n`
+            ? `#!${process.execPath}\nif (process.argv[2] === 'ls') console.log(${JSON.stringify(JSON.stringify(inventory))});\nif (process.argv[2] === 'bin-paths') console.log(${JSON.stringify(
+                Object.values(executables)
+                  .map((entry) => path.dirname(entry))
+                  .join("\n"),
+              )});\n`
             : "#!/bin/sh\nexit 0\n";
         writeFileSync(tool.executable, executable, { mode: 0o755 });
         sealProjectToolBundle(root, tool.directory, tool);
@@ -738,11 +751,24 @@ test("disposable compatibility preparation preserves dependencies and passes the
       calls.push(args);
       if (args[0] === "lock") {
         const file = path.join(options.cwd, ".codex/mise.lock");
+        for (const name of ["package.json", "aube-lock.yaml"]) {
+          const graphFile = path.join(options.cwd, ".codex/.mise/locks/pnpm/current", name);
+          writeFileSync(
+            graphFile,
+            readFileSync(graphFile, "utf8").replaceAll(matrix.stable.pnpm.version, "11.27.0"),
+          );
+        }
+        const digest = createHash("sha256")
+          .update(
+            readFileSync(path.join(options.cwd, ".codex/.mise/locks/pnpm/current/aube-lock.yaml")),
+          )
+          .digest("hex");
         writeFileSync(
           file,
           readFileSync(file, "utf8")
             .replaceAll(matrix.stable.node.version, "26.1.0")
-            .replaceAll(matrix.stable.pnpm.version, "11.27.0"),
+            .replaceAll(matrix.stable.pnpm.version, "11.27.0")
+            .replace(/digest = "sha256:[a-f0-9]{64}"/u, `digest = "sha256:${digest}"`),
         );
       }
       return "";
