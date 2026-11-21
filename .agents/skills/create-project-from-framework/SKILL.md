@@ -1,11 +1,8 @@
 ---
 name: create-project-from-framework
 description:
-  Create a clean sibling project from the CodexRig Framework after the user supplies a project name
-  and is proactively invited to develop a detailed product description with Codex. Exclude Git
-  history, local runtime/cache state, framework planning history, provider-specific collaboration
-  metadata, and framework-only material while preserving both portable CI adapters, project policy,
-  and reusable tooling.
+  Create a named, isolated child project from CodexRig. Invite a detailed product brief and transfer
+  the selected portable tools, policies and CI adapters.
 ---
 
 # Create Project From CodexRig Framework

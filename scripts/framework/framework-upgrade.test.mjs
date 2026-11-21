@@ -1,7 +1,9 @@
 /** Verifies framework upgrade conflicts, rollback, runtime exclusion and product preservation. */
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs, { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
+import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { pathToFileURL } from "node:url";
@@ -204,6 +206,77 @@ test("target-owned runtime exclusion blocks migration before any write", async (
   assert.equal(existsSync(path.join(data.targetRoot, "NOTICE")), true);
 });
 
+test("target sessions in either worktree protect apply and journal recovery until exit", async () => {
+  const data = fixture();
+  const root = data.targetRoot;
+  const peer = path.join(path.dirname(root), "linked-target");
+  const git = (...args) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        ...args,
+      ],
+      { cwd: root, stdio: "pipe" },
+    );
+  git("init", "--initial-branch=main");
+  git("add", "--all");
+  git("commit", "-m", "Fixture");
+  git("worktree", "add", "--detach", peer, "HEAD");
+  const runtime = await import(
+    pathToFileURL(path.join(root, "scripts/repository/runtime-session-lease.mjs")).href
+  );
+  const plan = buildFrameworkUpgradePlan(data);
+  const before = readFileSync(path.join(root, data.file));
+  const journal = path.join(root, ".project-state/framework-upgrade/journal.json");
+  async function withActiveSession(worktree, check) {
+    const { sessionId } = runtime.issueRuntimeSessionLease({ root: worktree, pid: process.pid });
+    const binding = { root: worktree, pid: process.pid, runtimeSessionId: sessionId };
+    try {
+      for (const transition of ["supervisor", "handoff", "codex"])
+        runtime.transitionRuntimeSessionWriterProcess({
+          ...binding,
+          transition,
+          writerPid: process.pid,
+        });
+      runtime.activateRuntimeSessionLease({
+        ...binding,
+        codexSessionId: "child-maintenance-fixture",
+      });
+      assert.equal(runtime.inspectRuntimeSessionLease({ root: worktree }).lease.phase, "active");
+      await check();
+    } finally {
+      runtime.transitionRuntimeSessionWriterProcess({ ...binding, transition: "complete" });
+      runtime.releaseRuntimeSessionLease({ root: worktree, pid: process.pid });
+    }
+  }
+  for (const worktree of [root, peer]) {
+    await withActiveSession(worktree, async () => {
+      await assert.rejects(applyFrameworkUpgrade(plan), /inactive Codex sessions/u);
+      assert.deepEqual(readFileSync(path.join(root, data.file)), before);
+      assert.equal(existsSync(journal), false);
+    });
+  }
+  const { lifecycleCapability, destination } = await beginFrameworkUpgrade(plan, runtime);
+  destination.release();
+  runtime.releaseRuntimeLifecycleLock({ root, owner: lifecycleCapability });
+  const interrupted = readFileSync(journal);
+  await withActiveSession(peer, async () => {
+    await assert.rejects(recoverInterruptedFrameworkUpgrade(root), /inactive Codex sessions/u);
+    assert.deepEqual(readFileSync(journal), interrupted);
+    assert.deepEqual(readFileSync(path.join(root, data.file)), before);
+  });
+  assert.equal(await recoverInterruptedFrameworkUpgrade(root), true);
+  assert.equal(existsSync(journal), false);
+  assert.equal((await applyFrameworkUpgrade(plan)).changed, true);
+  assert.equal((await applyFrameworkUpgrade(buildFrameworkUpgradePlan(data))).changed, false);
+});
+
 test("migration recovery preserves unrelated edits and resumes only after reconciliation", async () => {
   const data = fixture();
   const plan = buildFrameworkUpgradePlan(data);
@@ -238,7 +311,8 @@ test("current-output review requires policy decisions, preserves custom tools an
   const options = { sourceRoot: data.sourceRoot, targetRoot: data.targetRoot };
   const preview = buildFrameworkUpgradePlan(options);
   assert.ok(preview.conflicts.includes("AGENTS.md"));
-  assert.ok(preview.conflicts.includes("scripts/verify/product-check.mjs"));
+  assert.ok(!preview.conflicts.includes("scripts/verify/product-check.mjs"));
+  assert.ok(!preview.operations.some((op) => op.path === "scripts/verify/product-check.mjs"));
   await assert.rejects(applyFrameworkUpgrade(preview), /explicit local reconciliation/);
   const resolutions = preview.differences.map(({ kind, ...entry }) => ({
     ...entry,
@@ -491,7 +565,7 @@ test("destination lifecycle staging rejects imports outside the reviewed tool su
   assert.equal(existsSync(path.join(data.targetRoot, ".project-state/framework-upgrade")), false);
 });
 
-test("explicit regeneration preserves private state, requires quiescence and rolls back public owners", async () => {
+test("explicit regeneration preserves private state, requires quiescence and rolls back public owners", async (t) => {
   const data = fixture();
   fs.rmSync(path.join(data.targetRoot, "scripts/repository/runtime-session-lease.mjs"));
   write(data.targetRoot, ".sandbox_migration", "private marker\n");
@@ -538,7 +612,19 @@ test("explicit regeneration preserves private state, requires quiescence and rol
     ),
     /runtime-session-lease/,
   );
-  const staged = await stageRegenerationRuntime(data.sourceRoot, plan.regenerationRuntimeHash);
+  const stageParent = temporaryRoot("isolated-regeneration-");
+  const tempDirectory = t.mock.method(os, "tmpdir", () => stageParent);
+  let staged;
+  try {
+    staged = await stageRegenerationRuntime(data.sourceRoot, plan.regenerationRuntimeHash);
+  } finally {
+    tempDirectory.mock.restore();
+  }
+  const [stagedName] = fs.readdirSync(stageParent);
+  assert.ok(
+    existsSync(path.join(stageParent, stagedName, "scripts/repository/runtime-session-lease.mjs")),
+  );
+  assert.equal(existsSync(path.join(stageParent, stagedName, "scripts/verify")), false);
   const writer = staged.lifecycle.acquireRuntimeLifecycleLock({
     root: data.targetRoot,
     operation: "competing-writer",
@@ -622,7 +708,7 @@ test("regeneration recovery uses the bound source closure even when the installe
   }));
   const plan = buildFrameworkUpgradePlan({ ...options, resolutions });
   const stage = await stageRegenerationRuntime(data.sourceRoot, plan.regenerationRuntimeHash);
-  const { journal, lifecycleCapability } = beginFrameworkUpgrade(plan, stage.lifecycle);
+  const { journal, lifecycleCapability } = await beginFrameworkUpgrade(plan, stage.lifecycle);
   const item = journal.originals.find((x) => x.path === ownerPath);
   // Model an admitted interrupted file state without relying on target module evaluation.
   const broken = "export const incomplete = ;\n";

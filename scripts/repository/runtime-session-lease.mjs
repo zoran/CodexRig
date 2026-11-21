@@ -44,7 +44,6 @@ import {
   clearStaleRuntimeSessionLeaseState,
   issueRuntimeSessionLeaseState,
   releaseRuntimeSessionLeaseState,
-  reserveRuntimeSessionLeaseState,
   transitionRuntimeSessionWriterProcessState,
 } from "./runtime-session-state.mjs";
 export {
@@ -606,7 +605,7 @@ export function releaseRuntimeLifecycleLock({
   lifecycleCapabilities.delete(record.root);
 }
 
-function withSessionManagementCapability(root, testHooks, operation) {
+export function withSessionManagementCapability({ root, testHooks }, operation) {
   const lifecycleOwner = acquireRuntimeLifecycleLock({
     root,
     operation: "session-management",
@@ -628,7 +627,7 @@ export function clearStaleRuntimeSessionLease({
     assertRuntimeLifecycleQuiescent({ root, owner: lifecycleCapability });
     return clearStaleRuntimeSessionLeaseState({ root, testHooks });
   }
-  return withSessionManagementCapability(root, testHooks, () =>
+  return withSessionManagementCapability({ root, testHooks }, () =>
     clearStaleRuntimeSessionLeaseState({ root, testHooks }),
   );
 }
@@ -637,21 +636,12 @@ export function issueRuntimeSessionLease({ root = toolingRoot, pid, testHooks } 
   if (!Number.isSafeInteger(pid) || pid <= 0) {
     throw new Error("Codex runtime session lease requires a positive process id.");
   }
-  return withSessionManagementCapability(root, testHooks, () =>
+  return withSessionManagementCapability({ root, testHooks }, () =>
     issueRuntimeSessionLeaseState({
       root,
       pid,
       testHooks,
     }),
-  );
-}
-/** Atomically reserves the repository while the native resume picker selects a thread. */
-export function reserveRuntimeSessionLease({ root = toolingRoot, pid, testHooks } = {}) {
-  if (!Number.isSafeInteger(pid) || pid <= 0) {
-    throw new Error("Codex runtime session reservation requires a positive process id.");
-  }
-  return withSessionManagementCapability(root, testHooks, () =>
-    reserveRuntimeSessionLeaseState({ root, pid, testHooks }),
   );
 }
 export function activateRuntimeSessionLease({
@@ -661,7 +651,7 @@ export function activateRuntimeSessionLease({
   codexSessionId,
   testHooks,
 } = {}) {
-  return withSessionManagementCapability(root, testHooks, () =>
+  return withSessionManagementCapability({ root, testHooks }, () =>
     activateRuntimeSessionLeaseState({
       root,
       pid,
@@ -679,7 +669,7 @@ export function transitionRuntimeSessionWriterProcess({
   writerPid,
   testHooks,
 } = {}) {
-  return withSessionManagementCapability(root, testHooks, () =>
+  return withSessionManagementCapability({ root, testHooks }, () =>
     transitionRuntimeSessionWriterProcessState({
       root,
       pid,
@@ -691,7 +681,7 @@ export function transitionRuntimeSessionWriterProcess({
   );
 }
 export function releaseRuntimeSessionLease({ root = toolingRoot, pid, testHooks } = {}) {
-  return withSessionManagementCapability(root, testHooks, () =>
+  return withSessionManagementCapability({ root, testHooks }, () =>
     releaseRuntimeSessionLeaseState({ root, pid, testHooks }),
   );
 }

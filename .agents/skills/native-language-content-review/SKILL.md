@@ -1,9 +1,8 @@
 ---
 name: native-language-content-review
 description:
-  Read-only review of changed user-facing copy, UI text, help, product documentation, localization,
-  marketing, or support content for idiomatic target-language quality, preserved meaning, locale
-  fit, terminology, tone, and unsupported claims.
+  Read-only review of changed user-facing copy or documentation for idiomatic language, locale,
+  terminology, meaning and supportable claims.
 ---
 
 # Native-Language Content Review

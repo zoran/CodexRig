@@ -12,6 +12,8 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { after, test } from "node:test";
+import { toolingRoot } from "../filesystem/repository-files.mjs";
+import { compareUpgradeFile, upgradeFileContent } from "./framework-upgrade-merge.mjs";
 import { applyFrameworkUpgrade, buildFrameworkUpgradePlan } from "./framework-upgrade.mjs";
 import { selectedProjectVerification } from "./project-tool-selection.mjs";
 import {
@@ -149,6 +151,67 @@ test("current-output review preserves fresh policy parity and intentional policy
   assert.deepEqual(adapted.conflicts, [toolingPath]);
   assert.deepEqual(adapted.operations, []);
   assert.deepEqual(readTooling(targetRoot), tooling);
+});
+
+test("baseline policy updates pristine files and reports competing product edits before writing", async () => {
+  const data = fixture();
+  for (const [file, marker] of [
+    ["AGENTS.md", "portable-agent-entry"],
+    ["instructions.md", "portable-policy"],
+  ]) {
+    const source = path.join(data.sourceRoot, file);
+    const end = `<!-- codexrig:${marker}:end -->`;
+    const previous = readFileSync(source, "utf8");
+    assert.ok(previous.includes(end));
+    writeFileSync(source, previous.replace(end, `A new portable fixture rule.\n\n${end}`));
+  }
+  const productPolicy = path.join(data.targetRoot, "instructions.md");
+  const before = readFileSync(productPolicy, "utf8");
+  const custom =
+    before.replace("# Project Instructions", "# Customer engineering guide") +
+    "\nProduct-owned rule.\n";
+  writeFileSync(productPolicy, custom);
+  const conflict = buildFrameworkUpgradePlan(data);
+  assert.deepEqual(conflict.conflicts, ["instructions.md"]);
+  assert.ok(conflict.operations.some((op) => op.path === "AGENTS.md"));
+  await assert.rejects(applyFrameworkUpgrade(conflict), /conflicts/u);
+  assert.equal(readFileSync(productPolicy, "utf8"), custom);
+  assert.doesNotMatch(
+    readFileSync(path.join(data.targetRoot, "AGENTS.md"), "utf8"),
+    /new portable fixture rule/u,
+  );
+  const { kind, ...binding } = conflict.differences.find((item) => item.path === "instructions.md");
+  const resolved = buildFrameworkUpgradePlan({
+    ...data,
+    resolutions: [
+      {
+        ...binding,
+        action: "source",
+        reason: "Adopt the portable rule at the overlapping paragraph.",
+      },
+    ],
+  });
+  const resolution = resolved.operations.find((op) => op.path === "instructions.md");
+  assert.deepEqual(resolved.conflicts, []);
+  assert.match(resolution.content, /# Customer engineering guide/u);
+  assert.match(resolution.content, /new portable fixture rule/u);
+  assert.doesNotMatch(resolution.content, /Product-owned rule|<<<<<<<|>>>>>>>/u);
+  writeFileSync(productPolicy, before);
+  const plan = buildFrameworkUpgradePlan(data);
+  assert.deepEqual(plan.conflicts, []);
+  assert.deepEqual(plan.operations.map((op) => op.path).sort(), ["AGENTS.md", "instructions.md"]);
+  assert.equal((await applyFrameworkUpgrade(plan)).changed, true);
+  for (const file of ["AGENTS.md", "instructions.md"])
+    assert.match(
+      readFileSync(path.join(data.targetRoot, file), "utf8"),
+      /new portable fixture rule/u,
+    );
+  assert.deepEqual(buildFrameworkUpgradePlan(data).operations, []);
+  assert.deepEqual(
+    buildFrameworkUpgradePlan({ sourceRoot: data.sourceRoot, targetRoot: data.targetRoot })
+      .differences,
+    [],
+  );
 });
 
 test("baseline-backed tooling updates retain the child's launcher name and converge", async () => {
@@ -305,6 +368,25 @@ test("generated and reviewed-updated projects reuse dispatched checks and preser
   const preview = buildFrameworkUpgradePlan(options);
   assert.deepEqual(preview.conflicts, [verificationPath, executorPath]);
   assert.deepEqual(preview.operations, []);
+  const { kind, ...registryBinding } = preview.differences.find(
+    (item) => item.path === verificationPath,
+  );
+  const invalid = structuredClone(current);
+  invalid.exactConsumers["src/probe.mjs"] = ["absent-product-check"];
+  const invalidPlan = buildFrameworkUpgradePlan({
+    ...options,
+    resolutions: [
+      {
+        ...registryBinding,
+        action: "replace",
+        reason: "Exercise a dangling project verification binding.",
+        content: JSON.stringify(invalid),
+        mode: 0o644,
+      },
+    ],
+  });
+  assert.match(invalidPlan.conflictDetails[verificationPath][0], /unselected command/u);
+  await assert.rejects(applyFrameworkUpgrade(invalidPlan), /conflicts/u);
   const resolutions = preview.differences.map(({ kind, ...binding }) =>
     binding.path === verificationPath
       ? {
@@ -326,12 +408,196 @@ test("generated and reviewed-updated projects reuse dispatched checks and preser
   t.diagnostic(JSON.stringify({ generated, updated }));
 
   const repeated = buildFrameworkUpgradePlan(options);
-  assert.deepEqual(repeated.conflicts, [verificationPath]);
-  const [{ kind, ...binding }] = repeated.differences;
-  const settled = buildFrameworkUpgradePlan({
-    ...options,
-    resolutions: [{ ...binding, action: "keep", reason: "Retain the reviewed project check." }],
-  });
+  assert.deepEqual(repeated.conflicts, []);
+  assert.deepEqual(repeated.operations, []);
+  assert.deepEqual(await applyFrameworkUpgrade(repeated), { changed: false });
+});
+
+test("a pristine ancestor merges independent product text, modes and JSON through a repeatable upgrade", async () => {
+  const options = fixture();
+  const read = (root, file) => readFileSync(path.join(root, file), "utf8");
+  const sourceAgents = path.join(options.sourceRoot, "AGENTS.md");
+  const marker = "<!-- codexrig:portable-agent-entry:end -->";
+  writeFileSync(
+    sourceAgents,
+    read(options.sourceRoot, "AGENTS.md").replace(
+      marker,
+      `Carry the shared operational revision.\n\n${marker}`,
+    ),
+  );
+  const targetAgents = path.join(options.targetRoot, "AGENTS.md");
+  const agents = read(options.targetRoot, "AGENTS.md");
+  writeFileSync(targetAgents, agents.replace("# AGENTS.md", "# Product maintenance guide"));
+  chmodSync(targetAgents, 0o640);
+
+  for (const [file, shared, legacy, local] of [
+    [
+      "README.md",
+      "## Setup And Start",
+      "## Setup With Earlier Tools",
+      "## Product deployment notes",
+    ],
+    [
+      "docs/project.md",
+      "## System Shape",
+      "## Earlier System Description",
+      "## Integrated product runtime",
+    ],
+    [
+      ".codex/README.md",
+      "# Project Session Configuration",
+      "Previous configuration heading",
+      "## Product operator settings",
+    ],
+  ]) {
+    const original = read(options.baselineRoot, file);
+    assert.ok(original.includes(shared));
+    const old = original.replace(shared, legacy);
+    writeFileSync(path.join(options.baselineRoot, file), old);
+    writeFileSync(path.join(options.targetRoot, file), old + "\n" + local + "\n");
+  }
+  const rootTooling = readTooling(options.sourceRoot);
+  rootTooling.startup.attestationMaxAgeSeconds += 60;
+  writeTooling(options.sourceRoot, rootTooling);
+  const productTooling = readTooling(options.targetRoot);
+  productTooling.platform.protection.requiredApprovals += 1;
+  writeTooling(options.targetRoot, productTooling);
+
+  const plan = buildFrameworkUpgradePlan(options);
+  assert.deepEqual(plan.conflicts, []);
+  assert.deepEqual(
+    plan.operations.map((op) => op.path).sort(),
+    [".codex/README.md", toolingPath, "AGENTS.md", "README.md", "docs/project.md"].sort(),
+  );
+  assert.deepEqual(await applyFrameworkUpgrade(plan), { changed: true });
+  assert.match(read(options.targetRoot, "AGENTS.md"), /# Product maintenance guide/u);
+  assert.match(read(options.targetRoot, "AGENTS.md"), /Carry the shared operational revision/u);
+  assert.equal(statSync(targetAgents).mode & 0o777, 0o640);
+  for (const [file, shared, local] of [
+    ["README.md", "## Setup And Start", "## Product deployment notes"],
+    ["docs/project.md", "## System Shape", "## Integrated product runtime"],
+    [".codex/README.md", "# Project Session Configuration", "## Product operator settings"],
+  ]) {
+    const content = read(options.targetRoot, file);
+    assert.ok(content.includes(shared) && content.includes(local));
+  }
+  const result = readTooling(options.targetRoot);
+  assert.equal(
+    result.platform.protection.requiredApprovals,
+    productTooling.platform.protection.requiredApprovals,
+  );
+  assert.equal(
+    result.startup.attestationMaxAgeSeconds,
+    rootTooling.startup.attestationMaxAgeSeconds,
+  );
+  const settled = buildFrameworkUpgradePlan(options);
+  assert.deepEqual(settled.conflicts, []);
   assert.deepEqual(settled.operations, []);
   assert.deepEqual(await applyFrameworkUpgrade(settled), { changed: false });
+});
+
+test("reapplying a reorganized policy preserves the merged local rule without a decision", () => {
+  // Repeated blank lines around deleted sections give Git ambiguous hunk boundaries on replay.
+  const headings = "\nStart\n\n\n\nNotes\n";
+  const before = upgradeFileContent(headings + "\nSetup\n\n\n\n\nLegacy\n\n\n\n");
+  const desired = upgradeFileContent(headings + "\n".repeat(5));
+  const productRule = "Product rule\n\n";
+  const compare = (current) =>
+    compareUpgradeFile({
+      sourceRoot: toolingRoot,
+      file: "instructions.md",
+      before,
+      current,
+      desired,
+    });
+  const merged = compare(upgradeFileContent(productRule + before.content));
+  assert.deepEqual(merged.conflicts, []);
+  assert.equal(merged.next.content, productRule + desired.content);
+  assert.deepEqual(compare(merged.next), merged);
+});
+
+test("current output adds missing framework commands alongside project tools and reports exact shared-key conflicts", async () => {
+  const { sourceRoot, targetRoot } = fixture();
+  const options = { sourceRoot, targetRoot };
+  const packagePath = path.join(targetRoot, "package.json");
+  const pkg = JSON.parse(readFileSync(packagePath, "utf8"));
+  const command = pkg.scripts["context:map"];
+  delete pkg.scripts["context:map"];
+  pkg.scripts["product:check"] = "node scripts/product/verify.mjs";
+  pkg.dependencies = { "product-library": "1.2.3" };
+  pkg.license = "MIT";
+  writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + "\n");
+  mkdirSync(path.join(targetRoot, "scripts/product"));
+  writeFileSync(path.join(targetRoot, "scripts/product/verify.mjs"), "// Product verifier.\n");
+  const opaque = Buffer.from([0xff, 0x12]);
+  writeFileSync(path.join(targetRoot, "scripts/product/example.bin"), opaque);
+  const registry = addProductCheck(targetRoot);
+  const [first] = registry.commands.splice(0, 1);
+  writeFileSync(path.join(targetRoot, verificationPath), JSON.stringify(registry, null, 2) + "\n");
+
+  const plan = buildFrameworkUpgradePlan(options);
+  assert.deepEqual(plan.conflicts, []);
+  assert.deepEqual(
+    plan.operations.map((op) => op.path),
+    [verificationPath, "package.json"],
+  );
+  await applyFrameworkUpgrade(plan);
+  const mergedRegistry = JSON.parse(readFileSync(path.join(targetRoot, verificationPath), "utf8"));
+  assert.deepEqual(mergedRegistry.commands, [first, ...registry.commands]);
+  assert.deepEqual(mergedRegistry.workspaceOutputs, registry.workspaceOutputs);
+  assert.equal(
+    readFileSync(path.join(targetRoot, "scripts/product/verify.mjs"), "utf8"),
+    "// Product verifier.\n",
+  );
+  assert.deepEqual(readFileSync(path.join(targetRoot, "scripts/product/example.bin")), opaque);
+  const mergedPackage = JSON.parse(readFileSync(packagePath, "utf8"));
+  assert.deepEqual(mergedPackage, { ...pkg, scripts: { ...pkg.scripts, "context:map": command } });
+  assert.deepEqual(await applyFrameworkUpgrade(buildFrameworkUpgradePlan(options)), {
+    changed: false,
+  });
+
+  mergedPackage.scripts["context:map"] = "node scripts/product/verify.mjs";
+  writeFileSync(packagePath, JSON.stringify(mergedPackage, null, 2) + "\n");
+  const conflict = buildFrameworkUpgradePlan(options);
+  assert.deepEqual(conflict.conflicts, ["package.json"]);
+  assert.deepEqual(conflict.conflictDetails["package.json"], ["/scripts/context:map"]);
+  await assert.rejects(applyFrameworkUpgrade(conflict), /conflicts/u);
+  assert.deepEqual(JSON.parse(readFileSync(packagePath, "utf8")), mergedPackage);
+});
+
+test("a baseline conflict can be reconciled against all three inputs without losing product fields", async () => {
+  const options = fixture();
+  const locate = (root) => path.join(root, "package.json");
+  const setCommand = (root, value) => {
+    const pkg = JSON.parse(readFileSync(locate(root), "utf8"));
+    pkg.scripts["context:map"] = value;
+    if (root === options.targetRoot) pkg.scripts["product:build"] = "node product-build.mjs";
+    writeFileSync(locate(root), JSON.stringify(pkg, null, 2) + "\n");
+  };
+  setCommand(options.baselineRoot, "node old-map.mjs");
+  setCommand(options.targetRoot, "node product-map.mjs");
+  const plan = buildFrameworkUpgradePlan(options);
+  assert.deepEqual(plan.conflicts, ["package.json"]);
+  const { kind, ...binding } = plan.differences.find((item) => item.path === "package.json");
+  const resolutions = [
+    {
+      ...binding,
+      action: "source",
+      reason: "Adopt the shared command and retain the product build.",
+    },
+  ];
+  assert.deepEqual(buildFrameworkUpgradePlan({ ...options, resolutions }).conflicts, []);
+  setCommand(options.baselineRoot, "node other-reference.mjs");
+  assert.throws(
+    () => buildFrameworkUpgradePlan({ ...options, resolutions }),
+    /Stale reconciliation/u,
+  );
+  setCommand(options.baselineRoot, "node old-map.mjs");
+  await applyFrameworkUpgrade(buildFrameworkUpgradePlan({ ...options, resolutions }));
+  const merged = JSON.parse(readFileSync(locate(options.targetRoot), "utf8"));
+  assert.equal(merged.scripts["product:build"], "node product-build.mjs");
+  assert.notEqual(merged.scripts["context:map"], "node product-map.mjs");
+  assert.deepEqual(await applyFrameworkUpgrade(buildFrameworkUpgradePlan(options)), {
+    changed: false,
+  });
 });

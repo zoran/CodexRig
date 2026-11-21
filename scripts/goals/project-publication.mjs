@@ -416,6 +416,15 @@ export async function publishProject({
     requireManagedHook(root, binding);
     verified = sourceSnapshot(git);
     if (expectedCandidate) requireSnapshot(git, expectedCandidate);
+    if (lifecycle.inspectCandidate) {
+      output.task("Inspect the exact publication source and outgoing commits");
+      await lifecycle.inspectCandidate({
+        repositoryRoot: root,
+        tree: verified.tree,
+        head: verified.head,
+        upstream: git(["rev-parse", binding.tracking]),
+      });
+    }
     if (verified.tree !== git(["rev-parse", "HEAD^{tree}"])) {
       output.task("Validate Git commit author and committer");
       commitIdentity = resolvePublicationIdentity({ root, runGit });

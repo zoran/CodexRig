@@ -56,7 +56,7 @@ It supplies no application, public service, product data model, deployment targe
   from child selection.
 - Owned data and migrations: Tracked skill definitions only; no mutable data or migrations.
 - Tenant isolation: Framework only; no product tenant data.
-- Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/docs`,
+- Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/deps`, `scripts/docs`,
   `scripts/filesystem`, `scripts/framework`, `scripts/goals`, `scripts/repository`, `scripts/setup`,
   `scripts/terminal`, `scripts/verify`.
 - Focused verifier: `node scripts/verify/skill-paths.mjs`
@@ -151,9 +151,8 @@ It supplies no application, public service, product data model, deployment targe
   `--startup` discovers releases, `--locked` reproduces frozen CI inputs. Existing lockfiles
   reproduce offline through the same owner.
 - Private internals: Resolution/install journals, lifecycle locks, staged revalidation and rollback;
-  native collectors retain referenced, live or uncertain state. Shared Mise references contain
-  public pin files only; private tracking stays in each project. Quiescent migration retires only
-  that project's legacy shared private references.
+  project-private Mise tracking and shared verified installations. Housekeeping retains shared
+  runtime and bootstrap versions. Native collectors manage package data and download caches.
 - Owned data and migrations: Managed changes to `package.json`, `pnpm-lock.yaml`, and approved
   dependency policy inputs; transient transaction state is disposable.
 - Tenant isolation: Framework only; no product tenant data.
@@ -186,15 +185,20 @@ It supplies no application, public service, product data model, deployment targe
   reviewed child updates; excluded from products.
 - Runtime and technology: Node.js ESM.
 - Public contract: `framework:doctor`, `framework:version`, `framework:upgrade`,
-  `compatibility:matrix` and source housekeeping. Updates require explicit target/reconciliation or
-  pristine baseline; they preserve product identity, requirements and intentional configuration.
+  `compatibility:matrix` and source housekeeping. Updates require an explicit target. A pristine
+  ancestor enables three-way merging. Bound decisions resolve remaining conflicts.
 - Private internals: Version/file/hash/mode comparison, conflict plans and journaled target-owned
-  recovery; housekeeping reuses valid native pnpm installation state.
+  recovery. One planner compares the generated portable policies, package fields and verification
+  registry. A pristine reference adds three-way tool, CI and document merges and tracks retirements.
+  Regeneration stages the session runtime and its transitive imports. Writes and recovery check
+  leases across the target clone. Source-side child maintenance scratch lives under
+  `.project-state/child-maintenance/`. Housekeeping reuses valid native pnpm installation state.
 - Owned data and migrations: `.codexrig/framework.json`, `.codexrig/compatibility.json` and
   `.codexrig/project-tools.json`; transient target `.project-state/framework-upgrade/` journals.
   Generation and updates project the same portable instructions/AGENTS blocks and verification
-  consumers/shared inputs. Customized registry commands require explicit reconciliation; settled
-  updates are repeatable with no writes. Products retain no framework installation receipt.
+  consumers/shared inputs. Project-only commands coexist with canonical commands. Competing edits
+  require hash-bound reconciliation. Settled updates are repeatable with no writes. Products retain
+  no framework installation receipt.
 - Tenant isolation: Framework only; no product tenant data.
 - Allowed dependencies: `scripts/context`, `scripts/contracts`, `scripts/deps`, `scripts/docs`,
   `scripts/filesystem`, `scripts/goals`, `scripts/platform`, `scripts/repository`, `scripts/setup`,
@@ -225,7 +229,8 @@ It supplies no application, public service, product data model, deployment targe
 - Runtime and technology: Node.js ESM.
 - Public contract: `repo:housekeeping`, `goal:new`, `project:publish`; the source adapter owns
   framework publication. Publication authority, source snapshot binding, upstream/protection and
-  session admission remain explicit.
+  session admission remain explicit. The framework adapter cleans child-maintenance residue and
+  checks the exact candidate and outgoing local history for nonportable project references.
 - Private internals: Atomic reconciliation, inventory projection, Git publication and managed
   pre-push; health checks reuse evidence while runtime/freshness checks observe current state.
 - Owned data and migrations: Project-owned `config/delivery.json` detected evidence and its bounded
@@ -261,7 +266,7 @@ It supplies no application, public service, product data model, deployment targe
 
 - Root: `scripts/repository`
 - Responsibility: Source inventory, isolated Git/tool environments, worktree/session ownership,
-  snapshots, publication admission and owned tool/scratch storage.
+  snapshots, project-wide writer admission, publication admission and owned tool/scratch storage.
 - Runtime and technology: Node.js ESM.
 - Public contract: `worktree:status` and exported source/path, recovery, lease, snapshot, delivery,
   tool-storage and publication APIs. Caller admission proves exact native-process ancestry; isolated
@@ -272,9 +277,9 @@ It supplies no application, public service, product data model, deployment targe
   checks on caller loss; terminated Linux processes cannot retain a live identity. Startup rejects
   orphaned active operations for owned recovery instead of waiting on a dead coordinator.
 - Owned data and migrations: Ignored writer leases/latest-session markers under `.codex/runtime/`,
-  current `.project-state/repository-housekeeping/` journal, private operation-bound credential
-  recovery and temporary roots. Full runtime removal requires proven quiescence; no product data is
-  owned here.
+  brief writer admission lock in common Git metadata, current
+  `.project-state/repository-housekeeping/` journal, private operation-bound credential recovery and
+  temporary roots. Full runtime removal requires proven quiescence; no product data is owned here.
 - Tenant isolation: Framework only; no product tenant data.
 - Allowed dependencies: `scripts/contracts`, `scripts/filesystem`, `scripts/terminal`.
 - Focused verifier:
@@ -389,7 +394,7 @@ It supplies no application, public service, product data model, deployment targe
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `7.3.0`.
+- Framework version: `7.4.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->
@@ -405,10 +410,10 @@ It supplies no application, public service, product data model, deployment targe
 - Tracked `.codex/`, `.agents/`, `.codexrig/`, and `scripts/` surfaces are user-inspectable. Only
   sensitive or disposable runtime state is ignored; normative framework policy is never hidden.
 - Explicit project-tool migrations run from the source framework against current generated output
-  with reviewed hash-bound decisions, or an optional pristine reference. File comparison detects
-  conflicts, and the target's own runtime lock protects the complete transaction through cleanup.
-  Project documents and product identity are preserved; generated projects contain no self-updater
-  or installation receipt.
+  with an optional pristine reference and hash-bound decisions for unresolved edits. File comparison
+  detects overlaps, and the target's own runtime lock protects the complete transaction through
+  cleanup. Project documents and product identity are preserved; generated projects contain no
+  self-updater or installation receipt.
 
 ## Maintenance
 

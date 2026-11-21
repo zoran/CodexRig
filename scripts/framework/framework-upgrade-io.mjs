@@ -19,8 +19,12 @@ export function realUpgradeDirectory(value, label) {
   return realpathSync.native(resolved);
 }
 
-export function targetUpgradeFileState(root, relativePath) {
+export function targetUpgradeFileState(root, relativePath, { preserveOpaque = false } = {}) {
   const absolutePath = resolveRepositoryPath(root, relativePath);
+  if (preserveOpaque) {
+    const stats = lstatSync(absolutePath, { throwIfNoEntry: false });
+    if (stats && (!stats.isFile() || stats.nlink !== 1)) return null;
+  }
   const snapshot = readOptionalOwnedFile(
     root,
     absolutePath,
@@ -29,6 +33,7 @@ export function targetUpgradeFileState(root, relativePath) {
   if (!snapshot.exists) return { exists: false, mode: null, sha256: null };
   const content = snapshot.buffer.toString("utf8");
   if (!Buffer.from(content, "utf8").equals(snapshot.buffer)) {
+    if (preserveOpaque) return null;
     throw new Error(`Migration requires unchanged valid UTF-8 tool content: ${relativePath}.`);
   }
   return {

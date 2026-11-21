@@ -22,8 +22,49 @@ import {
 } from "../../../../scripts/repository/project-tool-environment.mjs";
 import { createPublicationOutput } from "../../../../scripts/terminal/publication-output.mjs";
 import { runPublicationCommand } from "../../../../scripts/goals/publication-command.mjs";
+import { frameworkUpgradePreview } from "../../../../scripts/framework/framework-upgrade-documents.mjs";
 
 const resetScript = fileURLToPath(new URL("reset-framework.mjs", import.meta.url));
+
+test("framework publication preserves and reports child references in source and outgoing history", async (t) => {
+  const f = fixture(t);
+  const relative = ["..", "fixture-child", "code", "README.md"].join("/");
+  write(f.root, "README.md", "# CodexRig Framework\n\n[Child notes](" + relative + ")\n");
+  write(f.root, "dependency.json", JSON.stringify({ dependency: "file:" + relative }));
+  const localTarget = path.join(f.root, "..", "example-target");
+  write(
+    f.root,
+    "repair.sh",
+    ["pnpm framework:upgrade --", "--target", JSON.stringify(localTarget)].join(" ") + "\n",
+  );
+  write(f.root, "review.patch", "pending child change\n");
+  const preview = JSON.stringify(
+    frameworkUpgradePreview({ digest: "d".repeat(64), conflicts: [], operations: [] }),
+  );
+  write(f.root, "staged.json", preview);
+  f.git("add", "--", "staged.json");
+  await assert.rejects(f.publish(), (error) => {
+    for (const file of ["README.md", "dependency.json", "repair.sh", "review.patch", "staged.json"])
+      assert.ok(error.message.includes(JSON.stringify(file)), error.message);
+    return true;
+  });
+  assert.equal(f.git("rev-parse", "HEAD"), f.baseline);
+  assert.equal(readFileSync(path.join(f.root, "staged.json"), "utf8"), preview);
+  assert.equal(
+    f.calls.some(([name]) => name === "verify"),
+    false,
+  );
+  f.git("add", "--all");
+  f.git("commit", "-m", "Local working material");
+  write(f.root, "README.md", "# CodexRig Framework\n\n[Dependency](https://nodejs.org/)\n");
+  f.git("rm", "--", "dependency.json", "repair.sh", "review.patch", "staged.json");
+  f.git("add", "README.md");
+  f.git("commit", "-m", "Remove child material");
+  const head = f.git("rev-parse", "HEAD");
+  await assert.rejects(f.publish(), /"README\.md" at [a-f0-9]+: documentation links outside/u);
+  assert.equal(f.git("rev-parse", "HEAD"), head);
+  assert.equal(f.git("ls-remote", "origin", "refs/heads/main"), f.baseline + "\trefs/heads/main");
+});
 
 function write(root, relative, text, mode = 0o600) {
   const target = path.join(root, relative);
@@ -130,6 +171,28 @@ test("publication resets, verifies, commits all source and pushes through its in
   write(f.root, "history.jsonl", "disposable session\n");
   write(f.root, "source.txt", "verified source\n");
   write(f.root, "new source.txt", "new verified file\n");
+  const decision = {
+    path: "README.md",
+    currentHash: "a".repeat(64),
+    currentMode: 420,
+    desiredHash: "b".repeat(64),
+    desiredMode: 420,
+    action: "keep",
+    reason: "Reviewed child-only content.",
+  };
+  const preview = frameworkUpgradePreview({
+    digest: "1".repeat(64),
+    conflicts: [],
+    operations: [],
+    differences: [],
+    deviations: [],
+    documentBindings: [],
+  });
+  write(f.root, "unexpected-output.txt", JSON.stringify(preview));
+  write(f.root, "reviewed-decisions.json", JSON.stringify([decision]));
+  write(f.root, ".project-state/child-maintenance/reproduction.patch", "private child patch\n");
+  write(f.root, "docs/Thumbs.db", "copied desktop metadata\n");
+  write(f.root, "kept-settings.json", '{"operations":[]}\n');
   const message = "GPT 6 Upgrade $(touch injected) `touch injected`";
   const messages = [];
   const result = await f.publish({ message, log: (line) => messages.push(line) });
@@ -144,6 +207,16 @@ test("publication resets, verifies, commits all source and pushes through its in
   assert.equal(f.git("status", "--porcelain"), "");
   assert.equal(existsSync(path.join(f.root, "history.jsonl")), false);
   assert.equal(existsSync(path.join(f.root, "injected")), false);
+  for (const file of [
+    "unexpected-output.txt",
+    "reviewed-decisions.json",
+    ".project-state/child-maintenance/reproduction.patch",
+    "docs/Thumbs.db",
+  ]) {
+    assert.equal(existsSync(path.join(f.root, file)), false);
+    assert.equal(f.git("ls-tree", "--name-only", "HEAD", "--", file), "");
+  }
+  assert.equal(f.git("show", "HEAD:kept-settings.json"), '{"operations":[]}');
   assert.equal(readFileSync(path.join(f.root, ".git/publication-hook-runs"), "utf8"), "ran\n");
   assert.deepEqual(
     f.calls.map(([name]) => name),

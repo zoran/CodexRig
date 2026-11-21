@@ -46,7 +46,7 @@ export async function runProjectCommand({
   );
   if (!inventory.complete || unsafe)
     throw new Error("Project command refused unsafe repository/worktree ownership.");
-  const locations = prepareProjectToolDirectories(root);
+  const locations = prepareProjectToolDirectories(root, { inherited });
   const environment = projectToolEnvironment({ root, inherited });
   // The injectable executable is for an explicit programmatic bootstrap/test owner. The public
   // command always uses the integrity-checked project installation, including Mise self-updates.

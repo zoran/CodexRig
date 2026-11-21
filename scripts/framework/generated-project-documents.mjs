@@ -1,4 +1,4 @@
-/** Owns initial product documents; writes only a new generation, never maintained project content. */
+/** Owns generated project documents and their shared projection for reviewed upgrades. */
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
@@ -80,12 +80,22 @@ export function writeIdentityDocs(sourceRoot, targetRoot, projectName, descripti
     writeRelative(targetRoot, file, content);
   if (description)
     writeRelative(targetRoot, initialRequirementsPath, initialRequirementsDocument(description));
-  writeRelative(targetRoot, "instructions.md", currentProjectInstructions(sourceRoot));
-  writeRelative(targetRoot, "AGENTS.md", initialProjectAgents(sourceRoot));
-  writeRelative(
-    targetRoot,
-    "README.md",
-    `# ${escapeMarkdownText(projectName)}
+  for (const [file, content] of Object.entries(
+    renderGeneratedProjectDocuments(
+      sourceRoot,
+      escapeMarkdownText(projectName),
+      Boolean(description),
+    ),
+  ))
+    writeRelative(targetRoot, file, content);
+}
+
+/** The escaped project label and creation-brief flag belong to the original generated project. */
+export function renderGeneratedProjectDocuments(sourceRoot, projectLabel, hasCreationBrief) {
+  return {
+    "instructions.md": currentProjectInstructions(sourceRoot),
+    "AGENTS.md": initialProjectAgents(sourceRoot),
+    "README.md": `# ${projectLabel}
 
 This repository owns its product and a selected set of inspectable development tools.
 
@@ -106,6 +116,8 @@ prepares frozen inputs for CI. Do not repeat preparation when its required state
 Only an explicitly authorized Dev session may add \`--yolo\`; prompts follow native session selection.
 Restart through the launcher after runtime changes. Startup waits for live lifecycle coordinators;
 dead coordinators with surviving commands require owned recovery instead of a long wait.
+One canonical Codex session owns writes across all linked Git worktrees of this project.
+Mise tracks project settings locally and reuses verified shared tool versions and downloads.
 Cancellable verification checks drain when their caller exits; other operations retain their
 completion boundary. Never remove a lock or interrupt another owner to bypass admission.
 
@@ -127,7 +139,7 @@ Preserve separate UI approval gates.
 - [Current technical inventory](docs/project.md)
 - [Deferred module candidates](docs/future-modules.md)
 - [Native session configuration](.codex/README.md)
-${description ? "- [Requirements intake draft](docs/requirements.md)\n" : ""}
+${hasCreationBrief ? "- [Requirements intake draft](docs/requirements.md)\n" : ""}
 ## Essential Commands
 
 Use \`bash -p scripts/setup/run-project.sh <command> [arguments]\` from a host shell for the pinned,
@@ -204,11 +216,7 @@ Keep the file/parent private and reconcile uncertain remote mutations before ret
 
 The project owner chooses licensing before distribution; third-party dependencies retain their terms.
 `,
-  );
-  writeRelative(
-    targetRoot,
-    ".codex/README.md",
-    `# Project Session Configuration
+    ".codex/README.md": `# Project Session Configuration
 
 Tracked \`config.toml\`, \`agents/*.toml\` and \`hooks.json\` own native role, permission and
 lifecycle-hook configuration. \`tooling.json\` selects startup/providers; \`toolchain.json\`,
@@ -233,17 +241,13 @@ Follow the canonical policies for [account isolation](../instructions.md#reposit
 [verification reuse](../instructions.md#verification-selection-and-runtime), and
 [isolated release](../instructions.md#delegated-release).
 `,
-  );
-  writeRelative(
-    targetRoot,
-    "docs/project.md",
-    initialProjectManifest({
-      displayName: escapeMarkdownText(projectName),
-      hasCreationBrief: Boolean(description),
+    "docs/project.md": initialProjectManifest({
+      displayName: projectLabel,
+      hasCreationBrief,
       deliveryProjection: renderDeliveryManifestProjection({
-        configuration: parseDeliveryConfiguration(delivery),
+        configuration: parseDeliveryConfiguration(initialDeliveryConfiguration()),
       }),
     }).replace("- Framework workflow authority", "- Project workflow authority"),
-  );
-  writeRelative(targetRoot, "docs/future-modules.md", initialFutureModulesDocument());
+    "docs/future-modules.md": initialFutureModulesDocument(),
+  };
 }

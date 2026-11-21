@@ -9,9 +9,7 @@ import {
   renameOwnedArtifact,
   readOptionalOwnedFile,
 } from "../filesystem/owned-file-operations.mjs";
-import { prepareUserToolDirectories, userToolPaths } from "../repository/user-tool-storage.mjs";
-import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
-import { inspectLinuxOpenRepositoryPaths } from "../repository/runtime-process-identity.mjs";
+import { prepareUserToolDirectories } from "../repository/user-tool-storage.mjs";
 import {
   prepareProjectToolDirectories,
   projectToolPaths,
@@ -252,71 +250,4 @@ export function retireReplacedProjectTools({ root, previousMatrix, owner }) {
     });
   }
   return obsolete.map((tool) => tool.directory);
-}
-
-/** Reuses Mise's native project registry for bundle pins; live binaries/libraries also retain a version. */
-export function retireUnreferencedUserBundles({ root, projects, owner }) {
-  const shared = userToolPaths();
-  if (
-    !owner ||
-    !currentRuntimeLifecycleCapability({
-      root: shared.lifecycle,
-      operation: "toolchain-maintenance",
-    })
-  )
-    throw new Error("Shared bundle retirement requires its installation lifecycle owner.");
-  assertRuntimeLifecycleQuiescent({ root: shared.lifecycle, owner });
-  const layout = projectManagedToolLayout(root);
-  const matrices = [...new Set([root, ...projects])].map((project) =>
-    readToolchainConfiguration(project),
-  );
-  const removed = [],
-    retained = [];
-  for (const name of ["mise", "codex"]) {
-    const keep = new Set(
-      matrices.map((matrix) => matrix.ci[name === "mise" ? "miseVersion" : "codexVersion"]),
-    );
-    const parent = path.dirname(path.dirname(layout[name].directory));
-    for (const version of readdirSync(parent)) {
-      if (keep.has(version) || !/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/u.test(version)) continue;
-      const directory = path.join(parent, version, path.basename(layout[name].directory));
-      if (!existsSync(directory)) continue;
-      const active = inspectLinuxOpenRepositoryPaths({
-        root: shared.root,
-        excludePids: [],
-        includeRuntimePaths: true,
-        matchesPath: (relative) =>
-          path.join(shared.root, relative).startsWith(`${directory}${path.sep}`),
-      });
-      if (active.status !== "inactive") {
-        retained.push(`${name}@${version}: active or unobservable runtime`);
-        continue;
-      }
-      const receipt = readOptionalOwnedFile(
-        shared.root,
-        path.join(directory, ".project-installation.json"),
-        "native installation receipt",
-        { maximumBytes: 1024 * 1024 },
-      );
-      if (!receipt.exists)
-        throw new Error("Unreferenced native bundle has no installation receipt.");
-      const recorded = JSON.parse(receipt.buffer.toString("utf8"));
-      const tool = {
-        ...layout[name],
-        version,
-        directory,
-        integrity: recorded.integrity,
-        executable: path.join(
-          directory,
-          path.relative(layout[name].directory, layout[name].executable),
-        ),
-      };
-      verifyProjectToolBundle(root, tool);
-      removeOwnedArtifact(shared.root, directory, "directory", "unreferenced native bundle", {
-        expectedIdentity: lstatSync(directory),
-      });
-      removed.push(`${name}@${version}`);
-    }
-  }
-  return { removed, retained };
 }

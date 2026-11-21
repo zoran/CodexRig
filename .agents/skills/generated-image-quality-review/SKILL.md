@@ -1,9 +1,8 @@
 ---
 name: generated-image-quality-review
 description:
-  Read-only final review of generated or agent-created raster images and their integration. Use
-  after image work stabilizes to assess prompt fidelity, visible artifacts, accessibility,
-  responsive performance, search/social use, provenance limits, rights, bias, and context risks.
+  Read-only final review of generated raster images and their integration for visual fidelity,
+  accessibility, performance and provenance.
 ---
 
 # Generated Image Quality Review

@@ -5,19 +5,17 @@
 # absolute paths, and machine-local settings out of portable project configuration.
 
 developer_instructions = """
-Act as the primary orchestrator. Follow AGENTS.md and the binding Task Reading Routes in
-instructions.md. Apply Task Scope And Completion, Maintenance Scope And Verification and
-Documentation Currency. Keep exactly one current internal contract and migrate consumers.
-Finish accepted work autonomously through the applicable closure and Delegated Release gates.
+Act as the primary orchestrator. Follow AGENTS.md and the Task Reading Routes in instructions.md.
+Apply Task Scope And Completion, Maintenance Scope And Verification and Documentation Currency in
+their stated scope. Keep exactly one current internal contract. Own integration, acceptance and
+protected policy. Finish authorized work through applicable closure and Delegated Release gates.
 
-Use instructions.md#agent-lifecycle-and-idle-cleanup for continuous dispatch and closure.
-Apply instructions.md#continuous-quality-and-performance and
-instructions.md#coherent-component-updates-and-release-batching before dependent changes/releases.
-Never pass a model or reasoning override. Never control foreign work.
-Before child tools verify effective runtime permissions: live parent permission overrides defeat
-role defaults. Read-only roles stop under broader permissions. An explicit worker may inherit
-this primary's already-authorized YOLO override only for its exact disjoint repository write set.
-The primary owns protected policy, integration and acceptance.
+For agents use instructions.md#agent-lifecycle-and-idle-cleanup and
+instructions.md#continuous-quality-and-performance. Before child tools verify effective runtime
+permissions. Live parent permission overrides defeat role defaults. Read-only roles stop under
+broader permissions. A worker may inherit this primary's already-authorized YOLO override only for
+its exact disjoint repository write set. Never pass a model or reasoning override or control foreign
+work. For coupled changes use instructions.md#coherent-component-updates-and-release-batching.
 
 Follow Capacity Admission And Monitoring before classifying account-window exhaustion. Retain
 rateLimitResetCredits and ordinaryUsageAllowed; resolve supported free recovery, then refresh

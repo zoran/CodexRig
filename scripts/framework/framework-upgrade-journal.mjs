@@ -2,6 +2,10 @@
 import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import {
+  assertUpgradeTargetIdle,
+  holdDestinationUpgradeRuntime,
+} from "./framework-upgrade-runtime.mjs";
+import {
   toolingRoot,
   normalizeRepositoryPath,
   resolveRepositoryPath,
@@ -194,32 +198,30 @@ export function restoreFrameworkUpgradeJournal(root, journal) {
   }
 }
 
-export function beginFrameworkUpgrade(plan, lifecycle) {
+export async function beginFrameworkUpgrade(plan, lifecycle) {
   const paths = frameworkUpgradeStatePaths(plan.targetRoot);
   const lifecycleCapability = lifecycle.acquireRuntimeLifecycleLock({
     root: paths.repositoryRoot,
     operation: "framework-upgrade",
   });
   let stateCreated = false;
+  let destination;
   try {
     lifecycle.assertRuntimeLifecycleQuiescent({
       root: plan.targetRoot,
       owner: lifecycleCapability,
     });
+    assertUpgradeTargetIdle(plan.targetRoot, lifecycle);
     if (existsSync(paths.root))
       throw new Error("Unsettled migration state requires explicit recovery.");
+    // Keep the installed writer lock while reading and admitting the destination runtime.
+    if (!plan.regenerate) {
+      destination = await holdDestinationUpgradeRuntime(plan, lifecycle);
+      assertUpgradeTargetIdle(plan.targetRoot, destination.lifecycle);
+    }
     ensureUpgradeDirectoryChain(plan.targetRoot, ".project-state/framework-upgrade");
     createExclusiveOwnedDirectory(plan.targetRoot, paths.lock, "framework upgrade lock");
     stateCreated = true;
-  } catch (error) {
-    lifecycle.releaseRuntimeLifecycleLock({
-      root: paths.repositoryRoot,
-      owner: lifecycleCapability,
-    });
-    if (error?.code === "EEXIST") throw new Error("Another framework upgrade is active.");
-    throw error;
-  }
-  try {
     atomicWriteUpgradeFile(
       plan.targetRoot,
       ".project-state/framework-upgrade/lock/owner.json",
@@ -232,7 +234,7 @@ export function beginFrameworkUpgrade(plan, lifecycle) {
     );
     const journal = journalForPlan(plan);
     persistFrameworkUpgradeJournal(plan.targetRoot, journal);
-    return { journal, lifecycleCapability, paths };
+    return { journal, lifecycleCapability, paths, destination };
   } catch (error) {
     if (stateCreated && existsSync(paths.root)) {
       try {
@@ -246,10 +248,16 @@ export function beginFrameworkUpgrade(plan, lifecycle) {
         // Suspicious state remains visible and fail-closed for explicit recovery.
       }
     }
-    lifecycle.releaseRuntimeLifecycleLock({
-      root: paths.repositoryRoot,
-      owner: lifecycleCapability,
-    });
+    try {
+      destination?.release();
+    } finally {
+      lifecycle.releaseRuntimeLifecycleLock({
+        root: paths.repositoryRoot,
+        owner: lifecycleCapability,
+      });
+    }
+    if (!stateCreated && error?.code === "EEXIST")
+      throw new Error("Another framework upgrade is active.");
     throw error;
   }
 }
@@ -272,6 +280,7 @@ export function recoverFrameworkUpgradeState(root, { lifecycle }) {
   let completing = false;
   try {
     lifecycle.assertRuntimeLifecycleQuiescent({ root, owner: lifecycleCapability });
+    assertUpgradeTargetIdle(root, lifecycle);
     const paths = frameworkUpgradeStatePaths(root);
     if (!existsSync(paths.journal)) {
       if (!existsSync(paths.root)) return false;

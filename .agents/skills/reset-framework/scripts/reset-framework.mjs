@@ -10,10 +10,19 @@ import {
   readProjectWorkContext,
 } from "../../../../scripts/context/project-work-state.mjs";
 import { claimAndRemove } from "../../../../scripts/filesystem/owned-path-safety.mjs";
+import { readOptionalOwnedFile } from "../../../../scripts/filesystem/owned-file-operations.mjs";
+import { isChildMaintenanceDocument } from "../../../../scripts/framework/framework-upgrade-documents.mjs";
+import { frameworkUpgradeStatePaths } from "../../../../scripts/framework/framework-upgrade-journal.mjs";
+import { dependencyTransactionPaths } from "../../../../scripts/deps/dependency-transaction-state.mjs";
+import { housekeepingStatePaths } from "../../../../scripts/repository/repository-housekeeping-files.mjs";
+import { resolveOwnedGitMetadata } from "../../../../scripts/repository/git-runtime-isolation.mjs";
+import { sensitivePathReason } from "../../../../scripts/repository/sensitive-paths.mjs";
 import {
   isPrivateCodexRuntimePath,
   isPrivateRepositoryStatePath,
   isRepositoryCodexHomePath,
+  isExcludedActivePath,
+  listRepositoryPathInventory,
   repositoryCodexRuntimeCacheDirectory,
   repositoryCodexRuntimeDirectory,
   repositoryCodexHomeCredentialFileNames,
@@ -60,6 +69,7 @@ const optionalEmptyDirectories = [
   "services",
 ];
 const scanExcludedDirectories = new Set([".codex", ".git", ".project-state", "node_modules"]);
+const protectedSourceEntries = new Set([".git", ".auth", ".project-state"]);
 const preservedCodexHomeFiles = new Set([
   ...repositoryCodexHomeCredentialFileNames,
   "config.toml",
@@ -212,18 +222,31 @@ function assertRuntimeInactive(root) {
 }
 
 /** Inspects full-reset candidates only after proving source identity and runtime quiescence. */
-export function inspectFrameworkReset(root = defaultRoot) {
+export function inspectFrameworkReset(root = defaultRoot, expectedFiles) {
   const canonical = requireFrameworkRoot(root);
   assertRuntimeInactive(canonical);
-  return Object.freeze(collectCandidates(canonical));
+  return Object.freeze(collectCandidates(canonical, { expectedFiles }));
 }
 
 /** Publication clears portable process residue while the caller keeps its private runtime alive. */
-export function inspectFrameworkPublicationReset(root = defaultRoot) {
+export function inspectFrameworkPublicationReset(root = defaultRoot, expectedFiles) {
   const canonical = requireFrameworkRoot(root);
+  if (entryStats(path.join(canonical, ".project-state"))?.isDirectory()) {
+    const owners = [
+      frameworkUpgradeStatePaths(canonical).root,
+      dependencyTransactionPaths(canonical).state,
+      housekeepingStatePaths(canonical).root,
+    ];
+    for (const state of owners) {
+      if (entryStats(state) && !isEmptyRealDirectory(state))
+        fail(
+          `Publication preserves unsettled transaction state at ${relativePath(canonical, state)}; finish recovery with its owner first.`,
+        );
+    }
+  }
   return inspectPublicationSession(canonical)
-    ? Object.freeze(collectCandidates(canonical, { includeLocalRuntime: false }))
-    : inspectFrameworkReset(canonical);
+    ? Object.freeze(collectCandidates(canonical, { includeLocalRuntime: false, expectedFiles }))
+    : inspectFrameworkReset(canonical, expectedFiles);
 }
 
 function requirePreservedFile(target, label) {
@@ -241,21 +264,37 @@ function requirePreservedFile(target, label) {
   return stats;
 }
 
-function scanProcessDocuments(root) {
+function containsProjectState(entries) {
+  return (
+    entries.some(({ name }) => protectedSourceEntries.has(name)) ||
+    (entries.some(({ name }) => name === ".codex") &&
+      entries.some(({ name }) => name === "package.json"))
+  );
+}
+
+function scanSourceResidue(root, nestedProjects) {
   const matches = [];
   const pending = [root];
   while (pending.length > 0) {
     const directory = pending.pop();
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const entries = readdirSync(directory, { withFileTypes: true });
+    if (directory !== root && containsProjectState(entries)) {
+      nestedProjects.push(relativePath(root, directory) + "/");
+      continue;
+    }
+    for (const entry of entries) {
       const target = path.join(directory, entry.name);
       const relative = relativePath(root, target);
-      if (entry.isSymbolicLink()) continue;
-      if (isPrivateRepositoryStatePath(relative)) continue;
+      if (isPrivateRepositoryStatePath(relative) || protectedSourceEntries.has(entry.name))
+        continue;
       if (entry.isDirectory()) {
-        if (!scanExcludedDirectories.has(entry.name) && relative !== "dist/exports") {
-          pending.push(target);
-        }
-      } else if (entry.isFile() && isRepositoryProcessArtifactPath(relative)) {
+        if (scanExcludedDirectories.has(entry.name) || isExcludedActivePath(relative)) continue;
+        pending.push(target);
+      } else if (
+        (entry.isFile() || entry.isSymbolicLink()) &&
+        (isRepositoryProcessArtifactPath(relative) ||
+          [".DS_Store", "Thumbs.db"].includes(entry.name))
+      ) {
         matches.push(relative);
       }
     }
@@ -357,8 +396,32 @@ function collectCodexCandidates(root, candidates) {
   }
 }
 
-function collectCandidates(root, { includeLocalRuntime = true } = {}) {
-  const candidates = new Set(scanProcessDocuments(root));
+function collectCandidates(root, { includeLocalRuntime = true, expectedFiles } = {}) {
+  const nestedProjects = [];
+  const candidates = new Set(scanSourceResidue(root, nestedProjects));
+  if (resolveOwnedGitMetadata(root)) {
+    const tracked = new Set(listRepositoryPathInventory({ root, includeUntracked: false }).paths);
+    for (const file of listRepositoryPathInventory({ root }).paths) {
+      if (
+        (path.posix.extname(file) && !/\.(?:json|log|out|txt)$/iu.test(file)) ||
+        tracked.has(file) ||
+        nestedProjects.some((prefix) => file.startsWith(prefix)) ||
+        isExcludedActivePath(file) ||
+        sensitivePathReason(file) ||
+        /(?:^|\/)(?:fixtures|testdata)\//u.test(file) ||
+        file.split("/").some((name) => protectedSourceEntries.has(name))
+      )
+        continue;
+      const target = absolutePath(root, file);
+      const stats = entryStats(target);
+      if (!stats?.isFile() || stats.nlink !== 1) continue;
+      const snapshot = readOptionalOwnedFile(root, target, "untracked upgrade document");
+      if (snapshot.exists && isChildMaintenanceDocument(snapshot.buffer)) {
+        candidates.add(file);
+        expectedFiles?.set(file, snapshot.stats);
+      }
+    }
+  }
   if (includeLocalRuntime) {
     for (const name of readdirSync(root)) {
       if (preservedCodexHomeFiles.has(name)) {
@@ -368,9 +431,11 @@ function collectCandidates(root, { includeLocalRuntime = true } = {}) {
     collectCodexCandidates(root, candidates);
   }
   for (const relative of removableTrees) {
+    if (nestedProjects.some((prefix) => (relative + "/").startsWith(prefix))) continue;
     if (entryStats(absolutePath(root, relative))) candidates.add(relative);
   }
   for (const relative of optionalEmptyDirectories) {
+    if (nestedProjects.some((prefix) => (relative + "/").startsWith(prefix))) continue;
     if (isEmptyRealDirectory(absolutePath(root, relative))) candidates.add(relative);
   }
   const ordered = [...candidates].sort();
@@ -396,7 +461,7 @@ function pruneEmptyParents(root, startDirectory) {
   }
 }
 
-export function removeResetCandidate(root, target, { testHooks } = {}) {
+export function removeResetCandidate(root, target, { expectedIdentity, testHooks } = {}) {
   const stats = entryStats(target);
   if (!stats) return;
   const relative = relativePath(root, target);
@@ -412,7 +477,9 @@ export function removeResetCandidate(root, target, { testHooks } = {}) {
     // Codex launcher/plugin temp trees intentionally contain executable wrapper links. Other reset
     // candidates retain the generic fail-closed policy for nested symlinks.
     allowSymlinkEntries: isPrivateCodexRuntimePath(relative),
+    preserveDirectory: isPrivateCodexRuntimePath(relative) ? undefined : containsProjectState,
     artifactPath: target,
+    expectedIdentity,
     expectedType,
     label: `reset candidate ${relative}`,
     ownedRootPath: root,
@@ -421,7 +488,7 @@ export function removeResetCandidate(root, target, { testHooks } = {}) {
   });
 }
 
-async function applyReset(root, candidates) {
+async function applyReset(root, candidates, expectedFiles) {
   for (const relative of candidates) {
     const target = absolutePath(root, relative);
     if (!entryStats(target)) continue;
@@ -429,7 +496,7 @@ async function applyReset(root, candidates) {
     if (removalParent !== root && !removalParent.startsWith(`${root}${path.sep}`)) {
       fail(`Reset refused a removal path whose parent escapes the framework: ${relative}.`);
     }
-    removeResetCandidate(root, target);
+    removeResetCandidate(root, target, { expectedIdentity: expectedFiles.get(relative) });
     pruneEmptyParents(root, path.dirname(target));
   }
 }
@@ -474,10 +541,11 @@ async function main() {
       fail("Reset refused while a repository verification session is active.");
     }
     const includeLocalRuntime = fullReset;
+    const expectedFiles = new Map();
     const candidates = options.publication
-      ? inspectFrameworkPublicationReset(root)
+      ? inspectFrameworkPublicationReset(root, expectedFiles)
       : fullReset
-        ? inspectFrameworkReset(root)
+        ? inspectFrameworkReset(root, expectedFiles)
         : verificationSourceCandidates(root);
 
     if (!options.apply) {
@@ -501,7 +569,7 @@ async function main() {
       JSON.stringify(inspectPublicationSession(root)) !== JSON.stringify(publicationSession)
     )
       fail("Publication session changed before source cleanup.");
-    await applyReset(root, candidates);
+    await applyReset(root, candidates, expectedFiles);
     const residual = collectCandidates(root, { includeLocalRuntime });
     if (residual.length > 0) fail(`Reset left removable state: ${residual.join(", ")}`);
     console.log(`Framework reset complete; removed ${candidates.length} path(s).`);

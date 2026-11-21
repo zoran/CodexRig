@@ -18,14 +18,7 @@ function terminal({ isTTY = true, columns = 80 } = {}) {
 }
 
 test("each project name uses a bounded animation without changing input or cursor visibility", async () => {
-  for (const label of [
-    "CodexRig",
-    "Kizor",
-    "KerdBot",
-    "Avatory",
-    "Future 27",
-    "未来のプロジェクト",
-  ]) {
+  for (const label of ["CodexRig", "Project", "Project 27", "未来のプロジェクト"]) {
     const stream = terminal(),
       waits = [];
     await showStartupIntro({

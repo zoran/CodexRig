@@ -1,10 +1,8 @@
 ---
 name: ui-ux-review
 description:
-  Read-only review of changed interactive surfaces, user flows, states, navigation, styling or
-  shared visual components for usability, accessibility, consistency and preservation of existing
-  design intent. Use after relevant UI implementation stabilizes or for an explicit UX review; skip
-  framework-only work without an affected user interface. This skill never authorizes a redesign.
+  Read-only review of changed interactive flows for usability, accessibility and existing design
+  intent. Use after implementation or for an explicit UX review.
 ---
 
 # UI/UX Review

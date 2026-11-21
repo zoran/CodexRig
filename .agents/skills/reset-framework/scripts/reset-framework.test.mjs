@@ -39,7 +39,10 @@ import {
   releaseDependencyTransactionLock,
 } from "../../../../scripts/deps/dependency-transaction-state.mjs";
 import { openFrameworkRuntimeStatus, removeResetCandidate } from "./reset-framework.mjs";
-import { projectToolEnvironment } from "../../../../scripts/repository/project-tool-environment.mjs";
+import {
+  prepareProjectToolDirectories,
+  projectToolEnvironment,
+} from "../../../../scripts/repository/project-tool-environment.mjs";
 
 const script = path.join(path.dirname(fileURLToPath(import.meta.url)), "reset-framework.mjs");
 const toolingRoot = path.resolve(path.dirname(script), "..", "..", "..", "..");
@@ -170,6 +173,95 @@ test("operator recovery invokes the reset owner for preview, apply, and clean pr
       }
     });
   }
+});
+
+test("source cleanup preserves nested child checkouts and their account data", (t) => {
+  const root = fixture();
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  const git = (...args) => {
+    const result = spawnSync(
+      "git",
+      [
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        ...args,
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, result.stderr);
+  };
+  git("init", "--quiet", "--initial-branch=main");
+  write(root, ".gitignore", readFileSync(path.join(toolingRoot, ".gitignore"), "utf8"));
+  prepareProjectToolDirectories(root);
+  git("add", "--", ".gitignore", "README.md", "package.json", ".agents", ".codex");
+  git("commit", "--quiet", "-m", "Framework fixture");
+  const scratch = ".project-state/child-maintenance";
+  write(root, `${scratch}/nested/.git/HEAD`, "ref: refs/heads/main\n");
+  write(root, `${scratch}/nested/.auth/account`, "child-owned\n");
+  git(
+    "init",
+    "--quiet",
+    "--separate-git-dir",
+    path.join(root, ".git", "nested-fixture"),
+    "copied-child",
+  );
+  git("-C", "copied-child", "commit", "--quiet", "--allow-empty", "-m", "Nested fixture");
+  write(root, "copied-child/docs/plans/fix.md", "child-owned plan\n");
+  write(root, "gitless-child/package.json", '{"name":"fixture-child"}');
+  write(root, "gitless-child/.codex/tooling.json", "{}");
+  write(root, "gitless-child/docs/plans/implementation-plan.md", "preserve child work\n");
+  const childReport = JSON.stringify({ digest: "a".repeat(64), conflicts: [], operations: [] });
+  write(root, "gitless-child/report.json", childReport);
+  const applied = run(root, ["--publication", "--apply"]);
+  assert.equal(applied.status, 1);
+  assert.match(applied.stderr, /preserved a nested repository or private state/u);
+  assert.equal(
+    readFileSync(path.join(root, scratch, "nested/.git/HEAD"), "utf8"),
+    "ref: refs/heads/main\n",
+  );
+  assert.equal(
+    readFileSync(path.join(root, scratch, "nested/.auth/account"), "utf8"),
+    "child-owned\n",
+  );
+  assert.equal(
+    readFileSync(path.join(root, "copied-child/docs/plans/fix.md"), "utf8"),
+    "child-owned plan\n",
+  );
+  rmSync(path.join(root, ".project-state"), { recursive: true });
+  const safe = run(root, ["--publication", "--apply"]);
+  assert.equal(safe.status, 0, safe.stderr);
+  assert.equal(
+    readFileSync(path.join(root, "gitless-child/docs/plans/implementation-plan.md"), "utf8"),
+    "preserve child work\n",
+  );
+  assert.equal(readFileSync(path.join(root, "gitless-child/report.json"), "utf8"), childReport);
+  assert.equal(
+    readFileSync(path.join(root, "copied-child/docs/plans/fix.md"), "utf8"),
+    "child-owned plan\n",
+  );
+});
+
+test("publication preserves unfinished transaction state before clearing disposable child work", (t) => {
+  const root = fixture();
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  const scratch = ".project-state/child-maintenance/notes.log";
+  write(root, scratch, "temporary child output");
+  for (const owner of ["framework-upgrade", "repository-housekeeping", "dependency-update"]) {
+    const journal = path.join(".project-state", owner, "journal.json");
+    write(root, journal, '{"pending":true}');
+    const result = run(root, ["--publication", "--apply"]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /preserves unsettled transaction state/u);
+    assert.equal(readFileSync(path.join(root, journal), "utf8"), '{"pending":true}');
+    assert.ok(existsSync(path.join(root, scratch)));
+    rmSync(path.join(root, ".project-state", owner), { recursive: true });
+  }
+  assert.equal(run(root, ["--publication", "--apply"]).status, 0);
+  assert.equal(existsSync(path.join(root, scratch)), false);
 });
 
 test("reset preserves reusable startup repairs and their release metadata byte for byte", (t) => {

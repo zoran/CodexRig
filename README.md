@@ -21,6 +21,9 @@ prompts; task scope stays unchanged. Keep `bash -p` to block inherited shell sta
 [Effective Permissions](instructions.md#effective-permissions-and-write-isolation) own these
 boundaries.
 
+One canonical Codex session owns writes across a project and its linked Git worktrees. Exit that
+session before opening the picker in another worktree of the same clone.
+
 For initial preparation without opening Codex:
 
 ```bash
@@ -45,10 +48,9 @@ stop release selection and never justify a downgrade.
 pnpm uses the official npm distribution on the pinned Node runtime. Its native GitHub builds are not
 required for other platforms. Mise binds the portable graph under
 `.codex/.mise/locks/pnpm/current/`; generation and transactional updates carry it with the pins.
-Shared tool collection tracks public pins separately from private Mise configuration. The next
-quiescent startup migrates this project's older shared private references without reading accounts.
-Legacy references from other projects name their owning roots and await those projects' updated
-startup; their versions remain protected until that migration.
+Mise tracks this project's configurations under `.auth/project-tools/state/mise/`. Startup checks
+the project's own pins and reuses verified shared installations even when another project uses
+different versions or settings.
 
 After framework changes, `/quit` and relaunch from the terminal; `/new` and `/resume` retain the
 running launcher. `/side` opens an independent temporary conversation. For startup defects, update
@@ -135,13 +137,21 @@ authorizing the source changes, publish through the existing owner:
 bash -p scripts/setup/run-project.sh pnpm framework:publish --message "<commit message>"
 ```
 
-This authorizes cleanup, verification, commit and push of reviewed non-ignored source on `main`,
-followed by remote confirmation. Failures preserve source and local commits. A verified calling
-session may remain active; full runtime reset requires stopped sessions. `--verbose` shows sanitized
-check output. Verification progress shows reused results and the active checks before completion.
-Generated projects use `project:publish` on their configured branch/upstream, retaining history and
-accounts without framework reset. Neither publisher deploys. Candidate pinning and isolated release
-clones follow [Delegated Release](instructions.md#delegated-release); see
+Keep source-side notes, patches, reproductions and saved reports from child updates or repairs in
+`.project-state/child-maintenance/`. Framework publication clears this scratch and recognizes loose
+untracked upgrade previews and reconciliation JSON by their content. It checks the candidate and
+outgoing local commits for misplaced review documents, loose patches and concrete external checkout
+references. A finding identifies the source file for review. Cleanup preserves nested checkouts and
+stops before deleting an unfinished update or recovery journal.
+
+When invoked with publication authority, the command cleans, verifies, commits and pushes reviewed
+non-ignored source on `main`, then confirms the remote commit. Failures preserve source and local
+commits. A verified calling session may remain active; full runtime reset requires stopped sessions.
+`--verbose` shows sanitized check output. Verification progress shows reused results and the active
+checks before completion. Generated projects use `project:publish` on their configured
+branch/upstream, retaining history and accounts without framework reset. Neither publisher deploys.
+Candidate pinning and isolated release clones follow
+[Delegated Release](instructions.md#delegated-release); see
 [publication gates](instructions.md#verification-and-publication-gates) for authority and evidence.
 
 A sealed critical handover is terminal: stop, exit Codex, relaunch and accept the announced
@@ -191,8 +201,8 @@ admission, migration, retention and uncertain ownership. Never empty `.tmp/` or 
 Pins/checksums stay tracked. Shared installations use `~/.local/share/project-tools/`;
 downloads/browser caches use `~/.cache/project-tools/`. pnpm shares graphs with project metadata in
 `node_modules`. `PROJECT_TOOL_STORAGE_HOME` relocates tools only; accounts/device state stays
-private. Native references and observed use protect other projects. Runtime/browser owners retire
-payloads; disposable checks reuse installations and clean their own managed scratch.
+private. Project housekeeping retains shared runtime versions and bootstrap bundles. Native package
+and cache collectors reclaim unused package data and expired downloads.
 
 ## Documentation Context Economy
 
@@ -209,13 +219,22 @@ source release (`pnpm framework:version`). Preview does not install tools or mod
 
 ```bash
 pnpm framework:upgrade -- --target <project-root>
+pnpm framework:upgrade -- --target <project-root> --baseline <pristine-generated-tree>
 pnpm framework:upgrade -- --target <project-root> --reconcile <reviewed-decisions.json>
 ```
 
-Review the write/delete plan and hash/mode-bound decisions for every divergent file, preserving
-product identity, documents and custom checks. Add `--apply` only with target sessions stopped; the
-target runtime enforces exclusion. A real pristine generated ancestor may supply `--baseline`. Older
-targets without that runtime owner require a fresh generated comparison and explicit
+Review the proposed writes, retirements and conflicts before adding `--apply`. Current-output
+comparison adds missing portable tools, package commands and verification entries. It preserves
+project-only files, package metadata and custom checks. Divergent shared commands or existing tool
+implementations require a decision.
+
+Supply the original pristine generated tree with `--baseline` when available. The updater then
+merges independent text edits in shared tools, CI, policies and generated documentation, combines
+independent JSON fields and retires unchanged obsolete framework files. Overlapping edits,
+modify/delete conflicts and competing lockfile changes stop the entire apply. JSON conflicts
+identify the affected keys. Use `--reconcile` with the same baseline for reviewed exceptions. Writes
+and recovery require inactive Codex sessions across the target clone's worktrees. Older targets
+without that runtime owner require a fresh generated comparison and explicit
 `--regenerate --confirm-quiescent --apply`; independently confirm quiescence because a new lock
 cannot fence an old launcher. Interrupted ordinary updates use `--recover`; regeneration uses
 `--regenerate --confirm-quiescent --recover` with the exact admitted source runtime.

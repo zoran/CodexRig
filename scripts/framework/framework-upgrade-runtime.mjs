@@ -14,6 +14,26 @@ import { readProjectToolSelection } from "./project-tool-selection.mjs";
 import { projectOutputText } from "./project-output-projection.mjs";
 import { importSpecifiersForFile } from "../repository/source-import-specifiers.mjs";
 import { targetUpgradeFileState } from "./framework-upgrade-io.mjs";
+import { inspectRepositoryWorktrees } from "../repository/worktree-recovery.mjs";
+
+/** Read the target runtime's own lease namespace, including its linked worktrees. */
+export function assertUpgradeTargetIdle(root, runtime) {
+  const inventory = inspectRepositoryWorktrees({ root });
+  if (!inventory.complete || typeof runtime.inspectRuntimeSessionLease !== "function")
+    throw new Error("Framework upgrade cannot establish target session ownership.");
+  for (const worktree of inventory.worktrees) {
+    if (
+      !worktree.available ||
+      !["absent", "stale"].includes(worktree.session.status) ||
+      !["absent", "stale"].includes(
+        runtime.inspectRuntimeSessionLease({ root: worktree.path }).status,
+      )
+    )
+      throw new Error(
+        "Framework upgrade requires inactive Codex sessions in every target worktree.",
+      );
+  }
+}
 
 function currentRuntimeSources(sourceRoot) {
   return readProjectToolSelection(sourceRoot)
@@ -22,24 +42,16 @@ function currentRuntimeSources(sourceRoot) {
     .map((file) => [file, projectOutputText(readRepositoryFile(sourceRoot, file))]);
 }
 
-/** Binds explicit regeneration/recovery to one current projected executable closure. */
+/** Bind recovery to the same projected source fingerprint recorded in existing journals. */
 export function regenerationRuntimeHash(sourceRoot) {
   return sha256(serializeCanonicalJson(currentRuntimeSources(sourceRoot)));
 }
 
 /** Recovery must understand the exact lifecycle contract installed by regeneration. */
 export function assertRegenerationLifecycleClosure(plan) {
-  const sources = new Map(currentRuntimeSources(plan.sourceRoot));
+  const sources = projectedLifecycleSources(currentRuntimeSources(plan.sourceRoot));
   const operations = new Map(plan.operations.map((operation) => [operation.path, operation]));
-  const pending = ["scripts/repository/runtime-session-lease.mjs"];
-  const visited = new Set();
-  while (pending.length) {
-    const file = pending.pop();
-    if (visited.has(file)) continue;
-    visited.add(file);
-    const expected = sources.get(file);
-    if (expected === undefined)
-      throw new Error(`Regeneration lifecycle dependency is not selected: ${file}.`);
+  for (const [file, expected] of sources) {
     const operation = operations.get(file);
     const actual = operation
       ? operation.action === "write"
@@ -48,11 +60,36 @@ export function assertRegenerationLifecycleClosure(plan) {
       : targetUpgradeFileState(plan.targetRoot, file).content;
     if (actual !== expected)
       throw new Error(`Regeneration requires the current lifecycle contract: ${file}.`);
-    for (const specifier of importSpecifiersForFile({ relativePath: file, content: expected })) {
-      if (specifier.startsWith("."))
-        pending.push(path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier)));
+  }
+}
+
+function lifecycleSources(readSource) {
+  const sources = new Map();
+  const pending = ["scripts/repository/runtime-session-lease.mjs"];
+  while (pending.length) {
+    const file = pending.pop();
+    if (sources.has(file)) continue;
+    const content = readSource(file);
+    sources.set(file, content);
+    for (const specifier of importSpecifiersForFile({ relativePath: file, content })) {
+      if (isBuiltin(specifier)) continue;
+      if (!specifier.startsWith("."))
+        throw new Error(
+          `Destination lifecycle requires a local reviewed dependency: ${specifier}.`,
+        );
+      pending.push(path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier)));
     }
   }
+  return sources;
+}
+
+function projectedLifecycleSources(allSources) {
+  const selected = new Map(allSources);
+  return lifecycleSources((file) => {
+    if (!selected.has(file))
+      throw new Error(`Regeneration lifecycle dependency is not selected: ${file}.`);
+    return selected.get(file);
+  });
 }
 
 /** Never imports a missing, superseded or partially installed target runtime. */
@@ -69,7 +106,7 @@ export async function stageRegenerationRuntime(sourceRoot, expectedHash) {
       "owned regeneration runtime stage",
     );
   try {
-    for (const [file, content] of sources) {
+    for (const [file, content] of projectedLifecycleSources(sources)) {
       const destination = path.join(temporary, file);
       mkdirSync(path.dirname(destination), { recursive: true });
       writeFileSync(destination, content);
@@ -90,11 +127,7 @@ function destinationRuntimeSources(plan) {
   for (const decision of plan.resolutions ?? [])
     if (["keep", "replace"].includes(decision.action)) admitted.add(decision.path);
   const operations = new Map(plan.operations.map((operation) => [operation.path, operation]));
-  const sources = new Map();
-  const pending = ["scripts/repository/runtime-session-lease.mjs"];
-  while (pending.length) {
-    const file = pending.pop();
-    if (sources.has(file)) continue;
+  return lifecycleSources((file) => {
     if (!admitted.has(file) || !file.endsWith(".mjs"))
       throw new Error(`Destination lifecycle dependency requires explicit tool review: ${file}.`);
     const operation = operations.get(file);
@@ -105,17 +138,8 @@ function destinationRuntimeSources(plan) {
       : targetUpgradeFileState(plan.targetRoot, file).content;
     if (content === undefined)
       throw new Error(`Destination lifecycle dependency is absent or retired: ${file}.`);
-    sources.set(file, content);
-    for (const specifier of importSpecifiersForFile({ relativePath: file, content })) {
-      if (isBuiltin(specifier)) continue;
-      if (!specifier.startsWith("."))
-        throw new Error(
-          `Destination lifecycle requires a local reviewed dependency: ${specifier}.`,
-        );
-      pending.push(path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier)));
-    }
-  }
-  return sources;
+    return content;
+  });
 }
 
 /** Both installed and destination owners exclude writers until the journal and files settle. */
@@ -147,12 +171,15 @@ export async function holdDestinationUpgradeRuntime(plan, installed) {
       });
       lifecycle.assertRuntimeLifecycleQuiescent({ root: plan.targetRoot, owner });
     }
-    return () => {
-      try {
-        if (owner) lifecycle.releaseRuntimeLifecycleLock({ root: plan.targetRoot, owner });
-      } finally {
-        cleanup();
-      }
+    return {
+      lifecycle,
+      release() {
+        try {
+          if (owner) lifecycle.releaseRuntimeLifecycleLock({ root: plan.targetRoot, owner });
+        } finally {
+          cleanup();
+        }
+      },
     };
   } catch (error) {
     try {

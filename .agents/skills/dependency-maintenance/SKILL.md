@@ -1,10 +1,8 @@
 ---
 name: dependency-maintenance
 description:
-  Inspect, update, pin, or remediate dependencies across a multi-package workspace while preserving
-  each package's current version line, lockfile integrity, migration requirements, and explicit
-  network uncertainty. Use for dependency reports, patch/minor/major upgrades, lockfile changes,
-  supply-chain incidents, or dependency policy work.
+  Inspect, update or remediate workspace dependencies and lockfiles. Preserve each package's version
+  line, integrity, migrations and network uncertainty.
 ---
 
 # Dependency Maintenance
@@ -28,8 +26,8 @@ manifest/lock consistency from network-dependent freshness.
    Resolve with scripts disabled unless a reviewed package requires a build step; inspect unexpected
    transitive/native changes.
 5. Keep declarations/digests in source, shared installations/package graphs in the admitted tool
-   store and accounts private. Relocation tests use isolated `PROJECT_TOOL_STORAGE_HOME`. Existing
-   native collectors preserve referenced/live versions; quiescent owners retire legacy copies.
+   store and accounts private. Relocation tests use isolated `PROJECT_TOOL_STORAGE_HOME`. Keep Mise
+   tracking private to each project and retain shared runtime and bootstrap versions.
 6. Verify lock consistency and actually affected consumers. Use `verify:external` only for required
    current registry/advisory observations; failed external lookups are not a clean result.
 

@@ -117,12 +117,12 @@ test("publication retains the final failed-check summary across both noisy outpu
   const diagnostic = await failedDiagnostic(`
     process.stderr.write('Mobile failed before cloud completed.\\n');
     process.stderr.write('Unrelated successful sibling warning.\\n'.repeat(100));
-    process.stderr.write('Adaptive verification failed: Broad regression checks failed: Kizor mobile\\n');
+    process.stderr.write('Adaptive verification failed: Broad regression checks failed: mobile fixture\\n');
     await new Promise(resolve => setTimeout(resolve, 30));
     process.stdout.write('Successful sibling output.\\n'.repeat(180));
     process.exitCode = 1;
   `);
-  assert.match(diagnostic, /Broad regression checks failed: Kizor mobile/u);
+  assert.match(diagnostic, /Broad regression checks failed: mobile fixture/u);
   assert.ok(diagnostic.split("\n").length <= 65);
 });
 

@@ -10,7 +10,8 @@ import {
   selectedProjectVerification,
 } from "./project-tool-selection.mjs";
 import { projectCiProjection, projectToolingConfiguration } from "./generated-project-tooling.mjs";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { formatContextError } from "../terminal/terminal-output.mjs";
@@ -26,6 +27,8 @@ import { localizationConfigurationPath } from "../contracts/localization-configu
 import { fail } from "./project-options.mjs";
 import { initialRequirementsPath } from "../docs/project-document-policy.mjs";
 import { generatedProjectDocuments } from "./project-transfer-policy.mjs";
+import { writeRelative } from "./generated-document-helpers.mjs";
+import { removeOwnedArtifact } from "../filesystem/owned-file-operations.mjs";
 
 const transformedProjectPaths = new Set([
   ".codex/README.md",
@@ -250,7 +253,7 @@ export function runGeneratedNode(sourceRoot, root, relativeScript, args = []) {
   }
 }
 
-function runGeneratedMarkdownFormatter(sourceRoot, targetRoot, argumentsList, input = "") {
+function runGeneratedMarkdownFormatter(sourceRoot, targetRoot, files) {
   const formatterPath = path.join(sourceRoot, "node_modules", "prettier", "bin", "prettier.cjs");
   if (!existsSync(formatterPath)) {
     fail(
@@ -259,12 +262,12 @@ function runGeneratedMarkdownFormatter(sourceRoot, targetRoot, argumentsList, in
   }
   const result = spawnSync(
     process.execPath,
-    [formatterPath, "--config", path.join(sourceRoot, ".prettierrc.json"), ...argumentsList],
+    [formatterPath, "--config", path.join(sourceRoot, ".prettierrc.json"), "--write", ...files],
     {
       cwd: targetRoot,
       env: projectToolEnvironment({ root: sourceRoot }),
       encoding: "utf8",
-      input,
+      input: "",
       stdio: "pipe",
     },
   );
@@ -272,17 +275,34 @@ function runGeneratedMarkdownFormatter(sourceRoot, targetRoot, argumentsList, in
   if (result.status !== 0) {
     fail(`Generated Markdown formatter failed with status ${result.status}`);
   }
-  return result.stdout;
 }
 
-/** Serializes desired policy without touching target files or accepting target formatter changes. */
-export function formatGeneratedMarkdownText(sourceRoot, relativePath, content) {
-  return runGeneratedMarkdownFormatter(
-    sourceRoot,
-    sourceRoot,
-    ["--stdin-filepath", relativePath],
-    content,
-  );
+/** Format a complete review projection in one private batch using the generation formatter. */
+export function formatProjectedDocuments(sourceRoot, documents) {
+  const stage = mkdtempSync(path.join(os.tmpdir(), "framework-document-review-"));
+  try {
+    const files = Object.keys(documents).filter((file) => generatedProjectDocuments.has(file));
+    for (const file of files) writeRelative(stage, file, documents[file]);
+    writeRelative(
+      stage,
+      ".prettierignore",
+      projectOutputText(readFileSync(path.join(sourceRoot, ".prettierignore"), "utf8")),
+    );
+    runGeneratedMarkdownFormatter(sourceRoot, stage, files);
+    return {
+      ...documents,
+      ...Object.fromEntries(
+        files.map((file) => [file, readFileSync(path.join(stage, file), "utf8")]),
+      ),
+    };
+  } finally {
+    removeOwnedArtifact(
+      path.dirname(stage),
+      stage,
+      "directory",
+      "owned project document projection",
+    );
+  }
 }
 
 export function formatGeneratedMarkdown(sourceRoot, targetRoot) {
@@ -290,12 +310,7 @@ export function formatGeneratedMarkdown(sourceRoot, targetRoot) {
   // portable output, which is still an unpublished artifact rather than an active tool home.
   prepareProjectToolDirectories(sourceRoot);
   runGeneratedMarkdownFormatter(sourceRoot, targetRoot, [
-    "--write",
-    "AGENTS.md",
-    "README.md",
-    "docs/future-modules.md",
-    "docs/project.md",
-    "instructions.md",
+    ...generatedProjectDocuments,
     ...(existsSync(path.join(targetRoot, initialRequirementsPath))
       ? [initialRequirementsPath]
       : []),

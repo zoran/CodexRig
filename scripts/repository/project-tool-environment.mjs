@@ -1,12 +1,13 @@
 /** Owns the clean, repository-bound environment shared by developer tools and their descendants. */
-import { lstatSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { ensureOwnedDirectoryChain } from "../filesystem/owned-file-operations.mjs";
+import { ensureOwnedPrivateDirectory } from "../filesystem/owned-path-safety.mjs";
 import { projectAccountStateDirectory } from "./source-inventory-policy.mjs";
 import { inheritedProjectTemporaryDirectory } from "./project-temporary-storage.mjs";
-import { userToolPaths, prepareMiseTracking } from "./user-tool-storage.mjs";
+import { prepareUserToolDirectories, userToolPaths } from "./user-tool-storage.mjs";
 
 export const projectToolStateDirectory = `${projectAccountStateDirectory}/project-tools`;
 
@@ -82,7 +83,15 @@ export function prepareProjectToolDirectories(root, { inherited = process.env } 
       throw new Error("Project tool storage must be private and owned by the current developer.");
   }
   assertGitCredentialStore(locations);
-  prepareMiseTracking(root, { inherited });
+  const miseState = path.join(locations.persistent, "mise");
+  ensureOwnedPrivateDirectory(root, miseState, "private Mise state");
+  ensureOwnedPrivateDirectory(
+    root,
+    path.join(miseState, "tracked-configs"),
+    "private Mise tracking",
+  );
+  if (existsSync(path.join(locations.root, ".codex/mise.toml")))
+    prepareUserToolDirectories(inherited);
   // Umask is process state, not an environment variable. Installers and their descendants
   // must not inherit a host's group/other write allowance; retain stricter caller restrictions.
   process.umask(process.umask() | 0o022);
@@ -221,7 +230,7 @@ export function projectToolEnvironment({ root, inherited = process.env } = {}) {
     MISE_TMP_DIR: temporary,
     MISE_DATA_DIR: shared.miseData,
     MISE_CACHE_DIR: shared.miseCache,
-    MISE_STATE_DIR: path.join(p.state, "mise"),
+    MISE_STATE_DIR: path.join(p.persistent, "mise"),
     NPM_CONFIG_USERCONFIG: path.join(p.config, "npm", "npmrc"),
     NPM_CONFIG_GLOBALCONFIG: path.join(p.config, "npm", "global-npmrc"),
     NPM_CONFIG_PREFIX: shared.npmPrefix,

@@ -7,50 +7,40 @@ Code and configuration own executable contracts. Preserve one owner for each fac
 
 ## Task Reading Routes
 
-At startup or resume reconstruct current state, then read the applicable routes and actual owners
-before dependent action. Reuse unchanged evidence. Navigation is not substantive evidence;
-`context:read --section` reads a direct body and lists children that may still need reading.
+Complete [startup reconstruction](#startup-repository-reconstruction) once per session or resume.
+For each request establish [scope and completion](#task-scope-and-completion) and read the actual
+owner. Use only the routes that affect the next decision. `context:map` shows this index and
+`context:read --section` reads one section. Open a child section when its condition applies.
 
-- **Every task:**
-  [Delivery and verification economy](#product-first-delivery-and-verification-economy),
-  [scope](#task-scope-and-completion), [maintenance](#maintenance-scope-and-verification),
-  [planning](#planning-entry-gate), relevant manifest, requirements/design and source owners.
-- **Startup/resume:** [Reconstruction](#startup-repository-reconstruction),
-  [lifecycle](#launcher-and-session-lifecycle), [announced handover](#critical-handover-receipt).
-  Use `$resume-project` for unfinished authorized work.
-- **Implementation:** [Engineering](#best-available-engineering-not-quick-fixes),
-  [course checks](#long-session-course-checks), `$project-implementation`.
-- **Product/architecture:** [Intake](#first-prompt-project-definition-intake), applicable
-  [architecture](#modular-architecture-parallel-ownership-and-integration) sections,
-  `$architecture-evolution`.
-- **Agents/background work:** [Admission](#admission-intelligence-and-provenance),
-  [permissions](#effective-permissions-and-write-isolation),
-  [capacity](#capacity-admission-and-monitoring),
-  [authority](#intelligence-parity-and-integration-authority), [coordination](#peer-coordination),
-  [lifecycle](#agent-lifecycle-and-idle-cleanup),
-  [quality and performance](#continuous-quality-and-performance).
-- **Accounts/infrastructure/delivery:** [Isolation](#repository-local-tool-and-account-isolation),
-  [infrastructure](#infrastructure-as-code), [delivery](#delivery-environments),
-  [security](#security-and-privacy).
-- **Multi-component change or deploy:**
-  [Dependency plan and preflight](#coherent-component-updates-and-release-batching) and
-  [release and manual testing](#continuous-delivery-and-manual-testing).
-- **Verification/review:** [Selection](#verification-selection-and-runtime),
-  [test strategy](#test-strategy), applicable review skill.
-- **Documentation:** [Ownership](#documentation-ownership), [currency](#documentation-currency),
-  [preservation](#context-economy-and-canonical-owners).
-- **Generation/update:** Relevant source-owned skill,
-  [maintenance](#maintenance-scope-and-verification) and [update scope](#repository-update-scope).
-- **Completion/publication:** [Closure](#completed-goal-closure-and-repository-housekeeping),
-  [gates](#verification-and-publication-gates), [delegated release](#delegated-release).
-- **Capacity pressure:** [Recovery](#capacity-admission-and-monitoring), then
-  [drain](#guarded-and-critical-drain). A successful critical seal is terminal.
-
-## Interpreting Examples And Scope
-
-Generalize examples only within the authorized class; explicit exclusions and closed lists remain
-boundaries. Resolve routine ambiguity from current evidence. Clarify material decisions while
-continuing independent work; examples never authorize unrelated features or external actions.
+- **Question or read-only review.** Answer from current evidence. For a review use the relevant
+  review skill. For a simple reversible edit work directly at its owner.
+- **Resume or handover.** Reconstruct unfinished authorized work with `$resume-project`. Follow
+  [session lifecycle](#launcher-and-session-lifecycle) and [receipt](#critical-handover-receipt) for
+  an announced handover.
+- **Implementation.** Use `$project-implementation`. For qualifying changes review the
+  [plan](#planning-entry-gate). Apply [course checks](#long-session-course-checks) during work.
+- **Product or architecture decision.** Use [intake](#first-prompt-project-definition-intake) for a
+  new product. For material boundary changes use `$architecture-evolution` and the relevant
+  [architecture section](#modular-architecture-parallel-ownership-and-integration).
+- **Maintenance or child update.** Apply [maintenance scope](#maintenance-scope-and-verification).
+  Generation and updates use their source-side skill and [update scope](#repository-update-scope).
+- **Delegation or background work.** Check [admission](#admission-intelligence-and-provenance),
+  [effective permissions](#effective-permissions-and-write-isolation) and
+  [capacity](#capacity-admission-and-monitoring) before dispatch. Apply
+  [ownership](#intelligence-parity-and-integration-authority), [coordination](#peer-coordination),
+  [oversight](#continuous-quality-and-performance) and [closure](#agent-lifecycle-and-idle-cleanup)
+  to admitted work.
+- **Accounts, infrastructure or delivery.** Open the applicable
+  [account](#repository-local-tool-and-account-isolation), [security](#security-and-privacy),
+  [infrastructure](#infrastructure-as-code) or [delivery](#delivery-environments) owner. For coupled
+  changes use [dependency preflight](#coherent-component-updates-and-release-batching).
+- **Verification and completion.** Select [evidence](#verification-selection-and-runtime) for the
+  changed behavior, reconcile [documentation](#documentation-currency) and
+  [settle completed slices](#completed-goal-closure-and-repository-housekeeping). Authorized
+  publication additionally requires [publication gates](#verification-and-publication-gates),
+  [delegated release](#delegated-release) and [delivery](#continuous-delivery-and-manual-testing).
+- **Capacity pressure.** Check [free recovery](#capacity-admission-and-monitoring) before
+  [critical drain](#guarded-and-critical-drain). A successful seal ends the session.
 
 ## Repository-Local Tool And Account Isolation
 
@@ -71,19 +61,9 @@ send a token to an unowned host.
 
 ## Repository Efficiency And Effectiveness
 
-Before a command identify its necessary statement/state change, reusable evidence, smaller
-alternatives and side effects. Read bounded owners, batch independent reads and minimize total
-implementation, coordination and maintenance cost. Avoid speculative abstractions, duplicate
-contracts and process artifacts without a consumer.
-
-Measure material bottlenecks. More output, longer timeouts or weaker checks do not repair excessive
-work. Reviews and handoffs create neither a new task nor a test trigger.
-
-## Production-Ready Means Code That Keeps Working
-
-Cover normal, failure, cancellation and recovery behavior at the robustness, security, accessibility
-and operational level the requirements justify. Stubs, bypasses, fabricated success and unobserved
-deployments are incomplete; preserve useful existing behavior.
+Read the relevant owners and batch independent observations. Before expensive or state-changing
+work, identify the acceptance gap, reusable evidence, cheaper alternatives and side effects. Measure
+a suspected bottleneck before raising limits or adding infrastructure.
 
 ## Current Contracts Only
 
@@ -103,111 +83,92 @@ Framework updates end at update acceptance; they do not reopen intake or start p
 
 ## Product-First Delivery And Verification Economy
 
-Deliver the smallest coherent working increment. Select evidence by actual risk and dependencies.
-Check cheap prerequisites and affected consumers before expensive dependent runs. Finish independent
-checks in each admitted verification phase. Batch repairs after the run and repeat only failed or
-invalidated checks. Pause affected work for real safety, authority, state or dependency blockers.
-Measure progress by usable behavior and missing acceptance evidence.
+Deliver the smallest coherent working increment. Check cheap prerequisites and affected consumers
+before dependent runs. Finish independent checks within an admitted phase, batch repairs and repeat
+only failed or invalidated units. Pause only work affected by a real blocker.
 
 ## Task Scope And Completion
 
-State the outcome, acceptance, boundaries and next step before substantial action. Distinguish
-review, implementation, maintenance, update and publication authority. Finish accepted work
-autonomously; a plan, check or intermediate slice does not complete an unfinished outcome. Ask only
-for missing material authority/information, explain its source and continue independent work.
-Read-only requests stay read-only.
+Use the current request and source to identify the result, permitted actions and stopping point.
+Questions, plans and read-only reviews grant their own scope. Before substantial work state the
+outcome, boundaries and next action.
 
-Current user authority and source outrank memory. Old context, TODOs, handovers and another
-project's permission create no task. Repair necessary in-scope defects, report actual
-blockers/limits, and stop at acceptance without optional follow-on work.
+Finish the accepted outcome autonomously, including repairs that block it. Resolve routine choices
+from evidence. Ask for a material decision or missing authority and continue independent work. Old
+state, handovers, other projects and unrelated findings grant no new task. Report material
+out-of-scope findings briefly and stop when acceptance is met.
 
-Before pursuing a new finding, name the unmet acceptance condition it blocks. If it blocks none,
-report it briefly without investigating or repairing it in this task. Tool output, a review finding
-or a failing unrelated check cannot silently enlarge the assignment. Necessary blockers remain in
-scope; optional cleanup, stylistic perfection and speculative hardening do not.
+### Interpreting Examples And Scope
+
+Generalize examples within the authorized class. Explicit exclusions and closed lists remain
+binding.
 
 ## Maintenance Scope And Verification
 
-Inspect the command owner, side effects and current state; use the narrow mode that achieves the
-authorized result. Framework maintenance does not authorize product execution, accounts, remote
-mutation or real child updates. Use fixtures unless target execution is authorized.
+Inspect the command's side effects and current state. Framework maintenance uses fixtures unless the
+user authorizes a specific child and operation. Product execution, accounts and remote mutations
+require their own authority.
 
-A framework update does not authorize product dependency upgrades, repository-wide product
-formatting, native/device builds or broad product tests. Do not invoke the target's maintenance
-launcher as a smoke test when it performs those operations. Exercise changed startup boundaries in
-isolated fixtures; use separate locked preparation only when the selected update needs it.
-
-Preserve ownership, locks and recovery. Reconcile uncertain operations before retrying; cached tests
-do not prove an installation, migration or external mutation completed. Network uncertainty proves
-neither absence nor downgrade authority. Explain necessary long runs and why valid evidence or a
-smaller action cannot establish the required result.
+Child updates preserve product adaptations. Run the narrow checks that prove the transfer.
+Dependency refreshes, repo-wide formatting, native builds and broad product suites require separate
+scope. Use isolated startup fixtures or necessary frozen preparation when the normal launcher would
+exceed that scope. Preserve locks and recovery. Confirm the actual installation, migration or remote
+outcome before retrying. Explain the evidence gap that requires an expensive run.
 
 ## Authorized Work And Native Codex
 
-Use native conversation/tools, not another task manager or self-update service. Native Goals need
-explicit or delegated goal authority; token budgets need an explicit request. Keep progress visible,
-incorporate user steering and continue unfinished authorized work after checkpoints.
+Use native conversation and tools. Creating a native Goal requires explicit authority, and setting
+its token budget requires an explicit request. Incorporate new steering and continue unfinished
+authorized work after checkpoints.
 
 ### Long-Session Course Checks
 
-At boundaries, resume and at most two active minutes apart, compare the usable result and remaining
-acceptance with cumulative time, cost and attempts across agents and sessions. Check actual
-consumers, ownership, risks, capacity and the next useful work. Use current evidence for this
-assessment.
+At resume, material boundaries and at most two active minutes apart, compare the open acceptance
+condition with new evidence, cumulative effort, ownership, capacity and the next useful step.
+Include the primary and every owned agent or background job, including during long checks. Obtain a
+checkpoint when evidence is missing.
 
-Describe the concrete work and its effect in plain language in user updates. Say what is usable now,
-what must finish next, and what the user can do. Explain any technical term that matters to that
-action.
-
-Two attempts without new discriminating evidence, disproportionate effort or a user report of drift
-require immediate reassessment. Name the failed hypothesis or stalled outcome and choose a smaller
-probe, a different repair or the concrete blocker. Redirect affected work at a safe boundary and
-compare the next expensive operation with the actual gap it closes.
-
-Include every owned agent and background job even during long checks. Use its last new evidence,
-open acceptance condition and next bounded action. Request a concise checkpoint when evidence is
-missing. Summarize material changes to the user. Follow
-[ownership and dispatch](#agent-lifecycle-and-idle-cleanup) throughout.
+After two attempts without discriminating evidence, disproportionate effort or a report of drift,
+reassess immediately. Name the failed hypothesis, choose a smaller probe or a different repair, or
+identify the concrete blocker. Redirect owned work at a safe boundary. Tell the user what is usable,
+what remains and any action they can take. Apply the
+[dispatch rules](#agent-lifecycle-and-idle-cleanup).
 
 ## Planning, Goals, Slices, Review Loops, And Audits
 
 ### Planning Entry Gate
 
-State whether planning is needed. Trivial reversible edits need no formal plan. Features,
-cross-owner changes, migrations, material risk or multi-step work need a visible native/commentary
-plan and a review/audit before implementation or delegation. Read-only discovery may precede that
-review.
+Work directly on a trivial reversible edit. For a feature, migration, cross-owner change, material
+risk or multi-step implementation, share and review one plan before edits or delegation. Read-only
+discovery can establish the plan.
 
 ### Plan Content And Review
 
-Keep one visible plan covering outcome, causes, owners/consumers, decisions, dependencies,
-proportional evidence and completion. Rank ready work by its contribution to the next usable result,
-required risk reduction and what it unblocks. Parallelize independent preparation, implementation,
-checks and delivery. Review feasibility, authority, architecture, cost and conflicts before
-implementation/delegation, then update the same plan at material boundaries. Resolve relevant
-findings and revisit only affected evidence.
+Cover the result, cause, owners and consumers, dependencies, evidence and completion. Check
+feasibility, authority, architecture, cost and writer conflicts. Prioritize the next usable result
+and the work it unblocks. Parallelize only independent work that passes admission. Update the same
+plan at material changes and recheck affected evidence.
 
 ## Best-Available Engineering, Not Quick Fixes
 
-Trace defects to their owner; make a coherent repair through explicit interfaces. Migrate consumers,
-remove superseded paths and consult current primary sources for uncertain external contracts. Accept
-behavior, integration, review and documentation together under the closure below.
+Trace a failure to its owner and repair the real entrypoint and consumers. For uncertain external
+contracts consult current primary sources.
+
+### Production-Ready Means Code That Keeps Working
+
+Preserve supported behavior. Observe normal operation, failure, cancellation and recovery at the
+security, accessibility and operational level the requirements justify.
 
 ### Completed-Goal Closure And Repository Housekeeping
 
-At each completed slice, accept or preserve owned handoffs, close their scopes, reconcile documents
-and clean verified owned residue through canonical housekeeping. Run
-`pnpm worktree:status -- --json` and settle eligible worktrees. Preserve accounts, active sessions,
-unrelated changes and uncertain recovery. At goal closure remove completed work context and settle
-remaining owned scopes.
-
-Audit integrated acceptance using valid evidence and required gaps. Local completion does not
-require publication. Full runtime sanitation requires session exit; source cleanup does not.
+Preserve accounts, active sessions, unrelated changes and uncertain recovery. Publication has its
+own gates. Full runtime sanitation requires session exit.
 
 #### Closure Sequence
 
-Integrate → reconcile docs/residue → audit acceptance → settle worktrees → report evidence/limits.
-Later changes reopen only affected acceptance.
+Integrate accepted handoffs, reconcile docs and remove verified owned residue through canonical
+housekeeping. Audit the result against scope and evidence. Run `pnpm worktree:status -- --json` and
+settle eligible worktrees after each completed slice. Later changes reopen affected checks.
 
 ## Temporary Data And Storage Housekeeping
 
@@ -290,18 +251,18 @@ verifiers and manifest together; remove retired paths. Preserve only promised pu
 
 ### Parallel Development And Integration
 
-Assign one writer per surface; sequence shared contracts before consumers and accept each handoff.
-Quiet Git state or a different account does not establish isolation. Apply the agent rules below.
+The primary assigns disjoint write sets and owns integration. Sequence shared contracts before their
+consumers. Apply [admission](#admission-intelligence-and-provenance) before delegating.
 
 ## Session Start
 
 ### Startup Repository Reconstruction
 
-Start with `bash -p scripts/setup/start-codex.sh`. Before intake or writes run
-`pnpm worktree:status -- --json` and `pnpm context:map`; inspect Git/upstream, untracked changes,
-every same-clone worktree/session, current owners and safe recovery. The hook does not replace this
-reconstruction. Competing or indeterminate writers block affected mutations. Preserve broken
-worktrees and use canonical settlement rather than manual deletion.
+Launch with `bash -p scripts/setup/start-codex.sh`. Before intake or writes run
+`pnpm worktree:status -- --json` and `pnpm context:map`. Inspect Git, upstream, untracked changes,
+all same-clone worktrees and sessions, and safe recovery. Competing or indeterminate writers block
+affected writes. Preserve broken worktrees for canonical settlement. A verified startup hook still
+requires this inventory.
 
 ### Launcher And Session Lifecycle
 
@@ -315,6 +276,10 @@ Runtime/tool changes require a full launcher restart. After critical handover, e
 launch again from the repository terminal. `/new` and `/resume` inside the running CLI do not
 replace its controller or hooks. Preserve native history and private recovery records. Unsupported
 private state requires quiescent recovery through the current owner, not ad hoc schema repair.
+
+One canonical primary session owns writes throughout the project, including its linked Git
+worktrees. Startup reserves this responsibility before opening the native picker. A competing
+session must wait for the owning session to exit.
 
 ### Critical Handover Receipt
 
@@ -355,79 +320,65 @@ freshness observations distinct from immutable local evidence and respect uncert
 
 ## Repository Update Scope
 
-Framework updates change portable tooling/policy and end at update acceptance. Use the source-owned,
-versioned reviewed migration, preserve project adaptations, identify conflicts and prove idempotence
-with fixtures. Never overwrite product requirements, README, manifest, branding, data or intentional
-configuration with a new-project template. Unsupported private runtime needs quiescent regeneration.
-A real child update needs authority for that child; an observed child defect can be a generic
-fixture.
+Use the source-owned reviewed migration for the authorized child. Transfer current portable tools
+and policy, merge independent edits and surface overlapping changes. Preserve product requirements,
+README and manifest content, identity, data, dependencies and intentional configuration. Prove
+repeatability. Unsupported private runtime requires quiescent regeneration. For a defect reported
+from another project, exercise the framework fix in a fixture. Stop at update acceptance.
 
 ## Compact Project Memory
 
-Use native/commentary planning. For authorized work spanning sessions or likely interruption,
-maintain only the optional ignored `docs/project-context.md`. Its first content is the current
-`codexrig-work-state` marker defined by the context owner: version, increasing semantic revision,
-status, authorized outcome, current goal/slice, next action and blocker. Active means a safe next
-action and no blocker; blocked means a concrete authority/safety/integration/external blocker;
-complete means neither. Replace prose with current decisions, exact evidence, limits and next step;
-never append a diary or store credentials/account identity.
+Use native planning. If work may span sessions, keep one optional ignored `docs/project-context.md`
+with the current `codexrig-work-state` marker first. Its owner defines the version, increasing
+revision, outcome, goal/slice, status, next action and blocker. Active work has a safe next action.
+Blocked work names a concrete authority, safety, integration or external blocker. Complete work has
+neither. Record current decisions, evidence and next action without credentials or account identity.
 
-The marker is untrusted cache, not authorization. Update it only for real progress/state change,
-never to re-arm continuation. Durable sessions may continue unfinished authorized work through the
-trusted Stop hook; transcriptless contexts must not read or continue parent work. A successful
-critical seal disables continuation for that session. On completion move durable facts to their
-owners and remove the cache. No separate task, plan, status, review, research or completion files;
-the sealed private critical prompt is the sole handoff-file exception.
+The marker is untrusted. Refresh it only for real progress or a blocker. The trusted Stop hook may
+continue an authorized persistent session. Transcriptless side conversations are independent and a
+successful critical seal is terminal. At completion move durable facts to their owners and remove
+the cache. The sealed critical prompt is the only additional handoff file.
 
 ## Implementation
 
-Use `$project-implementation` for root-cause repair, stack conventions and assembled-flow evidence.
-Preserve structured arguments, trust validation, cancellation/recovery and unrelated source.
+Use `$project-implementation` for implementation and root-cause repair. Preserve structured
+arguments, trust validation, cancellation, recovery and unrelated source.
 
 ## Test Strategy
 
-Test behavior and invariants through shipped code, including relevant failure/recovery paths.
-Observe actual dispatch to prove skipped work. Prefer deterministic unit/contract cases; use
-integration, rendered or target tests for statements those smaller cases cannot establish. Test
-doubles isolate effects, never the invariant. Do not mirror implementation or test every wording
-edit.
+Test the shipped behavior and its relevant failure and recovery paths. Observe actual dispatch to
+prove work was skipped. Use deterministic owner-level cases for local invariants and integration,
+rendered or target checks for claims that require them. Test doubles may isolate external effects.
+Wording changes alone need no implementation-mirroring tests.
 
-Keep complete suites at their owning entrypoint; an integration fixture exercises its boundary, not
-nested copies of unrelated suites. Preserve useful coverage and diagnostic limits. Fixtures, static
-checks, model behavior and observed deployment are different evidence. Reuse successes and repeat
-only affected checks.
-
-Design tests as independently executable files or packages at the behavior's owner. Separate fast
-unit/contract cases from process, filesystem, native-build and deployment integration. Do not make a
-focused test bootstrap a repository or invoke another complete suite. Shared fixtures prepare only
-the boundary under test. Register actual consumers for code, fixtures and configuration; avoid a
-whole-suite consumer when concrete test files cover the affected behavior. A new test must have a
-focused invocation and state what defect it detects. Split a slow mixed corpus by behavior before
-repeatedly replaying it; retain the complete entrypoint as composition of those units.
+Keep files and packages independently runnable. Separate fast cases from costly process, filesystem,
+build and deployment fixtures. Register the actual consumers of code, fixtures and configuration. A
+focused test covers a particular defect with only the preparation it needs. Split slow mixed suites
+by behavior and compose the complete run through its owning entrypoint. Reuse independent successes
+and preserve diagnostic limits.
 
 ## Documentation Ownership
 
-README discovers commands/durable docs; instructions own policy; `docs/project.md` records current
-reality. Requirements/design and executable schemas stay at their existing owners. Link instead of
-copying recipes across guides, skills and headers.
+README discovers commands and every maintained durable document. These instructions own workflow.
+The manifest owns current technical facts, existing requirements/design owners keep intent, and
+code/configuration own executable contracts. Link to an owner instead of repeating its recipe.
 
-## Documentation Has A High Bar
+### Documentation Has A High Bar
 
-Write durable information for a real reader. Remove repetition and obsolete detail while preserving
-unique requirements, links, licensing and authority/safety limits. No permanent progress, review or
-completion reports.
+Keep durable information a reader will use. Keep progress, review and completion reports in the
+conversation.
 
 ### Documentation Currency
 
-Per slice reconcile affected claims, commands, contracts, requirements/design, manifest and skills;
-remove resolved work or state a supported no-impact finding. Instruction/context edits need
-`pnpm context:check`; changed docs need relevant structure/link checks. Review/resume alone does not
-invalidate results.
+In the same slice update affected claims, commands, contracts, requirements/design, manifest and
+skills, or establish why they are current. Preserve unique requirements, licensing, links and
+authority limits when condensing text. Check instruction/context changes with `pnpm context:check`
+and changed docs with the relevant structure and link check.
 
 ### Context Economy And Canonical Owners
 
-Read bounded owners. Review semantic preservation when consolidating critical documents; structural
-checks prove neither meaning nor effectiveness. README must discover every maintained durable doc.
+Read the relevant section and follow its owner for detail. Judge policy changes against
+representative decisions as well as structure and size.
 
 ## Infrastructure As Code
 
@@ -464,30 +415,24 @@ Independent CI and protected environment gates remain mandatory.
 
 ### Coherent Component Updates And Release Batching
 
-Use the current plan for the changed components, affected producers/consumers, actual and intended
-versions, target, artifacts, owner, activation order, reusable evidence and recovery limits. Migrate
-coupled contracts and their consumers in one compatible batch. Check the real entrypoint and
-representative end-to-end flow, including affected failure or recovery behavior.
+Plan coupled changes together. Identify producers, consumers, current and intended versions,
+artifacts, target, activation order, owner, reusable evidence and recovery. Migrate the contract and
+its consumers in one compatible batch.
 
-Before expensive dependent work or deployment, use the maintained entrypoint's cheap preflight.
-Verify the actual required services, artifacts, tools, configuration, permissions, data/migrations
-and serving readiness. Verify newly introduced dependencies in the intended target through their
-real consumer. Refresh volatile observations before mutation and reuse valid source/artifact checks.
-A component scheduled for replacement needs evidence for its new version and activation order. Fix
-missing prerequisites and sustained failure causes in their owning code or configuration.
+Before expensive dependent work, run the maintained cheap preflight for required services, tools,
+configuration, permissions, data and migrations. Exercise the new dependency through its real
+consumer, including relevant failure or recovery. Recheck volatile target readiness before mutation.
+Repair missing prerequisites at their owner.
 
 ### Continuous Delivery And Manual Testing
 
-Use documented, maintained build, deploy and recovery entrypoints an authorized operator can run
-without an agent. One release owner carries each useful verified increment through authorized
-publication and deployment as soon as its required gates pass. Reconcile owned release state as
-increments finish. Overlap disjoint work and independent preparation while protecting the accepted
-candidate. Order push and deployment by actual target dependencies and authority.
+Use maintained build, deployment and recovery commands an operator can run. One release owner
+carries each authorized increment through its gates. Reconcile its state, protect the accepted
+candidate and order updates by actual target dependencies. Continue independent work in parallel.
 
-For authorized nonproduction delivery, let the user test as soon as the intended flow is reachable
-and the required access, data, artifact, dependency, startup and smoke checks pass. Send the URL or
-entrypoint, what works, how to test it and what remains. Run longer checks independently or
-afterward when target and scope allow. Required release or production gates retain their order.
+For authorized nonproduction delivery, share the entrypoint and a short manual check as soon as the
+intended flow, access, data and smoke checks are ready. Report what remains. Independent long checks
+can continue within scope. Preserve the required release and production gate order.
 
 ### Deployment And Qualification Failure Recovery
 
@@ -540,18 +485,14 @@ verified ownership handoff. Do not add a permanent scheduler or registry file.
 
 ### Continuous Quality And Performance
 
-For sustained parallel work or a material release, assign one admitted worker to continuous quality
-and performance through acceptance. Give it access to the current plan and relevant evidence, with
-explicit disjoint write ownership for any repairs. The primary covers this work if delegation cannot
-be admitted or justified.
+For sustained parallel work or a material release assign an admitted worker to quality and
+performance through acceptance. Give it the plan and evidence, with disjoint scope for any repairs.
+The primary covers oversight when delegation is unavailable or unjustified.
 
-Check downstream effects, dependencies and likely failures before implementation and at each release
-checkpoint. Use existing observations for phase times, queues, resource use and actual result
-quality. Flag concrete regressions, evidence gaps and expensive repetition promptly. Fix and verify
-material, authorized defects in the assigned write set, or give the primary the affected owner,
-impact and smallest useful check. Resolve release-blocking findings before the affected deploy.
-Reuse required evidence and keep unaffected work moving. Keep this assignment focused on oversight
-until its scope closes.
+Check downstream effects before implementation and each release. Use observed timings, queues,
+resource use and results to identify concrete regressions or missing evidence. Repair authorized
+issues in scope or give the primary the affected owner, impact and smallest proving check. Resolve
+release blockers before deployment and keep independent work moving.
 
 ### Capacity Admission And Monitoring
 
@@ -598,25 +539,20 @@ After all owned work is drained, record these exact lines in the work context:
 ```
 
 Run `pnpm handover:create -- --critical` as the final repository action. A successful seal is
-terminal: no tools, checks, messages, cleanup, continuation or later reset redemption in that
-session. Return the handover path and full-restart instruction, then stop. A failed seal is not
-success; repair only its bounded prerequisite while capacity permits, otherwise report the actual
-blocker.
+terminal. Return the handover path and full-restart instruction, then stop. No further tools,
+checks, coordination, cleanup, continuation or reset redemption are permitted in that session. If
+sealing fails, repair its bounded prerequisite while capacity permits or report the blocker.
 
 ### Agent Lifecycle And Idle Cleanup
 
-At each result/checkpoint promptly accept, reject or preserve the handoff, close its scope, and
-recheck admission. Before unrelated primary work or waiting, assign the next ready bounded task to
-that same agent from the current plan. Keep independent work moving during tests and releases. If no
-assignment is ready, identify the dependency, its owner and the next checkpoint. Keep an idle agent
-only for a named near-term task, otherwise close it through native controls and confirm slot
-release. Only the primary steers or closes agents. Before final handoff confirm all owned scopes are
-settled.
+At each result accept, reject or preserve the handoff, close its scope and recheck admission.
+Promptly assign a ready bounded task to the same agent before waiting or unrelated work. If the next
+task depends on another result, identify its owner and checkpoint. Keep an idle agent only for a
+named near-term task. Otherwise close it using native controls and confirm its slot is free.
 
-Keep the primary informed at least every two active minutes with the acceptance condition being
-advanced, new evidence and next action. The primary's [course check](#long-session-course-checks)
-monitors all admitted threads on that same cadence; waiting for an entire wave or a long test does
-not suspend it.
+Only the primary steers and closes owned agents. Agents report the acceptance condition, new
+evidence and next action at least every two active minutes under
+[course checks](#long-session-course-checks). Settle all owned scopes before the final handoff.
 
 ### Peer Coordination
 
@@ -634,9 +570,9 @@ only for its exact disjoint repository write set; no new credential, external, p
 out-of-root authority follows. Any mismatch or uncertain provenance blocks child repository tools.
 
 One primary's workers may share a checkout only with exact disjoint files and continuously monitored
-ownership, including generated outputs, caches and data. Independent same-host sessions use separate
-worktrees and leases; independent developers/hosts use separate clones and confirmed coordination.
-Different accounts do not change those boundaries. Logical isolation is not filesystem enforcement.
+ownership, including generated outputs, caches and data. Simultaneous independent sessions use
+separate clones and confirmed coordination. Different accounts do not change those boundaries.
+Logical isolation is not filesystem enforcement.
 
 ### Intelligence Parity And Integration Authority
 
@@ -668,56 +604,42 @@ or touching real child projects. Report that distinction.
 
 ### Verification Selection And Runtime
 
-Before running checks inspect `pnpm verify:changed -- --print-plan`: required/reused units and
-reasons, prerequisites, missing coverage and observed/unknown cost. `.codex/verification.json` is
-the single command and consumer contract. Extend it for project-specific checks, exact shared
-inputs, fixtures, configuration and dependent integrations. Select by changed path, module or check
-at the owning entrypoint. Unknown dependencies produce an actionable mapping diagnosis, never a
-silent full run or an assertion of complete coverage.
+Inspect `pnpm verify:changed -- --print-plan` for required and reused units, prerequisites, gaps,
+reasons and observed or unknown cost. `.codex/verification.json` owns commands and actual input
+consumers. Select by changed path, module or check. Diagnose and correct unmapped inputs before
+claiming coverage.
 
-Static checks default to repository-wide inputs. Use `inputScope: "owners"` only for an audited
-native module whose data inputs have registry owners; reuse also binds its executable import closure
-and source-path inventory. Runtime or external observations still need their own evidence.
+Reuse a successful unit when its direct and transitive inputs, fixture and test code, effective
+command, prerequisites and relevant environment match. Static checks default to repository-wide
+inputs. `inputScope: "owners"` requires an audited native module with registered data inputs. Its
+executable import closure and source-path inventory also bind reuse. Parser-proven formatting or
+comment changes may retain behavioral results. Changes to a formatter or executor invalidate only
+the units whose behavior they affect.
 
-Development runs only required units. A missing complete basis, new test/commit/session, review,
-audit, handoff or resume does not justify a full suite. Parser-proven formatting/comment equivalence
-may retain behavioral evidence; uncertain syntax stays conservative. Formatter changes must not
-invalidate unrelated behavioral tests. Executor changes reach the units whose execution they affect.
+Bind external observations to current target evidence or explicit `reuseMaxAgeMs`. Declare command
+`outputs` as exact repository-relative files and package outputs under `workspaceOutputs` as
+package-relative files. Verify produced bytes or state separately. A successful command or a
+directory name cannot establish them.
 
-Reuse successful units only when actual direct/transitive inputs, test/fixture code, effective
-command, prerequisites and relevant runtime/environment match. Local evidence does not expire merely
-because HEAD changed. External/time-sensitive checks need explicit freshness (`reuseMaxAgeMs`) or
-current target evidence. Declare native command `outputs` as exact repository-relative files, or
-package outputs through `workspaceOutputs`, for example
-`{"packages/core":{"build":["dist/index.js"]}}` with package-relative files. Reuse checks produced
-bytes separately from source inputs; consumers need a valid output contract or explicit state
-validator. Never infer output trees from directory names.
+During development use `pnpm verify:changed` for affected units or add `--check <key>` for one
+registered check. `--test-file <path>` retains a registered independent Node file result for the
+complete owner. `--test-name-pattern` supports diagnosis only. Compose complete owners from
+file/package results in dependency order, preserving inseparable groups. Keep completed independent
+units after failure. Use the atomic evidence store and execution lock, and reject malformed,
+incomplete, interrupted or misassigned records. A new commit, session, review, handoff or missing
+complete basis alone does not require a full run.
 
-Preserve successes after independent failures; repeat failed/affected units and necessary
-dependents. Keep the existing atomic, validated evidence record and execution lock; reject
-malformed, missing, incomplete, interrupted or wrongly assigned records. Do not build another cache,
-receipt history or an expensive system-wide scan to decide reuse.
+For publication, `pnpm verify` fills missing or invalidated units once. The publisher, retries and
+pre-push share that coverage. Justify a cold full run by its actual gaps and available narrower
+checks. Cover applicable syntax, formatting, types, policy, security, dependencies, functional and
+integration tests, builds, artifacts and target conditions. Preserve exact candidate and
+pushed-object checks and independent protected CI. A local cache cannot attest against the same OS
+user. Never copy receipts to manufacture admission.
 
-`pnpm verify:changed -- --check <key>` runs or reuses one registered check and retains successful
-units in the same evidence record. Add `--test-file <path>` to select one independent registered
-Node file; its result also satisfies that file in the complete owner. `--test-name-pattern` is
-diagnosis only and records no complete-unit evidence. Prefer the owning adaptive invocation over
-bare test commands when its result is needed later. Complete owners compose independent file/package
-results while preserving actual inseparable groups and dependency order. Before publication,
-`pnpm verify` fills missing/invalidated units and assembles full coverage once. Publisher, retries
-and pre-push share that evidence. A cold full run requires concrete missing coverage and
-consideration of smaller alternatives. Full coverage still includes applicable syntax/format, types,
-policy, security, dependencies, functional/integration tests, build and target/artifact conditions.
-
-Retain diagnostic time limits, cancellation ownership and meaningful failure behavior. At a measured
-limit stop new checks and diagnose; terminate only explicitly cancellable owned local processes.
-External mutations need safe completion/reconciliation. Forced replay requires `--force-full` and a
-structured `--force-reason` (`owner-request: <owner> - <reason>` or
-`uncovered-risk: <risk> - <reason>`); ordinary cache bypass is forbidden.
-
-The local store is performance evidence, not cryptographic attestation against the same OS user.
-Keep secret/pushed-object scans, exact candidate checks and independent protected CI. Unknown or
-uncovered publication coverage fails closed. Do not copy receipts to manufacture admission.
+Keep diagnostic limits and cancellation ownership. At a measured limit stop new checks and diagnose.
+Terminate only owned, explicitly cancellable local processes. Reconcile uncertain external
+mutations. Forced replay requires `--force-full` and a structured `--force-reason` of
+`owner-request: <owner> - <reason>` or `uncovered-risk: <risk> - <reason>`.
 
 ### Verification And Publication Gates
 
@@ -763,8 +685,8 @@ succeeds.
 
 ## Done
 
-Finish the accepted behavior, integration, evidence, relevant reviews, documentation and settlement.
-Report actual changes, checks and limits, then stop. Completion implies no new work or publication.
+At acceptance remove completed work context, close owned scopes and report changes, evidence and
+limits. Stop at the authorized outcome.
 
 <!-- codexrig:portable-policy:end -->
 
@@ -785,12 +707,20 @@ permission allows omission of source LICENSE/NOTICE; retain applicable third-par
 never initializes Git, publishes or continues source work in the product.
 
 The create/update skills own source-side workflows. A versioned `framework:upgrade` preview compares
-current selected files and optional pristine `--baseline`, preserving customizations and reporting
-exact conflicts. Apply only a reviewed conflict-free plan after target sessions exit. The target's
-current owner locks and journals mutations; `--recover` reconciles interrupted current transactions.
-Old metadata is opaque, not a legacy runtime reader. No dependency install, network, commit or push
-is hidden in update. Repeating a settled update is a no-op. Do not deploy a universal self-updater
-or overwrite product documents/configuration to make validation pass.
+current selected files and preserves project-only commands, checks and files. With the original
+pristine `--baseline` it merges independent edits in shared tools, policies, CI and generated
+documents and retires unchanged obsolete files. Review overlapping edits against all available
+inputs and reconcile generated lockfiles through their dependency owner. Apply only a reviewed
+conflict-free plan after target sessions exit. The target's current owner locks and journals
+mutations; `--recover` reconciles interrupted current transactions. Old metadata is opaque, not a
+legacy runtime reader. No dependency install, network, commit or push is hidden in update. Repeating
+a settled update is a no-op. Do not deploy a universal self-updater or overwrite product
+documents/configuration to make validation pass.
+
+During child updates and repairs keep target-specific notes, patches, copied examples and saved
+decisions in the source's ignored `.project-state/child-maintenance/`. Generalize any regression
+that belongs in the framework. Publication clears disposable material and checks the Git candidate
+and outgoing commits. Keep real repositories and recovery journals with their owning project.
 
 ### Git Platform Policy
 

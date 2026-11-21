@@ -1,10 +1,8 @@
 ---
 name: search-visibility
 description:
-  Read-only final review of public web surfaces for crawlability, indexing signals, metadata,
-  structured data, sitemaps, robots, multilingual alternates, image/search performance, and semantic
-  agent access. Use after relevant web implementation stabilizes or for an explicit SEO
-  audit/review; use the implementation skill when the request is to change SEO behavior.
+  Read-only SEO review of affected public pages for crawling, indexing, metadata, structured data
+  and discoverability. Use for an explicit audit or relevant web changes.
 ---
 
 # Search Visibility

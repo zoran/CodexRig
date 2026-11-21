@@ -1,6 +1,7 @@
 /** Verifies same-host worktree recovery inventory for the repository boundary. */
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { once } from "node:events";
 import {
   existsSync,
   mkdirSync,
@@ -16,7 +17,14 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
-import { issueRuntimeSessionLease, releaseRuntimeSessionLease } from "./runtime-session-lease.mjs";
+import {
+  acquireRuntimeLifecycleLock,
+  inspectRuntimeSessionLease,
+  issueRuntimeSessionLease,
+  releaseRuntimeLifecycleLock,
+  releaseRuntimeSessionLease,
+} from "./runtime-session-lease.mjs";
+import { projectSessionPlan, reserveProjectSession } from "./project-writer-admission.mjs";
 import { acquireVerificationSessionLock } from "../verify/verification-session-lock.mjs";
 import {
   formatWorktreeRecoveryJson,
@@ -80,6 +88,85 @@ function createCommittedRepository(parent, { initialBranch = "main" } = {}) {
   git(repository, ["commit", "--quiet", "-m", "base"]);
   return repository;
 }
+
+test("concurrent pickers admit one project writer across linked worktrees and release it on exit", async () => {
+  const parent = temporaryRoot("writer-admission-");
+  const root = createCommittedRepository(parent);
+  const linked = path.join(parent, "linked");
+  git(root, ["worktree", "add", "--quiet", "--detach", linked]);
+  const admission = new URL("./project-writer-admission.mjs", import.meta.url).href;
+  const leases = new URL("./runtime-session-lease.mjs", import.meta.url).href;
+  const code = `
+    import { reserveProjectSession } from ${JSON.stringify(admission)};
+    import { releaseRuntimeSessionLease } from ${JSON.stringify(leases)};
+    let reserved = false;
+    process.once("message", () => {
+      try {
+        reserveProjectSession({ root: process.cwd(), pid: process.pid });
+        reserved = true;
+        process.send({ reserved });
+      } catch (error) {
+        process.send({ reserved, message: error.message });
+      }
+    });
+    process.once("disconnect", () => {
+      if (reserved) releaseRuntimeSessionLease({ root: process.cwd(), pid: process.pid });
+    });
+    process.send("ready");
+  `;
+  const contender = spawn(process.execPath, ["--input-type=module", "--eval", code], {
+    cwd: linked,
+    stdio: ["ignore", "ignore", "inherit", "ipc"],
+  });
+  const done = once(contender, "exit", { signal: AbortSignal.timeout(30_000) });
+  const message = () => once(contender, "message", { signal: AbortSignal.timeout(15_000) });
+  const conflicts = /other worktrees|lifecycle.*active|lifecycle.*held|already owned/iu;
+  let reserved = false;
+  try {
+    assert.equal((await message())[0], "ready");
+    const result = message();
+    contender.send("reserve");
+    try {
+      reserveProjectSession({ root, pid: process.pid });
+      reserved = true;
+    } catch (error) {
+      assert.match(error.message, conflicts);
+    }
+    const [other] = await result;
+    if (!other.reserved) assert.match(other.message, conflicts);
+    assert.notEqual(reserved, other.reserved);
+    const inventory = inspectRepositoryWorktrees({ root });
+    assert.equal(inventory.worktrees.filter((w) => w.session.status === "active").length, 1);
+    assert.throws(() => projectSessionPlan({ root: reserved ? linked : root }), /other worktrees/u);
+  } finally {
+    contender.disconnect();
+    if (reserved) releaseRuntimeSessionLease({ root, pid: process.pid });
+    const [status] = await done;
+    assert.equal(status, 0);
+  }
+  const peer = reserved ? linked : root;
+  reserveProjectSession({ root: peer, pid: process.pid });
+  assert.equal(releaseRuntimeSessionLease({ root: peer, pid: process.pid }), true);
+});
+
+test("a pending maintenance operation in a linked worktree retains ownership during writer admission", () => {
+  const parent = temporaryRoot("writer-maintenance-");
+  const root = createCommittedRepository(parent);
+  const linked = path.join(parent, "linked");
+  git(root, ["worktree", "add", "--quiet", "--detach", linked]);
+  const owner = acquireRuntimeLifecycleLock({ root: linked, operation: "toolchain-maintenance" });
+  try {
+    assert.throws(
+      () => reserveProjectSession({ root, pid: process.pid }),
+      /running or unresolved/u,
+    );
+    assert.equal(inspectRuntimeSessionLease({ root }).status, "absent");
+  } finally {
+    releaseRuntimeLifecycleLock({ root: linked, owner });
+  }
+  reserveProjectSession({ root, pid: process.pid });
+  assert.equal(releaseRuntimeSessionLease({ root, pid: process.pid }), true);
+});
 
 function abandonedReservation(candidate) {
   const moduleUrl = new URL("./worktree-path-reservation.mjs", import.meta.url).href;

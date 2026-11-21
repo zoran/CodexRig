@@ -11,6 +11,7 @@ import {
 } from "../../../../scripts/goals/project-publication.mjs";
 import { createPublicationOutput } from "../../../../scripts/terminal/publication-output.mjs";
 import { inspectFrameworkPublicationReset } from "./reset-framework.mjs";
+import { assertCleanFrameworkPublicationSource } from "./publication-source.mjs";
 
 export function parseFrameworkPublicationArguments(args) {
   return parsePublicationArguments(args, "framework:publish");
@@ -36,6 +37,7 @@ export async function publishFramework({ root = toolingRoot, ...options } = {}) 
     displayName: "CodexRig",
     lifecycle: {
       inspect: () => inspectFrameworkPublicationReset(root),
+      inspectCandidate: assertCleanFrameworkPublicationSource,
       async prepare(context) {
         await reset(context);
         await context.gate(

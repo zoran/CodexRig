@@ -21,7 +21,7 @@ import {
   acquireRuntimeLifecycleLock,
   inspectRuntimeLifecycleLock,
   releaseRuntimeLifecycleLock,
-  reserveRuntimeSessionLease,
+  issueRuntimeSessionLease,
   runtimeLifecycleBusyErrorCode,
 } from "../repository/runtime-session-lease.mjs";
 import { maintainToolchain } from "./maintain-toolchain.mjs";
@@ -343,7 +343,7 @@ function reserveSiblingSession(root) {
   git("add", "--all");
   git("commit", "--quiet", "-m", "fixture");
   git("worktree", "add", "--quiet", "--detach", sibling);
-  reserveRuntimeSessionLease({ root: sibling, pid: process.pid });
+  issueRuntimeSessionLease({ root: sibling, pid: process.pid });
 }
 
 test("startup waits for a live verification without stealing its lock or starting maintenance", async (t) => {
@@ -394,7 +394,7 @@ test("startup rechecks session ownership after waiting for verification", async 
         startup: true,
         onLifecycleWait: async () => {
           await holder.release();
-          reserveRuntimeSessionLease({ root, pid: process.pid });
+          issueRuntimeSessionLease({ root, pid: process.pid });
         },
         candidateResolver: async () => {
           throw new Error("must not reach candidate discovery");

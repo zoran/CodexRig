@@ -1,10 +1,11 @@
 /** Owns tool storage housekeeping through native collectors and quiescent legacy retirement. */
-import { existsSync, lstatSync, realpathSync, mkdirSync, symlinkSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { validateMinimalMiseTools } from "../contracts/mise-toolchain-configuration.mjs";
 import { readRepositoryFile } from "../filesystem/repository-files.mjs";
 import { ensureOwnedPrivateDirectory } from "../filesystem/owned-path-safety.mjs";
 import {
+  prepareProjectToolDirectories,
   projectToolEnvironment,
   projectToolPaths,
 } from "../repository/project-tool-environment.mjs";
@@ -12,19 +13,10 @@ import {
   projectManagedToolLayout,
   verifyProjectToolBundle,
 } from "../repository/project-tool-executables.mjs";
-import {
-  userToolPaths,
-  assertUserToolParents,
-  prepareMiseTracking,
-  trackedToolProjects,
-  deferredMiseTrackingErrorCode,
-} from "../repository/user-tool-storage.mjs";
+import { assertUserToolParents, userToolPaths } from "../repository/user-tool-storage.mjs";
 import { inspectRepositoryWorktrees } from "../repository/worktree-recovery.mjs";
 import { inspectLinuxOpenRepositoryPaths } from "../repository/runtime-process-identity.mjs";
-import {
-  createProjectTemporaryScope,
-  reconcileProjectTemporaryStorage,
-} from "../repository/project-temporary-storage.mjs";
+import { reconcileProjectTemporaryStorage } from "../repository/project-temporary-storage.mjs";
 import {
   acquireRuntimeLifecycleLock,
   currentRuntimeLifecycleCapability,
@@ -33,13 +25,10 @@ import {
 } from "../repository/runtime-session-lease.mjs";
 import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycle-process.mjs";
 import { assertTrustedPnpmConfiguration } from "../repository/pnpm-workspace-manifests.mjs";
-import { formatContextError, sanitizeForTerminal } from "../terminal/terminal-output.mjs";
+import { formatContextError } from "../terminal/terminal-output.mjs";
 import { assertInstalledProjectTools } from "./project-runtime-admission.mjs";
 import { trustedPnpmCommand } from "./trusted-pnpm-command.mjs";
-import {
-  retireReplacedProjectTools,
-  retireUnreferencedUserBundles,
-} from "./project-tool-installation.mjs";
+import { retireReplacedProjectTools } from "./project-tool-installation.mjs";
 
 /** Old native tools used permissive modes inside private homes. Repair only these known paths. */
 function prepareLegacyDirectory(root, privateParent, segments) {
@@ -54,24 +43,18 @@ function prepareLegacyDirectory(root, privateParent, segments) {
 }
 
 /** No installs, downloads, version refresh, project tests or guessed filesystem eviction. */
-export function reconcileToolStorage({
-  root,
-  apply = false,
-  owner,
-  installationOwner,
-  runNative,
-} = {}) {
+export function reconcileToolStorage({ root, apply = false, owner, installationOwner } = {}) {
   const report = { actions: [], deferred: [] };
   if (!existsSync(path.join(root, ".codex/toolchain.json"))) return report;
-  const local = projectToolPaths(root);
+  if (apply && (!owner || currentRuntimeLifecycleCapability({ root }) !== owner))
+    throw new Error("Tool storage housekeeping requires the existing repository lifecycle owner.");
+  const local = apply ? prepareProjectToolDirectories(root) : projectToolPaths(root);
   const shared = userToolPaths();
   const legacy = [path.join(local.state, "tools"), path.join(local.data, "mise", "installs")];
   if (!apply) {
     report.deferred.push(...legacy.filter(existsSync).map((p) => path.relative(root, p)));
     return report;
   }
-  if (!owner || currentRuntimeLifecycleCapability({ root }) !== owner)
-    throw new Error("Tool storage housekeeping requires the existing repository lifecycle owner.");
   const environment = projectToolEnvironment({ root });
   const layout = projectManagedToolLayout(root);
   verifyProjectToolBundle(root, layout.mise);
@@ -102,16 +85,14 @@ export function reconcileToolStorage({
       input: "",
       stdio: "pipe",
     };
-    const result = runNative
-      ? runNative(command, args, options)
-      : spawnRuntimeLifecycleCommandSync({
-          repositoryRoot: root,
-          lifecycleCapability: owner,
-          command,
-          args,
-          options,
-          role: "storage-housekeeping",
-        });
+    const result = spawnRuntimeLifecycleCommandSync({
+      repositoryRoot: root,
+      lifecycleCapability: owner,
+      command,
+      args,
+      options,
+      role: "storage-housekeeping",
+    });
     if (result.error || result.status !== 0)
       throw new Error(
         `Native storage cleanup failed (${path.basename(command)} ${args[0]}): ${formatContextError(result.error?.message || result.stderr || result.stdout || `exit ${result.status}`, root)}`,
@@ -131,51 +112,7 @@ export function reconcileToolStorage({
           "Shared installer staging has unresolved ownership; retained for owner reconciliation.",
         );
     }
-    const tracked = prepareMiseTracking(root, { migrate: quiescent });
-    if (tracked) {
-      // Native tracking is the sole cross-project reference source, not a second installation ledger.
-      let projects;
-      try {
-        projects = trackedToolProjects();
-      } catch (error) {
-        if (error.code !== deferredMiseTrackingErrorCode) throw error;
-        // This typed diagnostic contains only public project paths and fixed admission reasons,
-        // not native output or configuration contents. Keep the actionable path visible.
-        report.deferred.push(
-          `${sanitizeForTerminal(error.message)}; shared runtime versions, tool bundles and account state are retained`,
-        );
-      }
-      if (projects) {
-        if (!projects.includes(root))
-          throw new Error("Shared cleanup requires the current native Mise project reference.");
-        const collection = createProjectTemporaryScope({
-          root: shared.root,
-          parent: shared.temporary,
-        });
-        try {
-          const state = path.join(collection.directory, "state");
-          mkdirSync(state, { mode: 0o700 });
-          symlinkSync(shared.miseTrackedConfigs, path.join(state, "tracked-configs"), "dir");
-          run(layout.mise.executable, ["prune", "--yes"], {
-            MISE_STATE_DIR: state,
-            MISE_CONFIG_DIR: collection.directory,
-            MISE_SYSTEM_CONFIG_DIR: collection.directory,
-            MISE_GLOBAL_CONFIG_FILE: path.join(collection.directory, "global.toml"),
-            MISE_SYSTEM_CONFIG_FILE: path.join(collection.directory, "system.toml"),
-          });
-        } finally {
-          if (!collection.release())
-            report.deferred.push("native collection state has active consumers");
-        }
-        report.actions.push("mise: unreferenced shared runtime versions");
-        const bundles = retireUnreferencedUserBundles({ root, projects, owner: sharedOwner });
-        report.actions.push(...bundles.removed.map((value) => `retired shared ${value}`));
-        report.deferred.push(...bundles.retained);
-      }
-    } else
-      report.deferred.push(
-        "shared runtime versions: waiting for quiescent native reference migration",
-      );
+    // Project pins establish no retirement authority over shared runtimes or bootstrap bundles.
     // Explicit paths defeat workspace store/cache overrides. Native pnpm owns reference tracking
     // across projects; never --force, remove links/ ourselves, or clear the whole shared store.
     if (existsSync(shared.pnpmStore)) {

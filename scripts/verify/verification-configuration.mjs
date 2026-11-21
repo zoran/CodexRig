@@ -38,6 +38,11 @@ function nodeTestRuntime(args) {
 /** This is executable project policy; native permissions still govern each selected command. */
 export function readVerificationConfiguration(root = toolingRoot) {
   const value = parseJsonFile(root, verificationConfigurationPath, "Verification configuration");
+  return validateVerificationConfiguration(value);
+}
+
+/** Validate and resolve the commands of one parsed registry before it is used or installed. */
+export function validateVerificationConfiguration(value) {
   if (
     !value ||
     value.schemaVersion !== 1 ||

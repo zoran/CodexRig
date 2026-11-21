@@ -45,11 +45,8 @@ export function repositoryContextMap(root = toolingRoot) {
       ...links,
       `Active module roots (${modules.length}):`,
       ...modules,
-      "Workflow: instructions.md; inspect its outline, then the sections applicable to this task.",
-      "Product facts: docs/project.md; use an outline and relevant sections, not a full specification dump.",
-      "Recovery: inspect only the current bounded docs/project-context.md when resuming authorized work.",
-      "Run pnpm worktree:status -- --json separately for actual worktrees, leases and recovery.",
-      "At every audit assess repository-wide effectiveness, efficiency and quality; a map or byte check proves none of them.",
+      "Use context:read for the relevant section. On resume, reconcile the current docs/project-context.md with the request.",
+      "Run pnpm worktree:status -- --json for actual worktrees, leases and recovery.",
     ].join("\n") + "\n",
   );
 }

@@ -60,10 +60,27 @@ test("sibling projects share installed tools and package payloads but isolate ac
   assert.notEqual(a.HOME, b.HOME);
   assert.notEqual(a.GH_CONFIG_DIR, b.GH_CONFIG_DIR);
   assert.notEqual(a.NPM_CONFIG_USERCONFIG, b.NPM_CONFIG_USERCONFIG);
+  assert.notEqual(a.MISE_STATE_DIR, b.MISE_STATE_DIR);
   assert.equal(
     projectToolEnvironment({ root: first, inherited: a }).MISE_DATA_DIR,
     a.MISE_DATA_DIR,
   );
+});
+
+test("project preparation refuses a redirected private Mise tracker before launching a tool", (t) => {
+  const [storage, root] = fixture(t);
+  const inherited = { PROJECT_TOOL_STORAGE_HOME: storage };
+  const tracker = path.join(
+    projectToolEnvironment({ root, inherited }).MISE_STATE_DIR,
+    "tracked-configs",
+  );
+  mkdirSync(path.dirname(tracker), { recursive: true, mode: 0o700 });
+  symlinkSync(storage, tracker, "dir");
+  assert.throws(
+    () => prepareProjectToolDirectories(root, { inherited }),
+    /unsafe private Mise tracking/u,
+  );
+  assert.deepEqual(fs.readdirSync(storage), [".codex"]);
 });
 
 test("real project commands reuse browser payload paths while reclaiming separate run profiles", async (t) => {

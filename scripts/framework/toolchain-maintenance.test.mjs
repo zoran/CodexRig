@@ -2,15 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -703,10 +695,7 @@ test("disposable compatibility preparation preserves dependencies and passes the
     fetchImpl: registry(),
     installBootstrapTools: async ({ matrix: candidate }) => {
       const layout = projectManagedToolLayout(root, candidate);
-      // This mocked installer must also satisfy the real post-install housekeeping inventory.
       const shared = prepareUserToolDirectories();
-      const reference = path.join(shared.miseTrackedConfigs, "fixture");
-      if (!existsSync(reference)) symlinkSync(path.join(root, ".codex/mise.toml"), reference);
       const installs = path.join(shared.miseData, "installs");
       const executables = {
         node: layout.node.executable,

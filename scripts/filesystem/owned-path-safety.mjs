@@ -431,6 +431,7 @@ export function validateRemovalTree(
   {
     allowSymlinkEntries = false,
     allowHardlinkEntries = false,
+    preserveDirectory,
     mountPointReader = currentMountPoints,
   } = {},
 ) {
@@ -444,7 +445,12 @@ export function validateRemovalTree(
   const pending = [rootPath];
   while (pending.length > 0) {
     const directory = pending.pop();
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const entries = readdirSync(directory, { withFileTypes: true });
+    if (preserveDirectory?.(entries))
+      throw new Error(
+        `Owned path safety preserved a nested repository or private state in ${label}.`,
+      );
+    for (const entry of entries) {
       visited += 1;
       if (visited > maximumRemovalTreeEntries) {
         throw new Error(`Owned path safety refused oversized ${label}.`);
@@ -523,6 +529,7 @@ export function claimAndRemove({
   artifactPath,
   expectedIdentity,
   expectedType,
+  preserveDirectory,
   label,
   mountPointReader,
   ownedRootPath = path.dirname(artifactPath),
@@ -553,6 +560,7 @@ export function claimAndRemove({
     const removalTreeOptions = {
       allowSymlinkEntries,
       allowHardlinkEntries,
+      preserveDirectory,
       ...(mountPointReader ? { mountPointReader } : {}),
     };
     const initialStats = validateRemovalTree(

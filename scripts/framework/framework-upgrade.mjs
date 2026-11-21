@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Owns explicit framework upgrade planning, conflict detection and atomic project-tool migration. */
-import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -10,18 +10,12 @@ import {
   serializeCanonicalJson,
   sha256,
 } from "../filesystem/repository-files.mjs";
-import { readFrameworkContract } from "../contracts/framework-contract.mjs";
 import { validateToolingConfiguration } from "../contracts/tooling-configuration.mjs";
-import { listPortableTransferFiles } from "../repository/source-inventory.mjs";
-import {
-  readProjectToolSelection,
-  selectedProjectPackage,
-  selectedProjectVerification,
-} from "./project-tool-selection.mjs";
+import { selectedProjectVerification } from "./project-tool-selection.mjs";
 import { projectCiProjection, projectToolingConfiguration } from "./generated-project-tooling.mjs";
 import { projectOutputText } from "./project-output-projection.mjs";
+import { frameworkUpgradePreview } from "./framework-upgrade-documents.mjs";
 import {
-  isProjectToolPath,
   atomicWriteUpgradeFile,
   realUpgradeDirectory,
   targetUpgradeFileState,
@@ -35,7 +29,6 @@ import {
 } from "./framework-upgrade-journal.mjs";
 import {
   assertRegenerationLifecycleClosure,
-  holdDestinationUpgradeRuntime,
   regenerationRuntimeHash,
   stageRegenerationRuntime,
 } from "./framework-upgrade-runtime.mjs";
@@ -45,9 +38,6 @@ import {
   removeOwnedEmptyDirectory,
 } from "../filesystem/owned-file-operations.mjs";
 
-function same(left, right) {
-  return left.sha256 === right.sha256 && left.mode === right.mode;
-}
 export function desiredProjectToolFile(source, file, selection, displayName) {
   let content = readRepositoryFile(source, file);
   if (file === ".codex/config.toml") {
@@ -70,147 +60,31 @@ export function desiredProjectToolFile(source, file, selection, displayName) {
     mode: content.startsWith("#!") ? 0o755 : 0o644,
   };
 }
-function packageMigration(base, current, desired, conflicts) {
-  const next = structuredClone(current);
-  const merge = (owner, before, actual, after) => {
-    const result = { ...actual };
-    for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
-      if (
-        JSON.stringify(actual[key]) === JSON.stringify(after[key]) ||
-        JSON.stringify(before[key]) === JSON.stringify(after[key])
-      )
-        continue;
-      if (JSON.stringify(actual[key]) !== JSON.stringify(before[key])) {
-        conflicts.push(`${owner}.${key}`);
-        continue;
-      }
-      if (Object.hasOwn(after, key)) result[key] = after[key];
-      else delete result[key];
-    }
-    return result;
-  };
-  next.scripts = merge(
-    "package.json scripts",
-    base.scripts ?? {},
-    current.scripts ?? {},
-    desired.scripts,
-  );
-  next.devDependencies = merge(
-    "package.json devDependencies",
-    base.devDependencies ?? {},
-    current.devDependencies ?? {},
-    desired.devDependencies,
-  );
-  const fields = merge(
-    "package.json",
-    { packageManager: base.packageManager, license: base.license },
-    { packageManager: current.packageManager, license: current.license },
-    { packageManager: desired.packageManager, license: desired.license },
-  );
-  Object.assign(next, fields);
-  return next;
-}
-
-/** Baseline is an explicitly supplied pristine generated tree. Old metadata is opaque file content. */
+/** One planner owns both the current-output and pristine-ancestor comparison. */
 export function buildFrameworkUpgradePlan(options) {
-  const { sourceRoot = toolingRoot, targetRoot, baselineRoot } = options;
+  const { sourceRoot = toolingRoot, targetRoot } = options;
+  if (options.baselineRoot && options.regenerate)
+    throw new Error("Regeneration requires current-output review.");
   const target = realUpgradeDirectory(targetRoot, "target");
   const targetTooling = targetUpgradeFileState(target, ".codex/tooling.json");
   const displayName = targetTooling.exists
     ? validateToolingConfiguration(JSON.parse(targetTooling.content)).startup.displayName
     : undefined;
-  const desiredTool = (source, file, selection) =>
-    desiredProjectToolFile(source, file, selection, displayName);
-  if (!baselineRoot) {
-    const plan = buildReviewedFrameworkUpgradePlan({ ...options, sourceRoot }, desiredTool);
-    if (options.regenerate === true) {
-      plan.regenerate = true;
-      plan.regenerationRuntimeHash = regenerationRuntimeHash(sourceRoot);
-      plan.digest = sha256(
-        serializeCanonicalJson({
-          digest: plan.digest,
-          regenerationRuntimeHash: plan.regenerationRuntimeHash,
-        }),
-      );
-    }
-    return plan;
-  }
-  if (options.regenerate || options.projectPaths?.length)
-    throw new Error("Regeneration and explicit project owners require current-output review.");
-  const source = realUpgradeDirectory(sourceRoot, "source");
-  const baseline = realUpgradeDirectory(baselineRoot, "pristine generated reference");
-  const roots = [source, target, baseline];
-  for (const left of roots)
-    for (const right of roots)
-      if (
-        left !== right &&
-        (right.startsWith(left + path.sep) || left.startsWith(right + path.sep))
-      )
-        throw new Error("Migration roots must be disjoint.");
-  if (new Set(roots).size !== 3) throw new Error("Migration needs three distinct roots.");
-  readFrameworkContract(source);
-  const selection = readProjectToolSelection(source);
-  const baselineFiles = listPortableTransferFiles({
-    root: baseline,
-    includeUntracked: true,
-  }).filter(isProjectToolPath);
-  const desiredFiles = selection.files.filter(isProjectToolPath);
-  const desiredSet = new Set(desiredFiles);
-  const operations = [],
-    conflicts = [],
-    snapshots = [];
-  for (const file of [...new Set([...baselineFiles, ...desiredFiles])].sort()) {
-    const before = targetUpgradeFileState(baseline, file);
-    const current = targetUpgradeFileState(target, file);
-    const desired = desiredSet.has(file)
-      ? desiredTool(source, file, selection)
-      : { exists: false, mode: null, sha256: null };
-    snapshots.push({ file, before, current, desired });
-    if (same(current, desired) || (desired.exists && same(before, desired))) continue;
-    if (!same(before, current)) {
-      conflicts.push(file);
-      continue;
-    }
-    operations.push(
-      desired.exists
-        ? {
-            path: file,
-            action: "write",
-            content: desired.content,
-            mode: desired.mode,
-            expected: current.sha256,
-            expectedMode: current.mode,
-          }
-        : { path: file, action: "delete", expected: current.sha256, expectedMode: current.mode },
+  const plan = buildReviewedFrameworkUpgradePlan(
+    { ...options, sourceRoot },
+    (source, file, selection) => desiredProjectToolFile(source, file, selection, displayName),
+  );
+  if (options.regenerate === true) {
+    plan.regenerate = true;
+    plan.regenerationRuntimeHash = regenerationRuntimeHash(sourceRoot);
+    plan.digest = sha256(
+      serializeCanonicalJson({
+        digest: plan.digest,
+        regenerationRuntimeHash: plan.regenerationRuntimeHash,
+      }),
     );
   }
-  const before = JSON.parse(readRepositoryFile(baseline, "package.json"));
-  const currentContent = readRepositoryFile(target, "package.json");
-  const current = JSON.parse(currentContent);
-  const desired = selectedProjectPackage(
-    JSON.parse(readRepositoryFile(source, "package.json")),
-    selection,
-  );
-  const next = packageMigration(before, current, desired, conflicts);
-  if (JSON.stringify(current) !== JSON.stringify(next))
-    operations.push({
-      path: "package.json",
-      action: "write",
-      content: JSON.stringify(next, null, 2) + "\n",
-      mode: lstatSync(path.join(target, "package.json")).mode & 0o777,
-      expected: sha256(currentContent),
-    });
-  const digest = sha256(
-    serializeCanonicalJson({ source, target, baseline, snapshots, operations, conflicts }),
-  );
-  return {
-    sourceRoot: source,
-    targetRoot: target,
-    baselineRoot: baseline,
-    operations,
-    conflicts: conflicts.sort(),
-    digest,
-  };
+  return plan;
 }
 
 /** The target's installed runtime owner understands its own current state and namespace. */
@@ -285,11 +159,11 @@ export async function applyFrameworkUpgrade(plan, { afterWrite, confirmQuiescent
     plan = refreshed;
     if (!plan.operations.length) return { changed: false };
     if (plan.regenerate) assertRegenerationLifecycleClosure(plan);
-    const { paths, lifecycleCapability } = beginFrameworkUpgrade(plan, lifecycle);
-    let releaseDestination;
+    const { paths, lifecycleCapability, destination } = await beginFrameworkUpgrade(
+      plan,
+      lifecycle,
+    );
     try {
-      if (!plan.regenerate)
-        releaseDestination = await holdDestinationUpgradeRuntime(plan, lifecycle);
       lifecycle.assertRuntimeLifecycleQuiescent({
         root: plan.targetRoot,
         owner: lifecycleCapability,
@@ -358,7 +232,7 @@ export async function applyFrameworkUpgrade(plan, { afterWrite, confirmQuiescent
       }
       throw error;
     } finally {
-      releaseDestination?.();
+      destination?.release();
     }
     return { changed: true };
   } finally {
@@ -398,7 +272,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         ] = args[++index];
       else
         throw new Error(
-          "Usage: pnpm framework:upgrade -- --target <project> [--reconcile <decisions.json> | --baseline <pristine-generated-tree>] [--project-path <public-owner>] [--regenerate --confirm-quiescent] [--apply]; or --target <project> [--regenerate --confirm-quiescent] --recover",
+          "Usage: pnpm framework:upgrade -- --target <project> [--baseline <pristine-generated-tree>] [--reconcile <decisions.json>] [--project-path <public-owner>] [--regenerate --confirm-quiescent] [--apply]; or --target <project> [--regenerate --confirm-quiescent] --recover",
         );
     }
     if (!options.targetRoot) throw new Error("An explicit target is required.");
@@ -411,26 +285,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       });
     } else {
       if (options.reconcileFile) {
-        if (options.baselineRoot)
-          throw new Error("Reconciliation uses current-output comparison, without a baseline.");
         options.resolutions = JSON.parse(readFileSync(options.reconcileFile, "utf8"));
         delete options.reconcileFile;
       }
       const plan = buildFrameworkUpgradePlan(options);
-      console.log(
-        JSON.stringify(
-          {
-            digest: plan.digest,
-            conflicts: plan.conflicts,
-            differences: plan.differences,
-            documentBindings: plan.documentBindings,
-            deviations: plan.deviations,
-            operations: plan.operations.map(({ path, action }) => ({ path, action })),
-          },
-          null,
-          2,
-        ),
-      );
+      console.log(JSON.stringify(frameworkUpgradePreview(plan), null, 2));
       if (apply) await applyFrameworkUpgrade(plan, { confirmQuiescent });
     }
   } catch (error) {

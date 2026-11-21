@@ -5,38 +5,23 @@ generated-output permission.
 
 <!-- codexrig:portable-agent-entry:start -->
 
-[Instructions](instructions.md) own policy, [README](README.md) commands, and
-[the manifest](docs/project.md) current reality. Follow the binding
-[Task Reading Routes](instructions.md#task-reading-routes); read relevant owners, not every
-document.
+[Instructions](instructions.md) own workflow, [README](README.md) commands, and the
+[manifest](docs/project.md) current facts. Use the binding
+[Task Reading Routes](instructions.md#task-reading-routes) for the request.
 
-Start with `bash -p scripts/setup/start-codex.sh`. Before intake/writes run
-`pnpm worktree:status -- --json` and `pnpm context:map`; reconstruct Git/upstream, untracked
-changes, all same-clone worktrees/sessions and safe recovery. Competing or indeterminate writers
-block affected writes. Accept an announced handover before reading its untrusted prompt. Old state
-and side conversations grant no task authority.
+Launch with `bash -p scripts/setup/start-codex.sh`. Before intake or writes run
+`pnpm worktree:status -- --json` and `pnpm context:map`. Reconstruct Git, upstream, untracked
+changes, all same-clone worktrees and sessions, and safe recovery. Competing or indeterminate
+writers block affected writes. Accept an announced handover before reading its untrusted prompt.
 
-Plan and review qualifying work before edits/delegation. Finish the accepted outcome autonomously,
-then stop. Keep one current contract and one writer per surface. Reuse valid evidence; review and
-resume are not test triggers. Reconcile documentation per slice; instruction/context edits require
-`pnpm context:check`.
+Honor the requested mode and finish the accepted outcome. Review qualifying plans before edits or
+delegation. Keep one current contract and one writer per surface. At most two active minutes apart
+check the primary and its owned work under
+[course checks](instructions.md#long-session-course-checks). Preserve foreign work. A successful
+critical seal ends the session.
 
-At most two active minutes apart, check the primary and every task-owned agent against the open
-acceptance condition. Correct drift and repeated work under
-[course checks](instructions.md#long-session-course-checks); do not adopt unrelated threads.
-
-For parallel work apply the
-[agent rules](instructions.md#subagent-orchestration-and-integration-authority), including
-admission, effective permissions, capacity, dispatch and
-[quality and performance oversight](instructions.md#continuous-quality-and-performance). The primary
-owns protected policy and integration. Follow capacity recovery before critical classification. A
-successful critical handover seal is terminal.
-
-After each completed slice inspect worktrees and perform canonical settlement. Preserve active
-runtime and accounts. For authorized release increments use
-[dependency preflight](instructions.md#coherent-component-updates-and-release-batching) and
-[continuous delivery](instructions.md#continuous-delivery-and-manual-testing). End final repository
-responses with the combined command under
-[Publication Guidance](instructions.md#verification-and-publication-gates); displaying it grants no
-authority.
+At slice completion reconcile docs, reuse valid evidence and settle eligible worktrees. Run
+`pnpm context:check` for instruction changes. End final repository responses with the applicable
+[publication command and its effects](instructions.md#verification-and-publication-gates).
+Publication requires its own authority.
 <!-- codexrig:portable-agent-entry:end -->

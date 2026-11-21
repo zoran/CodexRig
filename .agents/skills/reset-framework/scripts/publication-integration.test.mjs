@@ -17,6 +17,7 @@ function configure({ root, copyModule, write }) {
   write(".agents/skills/create-project-from-framework/SKILL.md", "# Generation fixture\n");
   write(".codexrig/project-tools.json", "{}\n");
   write("README.md", "# CodexRig Framework\n");
+  write(".gitignore", readFileSync(path.join(root, ".gitignore"), "utf8") + "/.project-state/\n");
   const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
   pkg.name = "codexrig";
   Object.assign(pkg.scripts, {
@@ -47,6 +48,8 @@ test("the framework command preserves its session through real reset, verificati
     ]);
     f.run("git", ["add", "--all"]);
     const candidate = `${f.run("git", ["rev-parse", "HEAD"]).trim()}:${f.run("git", ["write-tree"]).trim()}`;
+    const scratch = ".project-state/child-maintenance/reproduction.patch";
+    f.write(scratch, "workspace-only fix\n");
     const output = f.run("bash", [
       "scripts/setup/run-project.sh",
       "pnpm",
@@ -63,6 +66,8 @@ test("the framework command preserves its session through real reset, verificati
       "retained session history\n",
     );
     assert.equal(existsSync(path.join(f.root, "docs/project-context.md")), false);
+    assert.equal(existsSync(path.join(f.root, scratch)), false);
+    assert.equal(f.run("git", ["ls-tree", "--name-only", "HEAD", "--", scratch]).trim(), "");
     assert.equal(f.run("git", ["status", "--porcelain"]).trim(), "");
     assert.equal(f.counter().length, 1);
   } finally {

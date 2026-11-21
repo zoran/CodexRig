@@ -1,9 +1,8 @@
 ---
 name: architecture-evolution
 description:
-  Reassess product or framework architecture before a material purpose, domain, surface, deployment,
-  module, ownership, contract, data or layout change. Use for module addition, split, merge,
-  retirement, replacement and cross-module migrations; not for a trivial edit or read-only review.
+  Plan material changes to module boundaries, product surfaces, contracts, data ownership or
+  deployment. Use before restructuring or migrating consumers.
 ---
 
 # Architecture Evolution

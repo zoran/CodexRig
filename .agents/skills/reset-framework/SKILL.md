@@ -1,17 +1,16 @@
 ---
 name: reset-framework
 description:
-  Restore CodexRig to a reusable, product-neutral framework baseline. Use whenever the framework
-  itself was optimized, or when the user asks to reset, clean, sanitize, make pristine, remove
-  goals/slices/planning/history, or prepare the framework for commit, export, or reuse.
+  Inspect residue after framework optimization. Prepare source cleanup for publication or explicitly
+  requested reset, sanitation and reuse. Preserve active runtime.
 ---
 
 # Reset CodexRig Framework
 
-Use [maintenance scope](../../../instructions.md#maintenance-scope-and-verification): local
-framework acceptance does not require publication or full runtime sanitation. Preserve
-active/private and unrelated work. Confirm this is the source framework and inspect Git/worktree
-state.
+After framework changes inspect their source residue under
+[maintenance scope](../../../instructions.md#maintenance-scope-and-verification). Confirm the
+framework and worktree. Use publication cleanup for authorized publication and full sanitation only
+for an explicit reset. Preserve active, private and unrelated work.
 
 For authorized publication use the existing combined owner:
 
@@ -41,6 +40,11 @@ policy, `.auth`, admitted configuration/installation identity and valid exact pu
 Remove only owner-classified process/generated/disposable state; incompatible private formats are
 discarded under quiescence, never interpreted through a legacy reader. Product source is removed
 only when explicitly in scope.
+
+Child updates and repairs use `.project-state/child-maintenance/` for disposable source-side
+material. Publication removes recognized untracked upgrade documents and checks the exact Git
+candidate and outgoing history for child artifacts and checkout references. Resolve findings in
+durable source before retrying. Preserve nested repositories and private account state.
 
 Keep the manifest product-neutral. Verification's lock-bound read-only source baseline may retain
 valid unfinished context for an active session; completed source cleanup removes it. Reuse evidence

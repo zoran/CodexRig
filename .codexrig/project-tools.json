@@ -172,6 +172,7 @@
       "scripts/repository/worktree-recovery-cli.mjs",
       "scripts/repository/worktree-recovery-output.mjs",
       "scripts/repository/worktree-recovery.mjs",
+      "scripts/repository/project-writer-admission.mjs",
       "scripts/repository/project-tool-environment.mjs",
       "scripts/repository/user-tool-storage.mjs",
       "scripts/repository/project-temporary-storage.mjs",

@@ -251,7 +251,7 @@ function batchedCommitChanges(repositoryRoot, commits) {
   return parseRawCommitChangeBatch(output, commits);
 }
 
-async function scanGitObjects(repositoryRoot, objects) {
+async function scanGitObjects(repositoryRoot, objects, createScanner = createSecretContentScanner) {
   if (objects.length === 0) return new Map();
   const invocation = gitInvocation(repositoryRoot, ["cat-file", "--batch"]);
   const child = spawn("git", invocation.args, {
@@ -306,7 +306,7 @@ async function scanGitObjects(repositoryRoot, objects) {
           throw new Error(`Git cat-file returned an invalid object size for ${expected.objectId}.`);
         }
         header = Buffer.alloc(0);
-        scanner = createSecretContentScanner();
+        scanner = createScanner(expected);
         expectSeparator = remaining === 0;
       }
 
@@ -339,6 +339,71 @@ async function scanGitObjects(repositoryRoot, objects) {
     throw new Error("Git cat-file batch ended before every pushed object was read.");
   }
   return results;
+}
+
+/** Reads immutable publication blobs once, retaining every relevant path across outgoing commits. */
+export async function inspectPublicationTree({
+  repositoryRoot,
+  tree,
+  head,
+  upstream,
+  inspectPath,
+  wantsContent,
+  inspectContent,
+}) {
+  const objectId = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
+  if (
+    (tree !== "HEAD" && !objectId.test(tree)) ||
+    ((head !== undefined || upstream !== undefined) &&
+      (!objectId.test(head) || !objectId.test(upstream)))
+  )
+    throw new Error("Publication source inspection requires exact Git objects.");
+  assertNoReplacementRefs(repositoryRoot);
+  const entries = splitNullBuffer(
+    git(repositoryRoot, ["ls-tree", "-rz", "--full-tree", tree], { encoding: null }),
+  ).map((entry) => {
+    const match = /^(\d{6}) (?:blob|commit) ([0-9a-f]+)\t([\s\S]+)$/u.exec(entry);
+    if (!match) throw new Error("Unexpected Git publication tree entry.");
+    return { mode: match[1], objectId: match[2], relativePath: match[3] };
+  });
+  if (head) {
+    const commits = git(repositoryRoot, ["rev-list", head, "--not", upstream])
+      .trim()
+      .split(/\s+/u)
+      .filter(Boolean);
+    for (const entry of batchedCommitChanges(repositoryRoot, commits)) entries.push(entry);
+  }
+  const findings = new Set();
+  const pathsByBlob = new Map();
+  for (const entry of entries) {
+    const label =
+      JSON.stringify(entry.relativePath) +
+      (entry.commitObject ? ` at ${entry.commitObject.slice(0, 12)}` : "");
+    const reason = inspectPath(entry);
+    if (reason) findings.add(`${label}: ${reason}`);
+    else if (wantsContent(entry.relativePath)) {
+      if (!pathsByBlob.has(entry.objectId)) pathsByBlob.set(entry.objectId, new Map());
+      pathsByBlob.get(entry.objectId).set(label, entry.relativePath);
+    }
+  }
+  const objects = [...pathsByBlob.keys()].map((id) => ({ objectId: id, objectType: "blob" }));
+  await scanGitObjects(repositoryRoot, objects, (object) => {
+    const chunks = [];
+    return {
+      write(chunk) {
+        chunks.push(chunk);
+      },
+      findings() {
+        const content = Buffer.concat(chunks).toString("utf8");
+        for (const [label, file] of pathsByBlob.get(object.objectId)) {
+          const reason = inspectContent(file, content);
+          if (reason) findings.add(`${label}: ${reason}`);
+        }
+        return [];
+      },
+    };
+  });
+  return [...findings].sort();
 }
 
 export async function inspectPushedObjects(input, { repositoryRoot = root } = {}) {

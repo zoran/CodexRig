@@ -9,6 +9,7 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   readlinkSync,
   realpathSync,
@@ -30,94 +31,16 @@ import {
   prepareProjectToolDirectories,
   projectToolEnvironment,
 } from "../repository/project-tool-environment.mjs";
-import {
-  prepareUserToolDirectories,
-  prepareMiseTracking,
-  trackedToolProjects,
-  deferredMiseTrackingErrorCode,
-} from "../repository/user-tool-storage.mjs";
+import { prepareUserToolDirectories } from "../repository/user-tool-storage.mjs";
 import { runRepositoryHousekeeping } from "../goals/repository-housekeeping.mjs";
 import { runProjectCommand } from "../setup/project-command.mjs";
 import { inspectLinuxOpenRepositoryPaths } from "../repository/runtime-process-identity.mjs";
-import { acquireVerificationSessionLock } from "../verify/verification-session-lock.mjs";
-import { reconcileToolStorage } from "./tool-storage-housekeeping.mjs";
 import { maintainToolchain } from "./maintain-toolchain.mjs";
 import { toolchainConfigurationPaths } from "./toolchain-maintenance-inputs.mjs";
 
 const installed = projectManagedToolLayout(toolingRoot);
 const installedPnpm = installed.pnpm.executable;
 
-test("shared tracking accepts current native and npm package pins without admitting executable configuration", (t) => {
-  const parent = mkdtempSync(path.join(os.tmpdir(), "shared-tool-pins-"));
-  const previous = process.env.PROJECT_TOOL_STORAGE_HOME;
-  process.env.PROJECT_TOOL_STORAGE_HOME = parent;
-  t.after(() => {
-    if (previous === undefined) delete process.env.PROJECT_TOOL_STORAGE_HOME;
-    else process.env.PROJECT_TOOL_STORAGE_HOME = previous;
-    rmSync(parent, { recursive: true, force: true });
-  });
-  const shared = prepareUserToolDirectories();
-  const roots = ["native", "npm"].map((name) => path.join(parent, name));
-  for (const [index, root] of roots.entries()) {
-    mkdirSync(root, { mode: 0o700 });
-    write(
-      path.join(root, ".codex/mise.toml"),
-      `[tools]\nnode = "24.21.0"\n${index ? '"npm:pnpm"' : "pnpm"} = "11.28.0"\n`,
-    );
-    prepareProjectToolDirectories(root);
-    assert.equal(prepareMiseTracking(root), true);
-    symlinkSync(
-      path.join(root, ".codex/mise.toml"),
-      path.join(shared.miseTrackedConfigs, String(index)),
-    );
-  }
-  assert.deepEqual(trackedToolProjects().sort(), roots.sort());
-  for (const mode of [0o775, 0o777]) {
-    chmodSync(roots[0], mode);
-    assert.throws(
-      () => trackedToolProjects(),
-      (error) =>
-        error.code === deferredMiseTrackingErrorCode &&
-        error.message.includes(roots[0]) &&
-        /group\/other-writable/u.test(error.message),
-    );
-    assert.equal(lstatSync(roots[0]).mode & 0o777, mode, "inventory never repairs a project");
-  }
-  chmodSync(roots[0], 0o700);
-  const alias = path.join(parent, "linked-project");
-  symlinkSync(roots[0], alias, "dir");
-  const linkedReference = path.join(shared.miseTrackedConfigs, "linked-project");
-  symlinkSync(path.join(alias, ".codex/mise.toml"), linkedReference);
-  assert.throws(
-    () => trackedToolProjects(),
-    (error) => error.code === deferredMiseTrackingErrorCode && /noncanonical/u.test(error.message),
-  );
-  rmSync(linkedReference);
-  assert.deepEqual(trackedToolProjects().sort(), roots.sort());
-  const privateConfig = path.join(roots[1], ".auth/project-tools/config/mise/config.toml");
-  const privateReference = path.join(shared.miseTrackedConfigs, "legacy-private");
-  const privateContent = '[env]\nPRIVATE_SENTINEL = "preserved"\n';
-  write(privateConfig, privateContent);
-  symlinkSync(privateConfig, privateReference);
-  prepareMiseTracking(roots[0], { migrate: true });
-  assert.equal(readlinkSync(privateReference), privateConfig, "another project retains ownership");
-  assert.throws(
-    () => trackedToolProjects(),
-    (error) =>
-      error.code === deferredMiseTrackingErrorCode &&
-      error.message.includes(roots[1]) &&
-      /updated startup/u.test(error.message),
-  );
-  prepareMiseTracking(roots[1], { migrate: true });
-  assert.equal(lstatSync(privateReference, { throwIfNoEntry: false }), undefined);
-  assert.equal(readFileSync(privateConfig, "utf8"), privateContent);
-  assert.deepEqual(trackedToolProjects().sort(), roots.sort());
-  write(
-    path.join(roots[0], ".codex/mise.toml"),
-    '[tools]\nnode = "24.21.0"\n"npm:pnpm" = "11.28.0"\n[env]\nUNSAFE = "exec:payload"\n',
-  );
-  assert.throws(() => trackedToolProjects(), /non-executing exact project pins/u);
-});
 function write(file, text, mode = 0o600) {
   mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
   writeFileSync(file, text, { mode });
@@ -183,7 +106,7 @@ function fixture(t) {
     sealProjectToolBundle(roots[0], tool.directory, tool);
   }
   // These tiny launchers invoke the actual shipped runtimes. No Node/Python installation is
-  // copied for any fixture or run, and the native Mise resolver/uninstaller remains real.
+  // copied for any fixture or run, and native Mise resolves the project’s actual pins.
   layout = projectManagedToolLayout(roots[0], matrix);
   write(layout.node.executable, launcher(installed.node.executable), 0o755);
   write(layout.pnpm.executable, launcher(installedPnpm), 0o755);
@@ -239,7 +162,7 @@ test("real housekeeping collects unused shared packages, retires legacy runtimes
     path.join(second, ".codex/mise.toml"),
     `[tools]\nnode = ["${primaryNode}", "22.21.0"]\npnpm = "${readToolchainConfiguration().stable.pnpm.version}"\n`,
   );
-  // Native mise records the second project's exact config in the one shared tracker.
+  // Native Mise resolves the second project’s additional pin in its own environment.
   native(second, f.layout.mise.executable, ["ls", "--current", "--json"]);
   const unusedMatrix = structuredClone(readToolchainConfiguration(first));
   unusedMatrix.ci.miseVersion = "2026.8.1";
@@ -284,11 +207,7 @@ test("real housekeeping collects unused shared packages, retires legacy runtimes
   );
   assert.equal(existsSync(legacy), false, "native Mise uninstalls the replaced repository runtime");
   assert.equal(existsSync(legacyBundle), false);
-  assert.equal(
-    existsSync(unusedRuntime),
-    false,
-    "native Mise removes unused shared runtime versions",
-  );
+  assert.equal(existsSync(unusedRuntime), true, "a single project cannot retire a shared runtime");
   assert.equal(
     existsSync(retainedRuntime),
     true,
@@ -296,8 +215,8 @@ test("real housekeeping collects unused shared packages, retires legacy runtimes
   );
   assert.equal(
     existsSync(unusedBundle.directory),
-    false,
-    "the existing native bundle owner collects unused versions",
+    true,
+    "a single project cannot retire a shared bootstrap bundle",
   );
   assert.equal(
     existsSync(obsoletePackage),
@@ -350,61 +269,6 @@ test("real housekeeping collects unused shared packages, retires legacy runtimes
     0o775,
     "migration must never repair a symlink target",
   );
-});
-
-test("private Mise configuration stays local while shared native collection proceeds", (t) => {
-  const f = fixture(t);
-  const [first, second] = f.roots;
-  const privateConfig = path.join(second, ".auth/project-tools/config/mise/config.toml");
-  const content = '[env]\nADAPTER_SENTINEL = "isolated"\n';
-  write(privateConfig, content);
-  native(second, f.layout.mise.executable, ["ls", "--current", "--json"]);
-  const retainedRuntime = path.join(f.shared.miseData, "installs/node/18.19.0");
-  write(path.join(retainedRuntime, "bin/node"), launcher(installed.node.executable), 0o755);
-  const calls = [];
-  const lock = acquireVerificationSessionLock({ repositoryRoot: first });
-  let result;
-  try {
-    result = reconcileToolStorage({
-      root: first,
-      apply: true,
-      owner: lock.lifecycleCapability,
-      runNative(command, args, options) {
-        calls.push({ command, args });
-        return spawnSync(command, args, options);
-      },
-    });
-  } finally {
-    lock.release();
-  }
-  assert.equal(calls.filter(({ args }) => args[0] === "prune").length, 1);
-  assert.equal(calls.filter(({ args }) => args[0] === "store" && args[1] === "prune").length, 1);
-  assert.ok(!result.deferred.some((reason) => /private Mise configuration/u.test(reason)));
-  assert.ok(!existsSync(retainedRuntime));
-  assert.equal(readFileSync(privateConfig, "utf8"), content);
-});
-
-test("shared cleanup rejects executable tracked configuration before deleting any tool version", async (t) => {
-  const f = fixture(t);
-  const root = f.roots[0];
-  const privateConfig = path.join(f.roots[2], ".auth/project-tools/config/mise/config.toml");
-  write(privateConfig, '[env]\nADAPTER_SENTINEL = "isolated"\n');
-  symlinkSync(privateConfig, path.join(f.shared.miseTrackedConfigs, "000-private-reference"));
-  chmodSync(f.roots[2], 0o775);
-  symlinkSync(
-    path.join(f.roots[2], ".codex/mise.toml"),
-    path.join(f.shared.miseTrackedConfigs, "000-unadmitted-project"),
-  );
-  const unsafe = path.join(f.roots[1], ".codex/mise.toml");
-  write(unsafe, '[tools]\nnode = "24.21.0"\npnpm = "11.28.0"\n[env]\nUNSAFE = "retained"\n');
-  symlinkSync(unsafe, path.join(f.shared.miseTrackedConfigs, "unsafe-reference"));
-  const unused = path.join(f.shared.miseData, "installs/node/18.19.0/bin/node");
-  write(unused, launcher(installed.node.executable), 0o755);
-  await assert.rejects(
-    runRepositoryHousekeeping({ storageOnly: true, apply: true }, { root }),
-    /non-executing exact project pins/u,
-  );
-  assert.ok(existsSync(unused), "a rejected inventory cannot authorize collection");
 });
 
 test("runtime storage inspection detects the actual executable without an open file descriptor", () => {
@@ -471,7 +335,7 @@ test("process inspection tolerates proc entries disappearing during observation"
   }
 });
 
-test("startup composes native cleanup and migrates private pin tracking without downloads or runtime copies", async (t) => {
+test("startup reuses shared tools with fresh or unrelated Mise tracking and preserves private project settings", async (t) => {
   const f = fixture(t);
   const root = f.roots[0];
   for (const relative of toolchainConfigurationPaths) {
@@ -489,89 +353,83 @@ test("startup composes native cleanup and migrates private pin tracking without 
       devDependencies: {},
     }),
   );
-  const tracked = path.join(root, ".auth/project-tools/mise/tracked-configs");
-  rmSync(tracked, { recursive: true });
-  symlinkSync(f.shared.miseTrackedConfigs, tracked, "dir");
+  const registry = path.join(f.shared.lifecycle, "mise-tracked-configs");
   const privateConfig = path.join(root, ".auth/project-tools/config/mise/config.toml");
-  write(privateConfig, '[env]\nPRIVATE_SENTINEL = "preserved"\n');
-  symlinkSync(privateConfig, path.join(f.shared.miseTrackedConfigs, "legacy-private"));
-  chmodSync(path.dirname(tracked), 0o775);
-  symlinkSync(
-    path.join(f.parent, "removed-project/.codex/mise.toml"),
-    path.join(tracked, "dead-reference"),
-  );
-  const privateState = path.join(root, ".auth/project-tools/mise/private-account-sentinel");
-  write(privateState, "preserved private state");
-  native(root, f.layout.mise.executable, ["ls", "--current", "--json"]);
-  native(root, f.layout.pnpm.executable, [
-    "install",
-    "--offline",
-    "--ignore-scripts",
-    "--store-dir",
-    f.shared.pnpmStore,
-  ]);
-  const before = readFileSync(path.join(root, "pnpm-lock.yaml"));
-  const legacy = path.join(
-    root,
-    ".auth/project-tools/data/mise/installs/node",
-    matrix.stable.node.version,
-  );
-  write(path.join(legacy, "bin/node"), launcher(installed.node.executable), 0o755);
-  // Freeze external release discovery; execute the real startup installation/finalization/GC path.
-  const result = await maintainToolchain({
-    prepareStorage: () => {},
-    root,
-    startup: true,
-    locked: true,
-    fetchImpl: () => {
-      throw new Error("startup storage regression must not download");
-    },
-  });
-  assert.deepEqual(result.changedPaths, []);
-  assert.equal(existsSync(legacy), false);
-  assert.ok(lstatSync(tracked).isDirectory());
-  assert.ok(existsSync(path.join(tracked, "legacy-private")));
-  assert.equal(
-    lstatSync(path.join(f.shared.miseTrackedConfigs, "legacy-private"), { throwIfNoEntry: false }),
-    undefined,
-  );
-  assert.equal(readFileSync(privateConfig, "utf8"), '[env]\nPRIVATE_SENTINEL = "preserved"\n');
-  assert.equal(lstatSync(path.dirname(tracked)).mode & 0o777, 0o700);
-  assert.equal(
-    lstatSync(path.join(tracked, "dead-reference"), { throwIfNoEntry: false }),
-    undefined,
-  );
-  assert.equal(readFileSync(privateState, "utf8"), "preserved private state");
-  assert.deepEqual(readFileSync(path.join(root, "pnpm-lock.yaml")), before);
+  const setting = '[env]\nPROJECT_STORAGE_SETTING = "local"\n';
+  write(privateConfig, setting);
+  native(root, f.layout.pnpm.executable, ["install", "--offline", "--ignore-scripts"]);
+  const lockfile = readFileSync(path.join(root, "pnpm-lock.yaml"));
+  const notices = [];
+  const start = () =>
+    maintainToolchain({
+      root,
+      startup: true,
+      locked: true,
+      prepareStorage: () => {},
+      fetchImpl: () => {
+        throw new Error("startup storage regression must not download");
+      },
+      onReleaseNotice: (message) => notices.push(message),
+    });
 
-  // A registered sibling with permissive root modes must retain shared tools, not abort an
-  // otherwise verified startup or have its permissions silently rewritten by this project.
+  assert.equal(existsSync(registry), false);
+  assert.deepEqual((await start()).changedPaths, []);
+  assert.equal(
+    existsSync(registry),
+    false,
+    "a fresh project publishes no cross-project references",
+  );
+
   const sibling = f.roots[1];
-  native(sibling, f.layout.mise.executable, ["ls", "--current", "--json"]);
-  chmodSync(sibling, 0o775);
-  const retainedRuntime = path.join(f.shared.miseData, "installs/node/18.19.0");
-  write(path.join(retainedRuntime, "bin/node"), launcher(installed.node.executable), 0o755);
-  const oldMatrix = structuredClone(matrix);
-  oldMatrix.ci.miseVersion = "2026.8.1";
-  const retainedBundle = projectManagedToolLayout(root, oldMatrix).mise;
-  write(retainedBundle.executable, "#!/bin/sh\nexit 0\n", 0o755);
-  sealProjectToolBundle(root, retainedBundle.directory, retainedBundle);
-  const progress = [];
-  const retained = await maintainToolchain({
-    prepareStorage: () => {},
-    root,
-    startup: true,
-    locked: true,
-    fetchImpl: () => {
-      throw new Error("startup storage regression must not download");
-    },
-    onReleaseNotice: (message) => progress.push(message),
-  });
-  assert.deepEqual(retained.changedPaths, []);
-  assert.ok(progress.some((message) => message.includes(sibling) && /writable/u.test(message)));
-  assert.ok(existsSync(retainedRuntime), "unadmitted project references retain all runtimes");
-  assert.ok(existsSync(retainedBundle.directory), "unadmitted references also retain bundles");
-  assert.equal(lstatSync(sibling).mode & 0o777, 0o775, "sibling permissions stay unchanged");
-  assert.equal(readFileSync(privateState, "utf8"), "preserved private state");
-  assert.deepEqual(readFileSync(path.join(root, "pnpm-lock.yaml")), before);
+  const foreignPins = path.join(sibling, ".codex/mise.toml");
+  const foreignSettings = path.join(sibling, ".auth/project-tools/config/mise/config.toml");
+  write(foreignPins, '[tools]\nnode = "24"\n[env]\nSIBLING_SETTING = "local"\n');
+  write(foreignSettings, '[env]\nPROJECT_STORAGE_SETTING = "sibling"\n');
+  mkdirSync(registry);
+  const references = {
+    "foreign-pins": foreignPins,
+    "foreign-private": foreignSettings,
+    "removed-project": path.join(f.parent, "removed-project/.codex/mise.toml"),
+  };
+  for (const [name, target] of Object.entries(references))
+    symlinkSync(target, path.join(registry, name));
+  const formerState = path.join(root, ".auth/project-tools/mise");
+  mkdirSync(formerState, { recursive: true });
+  symlinkSync(registry, path.join(formerState, "tracked-configs"), "dir");
+  const retainedRuntime = path.join(f.shared.miseData, "installs/node/18.19.0/bin/node");
+  write(retainedRuntime, launcher(installed.node.executable), 0o755);
+
+  assert.deepEqual((await start()).changedPaths, []);
+  assert.equal(
+    native(root, f.layout.mise.executable, [
+      "exec",
+      "--locked",
+      "--",
+      "node",
+      "-p",
+      "process.env.PROJECT_STORAGE_SETTING",
+    ]).trim(),
+    "local",
+  );
+  assert.deepEqual(readdirSync(registry).sort(), Object.keys(references).sort());
+  for (const [name, target] of Object.entries(references))
+    assert.equal(readlinkSync(path.join(registry, name)), target);
+  const tracker = path.join(projectToolEnvironment({ root }).MISE_STATE_DIR, "tracked-configs");
+  assert.ok(lstatSync(tracker).isDirectory());
+  const trackedPaths = readdirSync(tracker).map((name) => readlinkSync(path.join(tracker, name)));
+  assert.ok(trackedPaths.includes(path.join(root, ".codex/mise.toml")));
+  assert.ok(trackedPaths.every((target) => target.startsWith(root + path.sep)));
+  assert.deepEqual(
+    notices.filter(
+      (message) => message.includes(sibling) || /shared runtime|shared tool cleanup/i.test(message),
+    ),
+    [],
+  );
+  assert.equal(readFileSync(privateConfig, "utf8"), setting);
+  assert.equal(
+    readFileSync(foreignSettings, "utf8"),
+    '[env]\nPROJECT_STORAGE_SETTING = "sibling"\n',
+  );
+  assert.ok(existsSync(retainedRuntime));
+  assert.deepEqual(readFileSync(path.join(root, "pnpm-lock.yaml")), lockfile);
 });

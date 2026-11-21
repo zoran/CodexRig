@@ -753,6 +753,11 @@
       "scripts/goals/repository-housekeeping.test.mjs",
       "scripts/repository/worktree-recovery.test.mjs"
     ],
+    "scripts/repository/project-writer-admission.mjs": [
+      "scripts/repository/worktree-recovery.test.mjs",
+      "scripts/setup/startup-state.test.mjs",
+      "scripts/setup/startup-session-controller.test.mjs"
+    ],
     "scripts/repository/worktree-recovery-cli.mjs": [
       "scripts/setup/startup-state.test.mjs",
       "scripts/goals/repository-housekeeping.test.mjs",
@@ -967,7 +972,8 @@
       "scripts/verify/pre-push.test.mjs"
     ],
     "scripts/verify/pushed-object-scan.mjs": [
-      "scripts/verify/pushed-object-scan.test.mjs"
+      "scripts/verify/pushed-object-scan.test.mjs",
+      ".agents/skills/reset-framework/scripts/publish-framework.test.mjs"
     ],
     "scripts/security/secret-patterns.mjs": [
       "scripts/terminal/terminal-output.test.mjs",
@@ -1151,10 +1157,25 @@
       "scripts/framework/framework-upgrade.test.mjs",
       "scripts/framework/framework-upgrade-identity.test.mjs"
     ],
+    "scripts/framework/framework-upgrade-merge.mjs": [
+      "scripts/framework/framework-upgrade.test.mjs",
+      "scripts/framework/framework-upgrade-identity.test.mjs"
+    ],
     "scripts/framework/framework-upgrade-review.mjs": [
       "scripts/framework/framework-upgrade.test.mjs",
       "scripts/setup/staged-project-validator.test.mjs",
       "scripts/framework/framework-upgrade-identity.test.mjs"
+    ],
+    "scripts/framework/framework-upgrade-documents.mjs": [
+      "scripts/framework/framework-upgrade.test.mjs",
+      ".agents/skills/reset-framework/scripts/publish-framework.test.mjs"
+    ],
+    ".agents/skills/reset-framework/scripts/publication-source.mjs": [
+      ".agents/skills/reset-framework/scripts/publish-framework.test.mjs",
+      ".agents/skills/reset-framework/scripts/publication-integration.test.mjs"
+    ],
+    "scripts/framework/framework-upgrade-journal.mjs": [
+      "scripts/framework/framework-upgrade.test.mjs"
     ],
     "scripts/framework/framework-upgrade-runtime.mjs": [
       "scripts/framework/framework-upgrade.test.mjs",

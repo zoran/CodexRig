@@ -1,9 +1,8 @@
 ---
 name: update-project-from-framework
 description:
-  Update an existing child repository from this framework, reconcile portable workflow and tooling
-  with current generation, and preserve intentional product adaptations. Use for explicitly
-  requested child updates or update feasibility reviews; a review stays read-only.
+  Review or update an explicitly selected child from current generated output while preserving
+  project adaptations. Feasibility reviews stay read-only.
 ---
 
 # Update Project From Framework
@@ -24,11 +23,17 @@ checks and approval gates. Preserve accounts/history and inspect private paths b
 pnpm framework:upgrade -- --target <root>
 ```
 
-The source's versioned selection/formatter projects current output. An optional real pristine
-`--baseline` adds three-way comparison; it does not replace policy review. Classify differences as
-current source behavior, intentional product extension, obsolete behavior or unresolved ownership.
-Trace imports/commands before retirement. Review startup, roles/hooks, instructions/skills,
-registry, CI and maintained docs together; keeping a file does not prove that it received the fix.
+The source's versioned selection and formatter project current output. The default plan retains
+target-only files and combines missing package commands and verification entries with product
+extensions. Review differing shared keys and existing opaque tools. Prefer the actual pristine
+generated ancestor with `--baseline` when available. It merges disjoint text changes in tools, CI,
+policies, READMEs and manifest documents, merges JSON by key and retires unchanged obsolete tools.
+Inspect overlapping edits and modify/delete conflicts. Regenerate conflicting dependency locks from
+the merged manifests through the target's dependency owner within the authorized scope. Classify
+differences as current source behavior, intentional product extension, obsolete behavior or
+unresolved ownership. Trace imports/commands before retirement. Review startup, roles/hooks,
+instructions/skills, registry, CI and maintained docs together; keeping a file does not prove that
+it received the fix.
 
 Prefer current implementations with necessary extensions at narrow owners. Preserve typed product,
 delivery, tenancy and locale decisions, actual module context/negative-test owners, dependency
@@ -38,19 +43,25 @@ tests.
 
 ## Apply A Bound, Recoverable Change
 
-Use an ephemeral reconciliation JSON array from the preview. Each decision retains `path`,
-`currentHash`, `currentMode`, `desiredHash`, `desiredMode`, with `action` (`source`, `keep`,
-`replace`, `remove`) and a concrete reason. Replacement adds reviewed UTF-8 `content` and integer
-`mode`. `keep` needs a product reason; `source` for a target-only path explicitly retires it.
-Maintained README/manifest/context use explicit document bindings, never wholesale template
-replacement. `--project-path <path>` admits additional reviewed owners without authorizing their
-deletion.
+Keep source-side previews, reconciliation JSON, patches, logs and reproductions in the ignored
+`.project-state/child-maintenance/` directory. Keep real checkouts and recovery journals with their
+target. Use synthetic names and portable paths for any regression retained in the framework. Use an
+ephemeral reconciliation JSON array from the preview. Each decision retains `path`, `currentHash`,
+`currentMode`, `desiredHash`, `desiredMode` and, with a baseline, `baseHash` and `baseMode`, with
+`action` (`source`, `keep`, `replace`, `remove`) and a concrete reason. Replacement adds reviewed
+UTF-8 `content` and integer `mode`. `keep` needs a product reason. For a target-only path, `source`
+explicitly retires it. For a package or verification conflict, the proposed source combines
+independent product fields with the shared values at the reported keys. With a baseline a source
+decision also retains text edits outside overlapping hunks. Maintained documents without a pristine
+ancestor use explicit document bindings. Preserve private work context. `--project-path <path>`
+admits additional reviewed owners without authorizing their deletion.
 
-Preview with `--reconcile <absolute-decisions.json>`; source/target hash or mode drift invalidates
-review. Only a reviewed conflict-free plan gains `--apply`. The target's current runtime owner
-locks, journals and rolls back proven transaction-owned bytes. Reconcile child lifecycle extensions
-and imports before staging that owner. Use `--target <root> --recover` after interruption; preserve
-unrelated changes and recovery blockers.
+Preview with `--reconcile <absolute-decisions.json>` and the original baseline when used. Source,
+target or reference hash or mode drift invalidates review. Only a reviewed conflict-free plan gains
+`--apply`. The target's current runtime owner locks, journals and rolls back proven
+transaction-owned bytes. Reconcile child lifecycle extensions and imports before staging that owner.
+Use `--target <root> --recover` after interruption; preserve unrelated changes and recovery
+blockers.
 
 Unsupported old runtime requires explicit `--regenerate --confirm-quiescent --apply` after all
 target writers stop and a fresh inventory. Prepare a disposable current child and reconcile product
@@ -73,8 +84,8 @@ frozen inputs separately; preserve `--startup` in the normal launcher. Missing e
 restart and fixture-only claims remain explicit.
 
 A final current-output preview must explain every intentional deviation. Repeating a settled update
-must make no writes; customized registry metadata stays explicitly reconciled. Use existing reviews
-and evidence, settle owned source/target state and remove owned temporary decisions. Report version,
-changes, preservation, exact tests and limits; stop at update acceptance without adopting the
-child's backlog or running `goal:new` to invent work. No installation receipt or universal
-self-updater.
+must make no writes. Check that custom commands still dispatch and product files survive. Use
+existing reviews and evidence, settle owned source/target state and remove owned temporary
+decisions. Report version, changes, preservation, exact tests and limits; stop at update acceptance
+without adopting the child's backlog or running `goal:new` to invent work. No installation receipt
+or universal self-updater.

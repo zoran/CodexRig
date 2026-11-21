@@ -1,10 +1,8 @@
 ---
 name: security-review
 description:
-  Read-only security and privacy review for changes that affect trust boundaries, authentication,
-  authorization, secrets, user data, dependencies, shell execution, CI, infrastructure, or runtime
-  configuration. Use near handoff when those surfaces changed or when the user explicitly requests a
-  security review; skip when the task has no meaningful security surface.
+  Read-only review of changed trust, authorization, privacy, dependency, shell, CI or runtime
+  boundaries, or an explicitly requested security review.
 ---
 
 # Security Review

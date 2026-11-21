@@ -28,13 +28,15 @@ import {
 import {
   activateRuntimeSessionLease,
   inspectRuntimeSessionLease,
-  inspectRuntimeSessionPlan,
   releaseRuntimeSessionLease,
   repositoryRuntimeRootIdentity,
-  reserveRuntimeSessionLease,
   transitionRuntimeSessionWriterProcess,
   validCodexSessionId,
 } from "../repository/runtime-session-lease.mjs";
+import {
+  projectSessionPlan,
+  reserveProjectSession,
+} from "../repository/project-writer-admission.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
 import { pnpmGraphPaths } from "../deps/pnpm-toolchain-graph.mjs";
 import { inspectProcessIdentity } from "../repository/runtime-process-identity.mjs";
@@ -242,7 +244,7 @@ export function startupAttestationBasis({
 
 /** Inspects whether native session selection can reserve this repository. */
 export function startupSessionPlan({ root = toolingRoot } = {}) {
-  return inspectRuntimeSessionPlan({ root });
+  return projectSessionPlan({ root });
 }
 
 export function startupSessionPlanToken(plan) {
@@ -260,7 +262,7 @@ export function reserveStartupAttestation(
     runtimeExecutables,
   } = {},
 ) {
-  const reservation = reserveRuntimeSessionLease({ root, pid });
+  const reservation = reserveProjectSession({ root, pid });
   try {
     const issued = issueStartupAttestation({
       root,

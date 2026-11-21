@@ -434,6 +434,7 @@ function invalidListedWorktree(record, currentRoot) {
 function standaloneRootInventory(currentRoot, repositoryKind, problem = null) {
   return Object.freeze({
     schemaVersion: 1,
+    commonGitDirectory: null,
     complete: problem === null,
     currentWorktree: currentRoot,
     integrationBranch: null,
@@ -486,6 +487,7 @@ function preserveAmbiguousCurrentInventory(currentRoot, worktrees, pruneTransact
   }
   return Object.freeze({
     schemaVersion: 1,
+    commonGitDirectory: null,
     complete: false,
     currentWorktree: currentRoot,
     integrationBranch: "main",
@@ -561,6 +563,7 @@ export function inspectRepositoryWorktrees({ root = toolingRoot } = {}) {
   }
   return Object.freeze({
     schemaVersion: 1,
+    commonGitDirectory,
     complete: worktrees.every((worktree) => worktree.problem === null),
     currentWorktree: currentRoot,
     integrationBranch: "main",

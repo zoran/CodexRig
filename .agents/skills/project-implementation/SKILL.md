@@ -1,10 +1,8 @@
 ---
 name: project-implementation
 description:
-  Implement, debug, refactor, or produce implementation-ready technical design with root-cause
-  analysis, stack-aware conventions, evidence-backed decisions, proportionate end-to-end evidence,
-  and whole-system handoff. Use for application, script, infrastructure, architecture, framework,
-  migration, or performance work; not for a final review or dependency-only maintenance.
+  Implement, debug, refactor or design a concrete change at its owner and verify the affected flow.
+  Dependency-only maintenance and final review have separate skills.
 ---
 
 # Project Implementation
@@ -40,25 +38,16 @@ stateful work apply
 
 ## Select Evidence And Finish
 
-For material defects prove the original failure and affected consumers through shipped code. Mocks
-may isolate external systems, not replace the invariant under test. Exercise contracts directly with
-existing specimens; keep complete provisioning and recovery journeys at one explicit integration
-owner. A module check must not replay prerequisite domains. Editorial edits need no
-implementation-mirroring tests. Distinguish fixture, rendered, native and real-target evidence.
+For material defects exercise the original failure and affected consumers through shipped code. Keep
+external effects isolated and complete provisioning/recovery journeys at their integration owner.
+Choose checks through [test strategy](../../../instructions.md#test-strategy) and
+[verification selection](../../../instructions.md#verification-selection-and-runtime). Distinguish
+fixture, rendered, native and real-target evidence.
 
-Inspect `pnpm verify:changed -- --print-plan`, reuse valid results and run only necessary checks.
-Use `--check <key>` and, for an independent Node file, `--test-file <path>` to retain focused
-successes for later composition. Filtered case diagnosis is not complete-file evidence. Place new
-tests at a small behavior owner; keep costly integration setup out of unrelated unit cases. Missing
-complete coverage does not start a development full run. Apply
-[documentation currency](../../../instructions.md#documentation-currency), report protected-owner
-corrections to the primary, and use `$system-coherence` plus relevant specialist review at
-acceptance. `$task-quality` composes that evidence without another blanket pass. Continue unfinished
-authorized work and stop when acceptance is met.
-
-Tie every additional investigation or repair to an unmet acceptance condition. Park unrelated
-findings in the handoff without adopting them; follow the course-check limit when attempts stop
-producing new evidence. A review is a bounded acceptance decision, not a search for more work.
+Reconcile [documentation](../../../instructions.md#documentation-currency) and report protected
+corrections to the primary. At acceptance use `$system-coherence` for nontrivial integration and
+`$task-quality` to compose relevant evidence. Follow up on a finding only when it blocks the
+accepted outcome.
 
 For interactive surfaces read [Rendered UI Implementation](references/rendered-ui.md); other work
 does not load that conditional workflow.

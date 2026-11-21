@@ -1,10 +1,8 @@
 ---
 name: system-coherence
 description:
-  Review changed code and whole-system integration for root-cause quality, cohesion, conventions,
-  ownership, contracts, data and lifecycle correctness. Use near handoff of non-trivial code,
-  architecture, configuration or workflow changes, or for suspected drift. Review requests stay
-  read-only; repair only within an already-authorized implementation. Skip trivial isolated edits.
+  Review a nontrivial change and its consumers for cohesion, contracts, state, lifecycle and
+  regressions. Keep standalone reviews read-only.
 ---
 
 # System Coherence

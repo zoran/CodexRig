@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import {
   activateRuntimeSessionLease,
   inspectRuntimeSessionLease,
@@ -147,7 +147,7 @@ export function publicationFixture(t, { globalIdentity = false, configure } = {}
   );
   write(
     "fixture-project-command.mjs",
-    `import {runProjectCommand} from ${JSON.stringify(pathToFileURL(path.join(root, "scripts/setup/project-command.mjs")).href)};
+    `import {runProjectCommand} from ${JSON.stringify("./scripts/setup/project-command.mjs")};
 import path from 'node:path';
 const [command,...args]=process.argv.slice(2);
 process.exitCode=await runProjectCommand({root:process.cwd(),command,args,miseExecutable:path.join(process.cwd(),'.auth/fixture-mise')});\n`,
@@ -187,7 +187,7 @@ process.exitCode=await runProjectCommand({root:process.cwd(),command,args,miseEx
       `import os from 'node:os';
 const originalUserInfo=os.userInfo;
 os.userInfo=(...args)=>({...originalUserInfo(...args),homedir:${JSON.stringify(home)}});
-await import(${JSON.stringify(pathToFileURL(path.join(root, "scripts/goals/publish-project.mjs")).href)});\n`,
+await import(${JSON.stringify("./scripts/goals/publish-project.mjs")});\n`,
     );
     identity = { config, content, withoutIdentity, marker, name, email };
   }

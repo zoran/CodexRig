@@ -1,9 +1,8 @@
 ---
 name: resume-project
 description:
-  Recover durable repository context and continue when the user says continue, resume or pick up, or
-  when startup reconstruction finds an unfinished authorized outcome. Prefer current source and
-  command evidence over memory; do not use for an independent transcriptless side conversation.
+  Recover unfinished authorized work on resume or accepted handover. Use current source and user
+  intent. Transcriptless side conversations stay independent.
 ---
 
 # Resume Project
@@ -11,18 +10,14 @@ description:
 Recover only unfinished authorized work; [session policy](../../../instructions.md#session-start)
 owns startup and continuation. Transcriptless side conversations remain independent.
 
-1. Reconstruct Git/upstream, untracked state, every same-clone worktree/session and safe recovery
-   with `pnpm worktree:status -- --json`; locate current owners via `pnpm context:map`. Read
-   applicable requirements/design and source, not private native transcripts as a repository index.
-2. Compare optional work context, old tasks/blockers and approvals against current user authority
-   and source. Preserve unrelated work without following it. Unknown evidence is neither success nor
-   a confirmed blocker; uncertain overlap blocks affected writes.
-3. Recover valid results and cumulative effort; reassess the approach, scope, capacity and next
-   coherent step. Historical critical labels/reserves do not decide the new session. Reconcile the
-   current visible plan/cache, preserving genuine unrelated blockers and user pauses.
-4. Continue safe authorized implementation immediately using `$project-implementation`; a resume is
-   not a test trigger. Reuse valid per-unit evidence and repeat only affected checks. Reconcile docs
-   with real progress, not by creating process history.
+1. Complete [startup reconstruction](../../../instructions.md#startup-repository-reconstruction)
+   once. Read the relevant project owners and current user request.
+2. Reconcile the optional work context, old approvals, blockers, results and cumulative effort
+   against current source, capacity and authority. Preserve unrelated work and explicit pauses.
+   Resolve uncertain writer overlap before writes.
+3. Resume in the accepted mode. Continue a read-only question as analysis, a plan as planning and
+   authorized implementation through its owner. Reuse valid evidence. Refresh the existing plan or
+   work context only for a material change.
 
 ## Accepted Critical Handover
 
