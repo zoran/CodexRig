@@ -23,9 +23,20 @@ test("publication progress exposes reused coverage and portable check starts bef
   assert.deepEqual(messages, ["Verification: 8 reused; 2 required"]);
   observe(Buffer.from("rt] alpha (preflight) scripts/alpha.test.mjs\n"));
   assert.match(messages.at(-1), /Verify alpha; 0\/2 completed/u);
-  observe(Buffer.from("[verification:passed] alpha 12ms\n"));
+  observe(Buffer.from("[verification:passed] alpha 12ms scripts/alpha.test.mjs\n"));
   observe(Buffer.from("[verification:start] beta (broad)\n[verification:passed] beta 8ms\n"));
   assert.equal(messages.at(-1), "Verification: 2/2 completed");
+});
+
+test("publication progress matches concurrently running files under the same check", () => {
+  const messages = [];
+  const observe = createPublicationVerificationProgress((value) => messages.push(value));
+  observe("[verification:start] setup (broad) scripts/setup/project-initialization.test.mjs\n");
+  observe("[verification:start] setup (broad) scripts/setup/startup-controller.test.mjs\n");
+  observe("[verification:passed] setup 50ms scripts/setup/startup-controller.test.mjs\n");
+  assert.equal(messages.at(-1), "Verify project-initialization; 1 completed");
+  observe("[verification:passed] setup 80ms scripts/setup/project-initialization.test.mjs\n");
+  assert.equal(messages.at(-1), "Verification: 2 completed");
 });
 
 test("publication progress shows a failed product while its admitted sibling finishes", () => {

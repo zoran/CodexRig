@@ -213,7 +213,7 @@ export function assertGeneratedProjectQuality(targetRoot) {
   for (const args of [
     ["scripts/verify/docs.mjs"],
     ["scripts/verify/verification-entrypoints.mjs"],
-    ["--test", "scripts/setup/runtime-safety.test.mjs"],
+    ["scripts/setup/validate-codex-config.mjs"],
   ]) {
     const result = spawnSync(process.execPath, args, {
       cwd: targetRoot,

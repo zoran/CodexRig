@@ -8,6 +8,7 @@ import path from "node:path";
 import process from "node:process";
 import test from "node:test";
 import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycle-process.mjs";
+import { createPublicationVerificationProgress } from "../terminal/publication-output.mjs";
 import { runPlan, verificationChildEnvironment } from "./verification-executor.mjs";
 import { verificationChildEnvironment as runtimeChildEnvironment } from "./verification-runtime-identity.mjs";
 import { withVerificationSessionLock } from "./verification-session-lock.mjs";
@@ -685,6 +686,8 @@ test("captured verifier output crosses the shared terminal-sanitization boundary
   const repositoryRoot = mkdtempSync(path.join(os.tmpdir(), "verification-captured-output-"));
   t.after(() => rmSync(repositoryRoot, { force: true, recursive: true }));
   const secret = `sk-${"s".repeat(32)}`;
+  const nestedProgress =
+    "[verification:start] build-core (workspace-build)\n[verification:failed] build-core 15ms";
   const multilineSecrets = [
     privateKeyBoundary("PRIVATE", "BEGIN"),
     "opaque-verifier-pem-body",
@@ -702,7 +705,7 @@ test("captured verifier output crosses the shared terminal-sanitization boundary
     import { withVerificationSessionLock } from ${JSON.stringify(lockUrl)};
     const command = {
       args: ["--input-type=module", "--eval", ${JSON.stringify(
-        `console.log(${JSON.stringify(`stdout ${secret} /tmp/private-verifier [31mred[0m`)}); console.error(${JSON.stringify(`stderr ${secret} /tmp/private-error`)}); console.error(${JSON.stringify(multilineSecrets)}); process.exit(1);`,
+        `console.log(${JSON.stringify(`stdout ${secret} /tmp/private-verifier [31mred[0m`)}); console.error(${JSON.stringify(`stderr ${secret} /tmp/private-error`)}); console.error(${JSON.stringify(multilineSecrets)}); console.log(${JSON.stringify(nestedProgress)}); process.exit(1);`,
       )}],
       executable: process.execPath,
       key: "sanitized-delivery",
@@ -745,6 +748,13 @@ test("captured verifier output crosses the shared terminal-sanitization boundary
   );
   assert.match(output, /<redacted-secret>/u);
   assert.match(output, /<local-path>/u);
+  assert.ok(output.includes("[verification:failed] build-core 15ms"));
+  const progress = [];
+  const observe = createPublicationVerificationProgress((message) => progress.push(message));
+  observe(result.stdout);
+  observe(result.stderr, "stderr");
+  assert.ok(progress.includes("Failed sanitized-delivery"));
+  assert.doesNotMatch(progress.join("\n"), /build-core/u);
 });
 
 test("truncated verifier output drops an incomplete credential line on both streams", (t) => {

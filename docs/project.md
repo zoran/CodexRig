@@ -389,7 +389,7 @@ It supplies no application, public service, product data model, deployment targe
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `7.2.0`.
+- Framework version: `7.3.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

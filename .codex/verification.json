@@ -313,7 +313,6 @@
       "args": [
         "--test",
         "--test-reporter=dot",
-        "--test-concurrency=1",
         "scripts/setup/startup-session-controller.test.mjs",
         "scripts/setup/setup-regression.test.mjs",
         "scripts/setup/project-initialization-boundaries.source.test.mjs",
@@ -1264,6 +1263,7 @@
     ],
     "scripts/terminal/publication-output.mjs": [
       "scripts/terminal/terminal-output.test.mjs",
+      "scripts/verify/verification-executor.test.mjs",
       "scripts/goals/project-publication.test.mjs",
       ".agents/skills/reset-framework/scripts/publish-framework.test.mjs",
       "scripts/goals/publication-command.test.mjs"

@@ -17,6 +17,7 @@ import { after, before, test } from "node:test";
 import { pathToFileURL } from "node:url";
 import { format } from "prettier";
 import {
+  assertGeneratedProjectQuality,
   cleanupTemporaryRoots,
   isolatedTrackedFrameworkSource,
   temporaryRoot,
@@ -355,37 +356,11 @@ test("generated launcher verification rejects locked maintenance in the normal s
   assert.match(rejected.stdout, /# fail 1\b/u);
 });
 
-test("source validation accepts the independent output and scans final staged bytes", async (t) => {
+test("source validation accepts the independent output and scans final staged bytes", async () => {
   const target = stage();
   await validateGeneratedProject(target);
-  // Executing child tests creates private tool state; keep the export/secret-scan fixture pristine.
-  const runtimeTarget = stage();
-  prepareProjectToolDirectories(runtimeTarget);
-  const runtimeContracts = spawnSync(
-    process.execPath,
-    [
-      "--test",
-      "--test-reporter=tap",
-      "scripts/setup/runtime-safety.test.mjs",
-      "scripts/contracts/mise-toolchain-configuration.test.mjs",
-      "scripts/deps/toolchain-releases.test.mjs",
-      "scripts/deps/toolchain-maintenance.test.mjs",
-    ],
-    {
-      cwd: runtimeTarget,
-      env: projectToolEnvironment({ root: runtimeTarget }),
-      encoding: "utf8",
-      timeout: 60_000,
-    },
-  );
-  assert.equal(runtimeContracts.status, 0, runtimeContracts.stderr || runtimeContracts.stdout);
-  assert.match(runtimeContracts.stdout, /# tests [1-9]\d*\b/u);
-  t.diagnostic(
-    runtimeContracts.stdout
-      .split("\n")
-      .filter((line) => /^# (?:tests|pass|fail|skipped) /u.test(line))
-      .join("; "),
-  );
+  // The independent child runs its shipped checks while the export fixture stays pristine.
+  assertGeneratedProjectQuality(stage());
   appendFileSync(path.join(target, "README.md"), `${["sk-", "a".repeat(24)].join("")}\n`);
   await assert.rejects(validateGeneratedProject(target), /potential secret material/i);
   const ignored = stage();

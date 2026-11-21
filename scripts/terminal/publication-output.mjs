@@ -33,9 +33,9 @@ export function createPublicationVerificationProgress(report) {
       show(`Verification: ${count}`);
     }
   };
-  const start = (id, label, key) => {
+  const start = (id, label) => {
     if (active.has(id) || active.size >= 1024) return;
-    const entry = { label, key, detail: "" };
+    const entry = { label, detail: "" };
     active.set(id, entry);
     render(entry);
   };
@@ -61,13 +61,22 @@ export function createPublicationVerificationProgress(report) {
         text,
       );
     if (started && keyPattern.test(started[1])) {
-      start(`${started[1]}:${started[2] ?? ""}`, started[1], started[1]);
+      const [, key, file] = started;
+      const label =
+        file
+          ?.split("/")
+          .at(-1)
+          .replace(/\.test\.mjs$/u, "") ?? key;
+      start(`${key}:${file ?? ""}`, label);
       return;
     }
-    const result = /^\[verification:(passed|failed)\] ([a-zA-Z0-9._:/-]+) \d+ms$/u.exec(text);
+    const result =
+      /^\[verification:(passed|failed)\] ([a-zA-Z0-9._:/-]+) \d+ms(?: ([a-zA-Z0-9._/-]+))?$/u.exec(
+        text,
+      );
     if (result) {
-      const entry = [...active].find(([, value]) => value.key === result[2]);
-      if (entry) finish(entry[0], result[1]);
+      const [, status, key, file] = result;
+      finish(`${key}:${file ?? ""}`, status);
       return;
     }
     if (!text.startsWith("[verification] ")) return;
@@ -81,7 +90,7 @@ export function createPublicationVerificationProgress(report) {
     )
       return;
     if (value.event === "command-start") {
-      start(value.key, value.key, value.key);
+      start(value.key, value.key);
     } else if (value.event === "command-complete") {
       if (["passed", "failed", "error"].includes(value.status)) finish(value.key, value.status);
     } else if (

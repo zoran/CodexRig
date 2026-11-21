@@ -385,17 +385,20 @@ function writeBuffer(stream, buffer) {
   if (!buffer || buffer.length === 0) return;
   const sanitized = sanitizeMultilineForTerminal(buffer.toString("utf8"), root);
   if (!sanitized) return;
-  stream.write(sanitized);
-  if (!sanitized.endsWith("\n")) stream.write("\n");
+  // Captured check output is diagnostic text, even when it contains verifier progress records.
+  const diagnostic = sanitized.replace(/\n$/u, "");
+  stream.write(`  > ${diagnostic.replaceAll("\n", "\n  > ")}\n`);
 }
 
 function printResult(result) {
+  const { command } = result;
   const status =
     result.error || result.status !== 0 || result.diagnosticRequired ? "failed" : "passed";
+  const file = command.testFile ? ` ${safeField(command.testFile)}` : "";
   console.log(
-    `[verification:${status}] ${safeField(result.command.acceptanceKey ?? result.command.key)} ${result.elapsedMs}ms`,
+    `[verification:${status}] ${safeField(command.acceptanceKey ?? command.key)} ${result.elapsedMs}ms${file}`,
   );
-  console.log(`\n[${safeField(result.command.label)}] ${safePrintableCommand(result.command)}`);
+  console.log(`\n[${safeField(command.label)}] ${safePrintableCommand(command)}`);
   writeBuffer(process.stdout, result.stdout);
   writeBuffer(process.stderr, result.stderr);
   if (result.error) console.error(formatContextError(result.error, root));
