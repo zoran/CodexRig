@@ -123,39 +123,7 @@ function remoteEvidence(root, contract) {
   return { ...parsed, provider, remoteName, source: "git-remote" };
 }
 
-function ciEvidence(environment, contract) {
-  const githubActions = environment.GITHUB_ACTIONS === "true";
-  const gitlabCi = environment.GITLAB_CI === "true";
-  if (githubActions && gitlabCi) {
-    throw new Error("GitHub Actions and GitLab CI identity cannot both be active.");
-  }
-  if (githubActions) {
-    const server = new URL(environment.GITHUB_SERVER_URL || "https://github.com");
-    const hostname = safeHostname(server.hostname, "GitHub Actions");
-    if (server.protocol !== "https:" || providerForHost(hostname, contract) !== "github") {
-      throw new Error("GitHub Actions host is not assigned to GitHub in the framework contract.");
-    }
-    return {
-      hostname,
-      provider: "github",
-      remoteName: "",
-      slug: safeSlug(environment.GITHUB_REPOSITORY),
-      source: "github-actions",
-    };
-  }
-  if (gitlabCi) {
-    const hostname = safeHostname(environment.CI_SERVER_HOST || "gitlab.com", "GitLab CI");
-    if (providerForHost(hostname, contract) !== "gitlab") {
-      throw new Error("GitLab CI host is not assigned to GitLab in the framework contract.");
-    }
-    return {
-      hostname,
-      provider: "gitlab",
-      remoteName: "",
-      slug: safeSlug(environment.CI_PROJECT_PATH),
-      source: "gitlab-ci",
-    };
-  }
+function explicitPlatformEvidence(environment, contract) {
   const explicitProvider = environment.CODEXRIG_GIT_PROVIDER;
   if (explicitProvider && !["github", "gitlab"].includes(explicitProvider)) {
     throw new Error("CODEXRIG_GIT_PROVIDER must be github or gitlab.");
@@ -187,16 +155,19 @@ export function detectGitProvider({
   environment = process.env,
   contract = readToolingConfiguration(root),
 } = {}) {
-  const ci = ciEvidence(environment, contract);
+  const explicit = explicitPlatformEvidence(environment, contract);
   const remote = remoteEvidence(root, contract);
-  if (ci && remote?.provider && ci.provider !== remote.provider) {
-    throw new Error("CI provider contradicts the selected Git remote provider.");
-  }
-  if (ci && remote?.slug && ci.slug !== remote.slug) {
-    throw new Error("CI repository identity contradicts the selected Git remote.");
+  if (
+    explicit &&
+    remote &&
+    (explicit.provider !== remote.provider ||
+      explicit.hostname !== remote.hostname ||
+      explicit.slug !== remote.slug)
+  ) {
+    throw new Error("Explicit Git platform identity contradicts the selected Git remote.");
   }
 
-  const evidence = ci ?? remote;
+  const evidence = remote ?? explicit;
   const configuredProvider = contract.platform.provider;
   let provider = evidence?.provider ?? null;
   if (configuredProvider !== "auto") {
@@ -207,7 +178,7 @@ export function detectGitProvider({
   }
   if (evidence && !provider) {
     throw new Error(
-      "Git remote host is not assigned to GitHub or GitLab; add the self-hosted domain to .codexrig/framework.json.",
+      "Git remote host is not assigned to GitHub or GitLab; add the self-hosted domain to .codex/tooling.json.",
     );
   }
   if (!evidence) {
@@ -231,10 +202,4 @@ export function detectGitProvider({
     slug: evidence.slug,
     source: evidence.source,
   };
-}
-
-export function platformCiPath(provider) {
-  if (provider === "github") return ".github/workflows/ci.yml";
-  if (provider === "gitlab") return ".gitlab-ci.yml";
-  return null;
 }

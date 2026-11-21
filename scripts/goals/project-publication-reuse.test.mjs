@@ -8,6 +8,11 @@ import { publicationFixture } from "./project-publication.fixture.mjs";
 test("development and publication retain independent check successes across retries and repairs", (t) => {
   const f = publicationFixture(t, {
     configure({ root, write }) {
+      // Workspace lifecycles execute in isolated snapshots. Record fixture observations in the
+      // same project-bound counter from both the source checks and the snapshot checks.
+      const recordCheck =
+        "import {appendFileSync} from 'node:fs';\nimport {join} from 'node:path';\n" +
+        "const checkLog = join(process.env.CODEX_HOME, '.auth', 'product-checks.jsonl');\n";
       const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
       pkg.scripts["verify:changed"] = "node scripts/verify/adaptive.mjs --mode repo";
       pkg.scripts["test:unit"] = "node fixture-workspace.mjs";
@@ -26,13 +31,14 @@ test("development and publication retain independent check successes across retr
       write("packages/independent/src/index.mjs", "export const independent = 1;\n");
       write(
         "packages/independent/check.mjs",
-        "import {appendFileSync} from 'node:fs';\nimport assert from 'node:assert/strict';\n" +
+        recordCheck +
+          "import assert from 'node:assert/strict';\n" +
           `import {independent} from ${JSON.stringify("./src/index.mjs")};\n` +
-          "appendFileSync('../../.auth/product-checks.jsonl', JSON.stringify({case: process.argv[2]}) + '\\n');\nassert.ok(independent > 0);\n",
+          "appendFileSync(checkLog, JSON.stringify({case: process.argv[2]}) + '\\n');\nassert.ok(independent > 0);\n",
       );
       write(
         "fixture-workspace.mjs",
-        "import {appendFileSync} from 'node:fs';\nappendFileSync('.auth/product-checks.jsonl', '{\"case\":\"workspace\"}\\n');\n",
+        recordCheck + 'appendFileSync(checkLog, \'{"case":"workspace"}\\n\');\n',
       );
       write("package.json", JSON.stringify(pkg));
       const config = JSON.parse(readFileSync(path.join(root, ".codex/verification.json"), "utf8"));
@@ -49,12 +55,12 @@ test("development and publication retain independent check successes across retr
       for (const key of ["shared", "product", "consumer"])
         write(
           `src/${key}.test.mjs`,
-          `import {appendFileSync} from 'node:fs';\n` +
+          recordCheck +
             `import assert from 'node:assert/strict';\n` +
             (key === "shared"
               ? ""
               : `import {product} from ${JSON.stringify("./product.mjs")};\n`) +
-            `appendFileSync('.auth/product-checks.jsonl', '${JSON.stringify({ case: key })}\\n');\n` +
+            `appendFileSync(checkLog, '${JSON.stringify({ case: key })}\\n');\n` +
             (key === "product" ? "assert.ok(product >= 0);\n" : "assert.ok(true);\n"),
         );
     },

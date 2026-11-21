@@ -12,7 +12,7 @@ import {
 } from "../filesystem/repository-files.mjs";
 import { validateToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 import { selectedProjectVerification } from "./project-tool-selection.mjs";
-import { projectCiProjection, projectToolingConfiguration } from "./generated-project-tooling.mjs";
+import { projectToolingConfiguration } from "./generated-project-tooling.mjs";
 import { projectOutputText } from "./project-output-projection.mjs";
 import { frameworkUpgradePreview } from "./framework-upgrade-documents.mjs";
 import {
@@ -33,6 +33,7 @@ import {
   stageRegenerationRuntime,
 } from "./framework-upgrade-runtime.mjs";
 import { buildReviewedFrameworkUpgradePlan } from "./framework-upgrade-review.mjs";
+import { applyWithPostUpdateReset } from "./framework-reset.mjs";
 import {
   removeOwnedRegularFile,
   removeOwnedEmptyDirectory,
@@ -47,8 +48,7 @@ export function desiredProjectToolFile(source, file, selection, displayName) {
   } else if (file === ".codex/verification.json") {
     content =
       JSON.stringify(selectedProjectVerification(JSON.parse(content), selection), null, 2) + "\n";
-  } else if ([".github/workflows/ci.yml", ".gitlab-ci.yml"].includes(file))
-    content = projectCiProjection(file, content);
+  }
   content = projectOutputText(content);
   // The launcher label is target-owned and must not pass through source-brand projection.
   if (file === ".codex/tooling.json") content = projectToolingConfiguration(content, displayName);
@@ -67,9 +67,15 @@ export function buildFrameworkUpgradePlan(options) {
     throw new Error("Regeneration requires current-output review.");
   const target = realUpgradeDirectory(targetRoot, "target");
   const targetTooling = targetUpgradeFileState(target, ".codex/tooling.json");
-  const displayName = targetTooling.exists
-    ? validateToolingConfiguration(JSON.parse(targetTooling.content)).startup.displayName
-    : undefined;
+  let displayName;
+  if (targetTooling.exists) {
+    // Validate the existing project identity independently of retired provider build settings.
+    const configuration = JSON.parse(targetTooling.content);
+    if (configuration.platform) delete configuration.platform.ci;
+    if (configuration.platform?.protection)
+      delete configuration.platform.protection.mergeSerialization;
+    displayName = validateToolingConfiguration(configuration).startup.displayName;
+  }
   const plan = buildReviewedFrameworkUpgradePlan(
     { ...options, sourceRoot },
     (source, file, selection) => desiredProjectToolFile(source, file, selection, displayName),
@@ -290,7 +296,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       }
       const plan = buildFrameworkUpgradePlan(options);
       console.log(JSON.stringify(frameworkUpgradePreview(plan), null, 2));
-      if (apply) await applyFrameworkUpgrade(plan, { confirmQuiescent });
+      if (apply) {
+        const reset = await applyWithPostUpdateReset(plan.sourceRoot, () =>
+          applyFrameworkUpgrade(plan, { confirmQuiescent }),
+        );
+        if (reset !== "none")
+          console.error(
+            reset === "complete"
+              ? "Framework post-update session reset complete."
+              : "Framework post-update session reset scheduled for session exit.",
+          );
+      }
     }
   } catch (error) {
     console.error(error.message);

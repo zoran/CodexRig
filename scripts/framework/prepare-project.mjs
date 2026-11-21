@@ -44,7 +44,10 @@ export async function prepareProject({
   assertIndependentProjectOutput(targetRoot);
   await validateGeneratedProject(targetRoot);
   if (!skipVerify) runGeneratedNode(sourceRoot, targetRoot, "scripts/verify/repository-smoke.mjs");
-  assertGeneratedProjectClean(targetRoot, identity, { projectDescription: description });
+  assertGeneratedProjectClean(targetRoot, identity, {
+    projectDescription: description,
+    transferManifest,
+  });
   assertGeneratedProjectParity({
     sourceRoot,
     targetRoot,

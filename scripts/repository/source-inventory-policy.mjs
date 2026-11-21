@@ -1,5 +1,6 @@
 /** Owns source inventory policy behavior for the repository inventory and filesystem boundary. */
 import path from "node:path";
+import { infrastructureStatePathReason } from "./sensitive-paths.mjs";
 
 export const repositoryCodexRuntimeDirectory = ".codex/runtime";
 export const repositoryCodexRuntimeCacheDirectory = `${repositoryCodexRuntimeDirectory}/cache`;
@@ -41,6 +42,7 @@ const nonPortableDirectoryNames = new Set([
 
 export const repositoryCodexHomeRuntimeDirectoryNames = Object.freeze([
   ".tmp",
+  "archived_sessions",
   "cache",
   "log",
   "logs",
@@ -285,9 +287,29 @@ export function isExcludedActivePath(value) {
   return activeSourcePathClassification(value) !== null;
 }
 
+/** Reserved paths for local builds, shared by portable transfer and outgoing Git refs. */
+export function localBuildPublicationPathReason(relativePath) {
+  if (relativePath === ".project-state/build" || relativePath.startsWith(".project-state/build/")) {
+    return "private local build configuration or output";
+  }
+  if (/(?:^|\/)(?:build|dist)\//u.test(relativePath)) return "generated local build output";
+  if (
+    /^\.(?:github|gitea|forgejo)\/workflows\/.+\.ya?ml$/iu.test(relativePath) ||
+    /^(?:\.gitlab-ci|bitbucket-pipelines|azure-pipelines|\.circleci\/config)\.ya?ml$/iu.test(
+      relativePath,
+    )
+  ) {
+    return "enabled provider workflow configuration";
+  }
+  return null;
+}
+
 export function nonPortableTransferPathReason(value) {
   const relativePath = normalizeSourceRelativePath(value);
   if (!relativePath) return "unsafe repository-relative path";
+  const buildReason =
+    localBuildPublicationPathReason(relativePath) ?? infrastructureStatePathReason(relativePath);
+  if (buildReason) return buildReason;
   if (
     relativePath === projectAccountStateDirectory ||
     relativePath.startsWith(`${projectAccountStateDirectory}/`)
@@ -304,7 +326,6 @@ export function nonPortableTransferPathReason(value) {
   if (segments.some((segment) => nonPortableDirectoryNames.has(segment))) {
     return "generated, dependency, backup, or runtime state";
   }
-  if (relativePath.startsWith("dist/exports/")) return "generated project export";
   if (relativePath.startsWith("playwright/.auth/")) return "browser authentication state";
   if (
     basename.endsWith(".bak") ||

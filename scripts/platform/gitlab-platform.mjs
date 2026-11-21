@@ -222,61 +222,15 @@ async function writeBranchProtection({ fetchImpl, operation, token }) {
   return operation.updated;
 }
 
-function basicProjectSettings() {
-  return {
-    only_allow_merge_if_all_discussions_are_resolved: true,
-    only_allow_merge_if_pipeline_succeeds: true,
-    remove_source_branch_after_merge: true,
-  };
-}
-
-async function writeProjectSettings({ base, contract, fetchImpl, token, warnings }) {
-  const basic = basicProjectSettings();
-  const serialization = contract.platform.protection.mergeSerialization;
-  const update = (body) =>
-    platformApiRequest(fetchImpl, base, {
-      body,
-      method: "PUT",
-      provider: "gitlab",
-      token,
-    });
-  if (serialization === "disabled") {
-    await update(basic);
-    return basic;
-  }
-  const serialized = {
-    ...basic,
-    merge_pipelines_enabled: true,
-    merge_trains_enabled: true,
-    merge_trains_skip_train_allowed: false,
-  };
-  const enforced = { ...serialized, merge_train_enforcement: "enforce_for_all_users" };
-  try {
-    await update(enforced);
-    return enforced;
-  } catch (error) {
-    const canFallback =
-      error instanceof PlatformApiError &&
-      [400, 403, 404].includes(error.status) &&
-      serialization === "prefer";
-    if (!canFallback) throw error;
-  }
-  try {
-    await update(serialized);
-    warnings.push(
-      "GitLab merge-train enforcement was unavailable; merge trains remain enabled but privileged users may be able to bypass them.",
-    );
-    return serialized;
-  } catch (error) {
-    const canDisable = error instanceof PlatformApiError && [400, 403, 404].includes(error.status);
-    if (!canDisable) throw error;
-  }
-  await update(basic);
-  warnings.push(
-    "GitLab merged-results pipelines or merge trains were unavailable; protected merge requests still require green CI.",
-  );
-  return basic;
-}
+const projectSettings = {
+  auto_devops_enabled: false,
+  builds_access_level: "disabled",
+  merge_pipelines_enabled: false,
+  merge_trains_enabled: false,
+  only_allow_merge_if_all_discussions_are_resolved: true,
+  only_allow_merge_if_pipeline_succeeds: false,
+  remove_source_branch_after_merge: true,
+};
 
 function approvalRuleOperation({ base, owned, required }) {
   if (required === 0) {
@@ -389,13 +343,11 @@ export async function applyGitlabPlatform({ contract, detected, token, fetchImpl
   });
   const state = stateStore.begin();
 
-  const warnings = [];
-  const expectedProject = await writeProjectSettings({
-    base,
-    contract,
-    fetchImpl,
+  await platformApiRequest(fetchImpl, base, {
+    body: projectSettings,
+    method: "PUT",
+    provider: "gitlab",
     token,
-    warnings,
   });
   stateStore.record("project settings written");
   const branchUpdate = await writeBranchProtection({
@@ -427,7 +379,7 @@ export async function applyGitlabPlatform({ contract, detected, token, fetchImpl
   const actualBranch = await protectedBranch({ base, branch, fetchImpl, token });
   const actualSettings = await approvalSettings({ base, fetchImpl, token });
   const actualRules = await approvalInventory({ base, fetchImpl, token });
-  verifyObject(actualProject, expectedProject, "project-settings");
+  verifyObject(actualProject, projectSettings, "project-settings");
   verifyBranch(actualBranch, contract.platform.protection);
   verifyApprovalSettings(actualSettings, desiredSettings);
   verifyApprovalRule(actualRules, contract.platform.protection.requiredApprovals);
@@ -438,6 +390,6 @@ export async function applyGitlabPlatform({ contract, detected, token, fetchImpl
     repository: detected.slug,
     resumed: state.resumed,
     updated: [branchUpdate, approvalUpdate, "approval settings"].join(", "),
-    warnings,
+    warnings: [],
   };
 }

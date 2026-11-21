@@ -1,4 +1,4 @@
-/** Exercises bounded sibling reads, original file protections and parent replacement refusal. */
+/** Exercises owned directory initialization, bounded sibling reads and parent replacement refusal. */
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
@@ -8,9 +8,21 @@ import test from "node:test";
 import {
   openOwnedDirectoryBinding,
   closeOwnedDirectoryBinding,
+  ensureOwnedPrivateDirectory,
   readStableOwnedFile,
   readStableOwnedFiles,
 } from "./owned-path-safety.mjs";
+
+test("concurrent initialization accepts an existing private directory from its peer", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "owned-directory-create-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const directory = path.join(root, "runtime");
+  const result = ensureOwnedPrivateDirectory(root, directory, "runtime", {
+    testHooks: { beforeDirectoryCreate: () => fs.mkdirSync(directory, { mode: 0o700 }) },
+  });
+  assert.deepEqual(result, { created: false, path: directory });
+  assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
+});
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "owned-file-read-"));

@@ -423,7 +423,17 @@ function regularRepositoryFileInventory({
   const inventory = sourcePathInventory(root, { includeUntracked });
   let candidates = inventory.candidates;
   if (activeOnly) candidates = candidates.filter((candidate) => !isExcludedActivePath(candidate));
-  if (portableOnly) assertPortableFiles(candidates);
+  if (portableOnly) {
+    // Git still lists locally deleted files until staged. Reject existing forbidden entries,
+    // including dangling symlinks. Regular source files are checked by listRegularFiles below.
+    assertPortableFiles(
+      candidates.filter(
+        (file) =>
+          nonPortableTransferPathReason(file) &&
+          lstatSync(path.join(root, file), { throwIfNoEntry: false }),
+      ),
+    );
+  }
   const protectedPrivatePaths =
     activeOnly || portableOnly
       ? []

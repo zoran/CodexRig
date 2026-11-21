@@ -8,6 +8,7 @@ import {
 } from "../filesystem/repository-files.mjs";
 import { importSpecifiersForFile } from "../repository/source-import-specifiers.mjs";
 import { nonPortableTransferPathReason } from "../repository/source-inventory-policy.mjs";
+import { projectOutputText } from "./project-output-projection.mjs";
 
 export const projectToolSelectionPath = ".codexrig/project-tools.json";
 export function readProjectToolSelection(root = toolingRoot) {
@@ -71,8 +72,8 @@ export function readProjectToolSelection(root = toolingRoot) {
     }
   }
   const assertCommandClosure = (command, owner) => {
-    for (const match of String(command).matchAll(
-      /(?:^|[\s"']|\$root\/)((?:scripts|\.agents)\/[A-Za-z0-9._/-]+\.(?:mjs|sh))(?=$|[\s"'])/gu,
+    for (const match of projectOutputText(String(command)).matchAll(
+      /(?:^|[\s"']|\$root\/)((?:scripts|\.agents)\/[A-Za-z0-9._/-]+\.(?:mjs|sh|py))(?=$|[\s"'])/gu,
     )) {
       if (!owners.has(match[1]))
         throw new Error(`${owner} executes unselected project tool ${match[1]}.`);

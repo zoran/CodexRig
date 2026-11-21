@@ -1,99 +1,29 @@
-/** Verifies compatibility CI uses the single private installer and preserves experimental selection. */
+/** Verifies local compatibility matrix discovery and host toolchain freshness reporting. */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { readCompatibilityMatrix } from "../contracts/framework-contract.mjs";
 import { toolingRoot } from "../filesystem/repository-files.mjs";
-import { ciAdapterContractViolations } from "../deps/ci-toolchain-contract.mjs";
-import { projectCiProjection } from "./generated-project-tooling.mjs";
-import { gitlabChildPipeline } from "./compatibility-matrix.mjs";
 import { compatibilityFreshnessWarnings } from "../setup/tooling-doctor.mjs";
 
-for (const [provider, file] of [
-  ["github", ".github/workflows/ci.yml"],
-  ["gitlab", ".gitlab-ci.yml"],
-]) {
-  test(`${provider} source and generated CI enter the common isolated locked execution flow`, () => {
-    const source = readFileSync(path.join(toolingRoot, file), "utf8");
-    const generated = projectCiProjection(file, source);
-    for (const content of [source, generated]) {
-      assert.deepEqual(ciAdapterContractViolations(provider, content), []);
-      for (const prefix of ["node", "env -u NODE_OPTIONS node", "env -u NODE_PATH node"]) {
-        const exposed = content.replace("env -u NODE_OPTIONS -u NODE_PATH node", prefix);
-        assert.notEqual(exposed, content, "the initial installer must remove both Node controls");
-        assert.ok(
-          ciAdapterContractViolations(provider, exposed).includes("reviewed-local-install"),
-          prefix,
-        );
-      }
-      const provisions = [...content.matchAll(/ripgrep shellcheck python3/gu)];
-      assert.ok(provisions.length, "Linux cancellation fixtures require Python");
-      for (const provision of provisions) {
-        const withoutPython =
-          content.slice(0, provision.index) +
-          "ripgrep shellcheck" +
-          content.slice(provision.index + provision[0].length);
-        assert.ok(
-          ciAdapterContractViolations(provider, withoutPython).includes(
-            "linux-cancellation-prerequisite",
-          ),
-        );
-      }
-      assert.ok(
-        ciAdapterContractViolations(provider, content.replaceAll("bash -p ", "bash ")).includes(
-          "isolated-verification",
-        ),
-      );
-      assert.ok(
-        ciAdapterContractViolations(
-          provider,
-          content.replace("maintain-toolchain.mjs --locked", "maintain-toolchain.mjs"),
-        ).includes("reviewed-local-install"),
-      );
-      assert.ok(
-        ciAdapterContractViolations(
-          provider,
-          content.replace("run-project.sh pnpm verify", "run-project.sh node --version"),
-        ).includes("isolated-verification"),
-      );
-      assert.ok(
-        ciAdapterContractViolations(
-          provider,
-          content + "\n# forbidden installer: npm install --global candidate\n",
-        ).includes("global-tool-install"),
-      );
-    }
-    for (const prefix of ["node", "env -u NODE_OPTIONS node", "env -u NODE_PATH node"]) {
-      const exposed = source.replace(
-        /env -u NODE_OPTIONS -u NODE_PATH node(\s+scripts\/framework\/compatibility-matrix\.mjs)/u,
-        `${prefix}$1`,
-      );
-      assert.notEqual(exposed, source, "the matrix bootstrap must remove both Node controls");
-      assert.ok(
-        ciAdapterContractViolations(provider, exposed).includes("isolated-matrix-generation"),
-        prefix,
-      );
-    }
-    assert.doesNotMatch(
-      generated,
-      /compatibility-matrix:|prepare-compatibility-track|compatibility-canary|framework:doctor|repo:housekeeping/u,
-    );
+function matrixCommand(...args) {
+  return spawnSync(process.execPath, ["scripts/framework/compatibility-matrix.mjs", ...args], {
+    cwd: toolingRoot,
+    encoding: "utf8",
+    timeout: 10000,
   });
 }
 
-test("GitLab experiments select declared tracks through the same owned maintenance transaction", () => {
-  const matrix = readCompatibilityMatrix();
-  const source = gitlabChildPipeline(matrix);
-  assert.doesNotMatch(source, /npm install --global|mise_stage|codex_install_root/u);
-  assert.equal(
-    source.split("prepare-compatibility-track.mjs --disposable-checkout").length - 1,
-    matrix.canaries.length,
-  );
-  assert.equal(source.split("run-project.sh pnpm verify").length - 1, matrix.canaries.length);
-  assert.equal(source.split("ripgrep shellcheck python3").length - 1, matrix.canaries.length);
-  for (const track of matrix.canaries)
-    assert.ok(source.includes(`CODEXRIG_COMPATIBILITY_TRACK: '${track.id}'`));
+test("local compatibility discovery exposes declared versions and experiment selectors", () => {
+  const reply = matrixCommand("--json");
+  assert.equal(reply.status, 0, reply.stderr);
+  assert.deepEqual(JSON.parse(reply.stdout), readCompatibilityMatrix());
+  const missing = matrixCommand("--check-track");
+  assert.notEqual(missing.status, 0);
+  assert.match(missing.stderr, /declared compatibility track id/u);
+  const unknown = matrixCommand("--check-track", "absent");
+  assert.notEqual(unknown.status, 0);
+  assert.match(unknown.stderr, /Unknown compatibility track/u);
 });
 
 test("online freshness names the distinct stable and reviewed Codex versions", () => {
@@ -108,7 +38,7 @@ test("online freshness names the distinct stable and reviewed Codex versions", (
     [
       {
         code: "online.codex.newer",
-        message: `Codex stable ${newerCodex} is newer than the reviewed blocking-CI version ${matrix.ci.codexVersion}; run canonical startup maintenance to review the official archives and update project installations and CI pins together.`,
+        message: `Codex stable ${newerCodex} is newer than the local toolchain pin ${matrix.ci.codexVersion}. Run startup maintenance to review the official archives and update the shared installation.`,
       },
     ],
   );

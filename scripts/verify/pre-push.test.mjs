@@ -14,6 +14,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { copyHookInstallerFixture } from "../setup/setup-regression-test-helpers.mjs";
 import { runSelectedPrePushPolicy } from "./pre-push-policy.mjs";
 import { changedPathsFromGit, validateCurrentCheckoutForPush } from "./adaptive-state.mjs";
 
@@ -187,33 +188,8 @@ test("the installed hook cannot be skipped through BASH_ENV", () => {
   const nodePreload = path.join(parent, "node-preload.cjs");
   const nodePreloadSentinel = path.join(parent, "node-preload-ran");
   mkdirSync(binDirectory);
-  mkdirSync(path.join(repository, "scripts", "git-hooks"), { recursive: true });
-  mkdirSync(path.join(repository, "scripts", "repository"), { recursive: true });
-  mkdirSync(path.join(repository, "scripts", "setup"), { recursive: true });
+  copyHookInstallerFixture(repository);
   mkdirSync(path.join(repository, "scripts", "verify"), { recursive: true });
-  for (const relativePath of [
-    "scripts/git-hooks/pre-push",
-    "scripts/contracts/portable-toml.mjs",
-    "scripts/contracts/semver-contract.mjs",
-    "scripts/repository/git-runtime-isolation.mjs",
-    "scripts/repository/project-temporary-storage.mjs",
-    "scripts/repository/project-tool-environment.mjs",
-    "scripts/repository/runtime-process-cancellation.mjs",
-    "scripts/repository/runtime-process-identity.mjs",
-    "scripts/repository/source-inventory-policy.mjs",
-    "scripts/repository/user-tool-storage.mjs",
-    "scripts/filesystem/repository-files.mjs",
-    "scripts/filesystem/owned-file-operations.mjs",
-    "scripts/filesystem/artifact-identity.mjs",
-    "scripts/filesystem/owned-path-safety.mjs",
-    "scripts/repository/runtime-process-io.mjs",
-    "scripts/setup/install-git-hooks.mjs",
-    "scripts/setup/install-git-hooks.sh",
-    "scripts/setup/resolve-git-hooks-path.mjs",
-  ]) {
-    mkdirSync(path.dirname(path.join(repository, relativePath)), { recursive: true });
-    copyFileSync(path.join(root, relativePath), path.join(repository, relativePath));
-  }
   writeFileSync(
     path.join(repository, "scripts", "verify", "pre-push.sh"),
     `#!/bin/sh\nprintf 'ran\\n' >${JSON.stringify(sentinel)}\nexit 17\n`,

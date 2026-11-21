@@ -23,6 +23,7 @@ import {
   temporaryRoot,
 } from "./project-initialization-test-helpers.mjs";
 import { stageProjectExport } from "../framework/stage-project-export.mjs";
+import { projectOutputText } from "../framework/project-output-projection.mjs";
 import { validateGeneratedProject } from "../framework/validate-staged-project.mjs";
 import { parsePortableToml } from "../contracts/portable-toml.mjs";
 import { documentContextSections } from "../docs/document-context.mjs";
@@ -81,6 +82,10 @@ test("generated children receive canonical task, planning, documentation, mainte
   for (const [heading, marker] of [
     ["Task Reading Routes", "<!-- current-task-reading-routes -->"],
     ["Task Scope And Completion", "<!-- current-task-scope-policy -->"],
+    ["YOLO Session Approval", null],
+    ["Best-Available Engineering, Not Quick Fixes", null],
+    ["Critical Handover Receipt", null],
+    ["Guarded And Critical Drain", null],
     ["Planning, Goals, Slices, Review Loops, And Audits", "<!-- current-planning-policy -->"],
     ["Documentation Ownership", "<!-- current-documentation-ownership-policy -->"],
     ["Documentation Currency", "<!-- current-documentation-currency-policy -->"],
@@ -101,12 +106,15 @@ test("generated children receive canonical task, planning, documentation, mainte
     ],
     ["Capacity Admission And Monitoring", "<!-- current-capacity-admission-policy -->"],
     ["Infrastructure As Code", "<!-- current-infrastructure-as-code-policy -->"],
+    ["Infrastructure Tool Selection And Ownership", null],
+    ["Infrastructure State, Verification And Change Lifecycle", null],
+    ["Local Builds And Retention", null],
     ["Test Strategy", "<!-- current-test-strategy-policy -->"],
     ["Deployment And Qualification Failure Recovery", "<!-- current-delivery-failure-policy -->"],
   ]) {
     assert.equal(
       await normalizedMarkdown(policyBody(generatedInstructions, heading)),
-      await normalizedMarkdown(policyBody(sourceInstructions, heading)),
+      await normalizedMarkdown(projectOutputText(policyBody(sourceInstructions, heading))),
     );
     if (marker) assert.equal(generatedInstructions.includes(marker), false);
   }
@@ -115,13 +123,51 @@ test("generated children receive canonical task, planning, documentation, mainte
     policyBody(generatedInstructions, "Task Reading Routes"),
   ))
     assert.ok(anchors.has(reference.slice(1)), `Generated task route must resolve: ${reference}`);
-  for (const file of [".codex/config.toml", ".codex/agents/worker.toml"]) {
+  for (const file of [
+    ".codex/config.toml",
+    ".codex/agents/default.toml",
+    ".codex/agents/explorer.toml",
+    ".codex/agents/worker.toml",
+  ]) {
     const { developer_instructions: prompt } = parsePortableToml(
       readFileSync(path.join(target, file), "utf8"),
     );
+    if (file.startsWith(".codex/agents/"))
+      assert.ok(prompt.includes("instructions.md#long-session-course-checks"), file);
+    if (file === ".codex/config.toml" || file === ".codex/agents/worker.toml")
+      assert.ok(prompt.includes("instructions.md#yolo-session-approval"), file);
     for (const [, anchor] of prompt.matchAll(/instructions\.md#([a-z0-9-]+)/gu))
       assert.ok(anchors.has(anchor), `${file} refers to a missing generated rule: #${anchor}`);
   }
+  const scripts = JSON.parse(readFileSync(path.join(target, "package.json"), "utf8")).scripts;
+  assert.equal(scripts["build:local"], "node scripts/local-build/local-build.mjs");
+  assert.equal(scripts["infra:admin"], "python3 -B scripts/infrastructure/admin.py");
+  for (const file of [
+    "scripts/infrastructure/ansible/deploy.yml",
+    "scripts/infrastructure/ansible/library/deploy_cpu_step.py",
+    "scripts/infrastructure/remote-cpu.test.mjs",
+    "scripts/infrastructure/fleet_profile.py",
+    "scripts/infrastructure/ansible/verify_fleet.yml",
+    "scripts/infrastructure/deploy_watch.py",
+    "scripts/infrastructure/monitor_operations.py",
+    "scripts/context/account-capacity.mjs",
+    "scripts/context/account-pause-state.mjs",
+  ])
+    assert.equal(
+      readFileSync(path.join(target, file), "utf8"),
+      projectOutputText(readFileSync(path.join(source, file), "utf8")),
+      file,
+    );
+  for (const [tool, args] of [
+    ["python3", ["-B", "scripts/infrastructure/admin.py", "list"]],
+    [process.execPath, ["scripts/context/account-capacity.mjs", "--help"]],
+    [process.execPath, ["scripts/local-build/local-build.mjs", "--help"]],
+  ]) {
+    const result = spawnSync(tool, args, { cwd: target, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  }
+  for (const file of [".github/workflows", ".gitlab-ci.yml", ".project-state/build"])
+    assert.equal(existsSync(path.join(target, file)), false, file);
   await validateGeneratedProject(target);
   const contextPath = path.join(target, "docs/project-context.md");
   const marker = /`([a-z]+-work-state)`/u.exec(generatedInstructions)?.[1];
@@ -302,6 +348,12 @@ test("generated validators reject primary policy that omits recovery before acco
 
 test("generated launcher verification rejects locked maintenance in the normal startup path", () => {
   const target = stage();
+  assert.match(
+    readFileSync(path.join(target, "scripts/setup/start-codex-session.sh"), "utf8"),
+    /exec node scripts\/setup\/startup-session-controller\.mjs /u,
+  );
+  assert.equal(existsSync(path.join(target, "scripts/framework/framework-session.mjs")), false);
+  assert.equal(existsSync(path.join(target, "scripts/framework/framework-reset.mjs")), false);
   const testPath = "scripts/setup/codex-launcher.test.mjs";
   assert.equal(
     existsSync(path.join(target, testPath)),

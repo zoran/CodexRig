@@ -31,10 +31,10 @@ It supplies no application, public service, product data model, deployment targe
 - State: tracked contracts/code/docs/lockfiles; ignored `.codex/runtime/` and `.project-state/`
   coordinate current sessions, evidence and interrupted operations. Accounts remain private;
   installed tools and public caches may use the shared user-tool store.
-- Delivery/infrastructure: GitHub/GitLab CI and local toolchain configuration are integrated. No
-  product UI/API, runtime identity/tenancy service, infrastructure backend or deployment is
-  configured. Portable product validators remain framework capabilities. Source and technical docs
-  use English; no child-facing locale set is selected here.
+- Delivery/infrastructure: GitHub/GitLab host source and reviews. Build and verification run locally
+  with shared host tools. No product UI/API, runtime identity/tenancy service, infrastructure
+  backend or deployment is configured. Portable product validators remain framework capabilities.
+  Source and technical docs use English; no child-facing locale set is selected here.
 
 <!-- project:delivery-inventory:start -->
 
@@ -85,12 +85,12 @@ It supplies no application, public service, product data model, deployment targe
 #### Project Context And Recovery
 
 - Root: `scripts/context`
-- Responsibility: Work-state validation, context navigation, durable-session continuation and
-  repository-bound critical handovers.
+- Responsibility: Work-state validation, context navigation, durable-session continuation, native
+  account-window checks, recoverable capacity pauses and hard-limit handovers.
 - Runtime and technology: Node.js ESM.
-- Public contract: `context:map`, bounded `context:read`, `context:check`, `handover:create`,
-  `handover:receive`, `handover:acknowledge` and exported portable validators. Receipt requires the
-  accepted exact prompt and a distinct canonical session; current authority/capacity are reassessed.
+- Public contract: `context:map`, bounded `context:read`, `context:check`, `handover:check`,
+  `handover:create`, `handover:receive` and `handover:acknowledge`. A named ordinary handover may be
+  received in the same or a later canonical session. Hard-limit seals require a later session.
 - Private internals: Work-marker revisions, continuation guards, prompt integrity and ignore-policy
   checks.
 - Owned data and migrations: Bounded `.codex/runtime/stop-continuation/` state and private transient
@@ -141,15 +141,15 @@ It supplies no application, public service, product data model, deployment targe
 #### Dependency Management
 
 - Root: `scripts/deps`
-- Responsibility: Compatible dependency/tool/CI resolution, isolated candidate validation,
+- Responsibility: Compatible dependency and host-tool resolution, isolated candidate validation,
   transactional pin publication and offline reproduction. pnpm uses the official portable npm
   distribution through Mise; its integrity-bound graph lives under
   `.codex/.mise/locks/pnpm/current/` and travels with the toolchain transaction and generator.
   Native Node artifacts still cover the supported platform matrix.
 - Runtime and technology: Node.js ESM.
 - Public contract: `deps:install`, `deps:report`, `deps:update*` and `maintain-toolchain.mjs`;
-  `--startup` discovers releases, `--locked` reproduces frozen CI inputs. Existing lockfiles
-  reproduce offline through the same owner.
+  `--startup` discovers releases, `--locked` reproduces frozen local build inputs. Existing
+  lockfiles reproduce offline through the same owner.
 - Private internals: Resolution/install journals, lifecycle locks, staged revalidation and rollback;
   project-private Mise tracking and shared verified installations. Housekeeping retains shared
   runtime and bootstrap versions. Native collectors manage package data and download caches.
@@ -189,10 +189,13 @@ It supplies no application, public service, product data model, deployment targe
   ancestor enables three-way merging. Bound decisions resolve remaining conflicts.
 - Private internals: Version/file/hash/mode comparison, conflict plans and journaled target-owned
   recovery. One planner compares the generated portable policies, package fields and verification
-  registry. A pristine reference adds three-way tool, CI and document merges and tracks retirements.
+  registry. A pristine reference adds three-way tool and document merges and tracks retirements.
   Regeneration stages the session runtime and its transitive imports. Writes and recovery check
   leases across the target clone. Source-side child maintenance scratch lives under
-  `.project-state/child-maintenance/`. Housekeeping reuses valid native pnpm installation state.
+  `.project-state/child-maintenance/`. The source session controller consumes the private
+  post-update reset request after session exit or before admission. The reset owner clears local
+  session history and update scratch after proving quiescence. Housekeeping reuses valid native pnpm
+  installation state.
 - Owned data and migrations: `.codexrig/framework.json`, `.codexrig/compatibility.json` and
   `.codexrig/project-tools.json`; transient target `.project-state/framework-upgrade/` journals.
   Generation and updates project the same portable instructions/AGENTS blocks and verification
@@ -246,8 +249,8 @@ It supplies no application, public service, product data model, deployment targe
 #### Git Platform Adapters
 
 - Root: `scripts/platform`
-- Responsibility: GitHub/GitLab detection and authorized reconciliation of protected branches, CI,
-  review and serialization.
+- Responsibility: GitHub/GitLab detection and authorized reconciliation of protected branches,
+  reviews and provider build settings.
 - Runtime and technology: Node.js ESM.
 - Public contract: `platform:detect`, `platform:configure`; preview is credential-free. Explicit
   apply uses the private provider/host/repository-bound account and reads back effective policy.
@@ -308,9 +311,10 @@ It supplies no application, public service, product data model, deployment targe
 - Runtime and technology: Node.js ESM and Bash.
 - Public contract: `codex:start`, `codex:validate`, `setup`, `hooks:install`, `project:export`, and
   the common locked project command wrapper. `.codex/tooling.json` owns launcher identity; both
-  generation and CI use the same portable contracts.
+  generation and local verification use the same portable contracts.
 - Private internals: Preloaded controller, exact SessionStart/Stop hooks, supervisor, PID/terminal
-  proofs and current attestations.
+  proofs and current attestations. SessionStart conveys the verified approval mode, including
+  advance operator approval for the scope of a YOLO task.
 - Owned data and migrations: Disposable current-schema startup attestation under
   `.codex/runtime/cache/codexrig/` plus the installed local Git hook. Repository Boundaries owns the
   short-lived writer lease and separate latest-session recovery marker that Setup coordinates.
@@ -320,6 +324,39 @@ It supplies no application, public service, product data model, deployment targe
 - Focused verifier:
   `node --test scripts/setup/setup-regression.test.mjs scripts/setup/codex-launcher.test.mjs scripts/setup/startup-session-controller.test.mjs scripts/setup/startup-state.test.mjs`
 - Steward: Setup capability maintainer.
+
+#### Local Builds
+
+- Root: `scripts/local-build`
+- Responsibility: Execute the private build pipeline against a committed source snapshot.
+- Runtime and technology: Node.js and the operator host's pinned toolchain.
+- Public contract: `build:local init|run|list|clean`.
+- Private internals: Source snapshots, resource limits, artifact promotion and retention.
+- Owned data and migrations: Local pipeline, work and up to three successful releases under
+  `.project-state/build/`.
+- Tenant isolation: Each project owns its build inputs and releases.
+- Allowed dependencies: `scripts/repository`, `scripts/filesystem`, `scripts/setup`,
+  `scripts/terminal`.
+- Focused verifier: `node --test scripts/local-build/local-build.test.mjs`
+- Steward: Build tooling maintainer.
+
+#### Infrastructure Administration
+
+- Root: `scripts/infrastructure`
+- Responsibility: Run project-declared infrastructure operations from a shared CLI and text menu,
+  converge comparable hosts to a researched fleet profile and supervise deployments.
+- Runtime and technology: Python 3 standard library with Ansible and Terraform executables.
+- Public contract: `infra:admin` and the project-owned `infra/operations.json` catalog. Linux
+  deployments can declare a CPU-bound staging command and a utilization threshold for each host.
+- Private internals: Target and plan binding, profile checks, measured CPU use and a dedicated
+  worker observing rollout health with bounded recovery via existing Ansible operations.
+- Owned data and migrations: Private operation plans and working data in
+  `.project-state/infrastructure/`.
+- Tenant isolation: Each operation selects a declared target and uses the project's account
+  environment.
+- Allowed dependencies: `scripts/setup`, `scripts/repository`.
+- Focused verifier: `pnpm verify:changed -- --check infrastructure-operations`
+- Steward: Infrastructure tooling maintainer.
 
 #### Stack Detection
 
@@ -394,7 +431,7 @@ It supplies no application, public service, product data model, deployment targe
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `7.4.0`.
+- Framework version: `8.0.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

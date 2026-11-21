@@ -10,7 +10,7 @@ import {
   publishProject,
 } from "../../../../scripts/goals/project-publication.mjs";
 import { createPublicationOutput } from "../../../../scripts/terminal/publication-output.mjs";
-import { inspectFrameworkPublicationReset } from "./reset-framework.mjs";
+import { inspectFrameworkPublicationReset } from "../../../../scripts/framework/framework-reset.mjs";
 import { assertCleanFrameworkPublicationSource } from "./publication-source.mjs";
 
 export function parseFrameworkPublicationArguments(args) {

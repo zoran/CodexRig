@@ -115,6 +115,7 @@ const requiredPrimaryInstructionFragments = Object.freeze([
   "ordinaryUsageAllowed",
   "historical reserve estimates are not binding",
   "5% or less",
+  "pnpm handover:check",
   "Critical Budget Drain",
   "pnpm handover:create -- --critical",
   "final repository action",

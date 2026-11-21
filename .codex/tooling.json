@@ -27,17 +27,13 @@
         "gitlab.com": "https://gitlab.com/api/v4"
       }
     },
-    "ci": {
-      "requiredCheck": "verify"
-    },
     "protection": {
       "requiredApprovals": 1,
       "requireCodeOwnerReview": false,
       "preventAuthorApproval": true,
       "preventCommitterApproval": true,
       "preventApprovalRuleOverrides": true,
-      "resetApprovalsOnPush": true,
-      "mergeSerialization": "prefer"
+      "resetApprovalsOnPush": true
     }
   },
   "productConfigurationRequired": false

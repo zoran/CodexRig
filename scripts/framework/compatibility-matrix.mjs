@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /** Owns compatibility matrix behavior for the framework lifecycle and child upgrade boundary. */
 import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
-import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import {
-  parseSemver,
-  readCompatibilityMatrix,
-  validateCompatibilityMatrix,
-} from "../contracts/framework-contract.mjs";
+import { parseSemver, readCompatibilityMatrix } from "../contracts/framework-contract.mjs";
 import { toolingRoot } from "../filesystem/repository-files.mjs";
 import { versionMatchesReleaseSelector } from "../contracts/semver-contract.mjs";
+import {
+  projectManagedToolLayout,
+  verifyProjectToolBundle,
+} from "../repository/project-tool-executables.mjs";
+import { canonicalRuntimeExecutable } from "../setup/startup-runtime-executables.mjs";
 import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
 
 function commandVersion(executable, args, label) {
@@ -34,52 +34,16 @@ function extractedVersion(output, label) {
   return match[1];
 }
 
-export function ciCompatibilityTracks(matrix = readCompatibilityMatrix()) {
-  return matrix.canaries.map((entry) => ({
-    codex: entry.codex,
-    description: entry.description,
-    experimental: !entry.required,
-    id: entry.id,
-    node: entry.node,
-    pnpm: entry.pnpm,
-  }));
-}
-
-function yamlSingleQuoted(value) {
-  return `'${String(value).replaceAll("'", "''")}'`;
-}
-
-export function gitlabChildPipeline(matrix = readCompatibilityMatrix()) {
-  const lines = ["stages:", "  - compatibility", ""];
-  for (const track of ciCompatibilityTracks(matrix)) {
-    lines.push(
-      `compatibility:${track.id}:`,
-      "  stage: compatibility",
-      `  image: ${yamlSingleQuoted(`node:${matrix.stable.node.version}-bookworm`)}`,
-      `  allow_failure: ${track.experimental ? "true" : "false"}`,
-      "  variables:",
-      `    CODEXRIG_COMPATIBILITY_TRACK: ${yamlSingleQuoted(track.id)}`,
-      "    GIT_DEPTH: '0'",
-      "  before_script:",
-      '    - test -n "${CI_JOB_IMAGE:-}"',
-      "    - apt-get update && apt-get install -y --no-install-recommends ripgrep shellcheck python3",
-      '    - env -u NODE_OPTIONS -u NODE_PATH node scripts/framework/prepare-compatibility-track.mjs --disposable-checkout "$CODEXRIG_COMPATIBILITY_TRACK"',
-      "  script:",
-      '    - bash -p scripts/setup/run-project.sh node scripts/framework/compatibility-matrix.mjs --check-track "$CODEXRIG_COMPATIBILITY_TRACK"',
-      "    - bash -p scripts/setup/run-project.sh pnpm verify",
-      "",
-    );
-  }
-  return `${lines.join("\n")}\n`;
-}
-
 export function checkCompatibilityTrack(trackId, matrix = readCompatibilityMatrix()) {
   const track = matrix.canaries.find((entry) => entry.id === trackId);
   if (!track) throw new Error(`Unknown compatibility track: ${trackId}.`);
+  const tools = projectManagedToolLayout(toolingRoot, matrix);
+  const codex = verifyProjectToolBundle(toolingRoot, tools.codex);
+  const pnpm = canonicalRuntimeExecutable(toolingRoot, tools.pnpm.executable, "pnpm");
   const versions = {
-    codex: extractedVersion(commandVersion("codex", ["--version"], "Codex"), "Codex"),
+    codex: extractedVersion(commandVersion(codex, ["--version"], "Codex"), "Codex"),
     node: process.version.replace(/^v/u, ""),
-    pnpm: extractedVersion(commandVersion("pnpm", ["--version"], "pnpm"), "pnpm"),
+    pnpm: extractedVersion(commandVersion(pnpm, ["--version"], "pnpm"), "pnpm"),
   };
   parseSemver(versions.node, "Node.js");
   if (!versionMatchesReleaseSelector(versions.node, track.node)) {
@@ -104,47 +68,30 @@ function parseArgs(argv) {
   const args = argv.filter((argument) => argument !== "--");
   const parsed = {
     checkTrack: "",
-    githubMatrix: false,
-    gitlabChild: false,
     json: false,
   };
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === "--github-matrix") parsed.githubMatrix = true;
-    else if (argument === "--gitlab-child") parsed.gitlabChild = true;
-    else if (argument === "--json") parsed.json = true;
-    else if (argument === "--check-track") parsed.checkTrack = args[++index] ?? "";
-    else if (argument.startsWith("--check-track=")) parsed.checkTrack = argument.slice(14);
-    else if (argument === "--help" || argument === "-h") parsed.help = true;
+    if (argument === "--json") parsed.json = true;
+    else if (argument === "--check-track" || argument.startsWith("--check-track=")) {
+      parsed.checkTrack = argument === "--check-track" ? args[++index] : argument.slice(14);
+      if (!parsed.checkTrack || parsed.checkTrack.startsWith("-"))
+        throw new Error("Select a declared compatibility track id.");
+    } else if (argument === "--help" || argument === "-h") parsed.help = true;
     else throw new Error(`Unknown compatibility matrix option: ${argument}.`);
   }
-  const modes = [
-    parsed.githubMatrix,
-    parsed.gitlabChild,
-    parsed.json,
-    Boolean(parsed.checkTrack),
-  ].filter(Boolean);
-  if (modes.length > 1) throw new Error("Select only one compatibility matrix output mode.");
+  if (parsed.json && parsed.checkTrack)
+    throw new Error("Select only one compatibility matrix output mode.");
   return parsed;
 }
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log(
-      "Usage: pnpm compatibility:matrix [-- --json|--github-matrix|--gitlab-child|--check-track <id>]",
-    );
+    console.log("Usage: pnpm compatibility:matrix [-- --json|--check-track <id>]");
     return;
   }
   const matrix = readCompatibilityMatrix();
-  if (args.githubMatrix) {
-    console.log(JSON.stringify({ include: ciCompatibilityTracks(matrix) }));
-    return;
-  }
-  if (args.gitlabChild) {
-    process.stdout.write(gitlabChildPipeline(matrix));
-    return;
-  }
   if (args.checkTrack) {
     const result = checkCompatibilityTrack(args.checkTrack, matrix);
     console.log(
@@ -157,7 +104,7 @@ function main() {
     return;
   }
   console.log(
-    `Stable: Node.js ${matrix.stable.node.version}, pnpm ${matrix.stable.pnpm.version}, Codex >=${matrix.stable.codex.minimumVersion}; blocking CI uses reviewed Codex ${matrix.ci.codexVersion}.`,
+    `Stable: Node.js ${matrix.stable.node.version}, pnpm ${matrix.stable.pnpm.version}, Codex >=${matrix.stable.codex.minimumVersion}, local Codex pin ${matrix.ci.codexVersion}.`,
   );
   for (const track of matrix.canaries) {
     console.log(

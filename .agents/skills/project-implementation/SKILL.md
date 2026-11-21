@@ -13,10 +13,14 @@ and closure; a delegated task inherits its accepted parent plan.
 
 ## Implement At The Owner
 
-Read requirements/design and trace the public entry through composition, contract, state and actual
-consumers. Establish a falsifiable failure hypothesis and the smallest discriminating observation.
-Read the relevant diagnostic; compare a working case before adding a fix. Sanitize observations and
-remove temporary probes. Repeated disproven hypotheses require reassessment, not stacked guards.
+Before every fix perform the
+[project-wide impact analysis](../../../instructions.md#best-available-engineering-not-quick-fixes).
+Trace the public entry through composition, shared runbooks, state and all affected consumers.
+Establish a falsifiable root-cause hypothesis and the smallest discriminating observation. Read the
+relevant diagnostic; compare a working case before adding a fix. Sanitize observations and remove
+temporary probes. If local fixes keep treating the same symptom,
+[reassess the whole approach](../../../instructions.md#long-session-course-checks) before editing
+again.
 
 Choose the smallest complete owner-level repair. Use `$architecture-evolution` for material boundary
 changes and `pnpm stack:detect` before product-stack decisions. Harness tools are not product

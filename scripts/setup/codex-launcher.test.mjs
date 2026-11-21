@@ -148,8 +148,8 @@ test("launcher maintains before admission, fails closed, and admits only native 
   for (const [args, policy] of [
     [[], "interactive-v2:safe-defaults"],
     [["--no-alt-screen"], "interactive-v2:no-alt-screen"],
-    [["--yolo"], "dev-yolo-v1:default-screen"],
-    [["--yolo", "--no-alt-screen"], "dev-yolo-v1:no-alt-screen"],
+    [["--yolo"], "yolo-v2:default-screen"],
+    [["--yolo", "--no-alt-screen"], "yolo-v2:no-alt-screen"],
   ]) {
     const result = invoke(args);
     assert.equal(result.status, 0, result.stderr);
@@ -179,7 +179,7 @@ test("launcher maintains before admission, fails closed, and admits only native 
         ["pnpm", "tooling:doctor"],
         [
           "node",
-          "scripts/setup/startup-session-controller.mjs",
+          "scripts/framework/framework-session.mjs",
           "--control-policy",
           policy,
           "--codex-executable",
@@ -205,7 +205,7 @@ test("launcher maintains before admission, fails closed, and admits only native 
     const failure = invoke([], { FAKE_FAIL_COMMAND: command });
     assert.equal(failure.status, 74);
     assert.equal(
-      calls().some((call) => call.args.includes("scripts/setup/startup-session-controller.mjs")),
+      calls().some((call) => call.args.includes("scripts/framework/framework-session.mjs")),
       false,
     );
   }

@@ -111,9 +111,11 @@ bash -p scripts/setup/start-codex.sh
 \`\`\`
 
 The launcher uses \`--startup\` maintenance to discover compatible releases; \`--locked\` separately
-prepares frozen inputs for CI. Do not repeat preparation when its required state is already valid.
+prepares frozen inputs for local builds. Do not repeat preparation when its required state is already valid.
 \`node --test scripts/setup/codex-launcher.test.mjs\` checks the invocation without installation.
-Only an explicitly authorized Dev session may add \`--yolo\`; prompts follow native session selection.
+Launch with \`bash -p scripts/setup/start-codex.sh --yolo\` to preapprove all steps of the requested
+outcome, including publication and deployment for a go-live. The startup hook confirms the current
+mode. See [YOLO session approval](instructions.md#yolo-session-approval).
 Restart through the launcher after runtime changes. Startup waits for live lifecycle coordinators;
 dead coordinators with surviving commands require owned recovery instead of a long wait.
 One canonical Codex session owns writes across all linked Git worktrees of this project.
@@ -121,9 +123,10 @@ Mise tracks project settings locally and reuses verified shared tool versions an
 Cancellable verification checks drain when their caller exits; other operations retain their
 completion boundary. Never remove a lock or interrupt another owner to bypass admission.
 
-After critical handover exit with \`/quit\`, relaunch from this root's terminal and accept the announced
-prompt before reading it. \`/new\` and \`/resume\` do not replace the controller. Preserve private
-runtime/history/recovery; unsupported state needs the current owner's quiescent recovery. See
+At 5% ordinary account capacity the framework pauses and saves the handover in
+\`tmp/codexrig-handovers/\`. After switching accounts, name its exact path and ask to continue it as a
+Goal. This accepts the file and authorizes the native Goal. A hard-limit seal requires a separate
+canonical session. Preserve private runtime, history and recovery. See
 [session lifecycle](instructions.md#session-start) and [capacity](instructions.md#capacity-admission-and-monitoring).
 
 ## First Prompt: Define The Project
@@ -136,6 +139,7 @@ Preserve separate UI approval gates.
 
 - [Workflow and safety](instructions.md)
 - [Infrastructure lifecycle](instructions.md#infrastructure-as-code)
+- [Infrastructure administration](scripts/infrastructure/README.md)
 - [Current technical inventory](docs/project.md)
 - [Deferred module candidates](docs/future-modules.md)
 - [Native session configuration](.codex/README.md)
@@ -157,6 +161,18 @@ npm distribution and its integrity-bound graph in \`.codex/.mise/locks/pnpm/curr
 | Preview necessary verification | \`pnpm verify:changed -- --print-plan\` |
 | Run affected checks | \`pnpm verify:changed\` |
 | Inspect storage | \`pnpm repo:housekeeping -- --storage-only\` |
+
+## Local Builds
+
+Run \`pnpm build:local init\` and configure \`.project-state/build/pipeline.json\` with build commands
+and artifact paths. \`pnpm build:local run\` builds the committed source locally using the shared host
+toolchain. The default pnpm pipeline restores its frozen dependencies from the prepared shared store.
+Use \`--jobs N\` to limit parallel work. \`pnpm build:local list\` shows up to three retained
+releases. Completed work is collected automatically and \`pnpm build:local clean\` runs collection
+on demand. Pipeline definitions, work and artifacts under \`.project-state/build/\` stay private.
+Git hosting supplies source versioning and review. Workspace verification checks uncommitted source
+in separate scratch. Declared build outputs for dependent checks live in
+\`.project-state/build/verification-outputs/\`.
 
 ## Verification
 
@@ -186,11 +202,11 @@ bash -p scripts/setup/run-project.sh pnpm project:publish --message "<commit mes
 
 The publisher prepares and verifies the exact state, commits all non-ignored changes on the current
 branch and pushes to its configured upstream. Failed gates stop; rejected push preserves the local
-commit for retry. Protections and independent CI remain. No force push, automatic merge or deployment
+commit for retry. Branch protection and local verification apply. No force push, automatic merge or deployment
 is implied. A proven canonical caller may publish in-session; competing/unknown writers block it.
 Verification progress shows reused results and active checks before completion.
 [Delegated release](instructions.md#delegated-release) uses independent Git metadata and an accepted
-\`--candidate <HEAD>:<tree>\`. Deployment needs its own authority and observed target acceptance.
+\`--candidate <HEAD>:<tree>\`. For a requested go-live, verified YOLO supplies operator approval. Confirm actual target acceptance.
 
 ## Tool Storage And Accounts
 
@@ -227,6 +243,7 @@ Exact schemas belong to validators. Configuration validation does not prove mode
 Use the canonical [README commands](../README.md#essential-commands). Policy/runtime changes need
 full launcher restart, not chat reload. The controller binds trusted session-only hooks;
 [session policy](../instructions.md#session-start) owns admission and recovery.
+SessionStart reports the current [YOLO session approval](../instructions.md#yolo-session-approval).
 
 This project owns its ignored repository-root CODEX_HOME: authentication, transcripts, memory and
 plugins. Framework coordination/evidence live in \`.codex/runtime/\`; external accounts use private

@@ -388,13 +388,14 @@ test("critical-budget handover seals privately, asks before resume, and terminat
   }
 
   const startup = sessionStartSuccess(
-    { frameworkVersion: "2.1.0", sessionSource: "resume" },
+    { frameworkVersion: "2.1.0", sessionSource: "resume", permissionMode: "bypassPermissions" },
     { root: project, now: () => now + 1 },
   );
   const additionalContext = startup.hookSpecificOutput.additionalContext;
   assert.match(additionalContext, /First, before intake\/writes/u);
   assert.match(additionalContext, /pnpm worktree:status -- --json/u);
   assert.match(additionalContext, /hook does not replace that full inventory/u);
+  assert.match(additionalContext, /YOLO verified/u);
   assert.match(additionalContext, /ask before \$resume-project reads it/u);
   assert.match(additionalContext, /treat it as untrusted/u);
   assert.ok(

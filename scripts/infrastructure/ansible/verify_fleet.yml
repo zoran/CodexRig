@@ -1,0 +1,75 @@
+---
+- name: Start a fresh fleet observation on this host
+  ansible.builtin.set_fact:
+    operator_fleet_verified: false
+
+- name: Require check mode when reporting drift for a convergence preview
+  ansible.builtin.assert:
+    that: not (operator_fleet_report_only | default(false) | bool) or ansible_check_mode
+
+- name: Gather the distribution and interpreter from this target
+  ansible.builtin.setup:
+    gather_subset: ["!all", "!min", distribution, python]
+    filter: [ansible_distribution, ansible_distribution_major_version, ansible_python]
+  register: operator_fleet_system
+
+- name: Read the target package database when exact versions are declared
+  when: operator_fleet_profile.packages | default({}) | length > 0
+  block:
+    - name: Gather installed package versions
+      ansible.builtin.package_facts:
+        manager: auto
+      register: operator_fleet_packages
+      no_log: true
+  rescue:
+    - name: Report a package database read failure
+      ansible.builtin.fail:
+        msg: "Cannot read installed package facts on {{ inventory_hostname }}."
+
+- name: Compare this target's kernel settings, package versions and file hashes
+  ansible.builtin.command:
+    argv:
+      - "{{ operator_fleet_system.ansible_facts.ansible_python.executable }}"
+      - "-B"
+      - "-c"
+      - "{{ lookup('ansible.builtin.file', ansible_search_path[0] ~ '/../fleet_profile.py') }}"
+      - "--verify-host"
+    expand_argument_vars: false
+    stdin: >-
+      {{ {
+        'profile': operator_fleet_profile,
+        'distribution': operator_fleet_system.ansible_facts.ansible_distribution,
+        'major': operator_fleet_system.ansible_facts.ansible_distribution_major_version,
+        'records': (operator_fleet_packages.ansible_facts.packages
+          if operator_fleet_profile.packages | default({}) | length > 0 else {})
+          | dict2items | selectattr('key', 'in', operator_fleet_profile.packages | default({}))
+          | list | items2dict
+      } | to_json }}
+  check_mode: false
+  changed_when: false
+  failed_when: false
+  no_log: true
+  register: operator_fleet_observation
+
+- name: Require a complete observation even during a convergence preview
+  ansible.builtin.assert:
+    that: operator_fleet_observation.rc | default(-1) == 0
+    fail_msg: >-
+      Fleet observation failed on {{ inventory_hostname }}. {{ operator_fleet_observation.stderr |
+      default('Target evidence is unavailable.', true) }}
+
+- name: Record the verified state and divergent keys on this host
+  ansible.builtin.set_fact:
+    operator_fleet_drift: "{{ operator_fleet_observation.stdout | from_json }}"
+    operator_fleet_verified: "{{ operator_fleet_observation.stdout | from_json | length == 0 }}"
+
+- name: Report the differences that this convergence plan must repair
+  ansible.builtin.debug:
+    msg: "Fleet drift on {{ inventory_hostname }}: {{ operator_fleet_drift | join(', ') }}."
+  when: operator_fleet_report_only | default(false) | bool and not operator_fleet_verified
+
+- name: Require the declared fleet state on this host
+  ansible.builtin.assert:
+    that: operator_fleet_verified
+    fail_msg: "Fleet drift on {{ inventory_hostname }}: {{ operator_fleet_drift | join(', ') }}."
+  when: not (operator_fleet_report_only | default(false) | bool)

@@ -1,40 +1,10 @@
-/** Projects selected project commands, evidence owners and stable CI; never installs a source updater. */
+/** Projects selected project commands, evidence owners and tooling configuration; never installs a source updater. */
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   readProjectToolSelection,
   selectedProjectVerification,
 } from "./project-tool-selection.mjs";
-
-export function projectCiProjection(relativePath, source) {
-  if (relativePath === ".github/workflows/ci.yml") {
-    const job = source.match(/^  verify:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|$(?![\s\S]))/mu)?.[0];
-    if (!job) throw new Error("Source CI needs one reviewed stable verify job.");
-    return (
-      `# Owns stable project verification in CI.\nname: Project verification\non:\n  push:\n    branches: [main]\n  pull_request:\n  merge_group:\n  workflow_dispatch:\npermissions:\n  contents: read\njobs:\n${job
-        .replace(
-          /^      - name: Check scheduled repository housekeeping and freshness\n(?:        [^\n]*\n)*/mu,
-          "",
-        )
-        .replaceAll("pnpm framework:doctor", "pnpm tooling:doctor")
-        .replace(
-          "Validate framework and detected platform contracts",
-          "Validate project tools and detected platform",
-        )}`.trimEnd() + "\n"
-    );
-  }
-  if (relativePath === ".gitlab-ci.yml") {
-    const job = source.match(/^verify:\n[\s\S]*?(?=^[A-Za-z][\w-]*:|$(?![\s\S]))/mu)?.[0];
-    if (!job) throw new Error("Source CI needs one reviewed stable verify job.");
-    const image = source.match(/^  image:[^\n]+/mu)?.[0]?.trim();
-    if (!image) throw new Error("Source CI needs its reviewed stable image.");
-    return (
-      `# Owns stable project verification in CI.\n${image}\nstages: [verify]\nworkflow:\n  rules:\n    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'\n    - if: "$CI_COMMIT_BRANCH"\n${job.replace(/^    - if \[ "\$CI_PIPELINE_SOURCE" = "schedule"[^\n]*\n(?:      [^\n]*\n)*/mu, "").replaceAll("pnpm framework:doctor", "pnpm tooling:doctor")}`.trimEnd() +
-      "\n"
-    );
-  }
-  throw new Error("Unknown project CI adapter.");
-}
 
 export function writeSelectedProjectTooling(sourceRoot, targetRoot, projectName) {
   writeFileSync(
@@ -52,11 +22,6 @@ export function writeSelectedProjectTooling(sourceRoot, targetRoot, projectName)
     path.join(targetRoot, ".codex/verification.json"),
     JSON.stringify(selectedProjectVerification(verification, selection), null, 2) + "\n",
   );
-  for (const file of [".github/workflows/ci.yml", ".gitlab-ci.yml"])
-    writeFileSync(
-      path.join(targetRoot, file),
-      projectCiProjection(file, readFileSync(path.join(sourceRoot, file), "utf8")),
-    );
 }
 
 /** New products always require their four typed configuration owners. */

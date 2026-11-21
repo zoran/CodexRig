@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Owns repository-bound critical handover sealing, full receipt, and exact-file acknowledgement. */
+/** Owns repository-bound terminal and account-pause handovers, full receipt and exact-file acknowledgement. */
 import { randomBytes } from "node:crypto";
 import { existsSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
@@ -15,9 +15,23 @@ import {
   openPrivateOwnedDirectory,
   readStableOwnedFile,
   removeStableOwnedFile,
+  sameStableIdentity,
   validateOwnedDirectoryBinding,
 } from "../filesystem/owned-path-safety.mjs";
 import { inspectRuntimeSessionLease } from "../repository/runtime-session-lease.mjs";
+import { withRuntimeLifecycleUpdateMutex } from "../repository/runtime-lifecycle-mutex.mjs";
+import {
+  accountPauseFilename,
+  assertPauseWorkState,
+  armAccountPause,
+  disarmAcknowledgedPause,
+  hasArmedAccountPause,
+  renderAccountPausePrompt,
+  recordedAccountPauseSequence,
+  acknowledgedPauseSequence,
+  markPauseAcknowledgement,
+  pauseFilenamePattern,
+} from "./account-pause-state.mjs";
 import { findSecretMatches } from "../security/secret-patterns.mjs";
 import { readProjectWorkContext, workContextResumeBoundary } from "./project-work-state.mjs";
 
@@ -27,7 +41,7 @@ export const criticalHandoverMaxAgeMilliseconds = 72 * 60 * 60 * 1_000;
 const handoverMaxBytes = 128 * 1_024;
 const clockSkewMilliseconds = 5 * 60 * 1_000;
 const candidateLimit = 128;
-const markerPattern = /^<!-- codexrig-critical-budget-handover\n([^\r\n]+)\n-->\n/u;
+const markerPattern = /^<!-- codexrig-(critical-budget|account-pause)-handover\n([^\r\n]+)\n-->\n/u;
 const filenamePattern = /^critical-budget-\d{8}T\d{9}Z-[a-f0-9]{12}\.prompt\.md$/u;
 const snapshotBegin = "----- BEGIN VERBATIM docs/project-context.md SNAPSHOT -----";
 const snapshotEnd = "----- END VERBATIM docs/project-context.md SNAPSHOT -----";
@@ -118,6 +132,9 @@ function canonicalMetadata(metadata) {
     sealingSessionId: metadata.sealingSessionId,
     workStateRevision: metadata.workStateRevision,
     workStateSha256: metadata.workStateSha256,
+    ...(metadata.budgetCategory === "account-pause"
+      ? { pauseSequence: metadata.pauseSequence }
+      : {}),
   };
 }
 
@@ -126,10 +143,11 @@ function parsedHandover(content) {
   if (!match) throw new Error("Critical-budget handover marker is missing.");
   let metadata;
   try {
-    metadata = JSON.parse(match[1]);
+    metadata = JSON.parse(match[2]);
   } catch {
     throw new Error("Critical-budget handover marker is invalid.");
   }
+  const pause = match[1] === "account-pause";
   if (
     !exactKeys(metadata, [
       "budgetCategory",
@@ -140,9 +158,11 @@ function parsedHandover(content) {
       "sealingSessionId",
       "workStateRevision",
       "workStateSha256",
+      ...(pause ? ["pauseSequence"] : []),
     ]) ||
-    metadata.schemaVersion !== 2 ||
-    metadata.budgetCategory !== "critical" ||
+    metadata.schemaVersion !== (pause ? 1 : 2) ||
+    metadata.budgetCategory !== (pause ? "account-pause" : "critical") ||
+    (pause && (!Number.isSafeInteger(metadata.pauseSequence) || metadata.pauseSequence < 1)) ||
     typeof metadata.frameworkVersion !== "string" ||
     !/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/u.test(metadata.frameworkVersion) ||
     typeof metadata.repositoryBinding !== "string" ||
@@ -160,7 +180,10 @@ function parsedHandover(content) {
   if (!Number.isFinite(createdAt) || new Date(createdAt).toISOString() !== metadata.createdAt) {
     throw new Error("Critical-budget handover timestamp is invalid.");
   }
-  if (!content.startsWith(`${match[0]}# Critical-Budget Cross-Account Handover Prompt\n`)) {
+  const header = pause
+    ? "# Account-Window Pause Handover Prompt"
+    : "# Critical-Budget Cross-Account Handover Prompt";
+  if (!content.startsWith(`${match[0]}${header}\n`)) {
     throw new Error("Critical-budget handover prompt header is invalid.");
   }
   const beginToken = `${snapshotBegin}\n`;
@@ -182,6 +205,7 @@ function parsedHandover(content) {
   if (sha256(context) !== metadata.workStateSha256) {
     throw new Error("Critical-budget handover snapshot integrity is invalid.");
   }
+  if (pause) assertPauseWorkState(context, metadata.workStateRevision);
   const normalizedMetadata = canonicalMetadata(metadata);
   if (content !== renderPrompt({ context, metadata: normalizedMetadata })) {
     throw new Error("Critical-budget handover prompt integrity is invalid.");
@@ -207,6 +231,8 @@ const capacityResumeBoundary =
 // Schema 2 binds the exact prompt bytes. Put current receiving guidance outside this historical
 // artifact so updating policy neither invalidates older handovers nor weakens integrity checks.
 function renderPrompt({ context, metadata }) {
+  if (metadata.budgetCategory === "account-pause")
+    return renderAccountPausePrompt(context, metadata, snapshotBegin, snapshotEnd);
   return [
     "<!-- codexrig-critical-budget-handover",
     JSON.stringify(metadata),
@@ -236,20 +262,18 @@ function renderPrompt({ context, metadata }) {
   ].join("\n");
 }
 
-export function createCriticalBudgetHandover({
-  root = toolingRoot,
-  now = Date.now,
-  random = randomBytes,
-  testHooks,
-} = {}) {
+function createHandover(
+  { root = toolingRoot, now = Date.now, random = randomBytes, testHooks } = {},
+  pause = false,
+) {
   const working = readProjectWorkContext(root, { testHooks });
   if (!working || working.state.status === "complete") {
-    throw new Error("Critical-budget handover requires active or blocked docs/project-context.md.");
+    throw new Error("Handover requires active or blocked docs/project-context.md.");
   }
   if (findSecretMatches(working.content, { conservative: true }).length > 0) {
-    throw new Error("Critical-budget handover refuses recognized secret material in work state.");
+    throw new Error("Handover refuses recognized secret material in work state.");
   }
-  for (const line of requiredDrainLines) {
+  for (const line of pause ? [] : requiredDrainLines) {
     if (!working.content.split(/\r?\n/u).includes(line)) {
       throw new Error(`Critical-budget handover requires drain attestation: ${line}`);
     }
@@ -263,8 +287,8 @@ export function createCriticalBudgetHandover({
     );
   }
   const metadata = {
-    schemaVersion: 2,
-    budgetCategory: "critical",
+    schemaVersion: pause ? 1 : 2,
+    budgetCategory: pause ? "account-pause" : "critical",
     createdAt: timestamp,
     frameworkVersion: readToolingConfiguration(root).protocol.version,
     repositoryBinding: repositoryBinding(root),
@@ -272,11 +296,55 @@ export function createCriticalBudgetHandover({
     workStateRevision: working.state.revision,
     workStateSha256: sha256(snapshot),
   };
-  const filename = `critical-budget-${compactTimestamp(timestamp)}-${random(6).toString("hex")}.prompt.md`;
-  const content = renderPrompt({ context: snapshot, metadata });
+  const filename = pause
+    ? accountPauseFilename(metadata)
+    : `critical-budget-${compactTimestamp(timestamp)}-${random(6).toString("hex")}.prompt.md`;
   const store = handoverStore(root, { create: true, testHooks });
   let created;
   try {
+    if (pause) {
+      if (
+        runtimeSession.lease.phase !== "active" ||
+        hasCriticalBudgetHandoverForSession({ root, sealingSessionId: metadata.sealingSessionId })
+      )
+        throw new Error("Account pause requires an active, unsealed canonical runtime session.");
+      const names = listOwnedDirectory(store, "account pause inventory").filter((name) =>
+        pauseFilenamePattern.test(name),
+      );
+      if (names.includes(filename)) {
+        const prior = parsedHandover(readOwnedPrompt(store, filename).content);
+        if (
+          prior.budgetCategory !== "account-pause" ||
+          accountPauseFilename(prior) !== filename ||
+          prior.repositoryBinding !== metadata.repositoryBinding ||
+          prior.workStateSha256 !== metadata.workStateSha256
+        )
+          throw new Error(
+            "The account pause for this work-state revision differs. Reconcile the current revision.",
+          );
+        if (
+          prior.pauseSequence <= acknowledgedPauseSequence(root, store, metadata.repositoryBinding)
+        )
+          throw new Error(
+            "This account pause was superseded. Reconcile the current work-state revision.",
+          );
+        armAccountPause(root, prior, filename);
+        return handoverResult(filename, prior);
+      }
+      if (names.length >= candidateLimit)
+        throw new Error("Account pause storage is full. Review and acknowledge prior handovers.");
+      const prior = [
+        ...repositoryHandovers({ root, pause: true, maximumCandidates: candidateLimit }),
+      ];
+      metadata.pauseSequence =
+        1 +
+        Math.max(
+          acknowledgedPauseSequence(root, store, metadata.repositoryBinding),
+          recordedAccountPauseSequence(root, metadata.repositoryBinding),
+          ...prior.map((entry) => entry.metadata.pauseSequence),
+        );
+    }
+    const content = renderPrompt({ context: snapshot, metadata });
     testHooks?.beforeHandoverPublish?.({ filename, store });
     validateOwnedDirectoryBinding(store, "critical-budget handover directory");
     created = createExclusiveOwnedFile(
@@ -305,6 +373,11 @@ export function createCriticalBudgetHandover({
   } finally {
     closeOwnedDirectoryBinding(store);
   }
+  if (pause) armAccountPause(root, metadata, filename);
+  return handoverResult(filename, metadata);
+}
+
+function handoverResult(filename, metadata) {
   return Object.freeze({
     createdAt: metadata.createdAt,
     relativePath: `${criticalHandoverDirectory}/${filename}`,
@@ -313,7 +386,17 @@ export function createCriticalBudgetHandover({
   });
 }
 
-function* repositoryHandovers({ root, testHooks, maximumCandidates = Infinity }) {
+export function createCriticalBudgetHandover(options = {}) {
+  return createHandover(options);
+}
+
+export function createAccountPauseHandover(options = {}) {
+  return withRuntimeLifecycleUpdateMutex(options.root ?? toolingRoot, () =>
+    createHandover(options, true),
+  );
+}
+
+function* repositoryHandovers({ root, testHooks, maximumCandidates = Infinity, pause = false }) {
   let store;
   try {
     store = handoverStore(root, { testHooks });
@@ -325,7 +408,7 @@ function* repositoryHandovers({ root, testHooks, maximumCandidates = Infinity })
     const binding = repositoryBinding(root);
     testHooks?.beforeHandoverDiscovery?.({ store });
     for (const filename of listOwnedDirectory(store, "critical-budget handover directory")
-      .filter((name) => filenamePattern.test(name))
+      .filter((name) => (pause ? pauseFilenamePattern : filenamePattern).test(name))
       .sort()
       .slice(-maximumCandidates)) {
       let metadata;
@@ -335,7 +418,14 @@ function* repositoryHandovers({ root, testHooks, maximumCandidates = Infinity })
         // Invalid, unsafe, or partially written files prove neither context nor a terminal seal.
         continue;
       }
-      if (metadata.repositoryBinding === binding) yield { filename, metadata };
+      if (
+        metadata.repositoryBinding === binding &&
+        (pause
+          ? metadata.budgetCategory === "account-pause" &&
+            accountPauseFilename(metadata) === filename
+          : metadata.budgetCategory === "critical")
+      )
+        yield { filename, metadata };
     }
   } finally {
     closeOwnedDirectoryBinding(store);
@@ -377,14 +467,55 @@ export function discoverRecentCriticalBudgetHandover({
       right.filename.localeCompare(left.filename, "en"),
   );
   const selected = candidates[0];
-  return selected
-    ? Object.freeze({
-        createdAt: selected.metadata.createdAt,
-        relativePath: `${criticalHandoverDirectory}/${selected.filename}`,
-        sealingSessionId: selected.metadata.sealingSessionId,
-        workStateRevision: selected.metadata.workStateRevision,
-      })
-    : null;
+  return selected ? handoverResult(selected.filename, selected.metadata) : null;
+}
+
+function pendingPauses(root, testHooks) {
+  const store = handoverStore(root, { testHooks });
+  if (!store) return [];
+  try {
+    const through = acknowledgedPauseSequence(root, store, repositoryBinding(root));
+    return [
+      ...repositoryHandovers({ root, testHooks, maximumCandidates: candidateLimit, pause: true }),
+    ]
+      .filter(({ metadata }) => metadata.pauseSequence > through)
+      .sort((a, b) => b.metadata.pauseSequence - a.metadata.pauseSequence);
+  } finally {
+    closeOwnedDirectoryBinding(store);
+  }
+}
+
+export function hasPendingAccountPause({ root = toolingRoot, testHooks } = {}) {
+  const store = handoverStore(root, { testHooks });
+  try {
+    return (
+      hasArmedAccountPause(root, repositoryBinding(root), store) ||
+      pendingPauses(root, testHooks).length > 0
+    );
+  } finally {
+    if (store) closeOwnedDirectoryBinding(store);
+  }
+}
+
+export function discoverRecentHandover({ root = toolingRoot, now = Date.now, testHooks } = {}) {
+  const currentTime = now();
+  const critical = discoverRecentCriticalBudgetHandover({
+    root,
+    now: () => currentTime,
+    testHooks,
+  });
+  let pause;
+  try {
+    pause = pendingPauses(root, testHooks).find(({ metadata }) => {
+      const age = currentTime - metadata.createdAtMilliseconds;
+      return age >= -clockSkewMilliseconds && age <= criticalHandoverMaxAgeMilliseconds;
+    });
+  } catch {
+    /* Unsafe storage offers no candidate context at startup. Stop checks its durable pause independently. */
+  }
+  if (pause && (!critical || pause.metadata.createdAtMilliseconds > Date.parse(critical.createdAt)))
+    return { ...handoverResult(pause.filename, pause.metadata), mode: "pause" };
+  return critical ? { ...critical, mode: "critical" } : null;
 }
 
 function receivingSession(root, metadata) {
@@ -392,10 +523,18 @@ function receivingSession(root, metadata) {
   if (
     session.status !== "active" ||
     session.lease.phase !== "active" ||
-    session.lease.sessionId === metadata.sealingSessionId
+    (metadata.budgetCategory === "critical" &&
+      session.lease.sessionId === metadata.sealingSessionId)
   ) {
     throw new Error("Handover receipt requires a later active canonical session.");
   }
+  if (
+    metadata.budgetCategory === "account-pause" &&
+    hasCriticalBudgetHandoverForSession({ root, sealingSessionId: session.lease.sessionId })
+  )
+    throw new Error(
+      "The sealed runtime must stop completely. Select this handover in a later active session.",
+    );
   return session.lease.sessionId;
 }
 
@@ -404,7 +543,9 @@ function withReceivingPrompt({ root, relativePath, testHooks }, consume) {
     typeof relativePath !== "string" ||
     !relativePath.startsWith(`${criticalHandoverDirectory}/`) ||
     relativePath !== `${criticalHandoverDirectory}/${path.basename(relativePath)}` ||
-    !filenamePattern.test(path.basename(relativePath))
+    ![filenamePattern, pauseFilenamePattern].some((pattern) =>
+      pattern.test(path.basename(relativePath)),
+    )
   ) {
     throw new Error("Handover receipt requires an exact repository-relative prompt path.");
   }
@@ -414,6 +555,12 @@ function withReceivingPrompt({ root, relativePath, testHooks }, consume) {
     const filename = path.basename(relativePath);
     const snapshot = readOwnedPrompt(store, filename);
     const metadata = parsedHandover(snapshot.content);
+    if (
+      metadata.budgetCategory === "account-pause"
+        ? filename !== accountPauseFilename(metadata)
+        : !filenamePattern.test(filename)
+    )
+      throw new Error("Selected handover filename does not match the prompt.");
     if (metadata.repositoryBinding !== repositoryBinding(root)) {
       throw new Error("The selected handover belongs to another repository.");
     }
@@ -453,30 +600,44 @@ export function acknowledgeCriticalBudgetHandover({
   if (typeof expectedSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(expectedSha256)) {
     throw new Error("Handover acknowledgement requires the received SHA-256 digest.");
   }
-  return withReceivingPrompt(
-    { root, relativePath, testHooks },
-    ({ filename, metadata, sessionId, snapshot, store }) => {
-      if (sha256(snapshot.content) !== expectedSha256) {
-        throw new Error("Handover acknowledgement digest does not match the selected artifact.");
-      }
-      testHooks?.beforeHandoverAcknowledge?.();
-      if (receivingSession(root, metadata) !== sessionId) {
-        throw new Error("The receiving canonical session changed before acknowledgement.");
-      }
-      removeStableOwnedFile(
-        store,
-        filename,
-        snapshot.stats,
-        "acknowledged critical-budget handover",
-      );
-      return Object.freeze({ relativePath, sha256: expectedSha256 });
-    },
-  );
+  const acknowledge = () =>
+    withReceivingPrompt(
+      { root, relativePath, testHooks },
+      ({ filename, metadata, sessionId, snapshot, store }) => {
+        if (sha256(snapshot.content) !== expectedSha256) {
+          throw new Error("Handover acknowledgement digest does not match the selected artifact.");
+        }
+        testHooks?.beforeHandoverAcknowledge?.();
+        if (receivingSession(root, metadata) !== sessionId) {
+          throw new Error("The receiving canonical session changed before acknowledgement.");
+        }
+        if (metadata.budgetCategory === "account-pause") {
+          const current = readOwnedPrompt(store, filename);
+          if (
+            !sameStableIdentity(snapshot.stats, current.stats) ||
+            current.content !== snapshot.content
+          )
+            throw new Error("The selected account pause changed before acknowledgement.");
+          markPauseAcknowledgement(root, store, metadata, filename, expectedSha256);
+        }
+        removeStableOwnedFile(
+          store,
+          filename,
+          snapshot.stats,
+          "acknowledged critical-budget handover",
+        );
+        if (metadata.budgetCategory === "account-pause") disarmAcknowledgedPause(root, metadata);
+        return Object.freeze({ relativePath, sha256: expectedSha256 });
+      },
+    );
+  return typeof relativePath === "string" && pauseFilenamePattern.test(path.basename(relativePath))
+    ? withRuntimeLifecycleUpdateMutex(root, acknowledge)
+    : acknowledge();
 }
 
 function usage() {
   return [
-    "Usage: pnpm handover:create -- --critical",
+    "Usage: pnpm handover:create -- --critical | --pause",
     "       pnpm handover:receive -- <exact-repository-relative-prompt>",
     "       pnpm handover:acknowledge -- <exact-repository-relative-prompt> --sha256 <received-digest>",
   ].join("\n");
@@ -492,6 +653,14 @@ function main() {
       "Developer: exit Codex completely with /quit, then run bash -p scripts/setup/start-codex.sh " +
         "from the project root in your terminal. /new and /resume do not restart the launcher. " +
         "Accept this handover when the new session announces it.",
+    );
+    return;
+  }
+  if (args.length === 2 && args[0] === "create" && args[1] === "--pause") {
+    const handover = createAccountPauseHandover();
+    console.log(`Account-window pause handover: ${handover.relativePath}`);
+    console.log(
+      "Automatic continuation is paused. Explicitly select this handover and check current capacity before resuming in this or a later active session.",
     );
     return;
   }

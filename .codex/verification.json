@@ -275,7 +275,9 @@
         "scripts/context/context-lifecycle.test.mjs",
         "scripts/context/portable-context-contract.test.mjs",
         "scripts/context/document-context.test.mjs",
-        "scripts/context/context-budget.test.mjs"
+        "scripts/context/context-budget.test.mjs",
+        "scripts/context/account-capacity.test.mjs",
+        "scripts/context/account-pause.test.mjs"
       ],
       "artifactOwners": [],
       "coveredTestPaths": [],
@@ -587,6 +589,42 @@
       ],
       "phase": "preflight",
       "reason": "Batch reads preserve per-file identity and parent replacement refusal without repeated ancestry walks."
+    },
+    {
+      "key": "local-build",
+      "label": "local build isolation and retention",
+      "executable": "$node",
+      "args": [
+        "--test",
+        "scripts/local-build/local-build.test.mjs"
+      ],
+      "artifactOwners": [],
+      "coveredTestPaths": [
+        "scripts/local-build/local-build.test.mjs"
+      ],
+      "reason": "local build isolation and retention",
+      "phase": "broad"
+    },
+    {
+      "key": "infrastructure-operations",
+      "label": "declarative infrastructure operations",
+      "executable": "$node",
+      "args": [
+        "--test",
+        "scripts/infrastructure/admin.test.mjs",
+        "scripts/infrastructure/remote-cpu.test.mjs",
+        "scripts/infrastructure/fleet-profile.test.mjs",
+        "scripts/infrastructure/deploy-watch.test.mjs"
+      ],
+      "artifactOwners": [],
+      "coveredTestPaths": [
+        "scripts/infrastructure/admin.test.mjs",
+        "scripts/infrastructure/remote-cpu.test.mjs",
+        "scripts/infrastructure/fleet-profile.test.mjs",
+        "scripts/infrastructure/deploy-watch.test.mjs"
+      ],
+      "reason": "declarative infrastructure operations",
+      "phase": "broad"
     }
   ],
   "testConsumers": {
@@ -677,6 +715,7 @@
       ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
       "scripts/deps/dependency-policy.test.mjs",
       "scripts/repository/project-tool-environment.test.mjs",
+      "scripts/repository/worktree-recovery.test.mjs",
       "scripts/setup/startup-state.test.mjs",
       "scripts/verify/verification-session-lock.test.mjs",
       "scripts/platform/platform-configuration-state.test.mjs",
@@ -1111,10 +1150,11 @@
     "scripts/repository/source-inventory-policy.mjs": [
       "scripts/repository/source-inventory-git-environment.test.mjs",
       "scripts/repository/source-inventory.test.mjs",
+      "scripts/verify/pushed-object-scan.test.mjs",
       "scripts/verify/verification-policy-inputs.test.mjs",
-      "scripts/verify/verification-scoped-inputs.test.mjs",
+      "scripts/verify/verification-policy-routing.test.mjs",
       "scripts/verify/verification-reuse.test.mjs",
-      "scripts/verify/verification-policy-routing.test.mjs"
+      "scripts/verify/verification-scoped-inputs.test.mjs"
     ],
     "scripts/repository/source-inventory.mjs": [
       "scripts/framework/framework-version.test.mjs",
@@ -1246,10 +1286,6 @@
       "scripts/verify/verification-reuse.test.mjs",
       "scripts/verify/verification-policy-routing.test.mjs",
       "scripts/verify/verification-selection.test.mjs"
-    ],
-    "scripts/deps/ci-toolchain-contract.mjs": [
-      "scripts/framework/compatibility-integrity.test.mjs",
-      "scripts/framework/toolchain-maintenance.test.mjs"
     ],
     "scripts/deps/maintain-toolchain.mjs": [
       "scripts/setup/bootstrap-entry.test.mjs",
@@ -1440,7 +1476,8 @@
       "scripts/setup/staged-project-validator.test.mjs",
       "scripts/setup/setup-regression.test.mjs",
       "scripts/setup/startup-session-controller.test.mjs",
-      "scripts/setup/startup-state.test.mjs"
+      "scripts/setup/startup-state.test.mjs",
+      "scripts/verify/pre-push.test.mjs"
     ],
     ".codex/tooling.json": [
       "scripts/framework/framework-upgrade-identity.test.mjs"
@@ -1486,7 +1523,9 @@
       "scripts/setup/runtime-safety.test.mjs"
     ],
     "scripts/context/session-stop-lifecycle.mjs": [
-      "scripts/setup/runtime-safety.test.mjs"
+      "scripts/setup/runtime-safety.test.mjs",
+      "scripts/context/account-pause.test.mjs",
+      "scripts/context/context-lifecycle.test.mjs"
     ],
     ".codex/toolchain.json": [
       "scripts/framework/framework-upgrade.test.mjs",
@@ -1617,6 +1656,64 @@
       "scripts/setup/repository-storage.test.mjs",
       "scripts/deps/pnpm-toolchain-graph.test.mjs",
       "scripts/framework/framework-version.test.mjs"
+    ],
+    "scripts/framework/framework-reset.mjs": [
+      ".agents/skills/reset-framework/scripts/reset-framework.test.mjs",
+      ".agents/skills/reset-framework/scripts/publish-framework.test.mjs",
+      ".agents/skills/reset-framework/scripts/publication-integration.test.mjs",
+      "scripts/framework/framework-upgrade.test.mjs",
+      "scripts/repository/project-tool-environment.test.mjs",
+      "scripts/setup/startup-session-controller.test.mjs"
+    ],
+    "scripts/framework/framework-session.mjs": [
+      "scripts/setup/codex-launcher.test.mjs",
+      "scripts/setup/startup-session-controller.test.mjs",
+      "scripts/setup/staged-project-validator.test.mjs"
+    ],
+    "scripts/local-build/local-build.mjs": [
+      "scripts/local-build/local-build.test.mjs"
+    ],
+    "scripts/infrastructure/admin.py": [
+      "scripts/infrastructure/admin.test.mjs"
+    ],
+    "scripts/infrastructure/ansible/deploy.yml": [
+      "scripts/infrastructure/admin.test.mjs"
+    ],
+    "scripts/infrastructure/ansible/library/deploy_cpu_step.py": [
+      "scripts/infrastructure/remote-cpu.test.mjs",
+      "scripts/infrastructure/admin.test.mjs"
+    ],
+    "scripts/verify/local-workspace-build.mjs": [
+      "scripts/verify/adaptive-runner.test.mjs",
+      "scripts/verify/verification-executor.test.mjs"
+    ],
+    "scripts/infrastructure/fleet_profile.py": [
+      "scripts/infrastructure/admin.test.mjs",
+      "scripts/infrastructure/fleet-profile.test.mjs"
+    ],
+    "scripts/infrastructure/ansible/verify_fleet.yml": [
+      "scripts/infrastructure/admin.test.mjs",
+      "scripts/infrastructure/fleet-profile.test.mjs"
+    ],
+    "scripts/infrastructure/deploy_watch.py": [
+      "scripts/infrastructure/admin.test.mjs",
+      "scripts/infrastructure/deploy-watch.test.mjs"
+    ],
+    "scripts/infrastructure/monitor_operations.py": [
+      "scripts/infrastructure/admin.test.mjs",
+      "scripts/infrastructure/deploy-watch.test.mjs"
+    ],
+    "scripts/context/account-capacity.mjs": [
+      "scripts/context/account-capacity.test.mjs",
+      "scripts/context/account-pause.test.mjs",
+      "scripts/setup/startup-session-controller.test.mjs"
+    ],
+    "scripts/context/account-pause-state.mjs": [
+      "scripts/context/account-pause.test.mjs"
+    ],
+    "scripts/context/critical-budget-handover.mjs": [
+      "scripts/context/account-pause.test.mjs",
+      "scripts/context/context-lifecycle.test.mjs"
     ]
   },
   "exactConsumers": {
@@ -1893,6 +1990,42 @@
     ],
     ".codex/.mise/locks/pnpm/current/aube-lock.yaml": [
       "repository-smoke"
+    ],
+    "scripts/framework/framework-reset.mjs": [
+      "framework-version"
+    ],
+    "scripts/framework/framework-session.mjs": [
+      "framework-version"
+    ],
+    "scripts/local-build/local-build.mjs": [
+      "local-build"
+    ],
+    "scripts/infrastructure/admin.py": [
+      "infrastructure-operations"
+    ],
+    "scripts/infrastructure/ansible/deploy.yml": [
+      "infrastructure-operations"
+    ],
+    "scripts/infrastructure/ansible/library/deploy_cpu_step.py": [
+      "infrastructure-operations"
+    ],
+    "scripts/infrastructure/fleet_profile.py": [
+      "infrastructure-operations"
+    ],
+    "scripts/infrastructure/ansible/verify_fleet.yml": [
+      "infrastructure-operations"
+    ],
+    "scripts/infrastructure/deploy_watch.py": [
+      "infrastructure-operations"
+    ],
+    "scripts/infrastructure/monitor_operations.py": [
+      "infrastructure-operations"
+    ],
+    "scripts/context/account-capacity.mjs": [
+      "context-regressions"
+    ],
+    "scripts/context/account-pause-state.mjs": [
+      "context-regressions"
     ]
   },
   "ownedCategories": {

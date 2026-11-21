@@ -448,7 +448,7 @@ function isInfrastructure(filePath) {
 }
 
 function isRepositorySourcePolicy(filePath) {
-  return filePath === ".gitignore" || filePath === ".gitattributes";
+  return [".gitignore", ".gitattributes", ".prettierignore"].includes(filePath);
 }
 
 function isLicensingContract(filePath) {

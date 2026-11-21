@@ -1,7 +1,6 @@
 /** Owns github platform behavior for the Git provider integration boundary. */
 import {
   paginatedPlatformApiRequest,
-  PlatformApiError,
   platformApiRequest,
   providerApiBase,
 } from "./platform-api.mjs";
@@ -11,8 +10,8 @@ export const githubRulesetName = "CodexRig main protection";
 /** Distinguishes a verified policy mismatch from an unavailable provider read-back. */
 class GithubRulesetMismatch extends Error {}
 
-export function githubRulesetPayload(contract, { includeSerialization = true } = {}) {
-  const { ci, integrationBranch, protection } = contract.platform;
+export function githubRulesetPayload(contract) {
+  const { integrationBranch, protection } = contract.platform;
   const rules = [
     { type: "deletion" },
     { type: "non_fast_forward" },
@@ -28,29 +27,7 @@ export function githubRulesetPayload(contract, { includeSerialization = true } =
         required_review_thread_resolution: true,
       },
     },
-    {
-      type: "required_status_checks",
-      parameters: {
-        do_not_enforce_on_create: false,
-        required_status_checks: [{ context: ci.requiredCheck }],
-        strict_required_status_checks_policy: true,
-      },
-    },
   ];
-  if (includeSerialization && protection.mergeSerialization !== "disabled") {
-    rules.push({
-      type: "merge_queue",
-      parameters: {
-        check_response_timeout_minutes: 60,
-        grouping_strategy: "ALLGREEN",
-        max_entries_to_build: 5,
-        max_entries_to_merge: 5,
-        merge_method: "SQUASH",
-        min_entries_to_merge: 1,
-        min_entries_to_merge_wait_minutes: 5,
-      },
-    });
-  }
   return {
     bypass_actors: [],
     conditions: {
@@ -105,112 +82,124 @@ function verifyGithubRuleset(actual, expected) {
       throw new GithubRulesetMismatch(`GitHub ruleset read-back omitted ${expectedRule.type}.`);
     assertExpectedSubset(actualRule, expectedRule, `rules.${expectedRule.type}`);
   }
-  if (
-    !expected.rules.some((rule) => rule.type === "merge_queue") &&
-    actualByType.has("merge_queue")
-  ) {
-    throw new GithubRulesetMismatch("GitHub ruleset read-back retained an unwanted merge queue.");
+  for (const type of ["merge_queue", "required_status_checks"]) {
+    if (!expected.rules.some((rule) => rule.type === type) && actualByType.has(type)) {
+      throw new GithubRulesetMismatch(
+        `GitHub ruleset read-back retained an unwanted ${type} rule.`,
+      );
+    }
   }
+}
+
+// The old framework-owned check was named "verify" and had no app binding.
+// Additional protection rules and external checks can share this ruleset.
+function retainAdditionalRules(payload, current) {
+  if (!Array.isArray(current.rules))
+    throw new Error("GitHub owned ruleset has no rules inventory.");
+  for (const { type, parameters } of current.rules) {
+    const owned = payload.rules.find((rule) => rule.type === type);
+    if (owned) {
+      if (owned.parameters) owned.parameters = { ...parameters, ...owned.parameters };
+    } else if (type === "required_status_checks") {
+      if (!Array.isArray(parameters?.required_status_checks)) {
+        throw new Error("GitHub owned ruleset has an invalid required status check list.");
+      }
+      const checks = parameters.required_status_checks.filter(
+        (check) => check.context !== "verify" || (check.integration_id ?? -1) > 0,
+      );
+      if (checks.length)
+        payload.rules.push({ type, parameters: { ...parameters, required_status_checks: checks } });
+    } else if (type !== "merge_queue") {
+      payload.rules.push(parameters === undefined ? { type } : { type, parameters });
+    }
+  }
+}
+
+async function readActionsEnabled(fetchImpl, url, token) {
+  const permissions = await platformApiRequest(fetchImpl, url, { provider: "github", token });
+  if (typeof permissions?.enabled !== "boolean")
+    throw new Error("GitHub repository Actions permission could not be verified.");
+  return permissions.enabled;
 }
 
 export async function applyGithubPlatform({ contract, detected, token, fetchImpl, stateStore }) {
   const base = `${providerApiBase(contract, "github", detected.hostname)}/repos/${detected.slug}`;
-  const existing = await paginatedPlatformApiRequest(fetchImpl, `${base}/rulesets`, {
-    provider: "github",
-    token,
-  });
+  const request = { provider: "github", token };
+  const existing = await paginatedPlatformApiRequest(
+    fetchImpl,
+    `${base}/rulesets?includes_parents=false`,
+    request,
+  );
   const ownedRulesets = existing.filter((ruleset) => ruleset?.name === githubRulesetName);
   if (ownedRulesets.length > 1) {
     throw new Error("GitHub has multiple CodexRig rulesets; reconcile duplicates manually.");
   }
   const owned = ownedRulesets[0];
-  if (owned && !Number.isSafeInteger(owned.id)) {
+  if (
+    owned &&
+    (!Number.isSafeInteger(owned.id) ||
+      (owned.source_type !== undefined && owned.source_type !== "Repository") ||
+      (owned.source !== undefined && owned.source.toLowerCase() !== detected.slug.toLowerCase()))
+  ) {
     throw new Error("GitHub owned ruleset identity is invalid.");
   }
+  const url = owned ? `${base}/rulesets/${owned.id}` : `${base}/rulesets`;
+  const payload = githubRulesetPayload(contract);
+  let rulesMatch = false;
+  if (owned) {
+    const current = await platformApiRequest(fetchImpl, url, request);
+    if (current?.id !== owned.id || current?.name !== githubRulesetName)
+      throw new Error("GitHub owned ruleset identity changed during inventory.");
+    retainAdditionalRules(payload, current);
+    try {
+      verifyGithubRuleset(current, payload);
+      rulesMatch = true;
+    } catch (error) {
+      if (!(error instanceof GithubRulesetMismatch)) throw error;
+    }
+  }
+  const actionsUrl = `${base}/actions/permissions`;
+  const actionsEnabled = await readActionsEnabled(fetchImpl, actionsUrl, token);
   const state = stateStore.begin();
   if (state.resumed && !owned) {
     throw new Error(
       "GitHub ruleset creation outcome is unknown; reconcile the original remote state before another create.",
     );
   }
-  const method = owned ? "PUT" : "POST";
-  const url = owned ? `${base}/rulesets/${owned.id}` : `${base}/rulesets`;
-  const serializationUnavailable = state.completed.includes("merge queue unavailable");
-  const requestedSerialization =
-    contract.platform.protection.mergeSerialization !== "disabled" && !serializationUnavailable;
-  const serializationWarning =
-    "GitHub merge queue was unavailable; branch, review, and CI protection remain active.";
-  const warnings = serializationUnavailable ? [serializationWarning] : [];
-  let payload = githubRulesetPayload(contract, {
-    includeSerialization: requestedSerialization,
-  });
-  if (state.resumed && owned) {
-    // A lost/error response does not establish whether the previous write took effect.
-    const original = await platformApiRequest(fetchImpl, `${base}/rulesets/${owned.id}`, {
-      provider: "github",
-      token,
-    });
-    let matches = true;
-    try {
-      verifyGithubRuleset(original, payload);
-    } catch (error) {
-      if (!(error instanceof GithubRulesetMismatch)) throw error;
-      matches = false;
-    }
-    if (matches) {
-      stateStore.record("ruleset verified");
-      stateStore.complete();
-      return {
-        provider: "github",
-        repository: detected.slug,
-        resumed: true,
-        updated: "verified existing ruleset",
-        warnings,
-      };
-    }
-  }
-  let written;
-  try {
-    written = await platformApiRequest(fetchImpl, url, {
+  if (!rulesMatch) {
+    const written = await platformApiRequest(fetchImpl, url, {
+      ...request,
       body: payload,
-      method,
-      provider: "github",
-      token,
+      method: owned ? "PUT" : "POST",
     });
-  } catch (error) {
-    const mayFallback =
-      requestedSerialization &&
-      error instanceof PlatformApiError &&
-      [403, 404, 422].includes(error.status) &&
-      contract.platform.protection.mergeSerialization === "prefer";
-    if (!mayFallback) throw error;
-    stateStore.record("merge queue unavailable");
-    payload = githubRulesetPayload(contract, { includeSerialization: false });
-    written = await platformApiRequest(fetchImpl, url, {
-      body: payload,
-      method,
-      provider: "github",
-      token,
-    });
-    warnings.push(serializationWarning);
+    stateStore.record("ruleset written");
+    const rulesetId = owned?.id ?? written?.id;
+    if (!Number.isSafeInteger(rulesetId))
+      throw new Error("GitHub ruleset write returned no stable identity.");
+    const actual = await platformApiRequest(fetchImpl, `${base}/rulesets/${rulesetId}`, request);
+    verifyGithubRuleset(actual, payload);
   }
-  stateStore.record("ruleset written");
-  const rulesetId = owned?.id ?? written?.id;
-  if (!Number.isSafeInteger(rulesetId)) {
-    throw new Error("GitHub ruleset write returned no stable identity.");
-  }
-  const actual = await platformApiRequest(fetchImpl, `${base}/rulesets/${rulesetId}`, {
-    provider: "github",
-    token,
-  });
-  verifyGithubRuleset(actual, payload);
   stateStore.record("ruleset verified");
+  if (actionsEnabled) {
+    await platformApiRequest(fetchImpl, actionsUrl, {
+      ...request,
+      body: { enabled: false },
+      method: "PUT",
+    });
+    if (await readActionsEnabled(fetchImpl, actionsUrl, token))
+      throw new Error("GitHub read-back still permits repository Actions.");
+  }
   stateStore.complete();
+  const retainedChecks = payload.rules.find((rule) => rule.type === "required_status_checks");
   return {
     provider: "github",
     repository: detected.slug,
     resumed: state.resumed,
-    updated: owned ? "ruleset" : "new ruleset",
-    warnings,
+    updated: rulesMatch ? "verified existing ruleset" : owned ? "ruleset" : "new ruleset",
+    warnings: retainedChecks
+      ? [
+          "Existing external status checks remain required. Their owners must provide results with repository Actions disabled.",
+        ]
+      : [],
   };
 }

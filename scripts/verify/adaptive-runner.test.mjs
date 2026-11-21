@@ -1,6 +1,6 @@
 /** Verifies adaptive runner behavior for the repository verification boundary. */
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -16,6 +16,7 @@ import {
   verificationExecutionUnits,
   verificationCheckFingerprints,
 } from "./verification-check-inputs.mjs";
+import { retainedWorkspaceOutput } from "./local-workspace-build.mjs";
 import { runPlan } from "./verification-executor.mjs";
 import { withVerificationSessionLock } from "./verification-session-lock.mjs";
 
@@ -96,17 +97,21 @@ test("acyclic workspace lifecycles reuse independent units and retain output pre
 test("missing or changed producer outputs rerun only that producer and its actual consumers", async (t) => {
   const repositoryRoot = mkdtempSync(path.join(tmpdir(), "workspace-output-reuse-"));
   t.after(() => rmSync(repositoryRoot, { force: true, recursive: true }));
+  const traceRoot = mkdtempSync(path.join(tmpdir(), "workspace-dispatch-"));
+  t.after(() => rmSync(traceRoot, { force: true, recursive: true }));
+  const trace = path.join(traceRoot, "dispatch.log");
+  const coreOutput = path.join(repositoryRoot, retainedWorkspaceOutput(".", "core.out"));
   const commands = ["core", "app", "independent"].map((name) => ({
     key: `build-${name}`,
     phase: "workspace-build",
     executable: process.execPath,
     args: [
       "--eval",
-      `const fs = require('node:fs'); ${name === "app" ? "if(fs.readFileSync('core.out','utf8') !== 'valid') throw Error('invalid core artifact');" : ""} fs.writeFileSync('${name}.out','valid'); fs.appendFileSync('dispatch.log','${name}\\n');`,
+      `const fs = require('node:fs'); ${name === "app" ? "if(fs.readFileSync('core.out','utf8') !== 'valid') throw Error('invalid core artifact');" : ""} fs.writeFileSync('${name}.out','valid'); fs.appendFileSync(${JSON.stringify(trace)},'${name}\\n');`,
     ],
     workspaceDirectories: [name],
     buildPrerequisites: name === "app" ? ["core"] : [],
-    outputs: [`${name}.out`],
+    outputs: [retainedWorkspaceOutput(".", `${name}.out`)],
     artifactOwners: ["fixture-builds"],
   }));
   const fingerprints = new Map(commands.map((command) => [command.key, "a".repeat(64)]));
@@ -139,7 +144,7 @@ test("missing or changed producer outputs rerun only that producer and its actua
       pending.workspaceCommands.map((unit) => unit.key),
       expected.map((name) => `build-${name}`),
     );
-    writeFileSync(path.join(repositoryRoot, "dispatch.log"), "");
+    writeFileSync(trace, "");
     const evidence = new Map(checks.map((check) => [check.key, check]));
     for (const key of pending.evidence.invalidatedKeys) evidence.delete(key);
     await withVerificationSessionLock(
@@ -160,13 +165,7 @@ test("missing or changed producer outputs rerun only that producer and its actua
       { repositoryRoot },
     );
     checks = [...evidence.values()];
-    assert.deepEqual(
-      readFileSync(path.join(repositoryRoot, "dispatch.log"), "utf8")
-        .trim()
-        .split("\n")
-        .filter(Boolean),
-      expected,
-    );
+    assert.deepEqual(readFileSync(trace, "utf8").trim().split("\n").filter(Boolean), expected);
     if (!expected.includes("independent") && before.length)
       assert.deepEqual(
         checks.find((check) => check.key === "build-independent"),
@@ -174,10 +173,12 @@ test("missing or changed producer outputs rerun only that producer and its actua
       );
   }
   await execute(["core", "app", "independent"]);
+  assert.equal(existsSync(path.join(repositoryRoot, "core.out")), false);
+  assert.equal(existsSync(path.join(repositoryRoot, "app.out")), false);
   await execute([]);
-  rmSync(path.join(repositoryRoot, "core.out"));
+  rmSync(coreOutput);
   await execute(["core", "app"]);
-  writeFileSync(path.join(repositoryRoot, "core.out"), "corrupt");
+  writeFileSync(coreOutput, "corrupt");
   await execute(["core", "app"]);
   const manifests = [
     {
@@ -205,18 +206,18 @@ test("missing or changed producer outputs rerun only that producer and its actua
     executable: process.execPath,
     args: [
       "--eval",
-      "const fs=require('node:fs'); for(const file of ['core.out','app.out']) if(fs.readFileSync(file,'utf8') !== 'valid') throw Error('bad prerequisite'); fs.appendFileSync('dispatch.log','test\\n');",
+      `const fs=require('node:fs'); for(const file of ['core.out','app.out']) if(fs.readFileSync(file,'utf8') !== 'valid') throw Error('bad prerequisite'); fs.appendFileSync(${JSON.stringify(trace)},'test\\n');`,
     ],
   };
   commands.push(consumer);
   fingerprints.set(consumer.key, "a".repeat(64));
   await execute(["test"], [consumer]);
-  rmSync(path.join(repositoryRoot, "core.out"));
+  rmSync(coreOutput);
   await execute(["core", "app", "test"], [consumer]);
-  writeFileSync(path.join(repositoryRoot, "core.out"), "corrupt");
+  writeFileSync(coreOutput, "corrupt");
   await execute(["core", "app", "test"], [consumer]);
-  rmSync(path.join(repositoryRoot, "core.out"));
-  symlinkSync("missing-output", path.join(repositoryRoot, "core.out"));
+  rmSync(coreOutput);
+  symlinkSync("missing-output", coreOutput);
   assert.throws(
     () =>
       pendingVerificationPlan(base, fingerprints, checks, {
@@ -225,8 +226,8 @@ test("missing or changed producer outputs rerun only that producer and its actua
       }),
     /non-symlink/u,
   );
-  rmSync(path.join(repositoryRoot, "core.out"));
-  writeFileSync(path.join(repositoryRoot, "core.out"), "valid");
+  rmSync(coreOutput);
+  writeFileSync(coreOutput, "valid");
   // Keep the last valid bytes in place while a selected rebuild of Core fails.
   const failedRebuild = commands
     .filter((command) => command.phase === "workspace-build")
@@ -246,15 +247,15 @@ test("missing or changed producer outputs rerun only that producer and its actua
     checks,
     { completeCommands: failedRebuild, repositoryRoot },
   );
-  writeFileSync(path.join(repositoryRoot, "dispatch.log"), "");
+  writeFileSync(trace, "");
   await assert.rejects(
     withVerificationSessionLock(() => runPlan(failedPlan, { repositoryRoot }), {
       repositoryRoot,
     }),
     /Workspace build failed: build-core, build-app/u,
   );
-  assert.equal(readFileSync(path.join(repositoryRoot, "core.out"), "utf8"), "valid");
-  assert.equal(readFileSync(path.join(repositoryRoot, "dispatch.log"), "utf8"), "independent\n");
+  assert.equal(readFileSync(coreOutput, "utf8"), "valid");
+  assert.equal(readFileSync(trace, "utf8"), "independent\n");
 
   const undeclared = commands.map((command) =>
     command.key === "build-core" ? { ...command, outputs: undefined } : command,
@@ -270,9 +271,9 @@ test("missing or changed producer outputs rerun only that producer and its actua
     blocked.evidence.blockedPrerequisites[0],
     /Missing output contract.*core.*workspaceOutputs/u,
   );
-  writeFileSync(path.join(repositoryRoot, "dispatch.log"), "");
+  writeFileSync(trace, "");
   await assert.rejects(runPlan(blocked, { repositoryRoot }), /Missing output contract/u);
-  assert.equal(readFileSync(path.join(repositoryRoot, "dispatch.log"), "utf8"), "");
+  assert.equal(readFileSync(trace, "utf8"), "");
   t.diagnostic(
     "Output lifecycle: full [3,0,2,2]; changed App test [1,3,3] after intact/deleted/corrupt Core outputs. Repairs order core before app before test; unrelated producer reused; missing contract dispatched 0.",
   );

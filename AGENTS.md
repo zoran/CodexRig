@@ -22,6 +22,7 @@ critical seal ends the session.
 
 At slice completion reconcile docs, reuse valid evidence and settle eligible worktrees. Run
 `pnpm context:check` for instruction changes. End final repository responses with the applicable
-[publication command and its effects](instructions.md#verification-and-publication-gates).
-Publication requires its own authority.
+[publication command and its effects](instructions.md#verification-and-publication-gates). For
+publication apply the current [session approval](instructions.md#yolo-session-approval) to the
+requested outcome and destination.
 <!-- codexrig:portable-agent-entry:end -->

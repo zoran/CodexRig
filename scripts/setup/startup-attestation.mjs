@@ -50,14 +50,15 @@ const startupAttestationKeys =
 export const startupControlPolicies = Object.freeze({
   default: "interactive-v2:safe-defaults",
   noAltScreen: "interactive-v2:no-alt-screen",
-  yolo: "dev-yolo-v1:default-screen",
-  yoloNoAltScreen: "dev-yolo-v1:no-alt-screen",
+  yolo: "yolo-v2:default-screen",
+  yoloNoAltScreen: "yolo-v2:no-alt-screen",
 });
 const fixedStartupAttestedInputs = Object.freeze([
   ".codex/config.toml",
   ".codex/hooks.json",
   ".codex/toolchain.json",
   ".codex/tooling.json",
+  ".codex/verification.json",
   ".codex/mise.lock",
   ".codex/mise.toml",
   ...pnpmGraphPaths,

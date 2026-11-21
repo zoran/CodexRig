@@ -215,13 +215,15 @@ test("empty generation excludes source capabilities, private markers and new uns
       "scripts/deps/toolchain-maintenance.test.mjs",
       "scripts/deps/tool-storage-housekeeping.test.mjs",
       "scripts/deps/pnpm-toolchain-graph.test.mjs",
+      "scripts/local-build/local-build.test.mjs",
+      "scripts/infrastructure/admin.test.mjs",
+      "scripts/infrastructure/remote-cpu.test.mjs",
+      "scripts/infrastructure/fleet-profile.test.mjs",
+      "scripts/infrastructure/deploy-watch.test.mjs",
     ],
   );
-  for (const file of [".github/workflows/ci.yml", ".gitlab-ci.yml"])
-    assert.doesNotMatch(
-      readFileSync(path.join(generated, file), "utf8"),
-      /canar|next-node|compatibility:|schedule|framework:/iu,
-    );
+  for (const file of [".github/workflows", ".gitlab-ci.yml", ".project-state/build"])
+    assert.equal(existsSync(path.join(generated, file)), false, file);
   assertGeneratedTransferParityContract(source, generated);
   const storageAdmission = run(generated, [
     "--test",

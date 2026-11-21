@@ -2,7 +2,7 @@
 name: create-project-from-framework
 description:
   Create a named, isolated child project from CodexRig. Invite a detailed product brief and transfer
-  the selected portable tools, policies and CI adapters.
+  the selected portable tools, policies and local build tools.
 ---
 
 # Create Project From CodexRig Framework
@@ -38,7 +38,7 @@ typed product/delivery/tenancy/localization configuration and optional `docs/req
 excludes source Git/runtime/accounts/context, framework-only capabilities and source release
 identity. NOTICE permits omission of source LICENSE/NOTICE/credits from generated output;
 third-party obligations remain and product licensing belongs to the owner. Memories are enabled only
-in the child's own isolated runtime. Both stable CI adapters remain; source experiments do not.
+in the child's own isolated runtime. Generated projects use local build and verification tools.
 
 The existing staged validator proves exact selected-byte parity plus declared identity/namespace,
 configuration and document transformations, contained imports, trust boundaries and private-state

@@ -1,11 +1,13 @@
 {
   "name": "codexrig",
-  "version": "7.4.0",
+  "version": "8.0.0",
   "private": true,
   "license": "PolyForm-Noncommercial-1.0.0",
   "type": "module",
   "packageManager": "pnpm@11.28.13",
   "scripts": {
+    "build:local": "node scripts/local-build/local-build.mjs",
+    "infra:admin": "python3 -B scripts/infrastructure/admin.py",
     "auth:check": "node scripts/verify/identity-access.mjs",
     "localization:check": "node scripts/verify/localization.mjs",
     "license:check": "node scripts/verify/licensing.mjs",
@@ -20,7 +22,7 @@
     "platform:configure": "node scripts/platform/configure-platform.mjs",
     "codex:start": "bash -p scripts/setup/start-codex.sh",
     "codex:validate": "node scripts/setup/validate-codex-model-policy.mjs",
-    "context:test": "node --test scripts/context/context-lifecycle.test.mjs scripts/context/portable-context-contract.test.mjs scripts/context/document-context.test.mjs scripts/context/context-budget.test.mjs",
+    "context:test": "node --test scripts/context/context-lifecycle.test.mjs scripts/context/portable-context-contract.test.mjs scripts/context/document-context.test.mjs scripts/context/context-budget.test.mjs scripts/context/account-capacity.test.mjs scripts/context/account-pause.test.mjs",
     "handover:create": "node scripts/context/critical-budget-handover.mjs create",
     "handover:receive": "node scripts/context/critical-budget-handover.mjs receive",
     "handover:acknowledge": "node scripts/context/critical-budget-handover.mjs acknowledge",
@@ -49,7 +51,8 @@
     "context:read": "node scripts/context/context-cli.mjs read",
     "context:check": "node scripts/context/context-cli.mjs check",
     "project:run": "bash -p scripts/setup/run-project.sh",
-    "project:publish": "node .agents/skills/reset-framework/scripts/publish-framework.mjs"
+    "project:publish": "node .agents/skills/reset-framework/scripts/publish-framework.mjs",
+    "handover:check": "node scripts/context/account-capacity.mjs"
   },
   "devDependencies": {
     "prettier": "^3.9.6"

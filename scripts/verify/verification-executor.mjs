@@ -1,4 +1,5 @@
 /** Owns verification executor behavior for the repository verification boundary. */
+import path from "node:path";
 import process from "node:process";
 import { performance } from "node:perf_hooks";
 import {
@@ -315,7 +316,7 @@ function verificationLifecycleCapability(repositoryRoot) {
   return lifecycleCapability;
 }
 
-function runCommand(command, repositoryRoot, requireDiagnosis) {
+function runCommand(command, repositoryRoot, requireDiagnosis, directory = repositoryRoot) {
   verificationLifecycleCapability(repositoryRoot);
   return withVerificationTemporaryStorage(
     repositoryRoot,
@@ -331,8 +332,11 @@ function runCommand(command, repositoryRoot, requireDiagnosis) {
           command: command.executable,
           lifecycleCapability: verificationLifecycleCapability(repositoryRoot),
           options: {
-            cwd: repositoryRoot,
-            env: environment,
+            cwd: directory,
+            env:
+              directory === repositoryRoot
+                ? environment
+                : { ...environment, GIT_CEILING_DIRECTORIES: path.dirname(directory) },
             stdio: ["ignore", "pipe", "pipe"],
           },
           repositoryRoot,
@@ -458,6 +462,7 @@ async function runArtifactSafeCommands(
   onResult,
   completed,
   interrupted,
+  workspaceFor,
 ) {
   if (commands.length === 0) return [];
   const results = new Array(commands.length);
@@ -483,6 +488,7 @@ async function runArtifactSafeCommands(
         }
         const startedAt = performance.now();
         try {
+          const workspace = command.workspaceDirectories ? workspaceFor() : undefined;
           for (const prerequisite of command.outputPrerequisites ?? []) {
             const produced = completed.get(prerequisite.key);
             if (produced && !prerequisite.outputs?.length) continue;
@@ -494,11 +500,17 @@ async function runArtifactSafeCommands(
               throw new Error(
                 `Build output prerequisite changed before ${command.key}: ${prerequisite.key}. Replan this producer and its consumers.`,
               );
+            if (workspace) workspace.transfer(prerequisite.outputs, { restore: true });
           }
           try {
-            results[index] = await runCommand(command, repositoryRoot, () => {
-              stopAdmission = true;
-            });
+            results[index] = await runCommand(
+              command,
+              repositoryRoot,
+              () => {
+                stopAdmission = true;
+              },
+              workspace?.directory,
+            );
           } catch (error) {
             // Startup or cleanup uncertainty can affect the shared execution boundary.
             stopAdmission = true;
@@ -507,6 +519,7 @@ async function runArtifactSafeCommands(
           const result = results[index];
           if (result.error || result.signal) stopAdmission = true;
           if (!result.error && result.status === 0 && !result.diagnosticRequired) {
+            workspace?.transfer(command.outputs);
             const outputFingerprint = verificationOutputFingerprint(command, {
               repositoryRoot,
             });
@@ -566,6 +579,26 @@ export async function runPlan(plan, { repositoryRoot = root, onResult } = {}) {
 
   const phases = commandsByExecutionPhase(plan);
   const completed = new Map();
+  // Held startup/recovery commands preload this executor before verification policy exists.
+  // Only load or prepare a working copy when a real, pending workspace command first needs it.
+  const {
+    createWorkspaceVerificationDirectory,
+    prepareWorkspaceVerificationStorage,
+    transferWorkspaceOutputs,
+  } = await import("./local-workspace-build.mjs");
+  const store = prepareWorkspaceVerificationStorage(repositoryRoot);
+  let workspace;
+  const workspaceFor = () => {
+    if (!workspace) {
+      const scope = createWorkspaceVerificationDirectory(repositoryRoot);
+      workspace = {
+        ...scope,
+        transfer: (outputs, options) =>
+          transferWorkspaceOutputs(repositoryRoot, scope.directory, store, outputs, options),
+      };
+    }
+    return workspace;
+  };
   const successfulCommandKeys = await withVerificationSignalForwarding(async (interrupted) => {
     const successful = [];
     for (const [phase, failurePrefix] of executionPhases) {
@@ -578,10 +611,16 @@ export async function runPlan(plan, { repositoryRoot = root, onResult } = {}) {
           onResult,
           completed,
           interrupted,
+          workspaceFor,
         )),
       );
     }
     return successful;
+  }).finally(() => {
+    if (workspace && !workspace.release())
+      console.warn(
+        "Workspace verification scratch retained for active consumers and housekeeping.",
+      );
   });
   console.log("\nDeterministic verification passed.");
   return Object.freeze({

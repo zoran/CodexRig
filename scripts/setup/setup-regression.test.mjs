@@ -52,6 +52,7 @@ import {
   cleanupTemporaryRoots,
   configFixture,
   copyPortableSetupFixture,
+  copyHookInstallerFixture,
   projectModel,
   root,
   run,
@@ -838,38 +839,9 @@ test("installed model catalog requires the shared future-compatible Astra/second
 
 test("hook installation is managed and never overwrites an unrelated hook", () => {
   const fixture = temporaryRoot("codex-hooks-");
-  mkdirSync(path.join(fixture, "scripts", "repository"), { recursive: true });
-  mkdirSync(path.join(fixture, "scripts", "setup"), { recursive: true });
-  mkdirSync(path.join(fixture, "scripts", "git-hooks"), { recursive: true });
-  const installer = path.join(fixture, "scripts", "setup", "install-git-hooks.sh");
-  const installerModule = path.join(fixture, "scripts", "setup", "install-git-hooks.mjs");
-  const pathResolver = path.join(fixture, "scripts", "setup", "resolve-git-hooks-path.mjs");
-  const gitIsolation = path.join(fixture, "scripts", "repository", "git-runtime-isolation.mjs");
-  const processIo = path.join(fixture, "scripts", "repository", "runtime-process-io.mjs");
-  const sourceHook = path.join(fixture, "scripts", "git-hooks", "pre-push");
-  copyFileSync(path.join(root, "scripts/setup/install-git-hooks.sh"), installer);
-  copyFileSync(path.join(root, "scripts/setup/install-git-hooks.mjs"), installerModule);
-  copyFileSync(path.join(root, "scripts/setup/resolve-git-hooks-path.mjs"), pathResolver);
-  copyFileSync(path.join(root, "scripts/repository/git-runtime-isolation.mjs"), gitIsolation);
-  copyFileSync(path.join(root, "scripts/repository/runtime-process-io.mjs"), processIo);
-  for (const relative of [
-    "scripts/contracts/portable-toml.mjs",
-    "scripts/contracts/semver-contract.mjs",
-    "scripts/repository/project-temporary-storage.mjs",
-    "scripts/repository/project-tool-environment.mjs",
-    "scripts/repository/runtime-process-cancellation.mjs",
-    "scripts/repository/runtime-process-identity.mjs",
-    "scripts/repository/source-inventory-policy.mjs",
-    "scripts/repository/user-tool-storage.mjs",
-    "scripts/filesystem/repository-files.mjs",
-    "scripts/filesystem/owned-file-operations.mjs",
-    "scripts/filesystem/artifact-identity.mjs",
-    "scripts/filesystem/owned-path-safety.mjs",
-  ]) {
-    mkdirSync(path.dirname(path.join(fixture, relative)), { recursive: true });
-    copyFileSync(path.join(root, relative), path.join(fixture, relative));
-  }
-  copyFileSync(path.join(root, "scripts/git-hooks/pre-push"), sourceHook);
+  copyHookInstallerFixture(fixture);
+  const installer = path.join(fixture, "scripts/setup/install-git-hooks.sh");
+  const sourceHook = path.join(fixture, "scripts/git-hooks/pre-push");
   chmodSync(installer, 0o755);
   chmodSync(sourceHook, 0o755);
   assert.equal(run("git", ["init", "-q"], { cwd: fixture }).status, 0);

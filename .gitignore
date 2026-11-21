@@ -1,3 +1,13 @@
+# Build definitions, worktrees, logs and releases are private under .project-state/build/.
+/.github/workflows/
+/.gitea/workflows/
+/.forgejo/workflows/
+/bitbucket-pipelines.y*ml
+/azure-pipelines.y*ml
+/.circleci/config.y*ml
+/.gitlab-ci.yml
+/.gitlab-ci.yaml
+
 # Dependencies and generated output.
 node_modules/
 .pnpm-store/
@@ -16,6 +26,12 @@ backup/
 backups/
 *.bak
 *.bak.*
+__pycache__/
+/infra/**/.terraform/
+/infra/**/*.tfstate
+/infra/**/*.tfstate.*
+/infra/**/.terraform.tfstate.lock.info
+/infra/**/*.tfplan
 
 # Repository-owned accounts and mutable tool state never belong to source or exports.
 /.auth/
@@ -27,6 +43,7 @@ backups/
 # Only framework coordination lives in .codex/runtime/; /tmp holds private handovers and process
 # temporaries, while /.tmp holds native cache work. Full runtime reset requires all sessions to exit.
 /.tmp
+/archived_sessions
 /cache
 /log
 /logs

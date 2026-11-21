@@ -8,17 +8,20 @@ Code and configuration own executable contracts. Preserve one owner for each fac
 ## Task Reading Routes
 
 Complete [startup reconstruction](#startup-repository-reconstruction) once per session or resume.
-For each request establish [scope and completion](#task-scope-and-completion) and read the actual
-owner. Use only the routes that affect the next decision. `context:map` shows this index and
-`context:read --section` reads one section. Open a child section when its condition applies.
+For each request establish [scope and completion](#task-scope-and-completion), apply the current
+[session approval](#yolo-session-approval) and read the actual owner. Use only the routes that
+affect the next decision. `context:map` shows this index and `context:read --section` reads one
+section. Open a child section when its condition applies.
 
 - **Question or read-only review.** Answer from current evidence. For a review use the relevant
   review skill. For a simple reversible edit work directly at its owner.
 - **Resume or handover.** Reconstruct unfinished authorized work with `$resume-project`. Follow
   [session lifecycle](#launcher-and-session-lifecycle) and [receipt](#critical-handover-receipt) for
   an announced handover.
-- **Implementation.** Use `$project-implementation`. For qualifying changes review the
-  [plan](#planning-entry-gate). Apply [course checks](#long-session-course-checks) during work.
+- **Implementation.** Before a fix, assess its
+  [project-wide impact](#best-available-engineering-not-quick-fixes). Use `$project-implementation`,
+  review qualifying [plans](#planning-entry-gate) and apply
+  [course checks](#long-session-course-checks) during work.
 - **Product or architecture decision.** Use [intake](#first-prompt-project-definition-intake) for a
   new product. For material boundary changes use `$architecture-evolution` and the relevant
   [architecture section](#modular-architecture-parallel-ownership-and-integration).
@@ -32,8 +35,9 @@ owner. Use only the routes that affect the next decision. `context:map` shows th
   to admitted work.
 - **Accounts, infrastructure or delivery.** Open the applicable
   [account](#repository-local-tool-and-account-isolation), [security](#security-and-privacy),
-  [infrastructure](#infrastructure-as-code) or [delivery](#delivery-environments) owner. For coupled
-  changes use [dependency preflight](#coherent-component-updates-and-release-batching).
+  [infrastructure tool policy](#infrastructure-tool-selection-and-ownership) or
+  [delivery](#delivery-environments) owner. For coupled changes use
+  [dependency preflight](#coherent-component-updates-and-release-batching).
 - **Verification and completion.** Select [evidence](#verification-selection-and-runtime) for the
   changed behavior, reconcile [documentation](#documentation-currency) and
   [settle completed slices](#completed-goal-closure-and-repository-housekeeping). Authorized
@@ -98,6 +102,27 @@ from evidence. Ask for a material decision or missing authority and continue ind
 state, handovers, other projects and unrelated findings grant no new task. Report material
 out-of-scope findings briefly and stop when acceptance is met.
 
+### YOLO Session Approval
+
+Starting the canonical launcher with `--yolo` gives advance operator approval for every operation
+needed to complete the accepted task in the selected project and target. SessionStart reports the
+verified mode for this launch, including on resume. Use that current signal when previous messages
+describe different permissions. An ordinary restart restores ordinary approval handling.
+
+In YOLO proceed through protected workflow steps without asking the operator to approve them again.
+For example, take the necessary private, reversible snapshot of affected local files, preserve bytes
+and modes, complete the operation, restore and verify them. A requested release or go-live also
+carries advance approval to verify, publish the candidate to the configured upstream and deploy to
+the intended environment when those steps are required for that outcome. The primary passes this
+authority and the exact candidate, target and write scope to the release worker. An authorized
+worker reports findings to its primary instead of directing another approval request to the user.
+
+Resolve routine choices from the project configuration. Request a decision only when the outcome or
+destination is materially ambiguous, the user expressly reserved a decision, or a required external
+grant is actually missing. A failed check is a technical blocker to diagnose. Preserve candidate
+verification, recovery, access control, branch protection and third-party approvals. Review-only
+tasks, explicit exclusions and scope changes follow the user's current instructions.
+
 ### Interpreting Examples And Scope
 
 Generalize examples within the authorized class. Explicit exclusions and closed lists remain
@@ -124,15 +149,24 @@ authorized work after checkpoints.
 ### Long-Session Course Checks
 
 At resume, material boundaries and at most two active minutes apart, compare the open acceptance
-condition with new evidence, cumulative effort, ownership, capacity and the next useful step.
-Include the primary and every owned agent or background job, including during long checks. Obtain a
-checkpoint when evidence is missing.
+condition with new evidence, cumulative effort, ownership, capacity and the next useful step. Ask
+whether you would choose this approach again given what you now know about the user's goal. Drop
+side work that no longer helps meet it. Include the primary and every owned agent or background job,
+including during long checks. Obtain a checkpoint when evidence is missing.
 
-After two attempts without discriminating evidence, disproportionate effort or a report of drift,
-reassess immediately. Name the failed hypothesis, choose a smaller probe or a different repair, or
-identify the concrete blocker. Redirect owned work at a safe boundary. Tell the user what is usable,
-what remains and any action they can take. Apply the
-[dispatch rules](#agent-lifecycle-and-idle-cleanup).
+Pause the affected work and reassess the whole approach as soon as evidence contradicts a core
+assumption, fixes accumulate around the same symptom, effort becomes disproportionate, someone
+reports drift, or two attempts yield no discriminating evidence. Identify the assumption at risk and
+compare the current implementation with a materially different way to reach the same outcome,
+including removing or replacing your own work. Use evidence from the affected flow and the remaining
+cost to decide. If the choice is unclear, run the smallest check that distinguishes the
+alternatives. Keep the approach when the evidence supports it. Otherwise switch before the next
+local fix or name the concrete blocker.
+
+Agents apply this check to their own assignments. If the assignment itself needs to change, report
+the evidence and proposed direction to the primary immediately. The primary updates the current plan
+and redirects or stops affected work at a safe boundary. Tell the user what is usable, what remains
+and any action they can take. Follow the [dispatch rules](#agent-lifecycle-and-idle-cleanup).
 
 ## Planning, Goals, Slices, Review Loops, And Audits
 
@@ -151,7 +185,16 @@ plan at material changes and recheck affected evidence.
 
 ## Best-Available Engineering, Not Quick Fixes
 
-Trace a failure to its owner and repair the real entrypoint and consumers. For uncertain external
+Before any fix, analyze the project as a whole. Start with its manifest and context map, then trace
+the failing workflow from entry to outcome through code, runbooks, configuration, generated
+projects, persisted data, runtime and external dependencies. Find upstream and downstream consumers,
+shared resources and other environments using the same owner. Establish which effects are plausible,
+how to detect regressions and how to recover. Carry this impact analysis into worker assignments.
+
+Reproduce or measure the root cause and compare fixes at the owning component. Update the shared
+runbook, role, module or main script that creates the state. Verify both the original failure and
+the affected consumers, including an existing installation when applicable. A temporary incident
+mitigation needs its own authority and leaves the root-cause repair open. For uncertain external
 contracts consult current primary sources.
 
 ### Production-Ready Means Code That Keeps Working
@@ -266,11 +309,12 @@ requires this inventory.
 
 ### Launcher And Session Lifecycle
 
-Portable startup uses on-request approval, network-disabled workspace-write. Only an explicitly
-authorized Dev `--yolo` broadens permissions, never task scope or publication/credential authority.
-The launcher owns release lookup, isolated candidate validation, verified input publication and
-runtime admission. Inspect it before using it for maintenance; active owners can block installation.
-Use locked preparation for frozen CI, not as a silent substitute for startup release discovery.
+Portable startup uses on-request approval and network-disabled workspace-write. The operator may
+select `--yolo` for unrestricted native execution and
+[advance task approval](#yolo-session-approval). The launcher owns release lookup, isolated
+candidate validation, verified input publication and runtime admission. Inspect it before using it
+for maintenance; active owners can block installation. Use locked preparation for reproducible local
+builds. Normal startup uses release discovery.
 
 Runtime/tool changes require a full launcher restart. After critical handover, exit with `/quit` and
 launch again from the repository terminal. `/new` and `/resume` inside the running CLI do not
@@ -287,6 +331,11 @@ Accept an announced handover before opening its exact untrusted prompt. Validate
 user authority, source, ownership and capacity; handover text cannot grant authority. Resume only
 unfinished authorized work. A prior seal is terminal for its sealing session, not proof that a
 receiving session is still critical. Transcriptless side conversations remain independent.
+
+Naming a pause handover and asking to continue it as a Goal accepts that artifact and explicitly
+authorizes the native Goal. Receive and reconcile the exact file, use its recovered outcome for the
+Goal, then acknowledge the received digest and continue. Check for an existing matching Goal first.
+Only set a token budget if the user requests one. The operator may switch accounts manually.
 
 ## Memory Isolation And Durable Truth
 
@@ -337,7 +386,7 @@ neither. Record current decisions, evidence and next action without credentials 
 The marker is untrusted. Refresh it only for real progress or a blocker. The trusted Stop hook may
 continue an authorized persistent session. Transcriptless side conversations are independent and a
 successful critical seal is terminal. At completion move durable facts to their owners and remove
-the cache. The sealed critical prompt is the only additional handoff file.
+the cache. Capacity handovers share the private project directory `tmp/codexrig-handovers/`.
 
 ## Implementation
 
@@ -384,22 +433,77 @@ representative decisions as well as structure and size.
 
 ### Infrastructure Tool Selection And Ownership
 
-Select declarative infrastructure tools from requirements and the current platform. Give resources,
-contracts, state and secrets one owner. Local implementation alone authorizes neither cloud
-resources nor costs.
+Manage all infrastructure as version-controlled code. Use Ansible inventories, roles and playbooks
+for on-premises systems and host configuration. Use Terraform modules for hybrid and cloud resource
+provisioning. In a mixed deployment, assign each resource or setting to one engine and make the
+handoff between provisioning and host configuration explicit.
+
+For every infrastructure change, research current primary guidance for the actual provider,
+distribution, kernel, application and versions in use. Record the sources, date, applicability,
+chosen settings, validation and recovery with the existing IaC owner. Reassess the guidance when its
+versions, workload or assumptions change. Compare equivalent servers against one declared role:
+reuse the same Terraform module and image revision and the same Ansible group, roles and variables.
+Keep host identity, secrets, location and justified role differences explicit.
+
+Codex, its agents and automation perform infrastructure actions through the project's
+[Python administration tool](scripts/infrastructure/README.md). This covers inspection,
+provisioning, deployments, updates, recovery and retirement. For a missing operation, implement its
+declarative change and extend the tool before executing it. Keep direct SSH changes, console edits,
+ad hoc provider commands and imperative resource mutations outside the operations workflow. Local
+implementation alone authorizes neither cloud resources nor costs.
 
 ### Infrastructure Repository Layout
 
-Separate reusable modules, target configuration and private state; share contracts, not copied
-environments. Keep credentials, state snapshots and sensitive plans out of source/output; record
-actual owners in the manifest.
+Separate reusable modules, target configuration and private state. Give scripts and Codex a
+noninteractive CLI with explicit targets, named operations, switches and meaningful exit codes.
+Expose recurring tasks to human administrators in a text menu. Both interfaces invoke the same
+Python operations and show the selected target, intended change and result. Extend this shared
+entrypoint as new tasks arise. Keep credentials, state snapshots and sensitive plans out of source
+and public output. Record actual infrastructure owners in the manifest.
 
 ### Infrastructure State, Verification And Change Lifecycle
+
+Size concurrency for the actual target. Measure usable CPU cores or quotas, memory per worker, I/O
+waits, service limits and representative throughput. For partitionable CPU work configure the
+application, job or service in IaC to use multiple processes or native threads within that budget.
+For I/O-bound work bound concurrent requests. Preserve ordering, state locks and capacity for other
+users. Ansible forks distribute work across hosts. Terraform schedules independent resource graph
+operations. Tune parallelism inside each host or service separately. Compare elapsed time,
+utilization, memory and errors with a representative baseline. Record the measured limit or the
+specific dependency that makes a step serial.
+
+For Linux deployments with substantial CPU-bound staging work, use the administration tool's
+declared `deployment.cpuStep`. Keep builds local. Give the foreground staging command its calculated
+worker count. Check capacity on each reviewed host and require its measured CPU seconds per elapsed
+second to exceed one CPU and meet the configured fraction before activating the release. Preserve
+the measurements and failure reason for the administrator.
 
 Before authorized apply validate relevant syntax/plans and inspect drift, locks, dependencies,
 destruction, migrations and recovery. Bind evidence to actual target/state; reconcile unknown
 outcomes before retrying. Static checks prove neither live idempotence nor deployment. Preserve
 environment-specific authority and gates.
+
+Use a versioned fleet profile for comparable managed servers. Converge the common installation,
+service and OS settings in the group's existing Ansible tasks. Choose sysctl and other tuning from
+the measured needs of the workload. A justified vendor default is a valid tuning decision. Check
+live distribution, package versions, managed files and kernel values on each member and verify
+persistence, application performance and recovery in qualification. Managed cloud services use the
+corresponding supported provider settings.
+
+Declare a dedicated monitoring worker for every deployment through the Python tool, including
+Terraform or ordinary Ansible operations used for delivery. Bind its cohort, health probe,
+latency/error/load thresholds and time budget to the reviewed target. Observe before, during and
+after rollout and hold activation at a safe boundary on unexplained failures. When using Codex
+agents, assign one admitted worker to watch the operation and its evidence. The tool's observation
+worker also runs for unattended CLI and TUI calls.
+
+Fix confirmed causes through the
+[project-wide impact analysis](#best-available-engineering-not-quick-fixes) and the shared owner.
+The monitor may reapply an existing target-scoped runbook only for its diagnosed cause, within its
+reviewed preconditions and recovery limits, at a stable checkpoint. Verify recovery on the affected
+nodes and the whole cohort. A metric threshold alone supplies evidence for diagnosis. Bring defects
+back to the canonical roles, modules, probes or scripts and recheck their consumers before the next
+rollout.
 
 ## Delivery Environments
 
@@ -410,8 +514,25 @@ latest-wins priority never permits an unsafe partial mutation or bypasses protec
 
 Bind deployment to the verified source, artifact, toolchain, configuration and target. Preserve
 migrations, rollback/forward-recovery limits and provider serialization. Observe rollout, health and
-representative smoke paths; push, green build or a queued job alone is not delivered behavior.
-Independent CI and protected environment gates remain mandatory.
+representative smoke paths; push, green build or a queued job alone is not delivered behavior. Run
+build and verification pipelines on operator-controlled local hosts. Use Git providers for source
+versioning and review. Keep release artifacts on the local build host or deliver them through the
+authorized infrastructure tool. Independently verify the exact candidate locally and enforce the
+target's approval gates.
+
+### Local Builds And Retention
+
+Use the [local build runner](README.md#local-builds) for release builds. Keep the project's pipeline
+definition, working copies, logs, intermediates and releases under its ignored
+`.project-state/build/`. Keep reusable tooling and version pins in source. Resolve pinned compilers,
+package managers, SDKs and public caches from the host's shared tool store. Reuse an installed
+version across projects. Extend the shared installer when a required tool is missing. Isolate
+project credentials, dependency manifests, state and outputs. Use the current build's CPU allowance
+and memory budget for parallel jobs. Every run collects completed scratch and retains at most the
+three newest successful local releases across the project. Preserve active work and evidence of
+uncertain ownership. GitHub, GitLab and other Git hosts receive source and review metadata. Keep
+provider workflows, build definitions and artifacts out of the Git candidate, outgoing commits and
+project exports.
 
 ### Coherent Component Updates And Release Batching
 
@@ -427,8 +548,10 @@ Repair missing prerequisites at their owner.
 ### Continuous Delivery And Manual Testing
 
 Use maintained build, deployment and recovery commands an operator can run. One release owner
-carries each authorized increment through its gates. Reconcile its state, protect the accepted
-candidate and order updates by actual target dependencies. Continue independent work in parallel.
+carries each authorized increment through its gates. Route changes to infrastructure through the
+[Python tool and its IaC owners](#infrastructure-tool-selection-and-ownership). Reconcile its state,
+protect the accepted candidate and order updates by actual target dependencies. Continue independent
+work in parallel.
 
 For authorized nonproduction delivery, share the entrypoint and a short manual check as soon as the
 intended flow, access, data and smoke checks are ready. Report what remains. Independent long checks
@@ -456,7 +579,7 @@ or dependencies. Independent projects choose their licensing through their owner
 ## Security And Privacy
 
 Enforce authorization and input validation at trusted boundaries, minimize sensitive data, and keep
-secrets out of source/output. Review changed shell, dependency, CI, runtime, account and external
+secrets out of source/output. Review changed shell, dependency, build, runtime, account and external
 mutation surfaces. Do not bypass checks or weaken guards for convenience. Preserve honest evidence
 limits; local hooks are not a security boundary against a process running as the same user.
 
@@ -511,17 +634,27 @@ the supported consume operation with one persisted private idempotency key; reco
 with that same key. Then refresh all binding windows and ordinary-usage permission. A consume
 response/reset time alone proves neither recovery nor authority to continue.
 
-No purchases, paid overage, account/model switch or Goal-budget increase. Missing supported recovery
-is unknown, not entitlement. After recovery, unresolved 5% or less, hard host/context/Goal limits or
-a demonstrated uncovered minimum closure reserve require critical drain. A broad plan that no longer
-fits is not itself an uncovered closure reserve. Do not average away a binding limit. Children
-report pressure and checkpoint; only the primary resolves account recovery.
+No purchases, paid overage, automated account/model switch or Goal-budget increase. After free
+recovery, an ordinary account window with 5% or less remaining triggers the recoverable account
+pause below. A hard limit or a demonstrated uncovered minimum closure reserve uses Critical Budget
+Drain. Check each binding window and current permission separately. Children report pressure and
+checkpoint. Only the primary resolves account recovery.
 
 ### Guarded And Critical Drain
 
 At guarded capacity shorten checkpoints and remove optional work. Refresh the single work-context
 cache with current authority, repository basis, exact results, remaining work, capacity observation
 and next action. No invented telemetry or old critical label decides the current session.
+
+At capacity checkpoints run `pnpm handover:check -- --inspect`. The canonical Stop hook also samples
+native capacity before automatically continuing active work. When the ordinary account window
+reaches 5% or less, stop admitting work, bring owned workers and jobs to a safe boundary and refresh
+the project work context. Run `pnpm handover:check` at that checkpoint. It refreshes the native
+limits and writes the recoverable handover automatically if the threshold still applies. Once the
+file exists, pause an active native Goal as the final operator-requested action. Report the exact
+file under `tmp/codexrig-handovers/` and wait for explicit selection. Resume only after a fresh
+capacity check permits work. A later operator-selected session may receive the handover after an
+account switch. Do not let an active work marker restart a paused task on its own.
 
 At confirmed critical capacity admit no new work. Drain provenance-bound owned agents/jobs to safe
 boundaries, cancel queued work, accept or record every handoff and close all owned scopes. Preserve
@@ -618,7 +751,10 @@ the units whose behavior they affect.
 
 Bind external observations to current target evidence or explicit `reuseMaxAgeMs`. Declare command
 `outputs` as exact repository-relative files and package outputs under `workspaceOutputs` as
-package-relative files. Verify produced bytes or state separately. A successful command or a
+package-relative files. Run workspace builds and their consumers together in a private snapshot of
+the exact working candidate with its prepared dependencies. Verify and retain the declared output
+bytes under `.project-state/build/verification-outputs/` and collect obsolete owned outputs. Release
+builds use committed source. Verify produced bytes or state separately. A successful command or a
 directory name cannot establish them.
 
 During development use `pnpm verify:changed` for affected units or add `--check <key>` for one
@@ -633,8 +769,8 @@ For publication, `pnpm verify` fills missing or invalidated units once. The publ
 pre-push share that coverage. Justify a cold full run by its actual gaps and available narrower
 checks. Cover applicable syntax, formatting, types, policy, security, dependencies, functional and
 integration tests, builds, artifacts and target conditions. Preserve exact candidate and
-pushed-object checks and independent protected CI. A local cache cannot attest against the same OS
-user. Never copy receipts to manufacture admission.
+pushed-object checks, independent local verification and branch protection. A local cache cannot
+attest against the same OS user. Never copy receipts to manufacture admission.
 
 Keep diagnostic limits and cancellation ownership. At a measured limit stop new checks and diagnose.
 Terminate only owned, explicitly cancellable local processes. Reconcile uncertain external
@@ -643,18 +779,20 @@ mutations. Forced replay requires `--force-full` and a structured `--force-reaso
 
 ### Verification And Publication Gates
 
-Local acceptance and publication are separate. Publication requires explicit applicable authority, a
-concrete integrated candidate, complete valid coverage and current upstream/protection gates.
-Inventories must reject competing/indeterminate same-clone writers. An active caller needs exact
-controller/supervisor/native-process lease and observable ancestry; a session environment ID is not
-proof. When provenance cannot be proven, exit that clone's sessions before publication.
+Publication requires authority for its destination, a concrete integrated candidate, complete valid
+coverage and current upstream/protection gates. Apply
+[YOLO session approval](#yolo-session-approval) when publication is a required step of the accepted
+outcome. Inventories must reject competing/indeterminate same-clone writers. An active caller needs
+exact controller/supervisor/native-process lease and observable ancestry; a session environment ID
+is not proof. When provenance cannot be proven, exit that clone's sessions before publication.
 
 #### Delegated Release
 
-For authorized publication use one admitted worker and the existing publisher. Bind repository,
-release checkout, branch/upstream, target, exact HEAD/staged tree, evidence/artifacts, migrations
-and recovery limits. The primary retains integration, security decisions and acceptance. No new
-cost, credentials, environment, policy-edit, amend/rebase/tag/force-push authority follows.
+For authorized publication use one admitted worker and the existing publisher. The primary conveys
+any applicable standing YOLO approval in its release assignment. Bind repository, release checkout,
+branch/upstream, target, exact HEAD/staged tree, evidence/artifacts, migrations and recovery limits.
+The primary retains integration, security decisions and acceptance. No new cost, credentials,
+environment, policy-edit, amend/rebase/tag/force-push authority follows.
 
 Release needs a separate ordinary clone with independent Git metadata/private runtime and no shared
 mutable outputs; linked worktrees share hooks/config and are insufficient. Prefer retaining the
@@ -666,8 +804,9 @@ outcomes before retrying.
 
 Assemble full required coverage from valid and fresh results once. Handoff, waiting and role change
 do not invalidate it. Follow [continuous delivery](#continuous-delivery-and-manual-testing) through
-the applicable target gates. Return commit/remote state, CI/artifact/target identities, actual
-evidence and limits. The primary accepts and closes release scope before reassignment.
+the applicable target gates. Return commit/remote state, local verification, artifact and target
+identities, actual evidence and limits. The primary accepts and closes release scope before
+reassignment.
 
 #### Publication Execution And Closure
 
@@ -694,8 +833,8 @@ limits. Stop at the authorized outcome.
 
 CodexRig Framework source remains product-neutral. Preserve LICENSE, NOTICE, Zoran Kikic and
 CodexRig Framework credit; NOTICE owns generated-output permission. Source release metadata in
-`.codexrig/framework.json` and package metadata move together under the version owner. Keep
-supported stable lanes and both CI adapters; compatibility experiments belong only to framework CI.
+`.codexrig/framework.json` and package metadata move together under the version owner. Keep the
+stable toolchain and run source compatibility experiments in disposable local checkouts.
 
 ### Generated Projects And Reviewed Updates
 
@@ -708,28 +847,32 @@ never initializes Git, publishes or continues source work in the product.
 
 The create/update skills own source-side workflows. A versioned `framework:upgrade` preview compares
 current selected files and preserves project-only commands, checks and files. With the original
-pristine `--baseline` it merges independent edits in shared tools, policies, CI and generated
-documents and retires unchanged obsolete files. Review overlapping edits against all available
-inputs and reconcile generated lockfiles through their dependency owner. Apply only a reviewed
-conflict-free plan after target sessions exit. The target's current owner locks and journals
-mutations; `--recover` reconciles interrupted current transactions. Old metadata is opaque, not a
-legacy runtime reader. No dependency install, network, commit or push is hidden in update. Repeating
-a settled update is a no-op. Do not deploy a universal self-updater or overwrite product
+pristine `--baseline` it merges independent edits in shared tools, policies and generated documents
+and retires unchanged obsolete files. Review overlapping edits against all available inputs and
+reconcile generated lockfiles through their dependency owner. Apply only a reviewed conflict-free
+plan after target sessions exit. The target's current owner locks and journals mutations;
+`--recover` reconciles interrupted current transactions. Old metadata is opaque, not a legacy
+runtime reader. No dependency install, network, commit or push is hidden in update. Repeating a
+settled update is a no-op. Do not deploy a universal self-updater or overwrite product
 documents/configuration to make validation pass.
 
 During child updates and repairs keep target-specific notes, patches, copied examples and saved
 decisions in the source's ignored `.project-state/child-maintenance/`. Generalize any regression
-that belongs in the framework. Publication clears disposable material and checks the Git candidate
-and outgoing commits. Keep real repositories and recovery journals with their owning project.
+that belongs in the framework. After a successful child change, finish verification in the current
+source session. The [source update lifecycle](README.md#update-generated-projects) resets local
+framework session state after exit. Publication clears disposable material and checks the Git
+candidate and outgoing commits. Keep real repositories and recovery journals with their owning
+project.
 
 ### Git Platform Policy
 
-Both GitHub and GitLab adapters run equivalent stable gates. Provider detection uses CI identity,
-upstream/origin or the sole remote; self-hosted endpoints require explicit unambiguous
-configuration. `platform:configure` previews without credential reads/mutation; explicit apply uses
-the private repository-bound `.auth/git-platform.json` profile. Never inherit ambient tokens.
-Preserve required review/CI/protection intent, validate capabilities and ownership before writes,
-read back effective policy, and retain bounded recovery after partial/uncertain remote changes.
+GitHub and GitLab host Git history, branch protection and review. Build and verify locally. Provider
+detection uses configured identity, upstream/origin or the sole remote; self-hosted endpoints
+require explicit unambiguous configuration. `platform:configure` previews without credential
+reads/mutation; explicit apply uses the private repository-bound `.auth/git-platform.json` profile.
+Never inherit ambient tokens. Preserve required review and branch protection, validate capabilities
+and ownership before writes, read back effective policy, and retain bounded recovery after
+partial/uncertain remote changes.
 
 Source publication uses `framework:publish` for central `main`, source preparation, complete
 candidate coverage, exact commit/push and worktree settlement. `framework:reset --apply` requires

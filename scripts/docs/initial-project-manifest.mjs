@@ -61,9 +61,11 @@ ${deliveryProjection}
   embedded, or real-time product surface is integrated.
 - Tenant isolation runtime: no product tenant resolver or data plane is integrated; the initial
   invariant contract is owned by \`${tenancyConfigurationPath}\` with pending resolution.
-- Product infrastructure roots: none are integrated; Ansible, Terraform or Pulumi selection and
-  layout remain pending actual requirements under the
+- Product infrastructure targets are unconfigured. The project Python administration tool drives
+  Ansible and Terraform operations declared for actual targets under the
   [Infrastructure As Code policy](../instructions.md#infrastructure-as-code).
+- Product builds run locally with host-shared tools. Pipeline, workspace and up to three releases
+  are private to the project. Git hosting handles source versioning and reviews.
 - Public product identity and brand: not configured.
 
 ${activeModuleInventoryHeading}

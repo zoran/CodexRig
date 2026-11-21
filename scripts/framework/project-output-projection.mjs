@@ -5,7 +5,12 @@ import { listStagedTransferFiles } from "../repository/source-inventory.mjs";
 
 /** New installations use one neutral protocol; source sessions keep their own current namespace. */
 export function projectOutputText(content) {
+  // Child launchers and their attestation inventory use the portable controller directly.
   return content
+    .replaceAll(
+      "scripts/framework/framework-session.mjs",
+      "scripts/setup/startup-session-controller.mjs",
+    )
     .replaceAll("CODEXRIG", "PROJECT")
     .replaceAll("CodexRig", "Project")
     .replaceAll("codexrig", "project");

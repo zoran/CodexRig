@@ -4,6 +4,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { importSpecifiersForFile } from "../repository/source-import-specifiers.mjs";
 import { listPortableTransferFiles } from "../repository/source-inventory.mjs";
 import {
   captureStableRepositoryFileIdentity,
@@ -46,6 +47,26 @@ export function copyPortableSetupFixture(targetRoot, { sourceRoot = root } = {})
       targetRoot,
       expectedIdentity: entry.identity,
     });
+  }
+}
+
+/** Assemble the installed hook fixture from its real entrypoints and their local imports. */
+export function copyHookInstallerFixture(targetRoot) {
+  const files = new Set([
+    "scripts/git-hooks/pre-push",
+    "scripts/setup/install-git-hooks.sh",
+    "scripts/setup/install-git-hooks.mjs",
+  ]);
+  for (const relativePath of files) {
+    const source = path.join(root, relativePath);
+    const target = path.join(targetRoot, relativePath);
+    mkdirSync(path.dirname(target), { recursive: true });
+    copyFileSync(source, target);
+    if (!relativePath.endsWith(".mjs")) continue;
+    const content = readFileSync(source, "utf8");
+    for (const specifier of importSpecifiersForFile({ relativePath, content }))
+      if (specifier.startsWith("."))
+        files.add(path.posix.join(path.posix.dirname(relativePath), specifier));
   }
 }
 

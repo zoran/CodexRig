@@ -376,23 +376,70 @@ test("transfer policy permits code ownership names and public certificate materi
   assert.doesNotThrow(() => assertSafeTransferSource({ root }));
 });
 
-test("portable inventory retains legitimate tracked vendor, dist, and build content", () => {
+test("portable inventory keeps tracked vendor, build tools and inactive workflow fixtures", () => {
   const source = temporaryRoot("export-tracked-source-");
-  const stagingParent = temporaryRoot("export-tracked-target-");
-  write(source, ".gitignore", "vendor/\ndist/\nbuild/\n");
-  write(source, "vendor/pkg/index.js", "vendored\n");
-  write(source, "dist/site/index.html", "built\n");
-  write(source, "build/schema.json", "{}\n");
+  const portable = [
+    "vendor/pkg/index.js",
+    "scripts/local-build/run.mjs",
+    "bin/build",
+    "tests/fixtures/.github/workflows/example.yaml",
+    "tests/fixtures/.gitlab-ci.yml",
+    ".github/workflows/README.md",
+    ".gitlab-ci.yml.example",
+  ];
+  write(source, ".gitignore", "vendor/\n");
+  for (const file of portable) write(source, file);
   write(source, "untracked-draft.txt", "local draft\n");
   initializeGit(source);
-  const forced = git(source, ["add", "-f", ".gitignore", "vendor", "dist", "build"]);
+  const forced = git(source, ["add", "-f", ".gitignore", ...portable]);
   assert.equal(forced.status, 0, forced.stderr);
 
-  const files = listPortableTransferFiles({ root: source, includeUntracked: false });
-  for (const relativePath of ["vendor/pkg/index.js", "dist/site/index.html", "build/schema.json"]) {
-    assert.ok(files.includes(relativePath));
-  }
-  assert.equal(files.includes("untracked-draft.txt"), false);
+  assert.deepEqual(
+    listPortableTransferFiles({ root: source, includeUntracked: false }),
+    [".gitignore", ...portable].sort(),
+  );
+});
+
+test("portable transfers reject force-added local builds and enabled provider workflows", () => {
+  const source = temporaryRoot("export-local-build-");
+  const reserved = [
+    ".project-state/infrastructure/target/plans/session/terraform.plan",
+    ".project-state/build/recipe.json",
+    ".project-state/build/outputs/report.txt",
+    "build/site.html",
+    "dist/index.js",
+    "apps/web/build/site.html",
+    "packages/lib/dist/index.js",
+    ".github/workflows/checks.yml",
+    ".github/workflows/release.yaml",
+    "infra/providers/.terraform/metadata.json",
+    "infra/network/team.tfplan",
+    "infra/network/custom.tfstate.backup",
+    ".gitlab-ci.yml",
+    ".gitlab-ci.yaml",
+    "bitbucket-pipelines.yml",
+    ".forgejo/workflows/check.yml",
+  ];
+  write(
+    source,
+    ".gitignore",
+    ".project-state/\nbuild/\ndist/\n/.github/workflows/\n/.gitlab-ci.*\n",
+  );
+  for (const file of reserved) write(source, file);
+  initializeGit(source);
+  const forced = git(source, ["add", "-f", ...reserved]);
+  assert.equal(forced.status, 0, forced.stderr);
+  assert.throws(
+    () => listPortableTransferFiles({ root: source, includeUntracked: false }),
+    (error) => {
+      for (const file of reserved) assert.ok(error.message.includes(`- ${file} (`), file);
+      return true;
+    },
+  );
+
+  const staged = temporaryRoot("export-staged-local-build-");
+  write(staged, ".github/workflows/custom.yaml");
+  assert.throws(() => listStagedTransferFiles({ root: staged }), /enabled provider workflow/u);
 });
 
 test("portable transfer fails closed for tracked runtime and dependency state", () => {

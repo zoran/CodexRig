@@ -240,8 +240,8 @@ for (const outcome of ["compatible", "retain", "baseline-changed", "unverified-b
       );
       assert.ok(notices.some((notice) => /Retaining mise.*pnpm/u.test(notice)));
       assert.deepEqual(result.matrix.ci.miseBinarySha256, current.ci.miseBinarySha256);
-      for (const file of [".github/workflows/ci.yml", ".gitlab-ci.yml"])
-        assert.ok(!readFileSync(path.join(root, file), "utf8").includes(candidate.ci.miseVersion));
+      const published = JSON.parse(readFileSync(path.join(root, ".codex/toolchain.json"), "utf8"));
+      assert.equal(published.ci.miseVersion, current.ci.miseVersion);
     }
   });
 }

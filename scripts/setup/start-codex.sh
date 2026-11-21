@@ -38,15 +38,15 @@ for argument in "$@"; do
       seen_yolo=true
       ;;
     *)
-      echo "Only --no-alt-screen and explicit Dev --yolo are supported; enter prompts after selecting a session." >&2
+      echo "Only --no-alt-screen and explicit --yolo are supported; enter prompts after selecting a session." >&2
       exit 64
       ;;
   esac
 done
 if [[ "$seen_yolo" == true && "$seen_no_alt_screen" == true ]]; then
-  startup_control_policy="dev-yolo-v1:no-alt-screen"
+  startup_control_policy="yolo-v2:no-alt-screen"
 elif [[ "$seen_yolo" == true ]]; then
-  startup_control_policy="dev-yolo-v1:default-screen"
+  startup_control_policy="yolo-v2:default-screen"
 elif [[ "$seen_no_alt_screen" == true ]]; then
   startup_control_policy="interactive-v2:no-alt-screen"
 else

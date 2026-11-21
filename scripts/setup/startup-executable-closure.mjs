@@ -15,7 +15,7 @@ export const startupExecutableEntryPoints = Object.freeze([
   "scripts/setup/session-control-hook-command.mjs",
   "scripts/setup/startup-attestation.mjs",
   "scripts/setup/startup-executable-closure.mjs",
-  "scripts/setup/startup-session-controller.mjs",
+  "scripts/framework/framework-session.mjs",
 ]);
 
 function resolvedRelativeModule(root, importer, specifier) {

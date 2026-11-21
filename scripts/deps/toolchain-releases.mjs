@@ -1,21 +1,6 @@
-/** Resolves compatible stable tool and CI releases from their official distribution owners. */
+/** Resolves compatible local tool releases from their official distribution owners. */
 import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { toolingRoot } from "../filesystem/repository-files.mjs";
-import { prepareProjectToolDirectories } from "../repository/project-tool-environment.mjs";
-import {
-  createProjectTemporaryScope,
-  temporaryEnvironment,
-} from "../repository/project-temporary-storage.mjs";
-import {
-  cleanGitEnvironment,
-  isolatedGitResultCompleted,
-} from "../repository/git-runtime-isolation.mjs";
-import { spawnSyncWithBoundedIo } from "../repository/runtime-process-io.mjs";
-import {
-  currentRuntimeLifecycleCapability,
-  assertRuntimeLifecycleQuiescent,
-} from "../repository/runtime-session-lease.mjs";
 import {
   compareSemver,
   parseSemver,
@@ -298,7 +283,7 @@ export async function resolveCompatibilityToolchain(
   return validateToolchainConfiguration(matrix);
 }
 
-/** Reviews official stable releases before the shared project-local installer consumes them. */
+/** Resolves official stable releases for installation in the shared host tool store. */
 export async function resolveToolchainReleases(
   current,
   { fetchImpl = globalThis.fetch, onProgress = () => {} } = {},
@@ -370,109 +355,4 @@ export async function verifiedMiseBinaryDigest(asset, fetchImpl = globalThis.fet
   if (bytes.length === 0 || `sha256:${digest}` !== asset.digest)
     throw new Error("Official mise binary integrity failed.");
   return digest;
-}
-
-/** Runs public Git discovery without host/project Git configuration, credentials, hooks or checkout. */
-function withPublicGithubGit(root, spawnGit, action) {
-  const owner = currentRuntimeLifecycleCapability({ root, operation: "toolchain-maintenance" });
-  const locations = prepareProjectToolDirectories(root);
-  const temporary = createProjectTemporaryScope({ root, parent: locations.temporary });
-  const directory = temporary.directory;
-  const environment = {
-    ...temporaryEnvironment(cleanGitEnvironment(process.env, root), directory),
-    HOME: directory,
-    USERPROFILE: directory,
-    XDG_CONFIG_HOME: directory,
-    GIT_CEILING_DIRECTORIES: locations.temporary,
-    GIT_CONFIG_COUNT: "0",
-    GIT_ALLOW_PROTOCOL: "https",
-  };
-  const git = (...args) => {
-    const result = spawnGit("git", args, {
-      cwd: directory,
-      env: environment,
-      encoding: "utf8",
-      input: "",
-      timeout: 60_000,
-      maxBuffer: 4 * 1024 * 1024,
-      stdio: "pipe",
-    });
-    if (!isolatedGitResultCompleted(result, { args, maximumOutputBytes: 4 * 1024 * 1024 }))
-      throw new Error(
-        `Public GitHub release lookup failed during git ${args[0]}; freshness is indeterminate.`,
-      );
-    return result.stdout.trim();
-  };
-  try {
-    return action(git);
-  } finally {
-    // Pending lifecycle work may still enter the directory; process inspection alone cannot
-    // establish that every admitted consumer has started and settled.
-    if (owner) assertRuntimeLifecycleQuiescent({ root, owner });
-    if (!temporary.release())
-      console.warn(
-        "Release lookup temporary storage retained for remaining consumers; housekeeping will reconcile it.",
-      );
-  }
-}
-
-/** Updates immutable GitHub action pins from public Git tags, without the account/IP REST quota. */
-export async function refreshGithubActions(
-  content,
-  { root = toolingRoot, spawnGit = spawnSyncWithBoundedIo } = {},
-) {
-  const pattern =
-    /\buses: ([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([a-f0-9]{40}) # v(\d+\.\d+\.\d+)\b/gu;
-  const updates = new Map();
-  const repositories = new Map();
-  for (const match of content.matchAll(pattern)) {
-    if (updates.has(match[0])) continue;
-    const [, repository, oldSha, current] = match;
-    const major = parseSemver(current).major;
-    const url = `https://github.com/${repository}.git`;
-    if (!repositories.has(repository))
-      repositories.set(
-        repository,
-        withPublicGithubGit(root, spawnGit, (git) => {
-          const refs = new Map();
-          for (const line of git("ls-remote", "--tags", "--exit-code", url).split("\n")) {
-            const record = /^([a-f0-9]{40})\t(refs\/tags\/[^\s]+)$/u.exec(line);
-            if (!record || refs.has(record[2]))
-              throw new Error("GitHub action tags are invalid or ambiguous.");
-            refs.set(record[2], record[1]);
-          }
-          return refs;
-        }),
-      );
-    const refs = repositories.get(repository);
-    const version = latestCompatibleVersion(
-      [...refs.keys()].map((ref) => ref.replace(/^refs\/tags\/v/u, "")),
-      `>=${current} <${major + 1}.0.0`,
-      current,
-    );
-    const identity = (tag) => refs.get(`${tag}^{}`) ?? refs.get(tag);
-    if (identity(`refs/tags/v${current}`) !== oldSha)
-      throw new Error(`GitHub action ${repository} moved its existing release tag.`);
-    const tag = `refs/tags/v${version}`;
-    const sha = identity(tag);
-    if (version !== current)
-      withPublicGithubGit(root, spawnGit, (git) => {
-        git("init", "--bare", "--template=", "--quiet");
-        git(
-          "fetch",
-          "--quiet",
-          "--depth=1",
-          "--filter=tree:0",
-          "--no-tags",
-          "--no-recurse-submodules",
-          "--no-auto-maintenance",
-          url,
-          tag,
-        );
-        if (git("rev-parse", "--verify", "FETCH_HEAD^{commit}") !== sha)
-          throw new Error("GitHub action tag changed during lookup or has no commit identity.");
-      });
-    updates.set(match[0], `uses: ${repository}@${sha} # v${version}`);
-  }
-  return content.replace(pattern, (match) => updates.get(match));
 }

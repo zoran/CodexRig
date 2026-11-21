@@ -216,9 +216,14 @@ export function ensureOwnedPrivateDirectory(
     if (!existsSync(boundTarget)) {
       testHooks?.beforeDirectoryCreate?.({ directoryPath: directory, label, parent });
       validateOwnedDirectoryBinding(parent, `${label} parent`);
-      mkdirSync(boundTarget, { mode: 0o700 });
+      try {
+        mkdirSync(boundTarget, { mode: 0o700 });
+        created = true;
+      } catch (error) {
+        // A concurrent initializer can win mkdir. Validate its directory below just like an existing one.
+        if (error.code !== "EEXIST") throw error;
+      }
       fsyncSync(parent.descriptor);
-      created = true;
     }
     const initial = lstatSync(boundTarget);
     if (

@@ -1,0 +1,188 @@
+---
+- name: Bind the deployment to its inventory hosts
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  any_errors_fatal: true
+  vars:
+    ansible_connection: local
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  tasks:
+    - name: Require the configured group to contain hosts
+      ansible.builtin.assert:
+        that:
+          - groups.get(operator_deploy_group, []) | length > 0
+        fail_msg: "Deployment inventory group {{ operator_deploy_group }} is empty or missing."
+
+    - name: Require the same group membership as the reviewed plan
+      ansible.builtin.assert:
+        that:
+          - groups[operator_deploy_group] | sort(case_sensitive=true) == operator_reviewed_hosts
+        fail_msg: "Inventory membership changed. Create and review a new deployment plan."
+      when: not ansible_check_mode
+
+    - name: Save the reviewed host list in the operator's private plan
+      ansible.builtin.copy:
+        content: "{{ groups[operator_deploy_group] | sort(case_sensitive=true) | to_json }}"
+        dest: "{{ operator_record_hosts }}"
+        mode: "0600"
+      check_mode: false
+      when: ansible_check_mode
+
+- name: Prepare and measure the staged release on every target
+  hosts: "{{ operator_deploy_group }}"
+  gather_facts: false
+  strategy: linear
+  any_errors_fatal: true
+  tasks:
+    - name: Converge the declared fleet baseline
+      ansible.builtin.include_tasks: "{{ operator_converge_tasks }}"
+      when: not operator_managed_deployment and not ansible_check_mode
+
+    - name: Observe the effective fleet baseline on the target
+      ansible.builtin.import_tasks: verify_fleet.yml
+
+    - name: Stage the deployment only on the matching fleet
+      when: operator_managed_deployment
+      block:
+        - name: Check effective CPU and memory before preparation
+          deploy_cpu_step:
+            argv: "{{ operator_cpu_argv }}"
+            memory_mib_per_worker: "{{ operator_cpu_limits.memory_mib_per_worker }}"
+            minimum_cpu_fraction: "{{ operator_cpu_limits.minimum_cpu_fraction }}"
+            reserve_memory_mib: "{{ operator_cpu_limits.reserve_memory_mib }}"
+            max_workers: "{{ operator_cpu_limits.max_workers | default(omit) }}"
+            capacity_only: true
+          register: operator_deploy_capacity
+
+        - name: Show the target's usable CPU, memory and worker count
+          ansible.builtin.debug:
+            msg:
+              host: "{{ inventory_hostname }}"
+              available_cpus: "{{ operator_deploy_capacity.available_cpus }}"
+              available_memory_mib: "{{ operator_deploy_capacity.available_memory_mib }}"
+              workers: "{{ operator_deploy_capacity.workers }}"
+
+        - name: Require a new fleet observation after staging
+          ansible.builtin.set_fact:
+            operator_fleet_verified: false
+          when: not ansible_check_mode
+
+        - name: Prepare the inactive deployment
+          ansible.builtin.include_tasks: "{{ operator_prepare_tasks }}"
+          when: not ansible_check_mode and operator_prepare_tasks is defined
+
+        - name: Run and measure the foreground staging command
+          deploy_cpu_step:
+            argv: "{{ operator_cpu_argv }}"
+            memory_mib_per_worker: "{{ operator_cpu_limits.memory_mib_per_worker }}"
+            minimum_cpu_fraction: "{{ operator_cpu_limits.minimum_cpu_fraction }}"
+            reserve_memory_mib: "{{ operator_cpu_limits.reserve_memory_mib }}"
+            max_workers: "{{ operator_cpu_limits.max_workers | default(omit) }}"
+          register: operator_deploy_measurement
+          when: not ansible_check_mode
+
+        - name: Show measured CPU use before activation
+          ansible.builtin.debug:
+            msg:
+              host: "{{ inventory_hostname }}"
+              workers: "{{ operator_deploy_measurement.workers }}"
+              cpu_seconds: "{{ operator_deploy_measurement.cpu_seconds }}"
+              wall_seconds: "{{ operator_deploy_measurement.wall_seconds }}"
+              average_cpus: "{{ operator_deploy_measurement.average_cpus }}"
+          when: not ansible_check_mode
+
+    - name: Reobserve the effective fleet after staging
+      ansible.builtin.import_tasks: verify_fleet.yml
+      when: operator_managed_deployment and not ansible_check_mode
+
+- name: Require successful staging on the entire reviewed group
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  any_errors_fatal: true
+  vars:
+    ansible_connection: local
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  tasks:
+    - name: Require the reviewed group to remain intact through staging
+      ansible.builtin.assert:
+        that:
+          - groups[operator_deploy_group] | sort(case_sensitive=true) == operator_reviewed_hosts
+        fail_msg: "Deployment inventory membership changed during staging. Activation stopped."
+      when: not ansible_check_mode
+
+    - name: Require every host's observed fleet baseline
+      ansible.builtin.assert:
+        that:
+          - hostvars[item].operator_fleet_verified is defined
+          - operator_fleet_report_only or hostvars[item].operator_fleet_verified
+        fail_msg: "Missing verified fleet baseline for {{ item }}."
+      loop: "{{ groups[operator_deploy_group] }}"
+
+    - name: Require a successful capacity check from every selected host
+      ansible.builtin.assert:
+        that:
+          - hostvars[item].operator_deploy_capacity is defined
+          - hostvars[item].operator_deploy_capacity is succeeded
+          - hostvars[item].operator_deploy_capacity.workers > 1
+          - hostvars[item].operator_deploy_capacity.available_cpus > 1
+        fail_msg: "Missing CPU capacity for {{ item }}."
+      loop: "{{ groups[operator_deploy_group] }}"
+      when: operator_managed_deployment
+
+    - name: Verify that every reviewed target measured sufficient CPU use
+      ansible.builtin.assert:
+        that:
+          - hostvars[item].operator_deploy_measurement is defined
+          - hostvars[item].operator_deploy_measurement.executed | default(false)
+          - hostvars[item].operator_deploy_measurement is succeeded
+          - hostvars[item].operator_deploy_measurement.average_cpus > 1
+          - hostvars[item].operator_deploy_measurement.average_cpus >=
+            hostvars[item].operator_deploy_measurement.minimum_average_cpus
+        fail_msg: "Missing successful CPU measurement for {{ item }}. Activation stopped."
+      loop: "{{ operator_reviewed_hosts | default([]) }}"
+      when: operator_managed_deployment and not ansible_check_mode
+
+    - name: Require fresh observer approval just before activation
+      when: operator_managed_deployment and not ansible_check_mode
+      block:
+        - name: Ask the active observer for a new assessment
+          ansible.builtin.copy:
+            content: '{"phase":"preactivation"}'
+            dest: "{{ operator_watch_dir }}/watch-request"
+            mode: "0600"
+
+        - name: Wait for the active observer's answer
+          ansible.builtin.wait_for:
+            path: "{{ operator_watch_dir }}/watch-response"
+            timeout: "{{ operator_watch_timeout }}"
+            sleep: 1
+
+        - name: Release activation only after a healthy observation
+          ansible.builtin.assert:
+            that:
+              - assessment is mapping
+              - assessment.healthy is sameas true
+            fail_msg: "The deployment observer withheld activation."
+          vars:
+            assessment: >-
+              {{ lookup('ansible.builtin.file', operator_watch_dir ~ '/watch-response') | from_json
+              }}
+
+        - name: Record the controller's approval for this reviewed release
+          ansible.builtin.set_fact:
+            operator_activation_approved: true
+
+- name: Activate the measured release
+  hosts: "{{ operator_deploy_group }}"
+  gather_facts: false
+  strategy: linear
+  any_errors_fatal: true
+  tasks:
+    - name: Execute the project's activation tasks
+      ansible.builtin.include_tasks: "{{ operator_activate_tasks }}"
+      when:
+        - operator_managed_deployment and not ansible_check_mode
+        - inventory_hostname in operator_reviewed_hosts
+        - hostvars['localhost'].operator_activation_approved | default(false)

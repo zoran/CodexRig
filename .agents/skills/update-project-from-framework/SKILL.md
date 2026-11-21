@@ -26,14 +26,14 @@ pnpm framework:upgrade -- --target <root>
 The source's versioned selection and formatter project current output. The default plan retains
 target-only files and combines missing package commands and verification entries with product
 extensions. Review differing shared keys and existing opaque tools. Prefer the actual pristine
-generated ancestor with `--baseline` when available. It merges disjoint text changes in tools, CI,
+generated ancestor with `--baseline` when available. It merges disjoint text changes in tools,
 policies, READMEs and manifest documents, merges JSON by key and retires unchanged obsolete tools.
 Inspect overlapping edits and modify/delete conflicts. Regenerate conflicting dependency locks from
 the merged manifests through the target's dependency owner within the authorized scope. Classify
 differences as current source behavior, intentional product extension, obsolete behavior or
 unresolved ownership. Trace imports/commands before retirement. Review startup, roles/hooks,
-instructions/skills, registry, CI and maintained docs together; keeping a file does not prove that
-it received the fix.
+instructions/skills, registry and maintained docs together; keeping a file does not prove that it
+received the fix.
 
 Prefer current implementations with necessary extensions at narrow owners. Preserve typed product,
 delivery, tenancy and locale decisions, actual module context/negative-test owners, dependency
@@ -84,8 +84,9 @@ frozen inputs separately; preserve `--startup` in the normal launcher. Missing e
 restart and fixture-only claims remain explicit.
 
 A final current-output preview must explain every intentional deviation. Repeating a settled update
-must make no writes. Check that custom commands still dispatch and product files survive. Use
-existing reviews and evidence, settle owned source/target state and remove owned temporary
-decisions. Report version, changes, preservation, exact tests and limits; stop at update acceptance
-without adopting the child's backlog or running `goal:new` to invent work. No installation receipt
-or universal self-updater.
+must make no target writes. Check that custom commands still dispatch and product files survive. The
+source upgrade command schedules the
+[post-update session reset](../../../README.md#update-generated-projects) when it applies changes.
+Finish verification and settle recovery while the source session is open. Report version, changes,
+preservation, exact tests and limits. Stop at update acceptance without adopting the child's backlog
+or running `goal:new` to invent work. No installation receipt or universal self-updater.

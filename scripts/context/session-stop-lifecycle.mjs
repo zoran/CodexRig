@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   discoverRecentCriticalBudgetHandover,
   hasCriticalBudgetHandoverForSession,
+  hasPendingAccountPause,
 } from "./critical-budget-handover.mjs";
 import { readProjectWorkContext, workContextResumeBoundary } from "./project-work-state.mjs";
 import { inspectRuntimeSessionLease } from "../repository/runtime-session-lease.mjs";
@@ -209,7 +210,19 @@ function sealedHandoverStop(root, testHooks) {
           testHooks,
         })
       : discoverRecentCriticalBudgetHandover({ root, testHooks });
-  if (!sealed) return null;
+  if (!sealed) {
+    try {
+      if (!hasPendingAccountPause({ root, testHooks })) return null;
+    } catch (error) {
+      return {
+        systemMessage: `Automatic continuation is paused until handover storage is reconciled: ${formatContextError(error, root)}.`,
+      };
+    }
+    return {
+      systemMessage:
+        "An account-window handover is paused. Wait for the user to select the exact snapshot before reading or resuming it. Recheck current capacity after explicit selection.",
+    };
+  }
   return {
     systemMessage:
       "A critical-budget handover is sealed for this runtime session. Stop completely. " +
@@ -298,6 +311,7 @@ export async function runStopLifecycle({
   root = repositoryRoot,
   hookInput = "",
   expectedSessionId = null,
+  inspectCapacity,
   testHooks,
 } = {}) {
   const prepared = prepareAutonomousContinuation(root, hookInput);
@@ -317,5 +331,30 @@ export async function runStopLifecycle({
     inspectHandover: false,
     testHooks,
   });
+  if (output.decision === "block" && inspectCapacity) {
+    try {
+      const { action } = await inspectCapacity();
+      if (action === "pause") {
+        return {
+          decision: "block",
+          reason:
+            "The verified ordinary account window reached 5% or less. Perform only the recoverable pause now. Drain owned work to a safe checkpoint, refresh docs/project-context.md and run pnpm handover:check. Once the handover exists, pause any active Goal, report the project tmp/ path and wait for explicit selection.",
+        };
+      }
+      if (action === "recovery-required" || action === "critical-drain") {
+        return {
+          decision: "block",
+          reason:
+            action === "recovery-required"
+              ? "Resolve the available or pending free account recovery under Capacity Admission And Monitoring and refresh permission before continuing."
+              : "The native account denies ordinary use. Follow Critical Budget Drain and stop after sealing.",
+        };
+      }
+    } catch {
+      // A failed observation cannot establish exhaustion. The primary owns the next capacity check.
+      output.reason +=
+        " Native account capacity is currently unknown. Recheck before admitting agents.";
+    }
+  }
   return output;
 }

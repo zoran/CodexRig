@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-/** Owns compatibility track preparation in a disposable CI checkout, never the published stable pins. */
+/** Owns compatibility track preparation in a disposable local checkout with the shared host toolchain. */
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { readCompatibilityMatrix } from "../contracts/framework-contract.mjs";
 import { toolingRoot } from "../filesystem/repository-files.mjs";
+import { inspectRepositoryWorktrees } from "../repository/worktree-recovery.mjs";
 import { maintainToolchain } from "../deps/maintain-toolchain.mjs";
 import { resolveCompatibilityToolchain } from "../deps/toolchain-releases.mjs";
 import { frameworkVersionReconciliationPlan } from "./framework-version.mjs";
@@ -15,6 +16,19 @@ export async function prepareCompatibilityTrack({ root = toolingRoot, trackId, .
   const matrix = readCompatibilityMatrix(root);
   const track = matrix.canaries.find((entry) => entry.id === trackId);
   if (!track) throw new Error("Unknown declared compatibility track.");
+  const inventory = inspectRepositoryWorktrees({ root });
+  const [worktree] = inventory.worktrees;
+  if (
+    !inventory.complete ||
+    inventory.repositoryKind !== "git" ||
+    inventory.worktrees.length !== 1 ||
+    !worktree?.current ||
+    !worktree.detached ||
+    worktree.dirty !== false ||
+    worktree.problem
+  ) {
+    throw new Error("Prepare an experiment in a clean, detached, disposable local clone.");
+  }
   const before = frameworkVersionReconciliationPlan({ root, review: true });
   if (before.blockingFindings.length || before.driftFindings.length)
     throw new Error(

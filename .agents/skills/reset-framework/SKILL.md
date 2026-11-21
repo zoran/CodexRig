@@ -30,9 +30,12 @@ env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/res
 env -u NODE_OPTIONS -u NODE_PATH node .agents/skills/reset-framework/scripts/reset-framework.mjs --apply
 ```
 
-Full apply requires all sessions exited and proven runtime quiescence. Review exact candidates and
-require a clean final preview. The owner's publication mode allows source cleanup for a proven live
-caller; do not manually remove leases, runtime databases/WAL, worktrees or unknown recovery.
+The [source upgrade command](../../../README.md#update-generated-projects) also schedules a full
+session reset after a successful child change. Its launcher settles the request after exit or before
+the next picker. A manual full apply requires all sessions exited and proven runtime quiescence.
+Review exact candidates and require a clean final preview. The owner's publication mode allows
+source cleanup for a proven live caller; do not manually remove leases, runtime databases/WAL,
+worktrees or unknown recovery.
 
 [Source inventory](../../../scripts/repository/source-inventory-policy.mjs) owns the precise
 retained credential/runtime classification. Preserve Git/history, source, dependencies, portable
@@ -44,7 +47,8 @@ only when explicitly in scope.
 Child updates and repairs use `.project-state/child-maintenance/` for disposable source-side
 material. Publication removes recognized untracked upgrade documents and checks the exact Git
 candidate and outgoing history for child artifacts and checkout references. Resolve findings in
-durable source before retrying. Preserve nested repositories and private account state.
+durable source before retrying. Preserve nested repositories, private accounts, local build
+pipelines and releases, and infrastructure plans and state. Their respective tools own retention.
 
 Keep the manifest product-neutral. Verification's lock-bound read-only source baseline may retain
 valid unfinished context for an active session; completed source cleanup removes it. Reuse evidence

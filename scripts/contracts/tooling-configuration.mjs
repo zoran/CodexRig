@@ -151,8 +151,6 @@ export function validateToolingConfiguration(value) {
       );
     }
   }
-  const ci = requiredObject(platform.ci, "platform.ci");
-  requiredString(ci.requiredCheck, "platform.ci.requiredCheck");
   const protection = requiredObject(platform.protection, "platform.protection");
   const approvals = requiredInteger(
     protection.requiredApprovals,
@@ -172,12 +170,11 @@ export function validateToolingConfiguration(value) {
       throw new Error(`platform.protection.${field} must be boolean.`);
     }
   }
-  if (!["disabled", "prefer", "required"].includes(protection.mergeSerialization)) {
+  if (Object.hasOwn(platform, "ci") || Object.hasOwn(protection, "mergeSerialization")) {
     throw new Error(
-      "platform.protection.mergeSerialization must be disabled, prefer, or required.",
+      "Remove provider CI and merge serialization settings from local-build tooling.",
     );
   }
-
   return contract;
 }
 

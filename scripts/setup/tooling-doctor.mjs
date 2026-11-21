@@ -1,14 +1,9 @@
 #!/usr/bin/env node
-/** Owns the local tooling doctor for runtime pins and CI integrity. */
+/** Owns the local tooling doctor for shared host runtimes and project pins. */
 import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
-import { existsSync, lstatSync } from "node:fs";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import {
-  toolingRoot,
-  readRepositoryFile,
-  resolveRepositoryPath,
-} from "../filesystem/repository-files.mjs";
+import { toolingRoot, readRepositoryFile } from "../filesystem/repository-files.mjs";
 import {
   compareSemver,
   parseSemver,
@@ -17,8 +12,7 @@ import {
 import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
 import { validateMinimalMiseTools } from "../contracts/mise-toolchain-configuration.mjs";
-import { detectGitProvider, platformCiPath } from "../platform/git-provider.mjs";
-import { ciAdapterContractViolations } from "../deps/ci-toolchain-contract.mjs";
+import { detectGitProvider } from "../platform/git-provider.mjs";
 import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
 import {
   projectManagedToolLayout,
@@ -42,7 +36,7 @@ function toolVersion(root, name, args, label, errors, environment) {
     pushFinding(
       errors,
       `tool.${label}.missing`,
-      `${label} managed project installation is unavailable or invalid.`,
+      `The project's pinned ${label} installation is unavailable or invalid in shared host storage.`,
     );
     return "";
   }
@@ -68,14 +62,7 @@ function toolVersion(root, name, args, label, errors, environment) {
   return match[1];
 }
 
-function regularFileExists(root, relativePath) {
-  const absolutePath = resolveRepositoryPath(root, relativePath);
-  if (!existsSync(absolutePath)) return false;
-  const stats = lstatSync(absolutePath);
-  return !stats.isSymbolicLink() && stats.isFile() && stats.nlink === 1;
-}
-
-function validateToolchainOwners({ contract, matrix, root, errors }) {
+function validateToolchainOwners({ matrix, root, errors }) {
   let packageJson;
   try {
     packageJson = JSON.parse(readRepositoryFile(root, "package.json"));
@@ -159,35 +146,6 @@ function validateRuntimeVersions({ matrix, root, errors, versions, environment }
   }
 }
 
-function validateCiAdapters({ root, matrix, errors }) {
-  for (const provider of ["github", "gitlab"]) {
-    const relativePath = platformCiPath(provider);
-    if (!regularFileExists(root, relativePath)) {
-      pushFinding(errors, `platform.${provider}.ci-missing`, `${provider} CI adapter is missing.`);
-      continue;
-    }
-    const content = readRepositoryFile(root, relativePath);
-    let violations;
-    try {
-      violations = ciAdapterContractViolations(provider, content, matrix);
-    } catch (error) {
-      pushFinding(
-        errors,
-        `platform.${provider}.ci-contract`,
-        `${provider} CI compatibility truth is invalid: ${error.message}`,
-      );
-      continue;
-    }
-    for (const violation of violations) {
-      pushFinding(
-        errors,
-        `platform.${provider}.ci-contract`,
-        `${provider} CI adapter violates the ${violation} requirement.`,
-      );
-    }
-  }
-}
-
 async function registryLatest(fetchImpl, packageName) {
   const encoded = encodeURIComponent(packageName);
   const response = await fetchImpl(`https://registry.npmjs.org/${encoded}/latest`, {
@@ -217,7 +175,7 @@ export function compatibilityFreshnessWarnings(matrix, latest) {
     pushFinding(
       warnings,
       "online.codex.newer",
-      `Codex stable ${latest.codex} is newer than the reviewed blocking-CI version ${matrix.ci.codexVersion}; run canonical startup maintenance to review the official archives and update project installations and CI pins together.`,
+      `Codex stable ${latest.codex} is newer than the local toolchain pin ${matrix.ci.codexVersion}. Run startup maintenance to review the official archives and update the shared installation.`,
     );
   }
   return warnings;
@@ -260,9 +218,8 @@ export async function diagnoseTooling({
     pushFinding(errors, "contract.invalid", error.message);
     return { errors, mode: "unknown", online: {}, platform: null, versions, warnings };
   }
-  validateToolchainOwners({ contract, matrix, root, errors });
+  validateToolchainOwners({ matrix, root, errors });
   validateRuntimeVersions({ matrix, root, errors, versions, environment });
-  validateCiAdapters({ root, matrix, errors });
   const mode = "project";
   let platform = null;
   try {

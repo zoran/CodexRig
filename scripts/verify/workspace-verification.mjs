@@ -3,6 +3,7 @@ import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { discoverPnpmWorkspaceManifestPaths } from "../repository/pnpm-workspace-manifests.mjs";
 import { normalizePath, root } from "./adaptive-state.mjs";
+import { retainedWorkspaceOutput } from "./local-workspace-build.mjs";
 import { readVerificationConfiguration } from "./verification-configuration.mjs";
 const defaultWorkspaceOutputs = readVerificationConfiguration().workspaceOutputs ?? {};
 
@@ -254,7 +255,7 @@ function workspaceUnits(owners, command, scriptName, manifests, outputDeclaratio
     artifactOwners: [`workspace:${owner.directory}`],
     workspaceDirectories: [owner.directory],
     outputs: outputDeclarations[owner.directory]?.[scriptName]?.map((file) =>
-      owner.directory === "." ? file : `${owner.directory}/${file}`,
+      retainedWorkspaceOutput(owner.directory, file),
     ),
     buildPrerequisites: buildPrerequisites([owner], scriptName, manifests),
   }));
@@ -310,7 +311,7 @@ export function workspaceLifecycleCommands(
       outputs: owners.every((owner) => outputDeclarations[owner.directory]?.[scriptName]?.length)
         ? owners.flatMap((owner) =>
             outputDeclarations[owner.directory][scriptName].map((file) =>
-              owner.directory === "." ? file : `${owner.directory}/${file}`,
+              retainedWorkspaceOutput(owner.directory, file),
             ),
           )
         : undefined,

@@ -38,7 +38,10 @@ import {
   acquireDependencyTransactionLock,
   releaseDependencyTransactionLock,
 } from "../../../../scripts/deps/dependency-transaction-state.mjs";
-import { openFrameworkRuntimeStatus, removeResetCandidate } from "./reset-framework.mjs";
+import {
+  openFrameworkRuntimeStatus,
+  removeResetCandidate,
+} from "../../../../scripts/framework/framework-reset.mjs";
 import {
   prepareProjectToolDirectories,
   projectToolEnvironment,
@@ -250,6 +253,12 @@ test("publication preserves unfinished transaction state before clearing disposa
   t.after(() => rmSync(root, { force: true, recursive: true }));
   const scratch = ".project-state/child-maintenance/notes.log";
   write(root, scratch, "temporary child output");
+  const retained = [
+    ".project-state/build/pipeline.json",
+    ".project-state/build/releases/release/artifact",
+    ".project-state/infrastructure/plans/review/terraform.plan",
+  ];
+  for (const file of retained) write(root, file, "private project data\n", 0o600);
   for (const owner of ["framework-upgrade", "repository-housekeeping", "dependency-update"]) {
     const journal = path.join(".project-state", owner, "journal.json");
     write(root, journal, '{"pending":true}');
@@ -262,6 +271,9 @@ test("publication preserves unfinished transaction state before clearing disposa
   }
   assert.equal(run(root, ["--publication", "--apply"]).status, 0);
   assert.equal(existsSync(path.join(root, scratch)), false);
+  assert.equal(run(root, ["--publication"]).status, 0);
+  for (const file of retained)
+    assert.equal(readFileSync(path.join(root, file), "utf8"), "private project data\n");
 });
 
 test("reset preserves reusable startup repairs and their release metadata byte for byte", (t) => {

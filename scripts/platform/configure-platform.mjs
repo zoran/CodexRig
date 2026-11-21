@@ -42,33 +42,22 @@ export function platformConfigurationPlan({ contract, detected }) {
   ) {
     throw new Error("Detected Git platform host is not owned by that provider in the contract.");
   }
-  const serialization = contract.platform.protection.mergeSerialization;
-  const serializationOperation =
-    serialization === "disabled"
-      ? []
-      : [
-          detected.provider === "github"
-            ? `${serialization} merge queue`
-            : `${serialization} merged-results pipeline and merge train`,
-        ];
   return {
     apiBaseUrl: providerApiBase(contract, detected.provider, detected.hostname),
     integrationBranch: contract.platform.integrationBranch,
-    mergeSerialization: serialization,
     operations:
       detected.provider === "github"
         ? [
             "reconcile repository ruleset",
             "require pull request review and resolved discussions",
-            "require CI",
-            ...serializationOperation,
+            "disable repository GitHub Actions and retire the framework workflow check and merge queue",
             "read back effective policy",
           ]
         : [
             "reconcile integration-branch protection",
             "reconcile merge request approval policy and rule",
-            "require CI and resolved discussions",
-            ...serializationOperation,
+            "disable GitLab CI/CD, Auto DevOps, merge pipelines and merge trains",
+            "require resolved discussions",
             "read back effective policy",
           ],
     provider: detected.provider,
@@ -81,7 +70,6 @@ export function platformConfigurationPlan({ contract, detected }) {
       requiredApprovals: contract.platform.protection.requiredApprovals,
       resetApprovalsOnPush: contract.platform.protection.resetApprovalsOnPush,
     },
-    requiredCheck: contract.platform.ci.requiredCheck,
   };
 }
 

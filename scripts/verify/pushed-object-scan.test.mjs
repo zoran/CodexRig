@@ -99,6 +99,66 @@ test("clean pushed range passes without findings", async (t) => {
   assert.equal(result.refCount, 1);
 });
 
+test("publication rejects force-added local builds and provider workflows even after removal", async (t) => {
+  const root = temporaryRepository();
+  t.after(() => rmSync(root, { force: true, recursive: true }));
+  const write = (file) => {
+    const location = path.join(root, file);
+    mkdirSync(path.dirname(location), { recursive: true });
+    writeFileSync(location, "ordinary fixture content\n");
+  };
+  writeFileSync(
+    path.join(root, ".gitignore"),
+    ".project-state/\nbuild/\ndist/\n/.github/workflows/\n/.gitlab-ci.*\n",
+  );
+  const baseline = commit(root, "baseline");
+  for (const file of [
+    "scripts/local-build/run.mjs",
+    "bin/build",
+    "tests/fixtures/.github/workflows/example.yaml",
+    "tests/fixtures/.gitlab-ci.yml",
+  ])
+    write(file);
+  const sourceCommit = commit(root, "portable source");
+  const scan = (tip, from) =>
+    inspectPushedObjects(`refs/heads/main ${tip} refs/heads/main ${from}\n`, {
+      repositoryRoot: root,
+    });
+  assert.deepEqual((await scan(sourceCommit, baseline)).findings, []);
+
+  const reserved = [
+    ".project-state/infrastructure/target/plans/session/terraform.plan",
+    ".project-state/build/recipe.json",
+    ".project-state/build/outputs/summary.txt",
+    "build/image.tar",
+    "dist/bundle.js",
+    "apps/web/build/image.tar",
+    "packages/tool/dist/bundle.js",
+    ".github/workflows/verify.yaml",
+    ".github/workflows/publish.yml",
+    ".gitlab-ci.yaml",
+    "bitbucket-pipelines.yml",
+    ".forgejo/workflows/check.yml",
+    ".gitlab-ci.yml",
+  ];
+  for (const file of reserved) write(file);
+  git(root, "add", "-f", "--", ...reserved);
+  const intermediate = commit(root, "locally built files");
+  git(root, "rm", "--quiet", "--", ...reserved);
+  const head = commit(root, "remove local files");
+  for (const from of [sourceCommit, "0".repeat(head.length)]) {
+    const { findings } = await scan(head, from);
+    assert.equal(findings.length, reserved.length);
+    for (const file of reserved) {
+      assert.ok(
+        findings.some((entry) => entry.startsWith(`"${file}" at ${intermediate.slice(0, 12)}:`)),
+        file,
+      );
+    }
+  }
+  assert.deepEqual((await scan(head, intermediate)).findings, []);
+});
+
 test("active Git replacement refs fail closed before pushed objects are inspected", async (t) => {
   const root = temporaryRepository();
   t.after(() => rmSync(root, { force: true, recursive: true }));

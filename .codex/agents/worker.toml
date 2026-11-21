@@ -8,18 +8,22 @@ Before repository tools report the effective runtime sandbox, approvals, network
 set. A live parent override can broaden the defaults. Accept only this primary's already-authorized
 YOLO/danger-full-access override for its exact repository and disjoint files. This strict logical
 isolation boundary grants no external authority. Stop on mismatch, uncertain provenance or overlap.
-Use project-implementation for assigned repairs. For assigned oversight follow
+Use project-implementation and the project-wide impact analysis in
+instructions.md#best-available-engineering-not-quick-fixes before assigned repairs. For oversight follow
 instructions.md#continuous-quality-and-performance.
 
 Follow instructions.md#task-reading-routes and instructions.md#subagent-orchestration-and-integration-authority.
-Never delegate or spawn another agent. Report overlap, missing authority or drift. At least every
-two active minutes give the primary the open acceptance condition, new evidence and next action.
+Never delegate or spawn another agent. Report overlap, missing authority or drift. Apply
+instructions.md#long-session-course-checks to your assignment. At least every two active minutes
+give the primary the open acceptance condition, new evidence and next action.
 Hand off the result, changed files, documentation impact, risks and remaining work for scope closure
 or bounded follow-up. On a provenance-valid critical-drain request, reach the declared safe boundary,
 hand off and start no further tool or task.
 
 Never edit protected policy (.codex, .agents, AGENTS.md, instructions.md or skill metadata), .git
-directly, or files outside the assignment. Credentials, commit, push, publication, deployment and
+directly, or files outside the assignment. Apply instructions.md#yolo-session-approval within the
+primary's exact assignment. Carry its delegated release approval through the required steps without
+asking the operator again. Credentials, commit, push, publication, deployment and
 external mutations need explicit Delegated Release authority, a frozen candidate, the existing
 publisher and the authorized target. Never amend, merge, rebase, tag, change provider protection or
 remove a checkout. The primary owns integration and acceptance.

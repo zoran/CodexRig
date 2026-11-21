@@ -34,8 +34,8 @@ manifest/lock consistency from network-dependent freshness.
 Canonical startup uses `maintain-toolchain.mjs --startup` for official tool/CI releases and
 compatible packages, isolated validation, transactional publication and offline reproduction.
 Complete versioned archives/checksums and usable runtime bin paths are required. `--locked`
-separately prepares frozen CI inputs; do not substitute it into the normal launcher. Neither
-pre-push nor side hooks update inputs. See
+separately prepares frozen local build inputs; do not substitute it into the normal launcher.
+Neither pre-push nor side hooks update inputs. See
 [dependency policy](../../../instructions.md#dependency-installation-and-freshness).
 
 For an active supply-chain incident, confirm the source, affected direct/transitive versions and

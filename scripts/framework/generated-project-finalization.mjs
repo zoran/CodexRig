@@ -9,15 +9,16 @@ import {
   selectedProjectPackage,
   selectedProjectVerification,
 } from "./project-tool-selection.mjs";
-import { projectCiProjection, projectToolingConfiguration } from "./generated-project-tooling.mjs";
+import { projectToolingConfiguration } from "./generated-project-tooling.mjs";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { formatContextError } from "../terminal/terminal-output.mjs";
-import { listManagedMarkdownFiles } from "../docs/document-scope.mjs";
+import { isManagedMarkdownPath, listManagedMarkdownFiles } from "../docs/document-scope.mjs";
 import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { listPortableTransferFiles } from "../repository/source-inventory.mjs";
+import { localBuildPublicationPathReason } from "../repository/source-inventory-policy.mjs";
 import { readStableRepositoryText } from "../repository/stable-file-snapshot.mjs";
 import { productSourceBoundaryFindings } from "../verify/path-hygiene.mjs";
 import { deliveryConfigurationPath } from "../contracts/delivery-configuration.mjs";
@@ -35,8 +36,6 @@ const transformedProjectPaths = new Set([
   ".codex/config.toml",
   ".codex/verification.json",
   ".codex/tooling.json",
-  ".github/workflows/ci.yml",
-  ".gitlab-ci.yml",
   ...generatedProjectDocuments,
   "package.json",
 ]);
@@ -148,14 +147,6 @@ function assertDeclaredConfigurationTransformations({
     projectOutputText(JSON.stringify(selectedProjectVerification(sourceVerification, selection)))
   )
     fail("Generated verification differs from its selected project capabilities.");
-  for (const file of [".github/workflows/ci.yml", ".gitlab-ci.yml"])
-    if (
-      readFileSync(path.join(targetRoot, file), "utf8") !==
-      projectOutputText(
-        projectCiProjection(file, readFileSync(path.join(sourceRoot, file), "utf8")),
-      )
-    )
-      fail("Generated CI differs from its selected stable adapter.");
 }
 
 export function assertGeneratedProjectParity({
@@ -320,11 +311,14 @@ export function formatGeneratedMarkdown(sourceRoot, targetRoot) {
 export function assertGeneratedProjectClean(
   targetRoot,
   packageName,
-  { projectDescription = "" } = {},
+  { projectDescription = "", transferManifest } = {},
 ) {
   for (const forbidden of [
     ".git",
     ".gitlab",
+    ".gitlab-ci.yml",
+    ".gitlab-ci.yaml",
+    ".github/workflows",
     ".codex/runtime",
     "docs/planning",
     ".project-state",
@@ -359,23 +353,17 @@ export function assertGeneratedProjectClean(
       const absolutePath = path.join(directory, entry.name);
       const relativePath = posixRelative(targetRoot, absolutePath);
       if (entry.isSymbolicLink()) fail(`Generated project contains a symlink: ${relativePath}`);
-      if (entry.isFile()) continue;
+      if (entry.isFile()) {
+        const excludedBuild = localBuildPublicationPathReason(relativePath);
+        if (excludedBuild) fail(`Generated project contains ${excludedBuild}: ${relativePath}`);
+        continue;
+      }
       if (!entry.isDirectory()) continue;
       if (forbiddenSegments.has(entry.name)) {
         fail(`Generated project contains forbidden nested state: ${relativePath}`);
       }
       pendingDirectories.push(absolutePath);
     }
-  }
-  const githubEntries = readdirSync(path.join(targetRoot, ".github"), {
-    recursive: true,
-    withFileTypes: true,
-  })
-    .filter((entry) => entry.isFile())
-    .map((entry) => posixRelative(targetRoot, path.join(entry.parentPath, entry.name)))
-    .sort();
-  if (githubEntries.join("\n") !== ".github/workflows/ci.yml") {
-    fail("Generated project must retain only the portable GitHub CI adapter under .github/.");
   }
   const boundaryFindings = productSourceBoundaryFindings({ repositoryRoot: targetRoot });
   if (boundaryFindings.length > 0) {
@@ -417,11 +405,11 @@ export function assertGeneratedProjectClean(
   const packageJson = JSON.parse(readFileSync(path.join(targetRoot, "package.json"), "utf8"));
   if (packageJson.name !== packageName) fail("Generated package name was not updated.");
   if (packageJson.version !== "0.1.0") fail("Generated package must start at version 0.1.0.");
-  if (!existsSync(path.join(targetRoot, ".gitlab-ci.yml"))) {
-    fail("Generated project must retain the portable GitLab CI adapter.");
-  }
   const projectDocuments = listManagedMarkdownFiles({ root: targetRoot });
   const expectedDocuments = [
+    ...transferManifest.files
+      .map(({ relativePath }) => relativePath)
+      .filter((file) => isManagedMarkdownPath(file) && !generatedProjectDocuments.has(file)),
     ...generatedProjectDocuments,
     ...(projectDescription ? [initialRequirementsPath] : []),
   ].sort();

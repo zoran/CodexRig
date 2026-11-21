@@ -12,6 +12,7 @@ Tracked configuration is portable; native runtime and account state are private.
 | `verification.json`                        | Commands, input consumers, shared execution inputs and output contracts.    |
 
 Exact schemas belong to their validators. Configuration validation does not prove model obedience.
+SessionStart reports the verified approval mode under the [YOLO session policy](../instructions.md#yolo-session-approval).
 Policy, runtime and hook changes take effect through the next canonical launch; reloading a chat
 does not replace its controller. Use the [README commands](../README.md#essential-commands).
 

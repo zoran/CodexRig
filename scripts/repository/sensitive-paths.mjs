@@ -63,7 +63,19 @@ function hasSensitiveRelativePath(segments) {
   ].some((candidate) => relative === candidate || relative.endsWith(`/${candidate}`));
 }
 
+export function infrastructureStatePathReason(value) {
+  const segments = normalizedSegments(value);
+  const name = segments.at(-1) ?? "";
+  return (segments[0] === ".project-state" && segments[1] === "infrastructure") ||
+    segments.includes(".terraform") ||
+    /(?:\.tfstate(?:\.|$)|\.tfplan$)/iu.test(name)
+    ? "private Terraform working data, state or saved plan"
+    : null;
+}
+
 export function sensitivePathReason(value) {
+  const infrastructure = infrastructureStatePathReason(value);
+  if (infrastructure) return infrastructure;
   const segments = normalizedSegments(value);
   const basename = (segments.at(-1) ?? "").toLowerCase();
   const extension = path.posix.extname(basename);

@@ -13,11 +13,13 @@ bash -p scripts/setup/start-codex.sh
 ```
 
 Startup maintains compatible tools/dependencies before native Codex resume. Defaults are
-workspace-write, on-request approvals and disabled command network access. Explicitly authorized Dev
-sessions use `bash -p scripts/setup/start-codex.sh --yolo` for unrestricted access without approval
-prompts; task scope stays unchanged. Keep `bash -p` to block inherited shell startup code. Only
-`--yolo` and `--no-alt-screen` are launcher controls; enter prompts after session selection.
-[Session Start](instructions.md#session-start) and
+workspace-write, on-request approvals and disabled command network access. Starting with
+`bash -p scripts/setup/start-codex.sh --yolo` gives advance approval for every step within the
+requested outcome, including the publication and deployment required by a go-live. The startup hook
+confirms the selected mode for new and resumed sessions. See
+[YOLO session approval](instructions.md#yolo-session-approval). Keep `bash -p` to block inherited
+shell startup code. Only `--yolo` and `--no-alt-screen` are launcher controls; enter prompts after
+session selection. [Session Start](instructions.md#session-start) and
 [Effective Permissions](instructions.md#effective-permissions-and-write-isolation) own these
 boundaries.
 
@@ -32,12 +34,12 @@ bash -p scripts/setup/run-project.sh pnpm setup
 bash -p scripts/setup/run-project.sh pnpm framework:doctor -- --online
 ```
 
-Frozen setup and CI add `--locked` to the maintenance command; normal startup retains release
-discovery. [Dependency maintenance](instructions.md#dependency-installation-and-freshness) owns
-installation, migration and freshness. Startup waits for a live lifecycle coordinator; cancelling
-the wait preserves the owner. A dead coordinator with surviving commands fails promptly for owned
-recovery. Cancellable verification checks drain when their caller exits; other operations retain
-their completion boundary. Never bypass a live or uncertain lock.
+Frozen setup and local builds add `--locked` to the maintenance command; normal startup retains
+release discovery. [Dependency maintenance](instructions.md#dependency-installation-and-freshness)
+owns installation, migration and freshness. Startup waits for a live lifecycle coordinator;
+cancelling the wait preserves the owner. A dead coordinator with surviving commands fails promptly
+for owned recovery. Cancellable verification checks drain when their caller exits; other operations
+retain their completion boundary. Never bypass a live or uncertain lock.
 
 Startup checks official native downloads with a one-byte ranged GET and cancels each response body,
 including when the server ignores Range. This avoids gateways that fail or stall on HEAD probes.
@@ -89,6 +91,8 @@ or explicitly defer it and develop requirements during
   [Infrastructure as Code](instructions.md#infrastructure-as-code) and
   [permission design](instructions.md#permission-design).
 - [Codex configuration](.codex/README.md): session, agent and private runtime settings.
+- [Infrastructure administration](scripts/infrastructure/README.md) covers the Python CLI, text menu
+  and project operation catalog.
 
 `.codexrig/` owns source release identity, compatibility experiments and project-tool selection.
 `.codex/tooling.json`, `.codex/toolchain.json` and `.codex/verification.json` own runtime settings,
@@ -113,7 +117,9 @@ pnpm verify:changed
 pnpm verify                             # explicit complete coverage
 pnpm project:export -- --name "<Project Name>"
 pnpm framework:reset                    # preview; add --apply after sessions exit
-pnpm handover:create -- --critical       # terminal seal after a confirmed critical-capacity decision
+pnpm handover:check -- --inspect          # read current native account windows
+pnpm handover:check                      # at a safe checkpoint, pause automatically at 5% or less
+pnpm handover:create -- --critical       # terminal seal for a confirmed hard limit
 ```
 
 Plan before running checks. Development selects affected units; missing full evidence, a review or
@@ -141,8 +147,9 @@ Keep source-side notes, patches, reproductions and saved reports from child upda
 `.project-state/child-maintenance/`. Framework publication clears this scratch and recognizes loose
 untracked upgrade previews and reconciliation JSON by their content. It checks the candidate and
 outgoing local commits for misplaced review documents, loose patches and concrete external checkout
-references. A finding identifies the source file for review. Cleanup preserves nested checkouts and
-stops before deleting an unfinished update or recovery journal.
+references. A finding identifies the source file for review. Cleanup preserves nested checkouts,
+local build pipelines, releases and infrastructure state. Unfinished update or recovery journals
+defer cleanup until their owner settles them.
 
 When invoked with publication authority, the command cleans, verifies, commits and pushes reviewed
 non-ignored source on `main`, then confirms the remote commit. Failures preserve source and local
@@ -154,9 +161,37 @@ Candidate pinning and isolated release clones follow
 [Delegated Release](instructions.md#delegated-release); see
 [publication gates](instructions.md#verification-and-publication-gates) for authority and evidence.
 
-A sealed critical handover is terminal: stop, exit Codex, relaunch and accept the announced
-handover. Keep its files intact; restart alone proves no capacity recovery.
+An ordinary 5% account pause saves unfinished work in the project's private
+`tmp/codexrig-handovers/` directory. After switching accounts, tell Codex “Mache mit dem Handover
+`<genauer Pfad>` als Goal weiter.” This selects the handover and authorizes the native Goal. A
+hard-limit seal requires a separate canonical session.
 [Capacity policy](instructions.md#capacity-admission-and-monitoring) owns admission and recovery.
+
+## Local Builds
+
+Run builds on the local host through the pinned project environment. From that environment use:
+
+```sh
+pnpm build:local init
+pnpm build:local run
+pnpm build:local list
+```
+
+Edit the generated `.project-state/build/pipeline.json` to name the project's build commands and
+artifact paths. The default pnpm pipeline materializes the committed lockfile offline from the
+shared store before building. Prepare its packages once. The runner builds a committed source
+snapshot, publishes successful outputs to `.project-state/build/releases/` and keeps the three
+newest successful releases across the project. Use `pnpm build:local run --jobs 4` to lower the
+local worker budget and `pnpm build:local clean` to collect old work on demand. A pipeline can set
+`memoryMiBPerJob` from a measured peak to bound parallel jobs by available memory as well as CPU.
+Workspace verification builds the current working tree, including uncommitted source, in its own
+scratch directory. Only declared outputs are cached in `.project-state/build/verification-outputs/`
+for checks that consume them. The runner uses the host's shared, pinned tools. Keep project inputs,
+pipeline definitions, work and release output isolated. GitHub and GitLab host source and reviews.
+The pre-push hook checks outgoing history for private pipeline files and build output. For an
+existing remote repository, preview the owner-scoped settings with `pnpm platform:configure`. Only a
+separately authorized apply disables Actions or GitLab CI/CD and Auto DevOps and reconciles the
+branch rules.
 
 ## Project Accounts
 
@@ -228,8 +263,11 @@ comparison adds missing portable tools, package commands and verification entrie
 project-only files, package metadata and custom checks. Divergent shared commands or existing tool
 implementations require a decision.
 
+Updates retire the two former stock provider workflows. An edited workflow needs a reviewed
+resolution so its project-specific behavior can move into the private local pipeline.
+
 Supply the original pristine generated tree with `--baseline` when available. The updater then
-merges independent text edits in shared tools, CI, policies and generated documentation, combines
+merges independent text edits in shared tools, policies and generated documentation, combines
 independent JSON fields and retires unchanged obsolete framework files. Overlapping edits,
 modify/delete conflicts and competing lockfile changes stop the entire apply. JSON conflicts
 identify the affected keys. Use `--reconcile` with the same baseline for reviewed exceptions. Writes
@@ -241,6 +279,17 @@ cannot fence an old launcher. Interrupted ordinary updates use `--recover`; rege
 
 One journal covers public tools/policy and named `--project-path` owners, excluding private runtime.
 Children have no self-updater or installation receipt.
+
+A successful `framework:upgrade -- --target <project-root> --apply` that changes the project
+schedules a full reset of the local CodexRig session state. Finish the update checks and exit
+CodexRig with `/quit`. The launcher then clears all framework threads, including archived ones,
+their indexes and databases, the local work-context cache, and the source-side child maintenance
+scratch. A terminal update can finish the reset immediately when the source is idle. After an
+interrupted exit, the next launch retries before opening the session picker. Active sessions,
+verification and unfinished recovery defer cleanup. Accounts, installation identity, source files
+and the updated project are preserved. Previews, failed applies and already-current projects leave
+session history in place.
+
 [Lifecycle](instructions.md#framework-lifecycle-compatibility-and-git-platforms) and
 [update scope](instructions.md#repository-update-scope) own reconciliation.
 [Targeted acceptance](instructions.md#maintenance-scope-and-verification) ends the update without

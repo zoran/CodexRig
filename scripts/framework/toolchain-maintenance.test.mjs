@@ -25,8 +25,6 @@ import { applyHousekeepingWrites } from "../repository/repository-housekeeping-t
 import { inspectRuntimeLifecycleLock } from "../repository/runtime-session-lease.mjs";
 import {
   acquireRuntimeLifecycleLock,
-  createRuntimeLifecycleDelegation,
-  cancelRuntimeLifecycleDelegation,
   releaseRuntimeLifecycleLock,
 } from "../repository/runtime-session-lease.mjs";
 import { prepareUserToolDirectories } from "../repository/user-tool-storage.mjs";
@@ -35,7 +33,6 @@ import { assertMaintenanceInventory, maintainToolchain } from "../deps/maintain-
 import {
   latestCompatibleVersion,
   releaseBytes,
-  refreshGithubActions,
   resolveToolchainReleases,
   resolveCompatibilityToolchain,
   verifiedMiseBinaryDigest,
@@ -297,98 +294,7 @@ test("official checksum lookup survives an exhausted REST quota and rejects corr
     /byte bound/u,
   );
 });
-function githubGitFixture(command, args) {
-  assert.equal(command, "git");
-  assert.equal(args[0], "ls-remote");
-  const repository = args
-    .at(-1)
-    .replace("https://github.com/", "")
-    .replace(/\.git$/u, "");
-  const source = readFileSync(path.join(toolingRoot, ".github/workflows/ci.yml"), "utf8");
-  const records = [...source.matchAll(/uses: ([^@ ]+)@([a-f0-9]{40}) # v(\d+\.\d+\.\d+)/gu)].filter(
-    (record) => record[1] === repository,
-  );
-  return {
-    pid: 123,
-    signal: null,
-    status: 0,
-    stdout:
-      [...new Set(records.map((record) => record[2] + "\trefs/tags/v" + record[3]))].join("\n") +
-      "\n",
-    stderr: "",
-  };
-}
-test("public Git resolves lightweight and annotated releases once per repository and verifies new commits", async (t) => {
-  const root = fixture(t),
-    oldSha = "a".repeat(40),
-    nextSha = "b".repeat(40),
-    tagSha = "c".repeat(40);
-  const content = `uses: actions/checkout@${oldSha} # v4.0.0\n`;
-  assert.equal(
-    spawnSync("git", ["init", "--template=", "--quiet"], {
-      cwd: root,
-      env: cleanGitEnvironment(process.env, root),
-    }).status,
-    0,
-  );
-  write(root, ".git/config", "[releaseprobe]\nmarker = inherited-project-config\n");
-  const calls = [],
-    directories = [];
-  const spawnGit = (command, args, options) => {
-    calls.push(args);
-    directories.push(options.cwd);
-    assert.equal(command, "git");
-    assert.equal(options.env.GIT_CONFIG_NOSYSTEM, "1");
-    assert.equal(options.env.GIT_CONFIG_COUNT, "0");
-    assert.equal(options.env.GIT_ALLOW_PROTOCOL, "https");
-    assert.equal(options.env.GIT_TERMINAL_PROMPT, "0");
-    assert.equal(options.env.GITHUB_TOKEN, undefined);
-    assert.equal(options.env.HOME, options.cwd);
-    assert.equal(options.env.USERPROFILE, options.cwd);
-    assert.ok(options.cwd.startsWith(path.join(root, ".auth/project-tools/tmp/")));
-    assert.equal(spawnSync("git", ["config", "--get", "releaseprobe.marker"], options).status, 1);
-    if (args[0] === "init") return spawnSync(command, args, options);
-    const stdout =
-      args[0] === "ls-remote"
-        ? `${oldSha}\trefs/tags/v4.0.0\n${tagSha}\trefs/tags/v4.1.0\n${nextSha}\trefs/tags/v4.1.0^{}\n${nextSha}\trefs/tags/v5.0.0\n`
-        : args[0] === "rev-parse"
-          ? nextSha + "\n"
-          : "";
-    return { pid: 123, signal: null, status: 0, stdout, stderr: "" };
-  };
-  assert.equal(
-    await refreshGithubActions(content + content, { root, spawnGit }),
-    `uses: actions/checkout@${nextSha} # v4.1.0\n`.repeat(2),
-  );
-  assert.equal(calls.filter((args) => args[0] === "ls-remote").length, 1);
-  assert.ok(calls.some((args) => args.includes("FETCH_HEAD^{commit}")));
-  assert.ok(directories.every((directory) => !existsSync(directory)));
-  for (const response of [
-    { status: 0, stdout: `${nextSha}\trefs/tags/v4.0.0\n` },
-    { status: 0, stdout: `${oldSha}\trefs/tags/v4.0.0\n${oldSha}\trefs/tags/v4.0.0\n` },
-    { status: 0, stdout: "invalid" },
-    { status: 128, stdout: "" },
-    { status: null, signal: "SIGTERM", stdout: "" },
-  ])
-    await assert.rejects(
-      refreshGithubActions(content, {
-        root,
-        spawnGit: () => ({ pid: 123, signal: null, stderr: "", ...response }),
-      }),
-      /moved|invalid|indeterminate/u,
-    );
-  await assert.rejects(
-    refreshGithubActions(content, {
-      root,
-      spawnGit: (command, args, options) =>
-        args[0] === "rev-parse"
-          ? { pid: 123, signal: null, status: 0, stdout: oldSha, stderr: "" }
-          : spawnGit(command, args, options),
-    }),
-    /changed during lookup/u,
-  );
-});
-test("configuration projection retains CI behavior and updates all stable pins", () => {
+test("configuration projection updates local stable pins without provider inputs", () => {
   const contents = Object.fromEntries(
     toolchainConfigurationPaths.map((name) => [
       name,
@@ -400,9 +306,10 @@ test("configuration projection retains CI behavior and updates all stable pins",
   candidate.stable.pnpm.version = "11.99.0";
   const result = projectToolchainConfiguration(contents, matrix, candidate);
   assert.match(result[".codex/mise.toml"], /node = "24\.99\.0"/u);
-  assert.match(result[".github/workflows/ci.yml"], /container: node:24\.99\.0-bookworm/u);
+  assert.deepEqual(Object.keys(result).sort(), Object.keys(contents).sort());
+  assert.ok(Object.keys(result).every((name) => name.startsWith(".codex/")));
   assert.match(result[".codex/toolchain.json"], /11\.99\.0/u);
-  assert.match(result[".gitlab-ci.yml"], /pnpm verify/u);
+  assert.match(result[".codex/mise.toml"], /pnpm = "11\.99\.0"/u);
 });
 
 test("multi-runtime product pins survive primary maintenance and require every locked artifact", (t) => {
@@ -527,7 +434,6 @@ for (const failure of ["network", "peer", "reproduce", "concurrent", "pending", 
             }
           : registry({ newerNode: ["none", "reproduce"].includes(failure) }),
       runCommand,
-      spawnGit: githubGitFixture,
       installBootstrapTools: async () => ({ mise: "mise", codex: "codex" }),
       admitProjectTools: () => {},
     });
@@ -684,6 +590,10 @@ test("disposable compatibility preparation preserves dependencies and passes the
   git(root, "commit", "--quiet", "-m", "published fixture");
   git(root, "remote", "add", "origin", remote);
   git(root, "push", "--quiet", "--set-upstream", "origin", "main");
+  await assert.rejects(
+    prepareCompatibilityTrack({ root, trackId: "next-node-lts" }),
+    /detached, disposable local clone/u,
+  );
   git(root, "checkout", "--detach", "--quiet");
   git(root, "config", "--remove-section", "branch.main");
   const head = git(root, "rev-parse", "HEAD"),
@@ -788,32 +698,4 @@ test("disposable compatibility preparation preserves dependencies and passes the
   );
   assert.equal(inspectRuntimeLifecycleLock({ root }).status, "absent");
   assert.deepEqual(readToolchainConfiguration(), matrix);
-});
-
-test("public Git scratch is preserved while the maintenance owner has pending consumers", async (t) => {
-  const root = fixture(t);
-  const owner = acquireRuntimeLifecycleLock({ root, operation: "toolchain-maintenance" });
-  let token, directory;
-  try {
-    await assert.rejects(
-      refreshGithubActions(`uses: actions/checkout@${"a".repeat(40)} # v4.0.0\n`, {
-        root,
-        spawnGit: (command, args, options) => {
-          directory = options.cwd;
-          token = createRuntimeLifecycleDelegation({
-            root,
-            owner,
-            operation: "toolchain-maintenance",
-            role: "release-git",
-          }).token;
-          return { pid: 1, status: null, signal: "SIGTERM", stdout: "", stderr: "" };
-        },
-      }),
-      /pending|active|quiescen|delegation|descendant/iu,
-    );
-    assert.equal(existsSync(directory), true, "Unsettled work retains its actual scratch");
-  } finally {
-    if (token) cancelRuntimeLifecycleDelegation({ root, owner, token });
-    releaseRuntimeLifecycleLock({ root, owner });
-  }
 });

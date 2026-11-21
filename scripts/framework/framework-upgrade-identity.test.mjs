@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import {
   chmodSync,
   cpSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   rmSync,
@@ -237,6 +238,41 @@ test("baseline-backed tooling updates retain the child's launcher name and conve
   assert.deepEqual(current.operations, []);
 });
 
+test("old provider settings and unchanged pipelines retire together while customized pipelines require review", async () => {
+  const data = fixture();
+  const file = ".gitlab-ci.yml";
+  for (const root of [data.baselineRoot, data.targetRoot]) {
+    const old = readTooling(root);
+    old.platform.ci = { requiredCheck: "verify" };
+    old.platform.protection.mergeSerialization = "prefer";
+    writeTooling(root, old);
+    writeFileSync(path.join(root, file), "verify: { script: pnpm verify }\n");
+  }
+  writeFileSync(path.join(data.targetRoot, file), "verify: { script: run-my-deploy }\n");
+  const review = buildFrameworkUpgradePlan(data);
+  assert.deepEqual(review.conflicts, [file]);
+  const noBaseline = buildFrameworkUpgradePlan({
+    sourceRoot: data.sourceRoot,
+    targetRoot: data.targetRoot,
+  });
+  assert.ok(noBaseline.conflicts.includes(file));
+  assert.equal(
+    noBaseline.operations.some((op) => op.path === file),
+    false,
+  );
+  const { kind, ...binding } = review.differences.find((entry) => entry.path === file);
+  const plan = buildFrameworkUpgradePlan({
+    ...data,
+    resolutions: [
+      { ...binding, action: "remove", reason: "Build has moved to the private local pipeline." },
+    ],
+  });
+  assert.deepEqual(plan.conflicts, []);
+  assert.equal((await applyFrameworkUpgrade(plan)).changed, true);
+  assert.equal(existsSync(path.join(data.targetRoot, file)), false);
+  assert.equal(readTooling(data.targetRoot).platform.ci, undefined);
+  assert.equal(readTooling(data.targetRoot).startup.displayName, "Cedar Product");
+});
 test("present tooling identity is validated while absent tooling retains its existing fallback", () => {
   const options = fixture();
   const tooling = readTooling(options.targetRoot);

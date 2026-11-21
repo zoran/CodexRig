@@ -2,13 +2,14 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import test from "node:test";
 import { spawnRuntimeLifecycleCommandSync } from "../repository/runtime-lifecycle-process.mjs";
 import { createPublicationVerificationProgress } from "../terminal/publication-output.mjs";
+import { retainedWorkspaceOutput } from "./local-workspace-build.mjs";
 import { runPlan, verificationChildEnvironment } from "./verification-executor.mjs";
 import { verificationChildEnvironment as runtimeChildEnvironment } from "./verification-runtime-identity.mjs";
 import { withVerificationSessionLock } from "./verification-session-lock.mjs";
@@ -374,7 +375,7 @@ test("verification plan metadata and commands cross the single-line terminal bou
   );
 });
 
-test("sanitized pnpm children cannot inherit ambient preload or script-shell configuration", (t) => {
+test("sanitized pnpm children cannot inherit ambient preload or script-shell configuration", async (t) => {
   const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), "verification-pnpm-environment-"));
   const preloadSentinel = path.join(fixtureRoot, "preload-ran");
   const shellSentinel = path.join(fixtureRoot, "shell-ran");
@@ -385,8 +386,12 @@ test("sanitized pnpm children cannot inherit ambient preload or script-shell con
     path.join(fixtureRoot, "package.json"),
     `${JSON.stringify({
       name: "verification-pnpm-environment",
+      dependencies: { "@fixture/lib": "workspace:*" },
       private: true,
-      scripts: { probe: "node --input-type=module --eval \"process.stdout.write('probe\\\\n')\"" },
+      scripts: {
+        build: "node build.cjs",
+        probe: "node --input-type=module --eval \"process.stdout.write('probe\\\\n')\"",
+      },
     })}\n`,
     "utf8",
   );
@@ -405,8 +410,37 @@ test("sanitized pnpm children cannot inherit ambient preload or script-shell con
     PNPM_CONFIG_NODE_OPTIONS: `--require=${preload}`,
     PNPM_CONFIG_SCRIPT_SHELL: unsafeShell,
   });
+  const lib = path.join(fixtureRoot, "packages/lib");
+  mkdirSync(lib, { recursive: true });
+  writeFileSync(
+    path.join(lib, "package.json"),
+    JSON.stringify({ name: "@fixture/lib", version: "1.0.0", main: "lib.cjs" }),
+  );
+  writeFileSync(path.join(lib, "lib.cjs"), "module.exports = __filename;\n");
+  assert.equal(spawnSync("git", ["init", "--quiet", fixtureRoot]).status, 0);
+  writeFileSync(
+    path.join(fixtureRoot, ".gitignore"),
+    readFileSync(new URL("../../.gitignore", import.meta.url)),
+  );
+  writeFileSync(path.join(fixtureRoot, "input.txt"), "current uncommitted input");
+  writeFileSync(
+    path.join(fixtureRoot, "build.cjs"),
+    `
+    const fs = require('node:fs');
+    if (process.cwd() === ${JSON.stringify(fixtureRoot)}) process.exit(14);
+    if (require('node:child_process').spawnSync('git',['rev-parse','--show-toplevel']).status === 0) process.exit(15);
+    if (!require('@fixture/lib').startsWith(process.cwd() + '/packages/lib/')) process.exit(16);
+    if (fs.existsSync("node_modules/.pnpm/obsolete-payload/file")) process.exit(17);
+    fs.mkdirSync("dist");
+    fs.writeFileSync("dist/replaced", "build output");
+    fs.copyFileSync("input.txt", "dist/result");
+  `,
+  );
   // Exercise the same prepared, explicitly hook-free workspace contract as canonical consumers.
-  writeFileSync(path.join(fixtureRoot, "pnpm-workspace.yaml"), "packages: []\npnpmfile: []\n");
+  writeFileSync(
+    path.join(fixtureRoot, "pnpm-workspace.yaml"),
+    'packages: ["packages/*"]\npnpmfile: []\nvirtualStoreType: global\nverifyDepsBeforeRun: error\n',
+  );
   const install = spawnSync(
     "pnpm",
     ["install", "--offline", "--ignore-scripts", "--ignore-pnpmfile"],
@@ -419,6 +453,9 @@ test("sanitized pnpm children cannot inherit ambient preload or script-shell con
     },
   );
   assert.equal(install.status, 0, install.stderr || install.stdout);
+  const obsolete = path.join(fixtureRoot, "node_modules/.pnpm/obsolete-payload");
+  mkdirSync(obsolete, { recursive: true });
+  writeFileSync(path.join(obsolete, "file"), "unreferenced local package");
   const result = spawnSync("pnpm", ["run", "probe"], {
     cwd: fixtureRoot,
     encoding: "utf8",
@@ -428,6 +465,61 @@ test("sanitized pnpm children cannot inherit ambient preload or script-shell con
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /probe/u);
+  const output = retainedWorkspaceOutput(".", "dist/result");
+  const replaced = retainedWorkspaceOutput(".", "dist/replaced");
+  const configuration = JSON.parse(
+    readFileSync(new URL("../../.codex/verification.json", import.meta.url), "utf8"),
+  );
+  configuration.workspaceOutputs = { ".": { build: ["dist/result", "dist/replaced"] } };
+  const configFile = path.join(fixtureRoot, ".codex/verification.json");
+  mkdirSync(path.dirname(configFile), { recursive: true });
+  writeFileSync(configFile, JSON.stringify(configuration));
+  const build = {
+    key: "workspace-build",
+    label: "isolated pnpm build",
+    executable: "pnpm",
+    args: ["run", "build"],
+    phase: "workspace-build",
+    workspaceDirectories: ["."],
+    outputs: [output, replaced],
+  };
+  await runLockedPlan({ ...plan([]), workspaceCommands: [build] }, fixtureRoot);
+  assert.equal(readFileSync(path.join(fixtureRoot, output), "utf8"), "current uncommitted input");
+  assert.equal(existsSync(path.join(fixtureRoot, "dist")), false);
+  const foreign = path.join(path.dirname(path.join(fixtureRoot, output)), "admin-note");
+  writeFileSync(foreign, "admin");
+  writeFileSync(path.join(fixtureRoot, replaced), "external replacement");
+  const temporaryStorage = new URL("../repository/project-temporary-storage.mjs", import.meta.url)
+    .href;
+  const orphan = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      `
+    import { createProjectTemporaryScope } from ${JSON.stringify(temporaryStorage)};
+    console.log(createProjectTemporaryScope({root:${JSON.stringify(fixtureRoot)},parent:${JSON.stringify(path.join(fixtureRoot, ".project-state/build/verification-work"))}}).directory);
+  `,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(orphan.status, 0, orphan.stderr);
+  assert.equal(existsSync(orphan.stdout.trim()), true);
+  configuration.workspaceOutputs = {};
+  writeFileSync(configFile, JSON.stringify(configuration));
+  await runLockedPlan(plan([]), fixtureRoot);
+  assert.equal(
+    existsSync(orphan.stdout.trim()),
+    false,
+    "clean dead workspace runs even on a reused plan",
+  );
+  assert.equal(
+    existsSync(path.join(fixtureRoot, output)),
+    false,
+    "retire the former declared output",
+  );
+  assert.equal(readFileSync(path.join(fixtureRoot, replaced), "utf8"), "external replacement");
+  assert.equal(readFileSync(foreign, "utf8"), "admin");
   assert.equal(existsSync(preloadSentinel), false);
   assert.equal(existsSync(shellSentinel), false);
 });

@@ -7,7 +7,7 @@ if [[ "$#" != 1 || "${CODEX_HOME:-}" != "$PWD" ]]; then
   exit 64
 fi
 case "$1" in
-  interactive-v2:safe-defaults | interactive-v2:no-alt-screen | dev-yolo-v1:default-screen | dev-yolo-v1:no-alt-screen) ;;
+  interactive-v2:safe-defaults | interactive-v2:no-alt-screen | yolo-v2:default-screen | yolo-v2:no-alt-screen) ;;
   *) exit 64 ;;
 esac
 
@@ -18,5 +18,5 @@ node scripts/setup/validate-codex-model-policy.mjs
 pnpm tooling:doctor
 codex_executable="$(node --input-type=module -e 'import {projectManagedToolLayout} from "./scripts/repository/project-tool-executables.mjs"; console.log(projectManagedToolLayout(process.cwd()).codex.executable)')"
 printf '\n  [OK] Opening Codex session picker.\n\n'
-exec node scripts/setup/startup-session-controller.mjs \
+exec node scripts/framework/framework-session.mjs \
   --control-policy "$1" --codex-executable "$codex_executable"

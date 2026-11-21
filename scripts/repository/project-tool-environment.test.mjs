@@ -29,7 +29,7 @@ import {
   nonPortableTransferPathReason,
 } from "./source-inventory-policy.mjs";
 import { scanRepositorySecrets } from "../verify/secrets.mjs";
-import { inspectFrameworkReset } from "../../.agents/skills/reset-framework/scripts/reset-framework.mjs";
+import { inspectFrameworkReset } from "../framework/framework-reset.mjs";
 import { pnpmMiseAlias } from "../contracts/mise-toolchain-configuration.mjs";
 
 function fixture(t) {

@@ -8,6 +8,7 @@ import {
   mkdirSync,
   readFileSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -38,6 +39,7 @@ import {
   validatedSupervisorTerminalStatus,
 } from "./startup-codex-process.mjs";
 import { startupControllerFailureMessage } from "./startup-session-controller.mjs";
+import { settlePostUpdateReset } from "../framework/framework-reset.mjs";
 
 const inheritedStorage = process.env.PROJECT_TOOL_STORAGE_HOME;
 // Managed temporary roots may be under the real user's home; model a separate fixture home.
@@ -200,9 +202,11 @@ function controllerFixture() {
       'const source=behavior==="new-session"?"startup":"resume";',
       'const sessionInput=JSON.stringify({cwd:root,hook_event_name:"SessionStart",model:projectModel,permission_mode:permissionMode,session_id:sessionId,source,transcript_path:path.join(root,"session.jsonl")});',
       'if(behavior==="cancel-picker")process.exit(0);',
+      'if(behavior==="check-clean-picker"&&existsSync(path.join(root,"archived_sessions")))process.exit(97);',
       'if(behavior==="delayed-picker"){waitForCodexBinding();writeFileSync(path.join(root,"picker-clock-advanced"),"ready");}',
       "const skipSessionStart=false;",
-      'if(!skipSessionStart){const started=spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[0].command],{cwd:root,encoding:"utf8",env:process.env,input:sessionInput,stdio:"pipe"});if(started.status!==0||JSON.parse(started.stdout).continue!==true){process.stderr.write(started.stderr+started.stdout);process.exit(90);}}',
+      'if(!skipSessionStart){const started=spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[0].command],{cwd:root,encoding:"utf8",env:process.env,input:sessionInput,stdio:"pipe"});if(started.status!==0||JSON.parse(started.stdout).continue!==true){process.stderr.write(started.stderr+started.stdout);process.exit(90);}writeFileSync(process.argv[1]+".last-context",JSON.parse(started.stdout).hookSpecificOutput.additionalContext);}',
+      'if(behavior==="request-update-reset"){const update=spawnSync(process.execPath,["fixture-update.mjs"],{cwd:root,encoding:"utf8"});if(update.status!==0){process.stderr.write(update.stderr);process.exit(96);}}',
       'if(behavior==="switch-session"){const next={...JSON.parse(sessionInput),session_id:"01a06666-5678-7abc-8def-0123456789ab",source:"startup",transcript_path:path.join(root,"next-session.jsonl")};const started=spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[0].command],{cwd:root,encoding:"utf8",env:process.env,input:JSON.stringify(next),stdio:"pipe"});process.stderr.write(started.stderr+started.stdout);process.exit(0);}',
       'if(behavior==="side-lifecycle"){',
       '  const assert=require("node:assert/strict");',
@@ -275,12 +279,7 @@ function runController(
       orphan: fixture.orphanMarkerPath,
     }),
   );
-  const controller = path.join(
-    fixture.project,
-    "scripts",
-    "setup",
-    "startup-session-controller.mjs",
-  );
+  const controller = path.join(fixture.project, "scripts/framework/framework-session.mjs");
   // Advance only the controller's clock after the real child-PID handoff. This exercises the
   // authenticated hook path after an hour in the picker without a wall-clock sleep or new proof.
   const clockSource = [
@@ -339,6 +338,24 @@ function waitForProcessExit(pid) {
   }
   process.kill(pid, "SIGKILL");
 }
+
+test("new and resumed sessions receive the current operator approval from the verified controller", () => {
+  const fixture = controllerFixture();
+  const approvalContext = () => readFileSync(fixture.codexExecutable + ".last-context", "utf8");
+  for (const [controlPolicy, behavior, preapproved] of [
+    [startupControlPolicies.yoloNoAltScreen, "new-session", true],
+    [startupControlPolicies.noAltScreen, "", false],
+    [startupControlPolicies.yolo, "", true],
+  ]) {
+    const result = runController(fixture, { controlPolicy, behavior });
+    assert.equal(result.status, 0, result.stderr);
+    const context = approvalContext();
+    assert.equal(context.includes("YOLO verified"), preapproved);
+    assert.equal(context.includes("including required publication and deployment"), preapproved);
+    assert.equal(context.includes("Standard approval mode"), !preapproved);
+    assert.equal(context.includes("Prior session resumed"), behavior !== "new-session");
+  }
+});
 
 test("controller binds canonical YOLO controls and the project-local Codex home", () => {
   const fixture = controllerFixture();
@@ -416,6 +433,82 @@ test("native picker cancellation releases its lease without claiming a session",
   assert.ok(capturedCalls(fixture)[0].args.includes("--no-daemon"));
   assert.equal(inspectRuntimeSessionLease({ root: fixture.project }).status, "absent");
   assert.equal(inspectRuntimeSessionRecovery({ root: fixture.project }).status, "absent");
+});
+
+test("the framework resets all threads after exit and retries an interrupted reset before the picker", () => {
+  const fixture = controllerFixture();
+  const { project } = fixture;
+  writeFileSync(path.join(project, "README.md"), "# CodexRig Framework\n");
+  mkdirSync(path.join(project, ".agents/skills/reset-framework"), { recursive: true });
+  writeFileSync(path.join(project, ".agents/skills/reset-framework/SKILL.md"), "# Fixture\n");
+  const archived = path.join(project, "archived_sessions");
+  mkdirSync(archived);
+  writeFileSync(path.join(archived, "prior.jsonl"), "older framework thread");
+  writeFileSync(path.join(project, "history.jsonl"), "current framework thread");
+  writeFileSync(path.join(project, "auth.json"), "fixture account", { mode: 0o600 });
+  writeFileSync(
+    path.join(project, "fixture-update.mjs"),
+    [
+      'import assert from "node:assert/strict";',
+      'import { existsSync } from "node:fs";',
+      'import { settlePostUpdateReset } from "./scripts/framework/framework-reset.mjs";',
+      'assert.equal(settlePostUpdateReset(process.cwd(), { request: true }), "pending");',
+      'assert.ok(existsSync("history.jsonl") && existsSync("archived_sessions/prior.jsonl"));',
+    ].join("\n"),
+  );
+  const session = runController(fixture, { behavior: "request-update-reset" });
+  assert.equal(session.status, 0, session.stderr);
+  assert.match(session.stdout, /session reset complete/u);
+  assert.equal(existsSync(archived), false);
+  assert.equal(existsSync(path.join(project, "history.jsonl")), false);
+  assert.equal(readFileSync(path.join(project, "auth.json"), "utf8"), "fixture account");
+
+  mkdirSync(archived);
+  const recovery = path.join(project, ".project-state/dependency-update");
+  mkdirSync(recovery, { recursive: true });
+  writeFileSync(path.join(recovery, "journal.json"), "{}");
+  assert.equal(settlePostUpdateReset(project, { request: true }), "pending");
+  assert.equal(existsSync(archived), true);
+  unlinkSync(path.join(recovery, "journal.json"));
+  const restarted = runController(fixture, { behavior: "check-clean-picker" });
+  assert.equal(restarted.status, 0, restarted.stderr);
+  assert.match(restarted.stdout, /session reset complete/u);
+  assert.equal(existsSync(archived), false);
+
+  mkdirSync(archived);
+  const work = {
+    version: 1,
+    revision: 1,
+    status: "active",
+    outcome: "Complete the update",
+    currentGoal: "Verify the updated project",
+    currentSlice: "Check recovery",
+    nextAction: "Resume the remaining verification",
+    blocker: null,
+  };
+  mkdirSync(path.join(project, "docs"), { recursive: true });
+  writeFileSync(
+    path.join(project, "docs/project-context.md"),
+    `<!-- codexrig-work-state\n${JSON.stringify(work)}\n-->\n`,
+  );
+  writeFileSync(
+    path.join(project, "fixture-update.mjs"),
+    [
+      'import assert from "node:assert/strict";',
+      'import { unlinkSync } from "node:fs";',
+      'import { createAccountPauseHandover } from "./scripts/context/critical-budget-handover.mjs";',
+      'import { settlePostUpdateReset } from "./scripts/framework/framework-reset.mjs";',
+      "const handover = createAccountPauseHandover();",
+      "unlinkSync(handover.relativePath);",
+      'assert.equal(settlePostUpdateReset(process.cwd(), { request: true }), "pending");',
+    ].join("\n"),
+  );
+  const paused = runController(fixture, { behavior: "request-update-reset" });
+  assert.equal(paused.status, 0, paused.stderr);
+  assert.ok(existsSync(path.join(project, ".codex/runtime/account-pause-pending.json")));
+  assert.equal(settlePostUpdateReset(project), "pending");
+  assert.ok(existsSync(archived));
+  assert.ok(existsSync(path.join(project, "docs/project-context.md")));
 });
 
 test("native picker selection remains valid after an hour in its live launcher", () => {

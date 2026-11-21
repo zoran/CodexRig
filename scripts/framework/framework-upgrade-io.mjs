@@ -63,6 +63,12 @@ export function atomicWriteUpgradeFile(root, relativePath, content, mode, { test
   });
 }
 
+// Hashes identify the last stock provider adapters. Earlier or edited copies require review.
+export const retiredProviderAdapters = new Map([
+  [".github/workflows/ci.yml", "7ea82d9b38ba2ec230e79e11e01b7cf2769aea4057cd6f914d765a9a4a63b2ee"],
+  [".gitlab-ci.yml", "99c100322de78af53e2e71f9976ac50abe94bf36cd1e7aa9de3f434644d21865"],
+]);
+
 const projectDocuments = new Set(["AGENTS.md", "README.md", "instructions.md", ".codex/README.md"]);
 export function isProjectToolPath(file) {
   return (
@@ -86,11 +92,12 @@ export const reviewedProjectDocuments = Object.freeze([
 /** Reviewed migration may reconcile workflow entry documents, never arbitrary product data. */
 export function isFrameworkUpgradePath(file) {
   return (
-    !nonPortableTransferPathReason(file) &&
-    (isProjectToolPath(file) ||
-      file === "package.json" ||
-      reviewedProjectDocuments.includes(file) ||
-      isReviewedProjectPath(file))
+    retiredProviderAdapters.has(file) ||
+    (!nonPortableTransferPathReason(file) &&
+      (isProjectToolPath(file) ||
+        file === "package.json" ||
+        reviewedProjectDocuments.includes(file) ||
+        isReviewedProjectPath(file)))
   );
 }
 

@@ -1,4 +1,5 @@
 # Excludes generated and local artifacts from formatting; source inventory also masks private runtime.
+/.project-state/
 node_modules/
 .pnpm-store/
 pnpm-lock.yaml

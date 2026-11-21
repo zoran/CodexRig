@@ -1,6 +1,6 @@
 /** Verifies framework upgrade conflicts, rollback, runtime exclusion and product preservation. */
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs, { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import os from "node:os";
@@ -73,9 +73,76 @@ function fixture() {
   return { sourceRoot: source, baselineRoot: baseline, targetRoot: target, file };
 }
 
+test("only a successful changed CLI apply resets idle framework sessions and keeps the child history", () => {
+  const { sourceRoot, targetRoot, baselineRoot, file } = fixture();
+  // Model a published source checkout with an observable HEAD and one independent child.
+  execFileSync(
+    "git",
+    [
+      "-c",
+      "user.name=Fixture",
+      "-c",
+      "user.email=fixture@example.invalid",
+      "-c",
+      "commit.gpgsign=false",
+      "commit",
+      "-qm",
+      "Fixture source",
+    ],
+    { cwd: sourceRoot },
+  );
+  const history = "sessions/thread.jsonl";
+  write(sourceRoot, history, "source history");
+  write(sourceRoot, "docs/project-context.md", "# Private notes from a closed framework thread\n");
+  write(sourceRoot, "archived_sessions/old.jsonl", "archived history");
+  write(sourceRoot, ".project-state/child-maintenance/review.json", "{}");
+  write(targetRoot, history, "product history");
+  const upgrade = (...args) =>
+    spawnSync(
+      process.execPath,
+      [
+        "scripts/framework/framework-upgrade.mjs",
+        "--target",
+        targetRoot,
+        "--baseline",
+        baselineRoot,
+        ...args,
+      ],
+      { cwd: sourceRoot, encoding: "utf8", timeout: 30_000 },
+    );
+  const preview = upgrade();
+  assert.equal(preview.status, 0, preview.stderr);
+  const original = readFileSync(path.join(targetRoot, file), "utf8");
+  write(targetRoot, file, original + "\n// Independent competing change.\n");
+  const conflicted = upgrade("--apply");
+  assert.equal(conflicted.status, 1, conflicted.stderr);
+  assert.match(conflicted.stderr, /migration conflicts/iu);
+  assert.equal(readFileSync(path.join(sourceRoot, history), "utf8"), "source history");
+  write(targetRoot, file, original);
+  const applied = upgrade("--apply");
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.match(applied.stderr, /session reset complete/u);
+  for (const relative of [
+    "sessions",
+    "archived_sessions",
+    ".project-state/child-maintenance",
+    "docs/project-context.md",
+  ])
+    assert.equal(existsSync(path.join(sourceRoot, relative)), false, relative);
+  assert.equal(readFileSync(path.join(targetRoot, history), "utf8"), "product history");
+  write(sourceRoot, history, "new unrelated conversation");
+  const repeated = upgrade("--apply");
+  assert.equal(repeated.status, 0, repeated.stderr);
+  assert.equal(readFileSync(path.join(sourceRoot, history), "utf8"), "new unrelated conversation");
+});
+
 test("explicit migration removes obsolete source tools under ownership and preserves product documents and identity", async (t) => {
-  const fixtureData = fixture(),
-    plan = buildFrameworkUpgradePlan(fixtureData);
+  const fixtureData = fixture();
+  for (const root of [fixtureData.baselineRoot, fixtureData.targetRoot]) {
+    write(root, ".github/workflows/ci.yml", "name: former pipeline\n");
+    write(root, ".gitlab-ci.yml", "verify: { script: pnpm verify }\n");
+  }
+  const plan = buildFrameworkUpgradePlan(fixtureData);
   for (const file of [
     "scripts/setup/start-codex.sh",
     "scripts/repository/runtime-session-lease.mjs",
@@ -139,6 +206,8 @@ test("explicit migration removes obsolete source tools under ownership and prese
     "scripts/framework",
     ".codexrig",
     "NOTICE",
+    ".github/workflows/ci.yml",
+    ".gitlab-ci.yml",
     ".project-state/framework-upgrade",
   ])
     assert.equal(existsSync(path.join(fixtureData.targetRoot, file)), false, file);

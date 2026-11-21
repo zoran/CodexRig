@@ -46,6 +46,7 @@ export function portableContextContractFindings({ repositoryRoot }) {
     try {
       const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
       for (const [name, command] of [
+        ["handover:check", "node scripts/context/account-capacity.mjs"],
         ["handover:create", "node scripts/context/critical-budget-handover.mjs create"],
         ["handover:receive", "node scripts/context/critical-budget-handover.mjs receive"],
         ["handover:acknowledge", "node scripts/context/critical-budget-handover.mjs acknowledge"],

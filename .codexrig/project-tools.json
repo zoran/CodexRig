@@ -36,9 +36,7 @@
       ".codex/toolchain.json",
       ".codex/tooling.json",
       ".codex/verification.json",
-      ".github/workflows/ci.yml",
       ".gitignore",
-      ".gitlab-ci.yml",
       ".prettierignore",
       ".prettierrc.json",
       "AGENTS.md",
@@ -61,7 +59,9 @@
       "scripts/context/project-work-state.mjs",
       "scripts/context/session-stop-lifecycle.mjs",
       "scripts/context/context-budget.mjs",
-      "scripts/context/context-cli.mjs"
+      "scripts/context/context-cli.mjs",
+      "scripts/context/account-capacity.mjs",
+      "scripts/context/account-pause-state.mjs"
     ],
     "contracts": [
       "scripts/contracts/delivery-configuration.mjs",
@@ -76,7 +76,6 @@
       "scripts/contracts/tooling-configuration.mjs"
     ],
     "deps": [
-      "scripts/deps/ci-toolchain-contract.mjs",
       "scripts/deps/dependency-inputs.mjs",
       "scripts/deps/dependency-plan.mjs",
       "scripts/deps/dependency-policy.mjs",
@@ -131,6 +130,24 @@
       "scripts/goals/publication-command.mjs",
       "scripts/goals/publication-command.test.mjs",
       "scripts/goals/project-publication.fixture.mjs"
+    ],
+    "local-build": [
+      "scripts/local-build/local-build.mjs",
+      "scripts/local-build/local-build.test.mjs"
+    ],
+    "infrastructure": [
+      "scripts/infrastructure/admin.py",
+      "scripts/infrastructure/admin.test.mjs",
+      "scripts/infrastructure/ansible/deploy.yml",
+      "scripts/infrastructure/ansible/library/deploy_cpu_step.py",
+      "scripts/infrastructure/remote-cpu.test.mjs",
+      "scripts/infrastructure/README.md",
+      "scripts/infrastructure/fleet_profile.py",
+      "scripts/infrastructure/ansible/verify_fleet.yml",
+      "scripts/infrastructure/fleet-profile.test.mjs",
+      "scripts/infrastructure/deploy_watch.py",
+      "scripts/infrastructure/monitor_operations.py",
+      "scripts/infrastructure/deploy-watch.test.mjs"
     ],
     "platform": [
       "scripts/platform/configure-platform.mjs",
@@ -271,6 +288,7 @@
       "scripts/verify/web-stack.mjs",
       "scripts/verify/white-label.mjs",
       "scripts/verify/workspace-verification.mjs",
+      "scripts/verify/local-workspace-build.mjs",
       "scripts/verify/pre-push-policy.mjs",
       "scripts/verify/pre-push-steps.sh",
       "scripts/verify/git-remote-identity.mjs",
@@ -286,6 +304,8 @@
     ]
   },
   "packageScripts": [
+    "build:local",
+    "infra:admin",
     "auth:check",
     "localization:check",
     "tenancy:check",
@@ -293,6 +313,7 @@
     "platform:configure",
     "codex:start",
     "codex:validate",
+    "handover:check",
     "handover:create",
     "handover:receive",
     "handover:acknowledge",
@@ -323,6 +344,8 @@
     "project:publish"
   ],
   "verificationCommands": [
+    "local-build",
+    "infrastructure-operations",
     "syntax-lint",
     "docs",
     "context-policy",

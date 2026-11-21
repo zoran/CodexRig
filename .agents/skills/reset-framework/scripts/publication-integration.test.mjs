@@ -12,6 +12,7 @@ import { inspectRuntimeSessionLease } from "../../../../scripts/repository/runti
 function configure({ root, copyModule, write }) {
   copyModule(".agents/skills/reset-framework/scripts/publish-framework.mjs");
   copyModule(".agents/skills/reset-framework/scripts/publication-baseline.mjs");
+  copyModule(".agents/skills/reset-framework/scripts/reset-framework.mjs");
   copyModule("scripts/goals/goal-publication-precondition.mjs");
   write(".agents/skills/reset-framework/SKILL.md", "# Reset fixture\n");
   write(".agents/skills/create-project-from-framework/SKILL.md", "# Generation fixture\n");

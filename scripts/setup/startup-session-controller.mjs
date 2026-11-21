@@ -7,6 +7,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { runStopLifecycle } from "../context/session-stop-lifecycle.mjs";
+import { classifyAccountCapacity, readAccountRateLimits } from "../context/account-capacity.mjs";
 import { toolingRoot } from "../filesystem/repository-files.mjs";
 import {
   prepareProjectToolDirectories,
@@ -264,6 +265,8 @@ function createLifecycleServer({ controlToken, launch, root }) {
           expectedSessionId: session.lease.codexSessionId,
           hookInput,
           root,
+          inspectCapacity: async () =>
+            classifyAccountCapacity(await readAccountRateLimits({ root, timeoutMs: 3000 })),
         });
         writeControllerResponse(response, 200, Object.keys(output).length === 0 ? null : output);
       } catch (error) {

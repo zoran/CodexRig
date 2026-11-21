@@ -120,14 +120,26 @@ test("provider detection supports declared self-hosts and rejects contradictory 
       detectGitProvider({
         root: repository("git@gitlab.com:team/project.git"),
         environment: {
-          GITHUB_ACTIONS: "true",
-          GITHUB_REPOSITORY: "owner/project",
-          GITHUB_SERVER_URL: "https://github.com",
+          CODEXRIG_GIT_PROVIDER: "github",
+          CODEXRIG_GIT_REPOSITORY: "owner/project",
+          CODEXRIG_GIT_HOST: "github.com",
         },
         contract,
       }),
     /contradicts/,
   );
+});
+
+test("hosted runner variables cannot supply a local repository identity", () => {
+  const environment = {
+    GITHUB_ACTIONS: "true",
+    GITHUB_REPOSITORY: "remote/runner",
+    GITLAB_CI: "true",
+    CI_PROJECT_PATH: "remote/runner",
+  };
+  const root = repository("git@gitlab.com:team/project.git");
+  assert.equal(detectGitProvider({ root, environment, contract }).slug, "team/project");
+  assert.equal(detectGitProvider({ root: temporaryRoot(), environment, contract }).provider, null);
 });
 
 test("API bases support self-hosted ports and paths but reject foreign origins", () => {
@@ -144,6 +156,15 @@ test("API bases support self-hosted ports and paths but reject foreign origins",
   foreign.platform.apiBaseUrls.gitlab["gitlab.example.test"] =
     "https://foreign.example.test/api/v4";
   assert.throws(() => validateToolingConfiguration(foreign), /owned by gitlab\.example\.test/);
+});
+
+test("the current tooling contract rejects obsolete hosted CI configuration", () => {
+  const legacy = structuredClone(contract);
+  legacy.platform.ci = { requiredCheck: "verify" };
+  assert.throws(() => validateToolingConfiguration(legacy), /provider CI/u);
+  delete legacy.platform.ci;
+  legacy.platform.protection.mergeSerialization = "prefer";
+  assert.throws(() => validateToolingConfiguration(legacy), /merge serialization/u);
 });
 
 test("platform configuration refuses an unowned host before I/O", async () => {
@@ -254,6 +275,7 @@ test("GitHub previews without I/O and applies a verified owned ruleset", async (
     },
   });
   assert.equal(preview.applied, false);
+  assert.ok(preview.plan.operations.some((op) => op.includes("disable repository GitHub Actions")));
   assert.equal(previewCalls, 0);
 
   const calls = [];
@@ -266,18 +288,19 @@ test("GitHub previews without I/O and applies a verified owned ruleset", async (
     fetchImpl: async (url, options) => {
       calls.push({ options, url });
       if (url.includes("?")) return response(200, []);
+      if (url.endsWith("/actions/permissions")) return response(200, { enabled: false });
       if (options.method === "POST") return response(201, { id: 7 });
       return response(200, { id: 7, ...payload });
     },
   });
   assert.equal(applied.applied, true);
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
   assert.equal(
     calls[0].url,
-    "https://api.github.com/repos/owner/project/rulesets?page=1&per_page=100",
+    "https://api.github.com/repos/owner/project/rulesets?includes_parents=false&page=1&per_page=100",
   );
-  assert.deepEqual(JSON.parse(calls[1].options.body), payload);
-  assert.equal(calls[1].options.headers.Authorization, "Bearer test-token");
+  assert.deepEqual(JSON.parse(calls[2].options.body), payload);
+  assert.equal(calls[2].options.headers.Authorization, "Bearer test-token");
   assert.equal(JSON.stringify(payload).includes("test-token"), false);
 });
 
@@ -293,6 +316,7 @@ test("GitHub pagination finds an existing owned ruleset without creating a dupli
     fetchImpl: async (url, options) => {
       calls.push({ options, url });
       const page = new URL(url).searchParams.get("page");
+      if (url.endsWith("/actions/permissions")) return response(200, { enabled: false });
       if (page === "1") return response(200, pageOne);
       if (page === "2") return response(200, [{ id: 707, name: payload.name }]);
       if (options.method === "PUT") return response(200, { id: 707 });
@@ -300,56 +324,121 @@ test("GitHub pagination finds an existing owned ruleset without creating a dupli
     },
   });
   assert.equal(calls.filter((call) => call.options.method === "POST").length, 0);
-  assert.ok(calls.some((call) => call.options.method === "PUT"));
+  assert.ok(
+    calls.every((call) => call.options.method === "GET"),
+    "a matching existing policy is read-only",
+  );
 });
 
-test("GitHub preferred serialization falls back and verifies the reduced policy", async () => {
-  const bodies = [];
-  const applied = await configurePlatform({
+test("GitHub removes the framework workflow check and queue, preserves custom rules and disables Actions", async () => {
+  const root = temporaryRoot();
+  const payload = githubRulesetPayload(contract);
+  const custom = { type: "required_signatures" };
+  let current = {
+    id: 7,
+    ...payload,
+    rules: [
+      ...payload.rules,
+      custom,
+      { type: "merge_queue", parameters: {} },
+      {
+        type: "required_status_checks",
+        parameters: {
+          strict_required_status_checks_policy: true,
+          required_status_checks: [
+            { context: "verify" },
+            { context: "verify", integration_id: 11 },
+            { context: "external-review", integration_id: 42 },
+          ],
+        },
+      },
+    ],
+  };
+  let enabled = true;
+  const writes = [];
+  const fetchImpl = async (url, options) => {
+    if (url.includes("?"))
+      return response(200, [
+        { id: 7, name: payload.name, source: "owner/project", source_type: "Repository" },
+        { id: 9, name: "Security team protections" },
+      ]);
+    if (url.endsWith("/actions/permissions")) {
+      if (options.method === "GET") return response(200, { enabled });
+      assert.deepEqual(JSON.parse(options.body), { enabled: false });
+      enabled = false;
+      writes.push("actions");
+      return response(204);
+    }
+    assert.ok(url.endsWith("/rulesets/7"));
+    if (options.method === "PUT") {
+      current = { id: 7, ...JSON.parse(options.body) };
+      writes.push("rules");
+    }
+    return response(200, current);
+  };
+  const options = { apply: true, contract, root, fetchImpl, detected: githubDetection() };
+  const applied = await configurePlatform(options);
+  assert.match(applied.warnings[0], /external status checks remain required/u);
+  assert.deepEqual(writes, ["rules", "actions"]);
+  assert.ok(current.rules.every((rule) => rule.type !== "merge_queue"));
+  assert.ok(current.rules.some((rule) => rule.type === custom.type));
+  assert.deepEqual(
+    current.rules.find((rule) => rule.type === "required_status_checks").parameters
+      .required_status_checks,
+    [
+      { context: "verify", integration_id: 11 },
+      { context: "external-review", integration_id: 42 },
+    ],
+  );
+  assert.ok(current.rules.some((rule) => rule.type === "pull_request"));
+  await configurePlatform(options);
+  assert.deepEqual(writes, ["rules", "actions"], "repeated apply reuses effective protections");
+});
+
+test("GitHub waits for effective Actions disablement and reuses verified provider state on retry", async () => {
+  const root = temporaryRoot();
+  const current = { id: 7, ...githubRulesetPayload(contract) };
+  let enabled = true;
+  const mutations = [];
+  const options = {
+    root,
     apply: true,
     contract,
     detected: githubDetection(),
-    root: temporaryRoot(),
-    fetchImpl: async (url, options) => {
-      if (url.includes("?")) return response(200, []);
-      if (options.method === "POST") {
-        bodies.push(JSON.parse(options.body));
-        return bodies.length === 1
-          ? response(422, { message: "unsupported" })
-          : response(201, { id: 7 });
-      }
-      return response(200, { id: 7, ...bodies.at(-1) });
+    fetchImpl: async (url, request) => {
+      if (url.includes("?")) return response(200, [{ id: 7, name: current.name }]);
+      if (url.endsWith("/rulesets/7")) return response(200, current);
+      assert.ok(url.endsWith("/actions/permissions"));
+      if (request.method === "GET") return response(200, { enabled });
+      mutations.push(JSON.parse(request.body));
+      return response(204);
     },
-  });
-  assert.equal(bodies.length, 2);
-  assert.ok(bodies[0].rules.some((rule) => rule.type === "merge_queue"));
-  assert.equal(
-    bodies[1].rules.some((rule) => rule.type === "merge_queue"),
-    false,
-  );
-  assert.equal(applied.warnings.length, 1);
+  };
+  await assert.rejects(configurePlatform(options), /still permits repository Actions/u);
+  const state = path.join(root, ".project-state/platform-configuration.json");
+  assert.ok(existsSync(state));
+  enabled = false;
+  assert.equal((await configurePlatform(options)).resumed, true);
+  assert.deepEqual(mutations, [{ enabled: false }]);
+  assert.equal(existsSync(state), false);
 });
 
 // A provider may apply the write even when its response is lost or reports a service failure.
 test("GitHub recovers an uncertain mutation by validating original state before another write", async () => {
-  for (const failure of ["service", "transport", "contract", "fallback"]) {
+  for (const failure of ["service", "transport", "contract"]) {
     const root = temporaryRoot();
-    const payload = githubRulesetPayload(contract, {
-      includeSerialization: failure !== "fallback",
-    });
-    const initialWrites = failure === "fallback" ? 2 : 1;
+    const payload = githubRulesetPayload(contract);
     let original = null,
       fail = true,
       writes = 0;
     const fetchImpl = async (url, options) => {
       if (url.includes("?")) return response(200, original ? [{ id: 7, name: original.name }] : []);
+      if (url.endsWith("/actions/permissions")) return response(200, { enabled: false });
       if (options.method !== "GET") {
         writes++;
         const requested = JSON.parse(options.body);
-        if (failure === "fallback" && requested.rules.some((rule) => rule.type === "merge_queue"))
-          return response(422);
         original = { id: 7, ...requested };
-        if (fail && ["service", "fallback"].includes(failure)) return response(503);
+        if (fail && failure === "service") return response(503);
         if (fail && failure === "transport") throw new Error("connection closed after apply");
         return response(201, { id: 7 });
       }
@@ -357,7 +446,7 @@ test("GitHub recovers an uncertain mutation by validating original state before 
     };
     const options = { apply: true, contract, detected: githubDetection(), root, fetchImpl };
     await assert.rejects(configurePlatform(options), /HTTP 503|could not be completed|read-back/u);
-    assert.equal(writes, initialWrites, "failure is surfaced without an automatic mutation retry");
+    assert.equal(writes, 1, "failure is surfaced without an automatic mutation retry");
     const statePath = path.join(root, ".project-state", "platform-configuration.json");
     assert.equal(existsSync(statePath), true);
     assert.equal(readFileSync(statePath, "utf8").includes("test-token"), false);
@@ -379,17 +468,17 @@ test("GitHub recovers an uncertain mutation by validating original state before 
       assert.equal(writes, 1, "an empty inventory cannot prove an uncertain create was rejected");
     }
     if (failure === "contract")
-      original.rules = original.rules.filter((rule) => rule.type !== "required_status_checks");
+      original.rules = original.rules.filter((rule) => rule.type !== "pull_request");
     const resumed = await configurePlatform(options);
     assert.equal(resumed.resumed, true);
     assert.equal(
       writes,
-      failure === "contract" ? 2 : initialWrites,
-      "the complete validator reuses matching state and repairs an actually missing CI rule",
+      failure === "contract" ? 2 : 1,
+      "the complete validator reuses matching state and repairs an actually missing review rule",
     );
     assert.equal(existsSync(statePath), false, "recovery cleanup follows verified state");
     assert.deepEqual(original, { id: 7, ...payload });
-    assert.equal(resumed.warnings.length, failure === "fallback" ? 1 : 0);
+    assert.equal(resumed.warnings.length, 0);
   }
 });
 
@@ -443,12 +532,12 @@ test("GitLab reconciles and reads back the complete merge-request policy", async
   });
   assert.equal(applied.provider, "gitlab");
   assert.deepEqual(harness.projectBodies[0], {
-    merge_pipelines_enabled: true,
-    merge_train_enforcement: "enforce_for_all_users",
-    merge_trains_enabled: true,
-    merge_trains_skip_train_allowed: false,
+    auto_devops_enabled: false,
+    builds_access_level: "disabled",
+    merge_pipelines_enabled: false,
+    merge_trains_enabled: false,
     only_allow_merge_if_all_discussions_are_resolved: true,
-    only_allow_merge_if_pipeline_succeeds: true,
+    only_allow_merge_if_pipeline_succeeds: false,
     remove_source_branch_after_merge: true,
   });
   const settingsWrite = harness.calls.find(
@@ -553,24 +642,24 @@ test("GitLab preserves granular merge access and removes every granular direct-p
   ]);
 });
 
-test("GitLab preferred serialization degrades progressively without weakening CI", async () => {
-  const harness = gitlabHarness({ projectFailures: 2 });
-  const applied = await configurePlatform({
+test("GitLab reports an unsupported local-build policy without a weaker fallback", async () => {
+  const harness = gitlabHarness({ projectFailures: 1 });
+  const options = {
     apply: true,
     contract,
     detected: gitlabDetection(),
     fetchImpl: harness.fetchImpl,
     root: temporaryRoot(),
-  });
-  assert.equal(harness.projectBodies.length, 3);
-  assert.equal(harness.projectBodies[0].merge_train_enforcement, "enforce_for_all_users");
-  assert.equal(harness.projectBodies[1].merge_train_enforcement, undefined);
-  assert.deepEqual(harness.projectBodies[2], {
-    only_allow_merge_if_all_discussions_are_resolved: true,
-    only_allow_merge_if_pipeline_succeeds: true,
-    remove_source_branch_after_merge: true,
-  });
-  assert.match(applied.warnings[0], /merged-results pipelines or merge trains/u);
+  };
+  await assert.rejects(configurePlatform(options), /HTTP 400/u);
+  assert.equal(harness.projectBodies.length, 1);
+  assert.equal(harness.projectBodies[0].builds_access_level, "disabled");
+  assert.ok(
+    harness.calls
+      .filter((call) => call.options.method !== "GET")
+      .every((call) => call.options.method === "PUT"),
+  );
+  assert.equal((await configurePlatform(options)).resumed, true);
 });
 
 test("GitLab uses the contract-owned self-hosted API base", async () => {

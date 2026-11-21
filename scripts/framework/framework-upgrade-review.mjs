@@ -10,10 +10,7 @@ import { readFrameworkContract } from "../contracts/framework-contract.mjs";
 import { initialRequirementsPath } from "../docs/project-document-policy.mjs";
 import { validateToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 import { validateVerificationConfiguration } from "../verify/verification-configuration.mjs";
-import {
-  listPortableTransferFiles,
-  listRepositoryPathInventory,
-} from "../repository/source-inventory.mjs";
+import { listRepositoryPathInventory } from "../repository/source-inventory.mjs";
 import { nonPortableTransferPathReason } from "../repository/source-inventory-policy.mjs";
 import { readProjectToolSelection, selectedProjectPackage } from "./project-tool-selection.mjs";
 import { renderGeneratedProjectDocuments } from "./generated-project-documents.mjs";
@@ -28,6 +25,7 @@ import {
 } from "./framework-upgrade-merge.mjs";
 import {
   isProjectToolPath,
+  retiredProviderAdapters,
   reviewedProjectDocuments,
   realUpgradeDirectory,
   targetUpgradeFileState,
@@ -84,8 +82,8 @@ export function buildReviewedFrameworkUpgradePlan(
   const selection = readProjectToolSelection(source);
   const selected = new Set(selection.files.filter(isProjectToolPath));
   const baselineTools = baseline
-    ? listPortableTransferFiles({ root: baseline, includeUntracked: true }).filter(
-        isProjectToolPath,
+    ? listRepositoryPathInventory({ root: baseline, includeUntracked: true }).paths.filter(
+        (file) => isProjectToolPath(file) && !nonPortableTransferPathReason(file),
       )
     : [];
   if (
@@ -101,6 +99,7 @@ export function buildReviewedFrameworkUpgradePlan(
   const files = new Set([
     ...selected,
     ...baselineTools,
+    ...retiredProviderAdapters.keys(),
     ...documents.keys(),
     ...reviewedProjectDocuments,
     ...projectPaths,
@@ -152,7 +151,16 @@ export function buildReviewedFrameworkUpgradePlan(
       desired = upgradeFileContent(serializeCanonicalJson(portablePackage), current.mode);
     } else if (selected.has(file)) desired = desiredTool(source, file, selection);
     else if (productDocument) desired = current;
-    const proposal = compareUpgradeFile({ sourceRoot: source, file, before, current, desired });
+    let proposal = compareUpgradeFile({ sourceRoot: source, file, before, current, desired });
+    if (retiredProviderAdapters.has(file) && current.exists) {
+      if (decision?.action === "replace")
+        throw new Error(`A retired provider pipeline can only be removed or preserved: ${file}.`);
+      if (!before?.exists)
+        proposal =
+          current.sha256 === retiredProviderAdapters.get(file) && current.mode === 0o644
+            ? { next: absentUpgradeFile, conflicts: [] }
+            : { next: current, conflicts: ["/"] };
+    }
     // The reviewed proposal already contains independently merged product fields and text hunks.
     const reviewed =
       (before || ["package.json", ".codex/verification.json"].includes(file)) &&

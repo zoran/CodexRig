@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Owns the read-only source-publication baseline without deleting the caller's live runtime. */
-import { inspectFrameworkPublicationReset } from "./reset-framework.mjs";
+import { inspectFrameworkPublicationReset } from "../../../../scripts/framework/framework-reset.mjs";
 import { toolingRoot } from "../../../../scripts/filesystem/repository-files.mjs";
 import { assertCleanFrameworkPublicationSource } from "./publication-source.mjs";
 

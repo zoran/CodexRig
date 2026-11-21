@@ -9,6 +9,7 @@ import {
   resolveOwnedGitMetadata,
 } from "../repository/git-runtime-isolation.mjs";
 import { sensitivePathReason } from "../repository/sensitive-paths.mjs";
+import { localBuildPublicationPathReason } from "../repository/source-inventory-policy.mjs";
 import { spawnSyncWithBoundedIo as spawnSync } from "../repository/runtime-process-io.mjs";
 import { parsePrePushInput, root, validatePushedRefsAgainstHead } from "./adaptive-state.mjs";
 import { createSecretContentScanner } from "./secret-content-scan.mjs";
@@ -442,7 +443,9 @@ export async function inspectPushedObjects(input, { repositoryRoot = root } = {}
   const findings = [];
   const blobs = new Map();
   for (const change of batchedCommitChanges(repositoryRoot, [...commits])) {
-    const pathReason = sensitivePathReason(change.relativePath);
+    const pathReason =
+      localBuildPublicationPathReason(change.relativePath) ??
+      sensitivePathReason(change.relativePath);
     if (pathReason) {
       findings.push(
         `${JSON.stringify(change.relativePath)} at ${change.commitObject.slice(0, 12)}: ${pathReason}`,

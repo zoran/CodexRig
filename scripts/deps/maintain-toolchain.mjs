@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Maintains the startup toolchain, compatible dependencies, and CI pins through repository-owned transactions. */
+/** Maintains the shared startup toolchain and compatible project dependencies through repository-owned transactions. */
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -46,8 +46,7 @@ import {
 } from "../repository/repository-housekeeping-transaction.mjs";
 import { formatContextError, sanitizeForTerminal } from "../terminal/terminal-output.mjs";
 import { showStartupIntro, startupStatus } from "../terminal/startup-presentation.mjs";
-import { ciAdapterContractViolations } from "./ci-toolchain-contract.mjs";
-import { resolveToolchainReleases, refreshGithubActions } from "./toolchain-releases.mjs";
+import { resolveToolchainReleases } from "./toolchain-releases.mjs";
 import {
   projectToolchainConfiguration,
   toolchainConfigurationPaths,
@@ -237,7 +236,6 @@ export async function maintainToolchain({
   locked = false,
   candidateResolver = resolveToolchainReleases,
   fetchImpl = globalThis.fetch,
-  spawnGit,
   runCommand,
   installBootstrapTools = installProjectBootstrapTools,
   prepareStorage = runStorageHousekeeping,
@@ -311,7 +309,7 @@ export async function maintainToolchain({
     onProgress(
       locked
         ? "Reproducing reviewed tool pins and the existing dependency lockfile."
-        : "Checking official tool releases, CI action pins and workspace dependencies.",
+        : "Checking official tool releases and workspace dependencies.",
     );
     let candidate =
       locked && candidateResolver === resolveToolchainReleases
@@ -321,19 +319,6 @@ export async function maintainToolchain({
             onProgress: onReleaseNotice,
           });
     const projected = projectToolchainConfiguration(inputs.contents, current, candidate);
-    if (!locked)
-      projected[".github/workflows/ci.yml"] = await refreshGithubActions(
-        projected[".github/workflows/ci.yml"],
-        { root, spawnGit },
-      );
-    for (const [provider, relativePath] of [
-      ["github", ".github/workflows/ci.yml"],
-      ["gitlab", ".gitlab-ci.yml"],
-    ]) {
-      const violations = ciAdapterContractViolations(provider, projected[relativePath]);
-      if (violations.length)
-        throw new Error(`Candidate ${provider} CI contract is invalid: ${violations.join(", ")}.`);
-    }
     verifyInputRecords(root, allInputs);
     installationRoot = prepareUserToolDirectories().lifecycle;
     // Always acquire project -> shared storage. Waiting must never reverse this order or
