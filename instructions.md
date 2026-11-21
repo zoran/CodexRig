@@ -147,6 +147,9 @@ coherence, effectiveness, efficiency and quality, including consumers outside th
 Reassess repeated failures or disproportionate effort; change the approach instead of repeating it.
 Use current evidence rather than rerunning checks merely to conduct the review.
 
+Describe the concrete work and its effect in plain language in user updates. Say what is usable now,
+what must finish next, and what the user can do. Explain any technical term that matters to that action.
+
 After two attempts that produce no new discriminating evidence, stop that approach: state the failed
 hypothesis and choose a smaller probe, a different repair or the concrete blocker. Before another
 long operation compare its expected cost with the remaining outcome. Do not keep a task alive by
