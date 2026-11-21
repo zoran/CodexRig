@@ -52,12 +52,15 @@ import {
   cleanupTemporaryRoots,
   configFixture,
   copyPortableSetupFixture,
+  projectModel,
   root,
   run,
   temporaryRoot,
   validPortableConfig,
   validPrimaryInstructions,
 } from "./setup-regression-test-helpers.mjs";
+
+const modelAssignment = `model = "${projectModel}"`;
 
 test("the sole TOML parser is strict and supports the portable config subset", () => {
   assert.deepEqual(
@@ -142,13 +145,13 @@ test("Codex config parser accepts only the complete typed portable policy", () =
     web_search: "cached",
     cli_auth_credentials_store: "file",
     mcp_oauth_credentials_store: "file",
-    model: "gpt-6-astra",
+    model: projectModel,
     approvals_reviewer: "user",
     approval_policy: "on-request",
     sandbox_mode: "workspace-write",
     "sandbox_workspace_write.network_access": false,
     "agents.enabled": true,
-    "agents.default_subagent_model": "gpt-6-astra",
+    "agents.default_subagent_model": projectModel,
     "agents.default_subagent_reasoning_effort": "max",
     "agents.max_concurrent_threads_per_session": 12,
     "agents.interrupt_message": true,
@@ -204,7 +207,7 @@ test("Codex config parser accepts only the complete typed portable policy", () =
   );
 
   const customizedProjectDefaults = validPortableConfig
-    .replaceAll('model = "gpt-6-astra"', 'model = "gpt-7-astra"')
+    .replaceAll(modelAssignment, 'model = "gpt-7-astra"')
     .replace("memories = true", "memories = false")
     .replace('theme = "catppuccin-mocha"', 'theme = "light"');
   const customizedPolicy = parsePortableCodexConfig(customizedProjectDefaults);
@@ -215,22 +218,25 @@ test("Codex config parser accepts only the complete typed portable policy", () =
   assert.equal(Object.hasOwn(validateCodexConfig(root), "service_tier"), false);
   const customTierPolicy = parsePortableCodexConfig(
     validPortableConfig.replace(
-      'model = "gpt-6-astra"\n',
-      'model = "gpt-6-astra"\nservice_tier = "fast"\n',
+      `${modelAssignment}\n`,
+      `${modelAssignment}\nservice_tier = "fast"\n`,
     ),
   );
   assert.equal(customTierPolicy.service_tier, "fast");
 
   for (const [label, content, expected] of [
     [
-      "missing four-agent default",
-      validPortableConfig.replace("Default to four useful concurrent subagents", ""),
-      /orchestration marker Default to four useful concurrent subagents/u,
+      "missing continuous quality policy",
+      validPortableConfig.replace("instructions.md#continuous-quality-and-performance", ""),
+      /orchestration marker instructions.md#continuous-quality-and-performance/u,
     ],
     [
-      "missing additional user-started agent scheduling",
-      validPortableConfig.replace("additional user-started agents", ""),
-      /orchestration marker additional user-started agents/u,
+      "missing shared dependency preflight policy",
+      validPortableConfig.replace(
+        "instructions.md#coherent-component-updates-and-release-batching",
+        "",
+      ),
+      /orchestration marker instructions.md#coherent-component-updates-and-release-batching/u,
     ],
     [
       "missing canonical dispatch policy binding",
@@ -300,13 +306,13 @@ test("Codex config parser accepts only the complete typed portable policy", () =
     ],
     [
       "unsupported non-Astra primary model",
-      validPortableConfig.replace('model = "gpt-6-astra"', 'model = "gpt-5.6-terra"'),
+      validPortableConfig.replace(modelAssignment, 'model = "gpt-5.6-terra"'),
       /outside the portable project policy/,
     ],
     [
       "mismatched delegated default",
       validPortableConfig.replace(
-        'default_subagent_model = "gpt-6-astra"',
+        `default_subagent_${modelAssignment}`,
         'default_subagent_model = "gpt-7-astra"',
       ),
       /agent defaults must use exactly the primary model and reasoning effort/,
@@ -570,7 +576,7 @@ test("startup attestation binds the complete preloaded controller closure", (t) 
   const hookInput = {
     cwd: fixture,
     hook_event_name: "SessionStart",
-    model: "gpt-6-astra",
+    model: projectModel,
     permission_mode: "default",
     session_id: "01a01234-5678-7abc-8def-0123456789ab",
     source: "startup",
@@ -685,11 +691,11 @@ test("project roles enforce exact Astra/max parity with the primary", () => {
       (error) => error.message.includes(`orchestration marker ${fragment}`),
     );
   }
-  assert.equal(parsedDefault.model, "gpt-6-astra");
+  assert.equal(parsedDefault.model, projectModel);
   assert.equal(parsedDefault.model_reasoning_effort, sharedAgentIntelligencePolicy.reasoningEffort);
   assert.equal(
     parseProjectAgentConfig(
-      defaultAgent.replace('model = "gpt-6-astra"', 'model = "gpt-7-astra"'),
+      defaultAgent.replace(modelAssignment, 'model = "gpt-7-astra"'),
       "default",
     ).model,
     "gpt-7-astra",
@@ -697,7 +703,7 @@ test("project roles enforce exact Astra/max parity with the primary", () => {
   assert.throws(
     () =>
       parseProjectAgentConfig(
-        defaultAgent.replace('model = "gpt-6-astra"', 'model = "gpt-5.6-luna"'),
+        defaultAgent.replace(modelAssignment, 'model = "gpt-5.6-luna"'),
         "default",
       ),
     /supported GPT Astra model matching the primary intelligence/,
@@ -718,6 +724,12 @@ test("project roles enforce exact Astra/max parity with the primary", () => {
       ),
     /project agent policy for sandbox_mode/,
   );
+  const workerAgent = readFileSync(path.join(root, ".codex", "agents", "worker.toml"), "utf8");
+  const qualityRoute = "instructions.md#continuous-quality-and-performance";
+  assert.throws(
+    () => parseProjectAgentConfig(workerAgent.replace(qualityRoute, ""), "worker"),
+    (error) => error.message.includes(`orchestration marker ${qualityRoute}`),
+  );
   const fixture = configFixture();
   rmSync(path.join(fixture, ".codex", "agents", "worker.toml"));
   assert.throws(
@@ -729,32 +741,29 @@ test("project roles enforce exact Astra/max parity with the primary", () => {
   const mismatchedDefaultPath = path.join(mismatchedFixture, ".codex", "agents", "default.toml");
   writeFileSync(
     mismatchedDefaultPath,
-    readFileSync(mismatchedDefaultPath, "utf8").replace(
-      'model = "gpt-6-astra"',
-      'model = "gpt-7-astra"',
-    ),
+    readFileSync(mismatchedDefaultPath, "utf8").replace(modelAssignment, 'model = "gpt-7-astra"'),
     "utf8",
   );
   assert.throws(
     () => validateCodexConfig(mismatchedFixture),
-    /Agent default must use exactly the primary intelligence gpt-6-astra with max reasoning/,
+    (error) =>
+      error.message.includes(
+        `Agent default must use exactly the primary intelligence ${projectModel} with max reasoning`,
+      ),
   );
 
   const futureFixture = configFixture();
   const futureConfigPath = path.join(futureFixture, ".codex", "config.toml");
   writeFileSync(
     futureConfigPath,
-    readFileSync(futureConfigPath, "utf8").replaceAll(
-      'model = "gpt-6-astra"',
-      'model = "gpt-7-astra"',
-    ),
+    readFileSync(futureConfigPath, "utf8").replaceAll(modelAssignment, 'model = "gpt-7-astra"'),
     "utf8",
   );
   for (const role of ["default", "explorer", "worker"]) {
     const rolePath = path.join(futureFixture, ".codex", "agents", `${role}.toml`);
     writeFileSync(
       rolePath,
-      readFileSync(rolePath, "utf8").replace('model = "gpt-6-astra"', 'model = "gpt-7-astra"'),
+      readFileSync(rolePath, "utf8").replace(modelAssignment, 'model = "gpt-7-astra"'),
       "utf8",
     );
   }
@@ -765,7 +774,7 @@ test("installed model catalog requires the shared future-compatible Astra/second
   const catalog = {
     models: [
       {
-        slug: "gpt-6-astra",
+        slug: projectModel,
         priority: 1,
         visibility: "list",
         supported_reasoning_levels: [{ effort: "xhigh" }, { effort: "max" }, { effort: "ultra" }],
@@ -790,40 +799,38 @@ test("installed model catalog requires the shared future-compatible Astra/second
       },
     ],
   };
-  assert.equal(validateModelCatalog(catalog, "gpt-6-astra", "max").delegatedModel, "gpt-6-astra");
+  assert.equal(validateModelCatalog(catalog, projectModel, "max").delegatedModel, projectModel);
   assert.equal(validateModelCatalog(catalog, "gpt-7-astra", "max").primaryModel, "gpt-7-astra");
   assert.throws(
     () => validateModelCatalog(catalog, "gpt-5.6-terra", "max"),
     /not a supported GPT Astra model/,
   );
   assert.throws(
-    () => validateModelCatalog(catalog, "gpt-6-astra", "xhigh"),
+    () => validateModelCatalog(catalog, projectModel, "xhigh"),
     /Primary and subagent reasoning must remain max/,
   );
   const primaryMissing = structuredClone(catalog);
   primaryMissing.models[0].slug = "unavailable-model";
-  assert.throws(
-    () => validateModelCatalog(primaryMissing, "gpt-6-astra", "max"),
-    /Configured primary model gpt-6-astra is unavailable/,
-  );
+  assert.throws(() => validateModelCatalog(primaryMissing, projectModel, "max"), {
+    message: `Configured primary model ${projectModel} is unavailable.`,
+  });
   const maxEffortMissing = structuredClone(catalog);
   maxEffortMissing.models[0].supported_reasoning_levels = [
     { effort: "xhigh" },
     { effort: "ultra" },
   ];
-  assert.throws(
-    () => validateModelCatalog(maxEffortMissing, "gpt-6-astra", "max"),
-    /configured reasoning effort max.*gpt-6-astra/i,
-  );
+  assert.throws(() => validateModelCatalog(maxEffortMissing, projectModel, "max"), {
+    message: `Configured reasoning effort max is not supported by primary model ${projectModel}.`,
+  });
   // A supported effort must also be the second-highest, regardless of catalog entry order.
   const reordered = structuredClone(catalog);
   reordered.models[0].supported_reasoning_levels.reverse();
-  assert.equal(validateModelCatalog(reordered, "gpt-6-astra", "max").primaryReasoningEffort, "max");
+  assert.equal(validateModelCatalog(reordered, projectModel, "max").primaryReasoningEffort, "max");
   for (const levels of [["xhigh", "max"], ["max"], ["max", "ultra", "unknown"]]) {
     const drifted = structuredClone(catalog);
     drifted.models[0].supported_reasoning_levels = levels.map((effort) => ({ effort }));
     assert.throws(
-      () => validateModelCatalog(drifted, "gpt-6-astra", "max"),
+      () => validateModelCatalog(drifted, projectModel, "max"),
       /second-highest|unknown reasoning effort/i,
     );
   }

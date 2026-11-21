@@ -356,9 +356,10 @@ It supplies no application, public service, product data model, deployment targe
   `auth:check`, `localization:check`, `tenancy:check`, and `format*` commands.
 - Private internals: One verification registry and atomic evidence store. Command/input/runtime
   fingerprints, freshness and declared output hashes control reuse; unknown owners stop coverage.
-  Audited static checks bind owned data and executable imports. Independent successes survive
-  failure; workspace cycles stay grouped. Registered checks and individual Node files retain the
-  same reusable units as complete verification; filtered case diagnosis records no coverage.
+  Audited static checks bind owned data and executable imports. Independent checks finish in the
+  admitted phase after ordinary failures. Failed outputs block their consumers and workspace cycles
+  stay grouped. Registered checks and individual Node files retain the same reusable units as
+  complete verification. Filtered case diagnosis records no coverage.
 - Owned data and migrations: One atomic validated evidence record and verification lock under
   ignored `.codex/runtime/`; incompatible disposable evidence is rejected, without a parallel reader
   or receipt history.
@@ -388,7 +389,7 @@ It supplies no application, public service, product data model, deployment targe
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `7.1.0`.
+- Framework version: `7.2.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

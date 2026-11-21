@@ -1,6 +1,6 @@
 name = "default"
 description = "General read-only delegated analysis that does not require a narrower role."
-model = "gpt-6-astra"
+model = "gpt-6.2-astra"
 model_reasoning_effort = "max"
 sandbox_mode = "read-only"
 developer_instructions = """

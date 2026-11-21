@@ -11,11 +11,13 @@ At startup or resume reconstruct current state, then read the applicable routes 
 before dependent action. Reuse unchanged evidence. Navigation is not substantive evidence;
 `context:read --section` reads a direct body and lists children that may still need reading.
 
-- **Every task:** [Scope](#task-scope-and-completion),
-  [maintenance](#maintenance-scope-and-verification), [planning](#planning-entry-gate), relevant
-  manifest, requirements/design and source owners.
+- **Every task:**
+  [Delivery and verification economy](#product-first-delivery-and-verification-economy),
+  [scope](#task-scope-and-completion), [maintenance](#maintenance-scope-and-verification),
+  [planning](#planning-entry-gate), relevant manifest, requirements/design and source owners.
 - **Startup/resume:** [Reconstruction](#startup-repository-reconstruction),
   [lifecycle](#launcher-and-session-lifecycle), [announced handover](#critical-handover-receipt).
+  Use `$resume-project` for unfinished authorized work.
 - **Implementation:** [Engineering](#best-available-engineering-not-quick-fixes),
   [course checks](#long-session-course-checks), `$project-implementation`.
 - **Product/architecture:** [Intake](#first-prompt-project-definition-intake), applicable
@@ -25,10 +27,14 @@ before dependent action. Reuse unchanged evidence. Navigation is not substantive
   [permissions](#effective-permissions-and-write-isolation),
   [capacity](#capacity-admission-and-monitoring),
   [authority](#intelligence-parity-and-integration-authority), [coordination](#peer-coordination),
-  [lifecycle](#agent-lifecycle-and-idle-cleanup).
+  [lifecycle](#agent-lifecycle-and-idle-cleanup),
+  [quality and performance](#continuous-quality-and-performance).
 - **Accounts/infrastructure/delivery:** [Isolation](#repository-local-tool-and-account-isolation),
   [infrastructure](#infrastructure-as-code), [delivery](#delivery-environments),
   [security](#security-and-privacy).
+- **Multi-component change or deploy:**
+  [Dependency plan and preflight](#coherent-component-updates-and-release-batching) and
+  [release and manual testing](#continuous-delivery-and-manual-testing).
 - **Verification/review:** [Selection](#verification-selection-and-runtime),
   [test strategy](#test-strategy), applicable review skill.
 - **Documentation:** [Ownership](#documentation-ownership), [currency](#documentation-currency),
@@ -97,8 +103,11 @@ Framework updates end at update acceptance; they do not reopen intake or start p
 
 ## Product-First Delivery And Verification Economy
 
-Deliver the smallest coherent working increment. Select evidence by actual risk and dependencies,
-combining valid results with required new checks. Check, agent and document counts are not outcomes.
+Deliver the smallest coherent working increment. Select evidence by actual risk and dependencies.
+Check cheap prerequisites and affected consumers before expensive dependent runs. Finish independent
+checks in each admitted verification phase. Batch repairs after the run and repeat only failed or
+invalidated checks. Pause affected work for real safety, authority, state or dependency blockers.
+Measure progress by usable behavior and missing acceptance evidence.
 
 ## Task Scope And Completion
 
@@ -141,27 +150,24 @@ incorporate user steering and continue unfinished authorized work after checkpoi
 
 ### Long-Session Course Checks
 
-At boundaries, resume and at most two active minutes apart, compare cumulative effort with the
-original outcome, remaining acceptance, changed risks, owners and capacity. Check whole-repository
-coherence, effectiveness, efficiency and quality, including consumers outside the immediate edit.
-Reassess repeated failures or disproportionate effort; change the approach instead of repeating it.
-Use current evidence rather than rerunning checks merely to conduct the review.
+At boundaries, resume and at most two active minutes apart, compare the usable result and remaining
+acceptance with cumulative time, cost and attempts across agents and sessions. Check actual
+consumers, ownership, risks, capacity and the next useful work. Use current evidence for this
+assessment.
 
 Describe the concrete work and its effect in plain language in user updates. Say what is usable now,
-what must finish next, and what the user can do. Explain any technical term that matters to that action.
+what must finish next, and what the user can do. Explain any technical term that matters to that
+action.
 
-After two attempts that produce no new discriminating evidence, stop that approach: state the failed
-hypothesis and choose a smaller probe, a different repair or the concrete blocker. Before another
-long operation compare its expected cost with the remaining outcome. Do not keep a task alive by
-finding new polish or repeating already accepted work.
+Two attempts without new discriminating evidence, disproportionate effort or a user report of drift
+require immediate reassessment. Name the failed hypothesis or stalled outcome and choose a smaller
+probe, a different repair or the concrete blocker. Redirect affected work at a safe boundary and
+compare the next expensive operation with the actual gap it closes.
 
-The primary checks its own thread and every admitted task-owned agent at this cadence, including
-while a long check is running. For each, identify the open acceptance condition, last new evidence,
-next bounded action and any repeated or expanding work. Use current messages and owned-job state; do
-not rerun tests or create a reporting subsystem for the check. If progress has drifted, promptly
-narrow or reassign the work, or cancel it at its next safe boundary. Missing updates require a
-bounded status request. Summarize a material correction to the user; do not emit empty heartbeat
-reports. Never inspect or control unrelated threads without a verified ownership handoff.
+Include every owned agent and background job even during long checks. Use its last new evidence,
+open acceptance condition and next bounded action. Request a concise checkpoint when evidence is
+missing. Summarize material changes to the user. Follow
+[ownership and dispatch](#agent-lifecycle-and-idle-cleanup) throughout.
 
 ## Planning, Goals, Slices, Review Loops, And Audits
 
@@ -175,9 +181,10 @@ review.
 ### Plan Content And Review
 
 Keep one visible plan covering outcome, causes, owners/consumers, decisions, dependencies,
-proportional evidence, completion and useful parallel work. Review feasibility, authority, safety,
-architecture and cost before implementation/delegation; update at material boundaries. Use coherent
-slices, not repository planning files, duplicate queues or prescribed ceremony. Resolve relevant
+proportional evidence and completion. Rank ready work by its contribution to the next usable result,
+required risk reduction and what it unblocks. Parallelize independent preparation, implementation,
+checks and delivery. Review feasibility, authority, architecture, cost and conflicts before
+implementation/delegation, then update the same plan at material boundaries. Resolve relevant
 findings and revisit only affected evidence.
 
 ## Best-Available Engineering, Not Quick Fixes
@@ -188,10 +195,11 @@ behavior, integration, review and documentation together under the closure below
 
 ### Completed-Goal Closure And Repository Housekeeping
 
-Accept or preserve owned handoffs and close their scopes. Reconcile documentation and owned residue
-through canonical housekeeping/reset, remove completed work context, and run
-`pnpm worktree:status -- --json` after each completed slice. Preserve accounts, active sessions,
-unrelated changes and uncertain recovery; preservation alone is not completion.
+At each completed slice, accept or preserve owned handoffs, close their scopes, reconcile documents
+and clean verified owned residue through canonical housekeeping. Run
+`pnpm worktree:status -- --json` and settle eligible worktrees. Preserve accounts, active sessions,
+unrelated changes and uncertain recovery. At goal closure remove completed work context and settle
+remaining owned scopes.
 
 Audit integrated acceptance using valid evidence and required gaps. Local completion does not
 require publication. Full runtime sanitation requires session exit; source cleanup does not.
@@ -454,6 +462,33 @@ migrations, rollback/forward-recovery limits and provider serialization. Observe
 representative smoke paths; push, green build or a queued job alone is not delivered behavior.
 Independent CI and protected environment gates remain mandatory.
 
+### Coherent Component Updates And Release Batching
+
+Use the current plan for the changed components, affected producers/consumers, actual and intended
+versions, target, artifacts, owner, activation order, reusable evidence and recovery limits. Migrate
+coupled contracts and their consumers in one compatible batch. Check the real entrypoint and
+representative end-to-end flow, including affected failure or recovery behavior.
+
+Before expensive dependent work or deployment, use the maintained entrypoint's cheap preflight.
+Verify the actual required services, artifacts, tools, configuration, permissions, data/migrations
+and serving readiness. Verify newly introduced dependencies in the intended target through their
+real consumer. Refresh volatile observations before mutation and reuse valid source/artifact checks.
+A component scheduled for replacement needs evidence for its new version and activation order. Fix
+missing prerequisites and sustained failure causes in their owning code or configuration.
+
+### Continuous Delivery And Manual Testing
+
+Use documented, maintained build, deploy and recovery entrypoints an authorized operator can run
+without an agent. One release owner carries each useful verified increment through authorized
+publication and deployment as soon as its required gates pass. Reconcile owned release state as
+increments finish. Overlap disjoint work and independent preparation while protecting the accepted
+candidate. Order push and deployment by actual target dependencies and authority.
+
+For authorized nonproduction delivery, let the user test as soon as the intended flow is reachable
+and the required access, data, artifact, dependency, startup and smoke checks pass. Send the URL or
+entrypoint, what works, how to test it and what remains. Run longer checks independently or
+afterward when target and scope allow. Required release or production gates retain their order.
+
 ### Deployment And Qualification Failure Recovery
 
 Identify the failed stage and original operation/run/resource; inspect actual remote state before
@@ -491,17 +526,32 @@ administration nor maximum permission fragmentation is an automatic design goal.
 
 ### Admission, Intelligence, And Provenance
 
-Default to four useful concurrent subagents when independent work, capacity, permissions and
-integration allow it; include admitted user-started/requested extras, at most twelve live. Use fewer
-when those conditions fail and state the reason. Never invent work or split cohesive changes to fill
-slots. Subagents do not delegate further. Plan ready assignments with exact scope, exclusions,
-dependencies, result, evidence and checkpoint; the primary owns integration and protected policy.
+Size the team to the useful independent work, capacity, permissions and integration cost. Include
+admitted user-started agents in the ceiling of twelve live. Keep cohesive serial work with the
+primary. Plan ready assignments with exact scope, exclusions, dependencies, result, evidence and
+checkpoint. Reassess the team at handoffs and course checks as the critical path changes. Only the
+primary delegates, owns integration and edits protected policy.
 
 Register each owned agent/job in the current session with repository realpath/stable identity,
 parent session, returned native identity, scope, checkout, checkpoint and safe cancellation method.
 Broad host/account listings are discovery only. Contact, poll, cancel or control only exact
 provenance matches; never foreign or ambiguous agents/processes. A user-started agent requires a
 verified ownership handoff. Do not add a permanent scheduler or registry file.
+
+### Continuous Quality And Performance
+
+For sustained parallel work or a material release, assign one admitted worker to continuous quality
+and performance through acceptance. Give it access to the current plan and relevant evidence, with
+explicit disjoint write ownership for any repairs. The primary covers this work if delegation cannot
+be admitted or justified.
+
+Check downstream effects, dependencies and likely failures before implementation and at each release
+checkpoint. Use existing observations for phase times, queues, resource use and actual result
+quality. Flag concrete regressions, evidence gaps and expensive repetition promptly. Fix and verify
+material, authorized defects in the assigned write set, or give the primary the affected owner,
+impact and smallest useful check. Resolve release-blocking findings before the affected deploy.
+Reuse required evidence and keep unaffected work moving. Keep this assignment focused on oversight
+until its scope closes.
 
 ### Capacity Admission And Monitoring
 
@@ -536,7 +586,7 @@ At confirmed critical capacity admit no new work. Drain provenance-bound owned a
 boundaries, cancel queued work, accept or record every handoff and close all owned scopes. Preserve
 foreign work. Reconcile current context and any confirmed cross-clone coordination before sealing.
 
-## Critical Budget Drain
+### Critical Budget Drain
 
 After all owned work is drained, record these exact lines in the work context:
 
@@ -557,11 +607,11 @@ blocker.
 
 At each result/checkpoint promptly accept, reject or preserve the handoff, close its scope, and
 recheck admission. Before unrelated primary work or waiting, assign the next ready bounded task to
-that same agent from the current plan. If none is ready, name the concrete dependency/limit and next
-checkpoint; retain only for a near-term dependent task, otherwise close through supported controls.
-Do not wait for a whole wave, accumulate idle agents or invent assignments. Only the primary steers
-or closes agents. Before final handoff confirm all unneeded owned agents/jobs are closed; repository
-housekeeping cannot manage native conversations.
+that same agent from the current plan. Keep independent work moving during tests and releases. If no
+assignment is ready, identify the dependency, its owner and the next checkpoint. Keep an idle agent
+only for a named near-term task, otherwise close it through native controls and confirm slot
+release. Only the primary steers or closes agents. Before final handoff confirm all owned scopes are
+settled.
 
 Keep the primary informed at least every two active minutes with the acceptance condition being
 advanced, new evidence and next action. The primary's [course check](#long-session-course-checks)
@@ -590,11 +640,11 @@ Different accounts do not change those boundaries. Logical isolation is not file
 
 ### Intelligence Parity And Integration Authority
 
-Use the exact configured GPT Astra model and `max` reasoning for primary and children, without spawn
-overrides or fallback tiers. The tracked primary/global/role settings must agree; validators fail
-closed on mismatch. Read-only roles remain read-only. Worker defaults are workspace-write with
-command network disabled; inherited overrides follow the preceding rule. Apps require equivalent
-scope enforcement because a command sandbox does not govern them.
+Use the exact GPT Astra model configured in `.codex/config.toml` and `max` reasoning for primary and
+children. Keep native spawn model and effort overrides unset. The tracked primary/default/role
+settings must agree; validators fail closed on mismatch. Read-only roles remain read-only. Worker
+defaults are workspace-write with command network disabled; inherited overrides follow the preceding
+rule. Apps require equivalent scope enforcement because a command sandbox does not govern them.
 
 The primary alone edits protected `.codex/config.toml`, `.codex/agents/**`, `AGENTS.md`,
 instructions, `.agents/skills/**`, `.codex/skills/**` and agent/skill metadata. It owns integration,
@@ -693,10 +743,9 @@ coordination/provider owners. Never copy credentials or receipts. Reconcile unkn
 outcomes before retrying.
 
 Assemble full required coverage from valid and fresh results once. Handoff, waiting and role change
-do not invalidate it. At each push assess useful deployment to an already-authorized target, or
-state why it is inapplicable/blocked. Observe rollout and health before claiming deployment. Return
-commit/remote state, CI/artifact/target identities, actual evidence and limits. The primary accepts
-and closes release scope before reassignment; no idle release slot or new release machinery.
+do not invalidate it. Follow [continuous delivery](#continuous-delivery-and-manual-testing) through
+the applicable target gates. Return commit/remote state, CI/artifact/target identities, actual
+evidence and limits. The primary accepts and closes release scope before reassignment.
 
 #### Publication Execution And Closure
 

@@ -1418,7 +1418,8 @@
       "scripts/setup/project-initialization-transfer.source.test.mjs",
       "scripts/setup/staged-project-validator.test.mjs",
       "scripts/setup/setup-regression.test.mjs",
-      "scripts/setup/startup-session-controller.test.mjs"
+      "scripts/setup/startup-session-controller.test.mjs",
+      "scripts/setup/startup-state.test.mjs"
     ],
     ".codex/tooling.json": [
       "scripts/framework/framework-upgrade-identity.test.mjs"

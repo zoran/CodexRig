@@ -358,7 +358,8 @@ export function pendingVerificationPlan(
     (reusable ? reused : required).push(observation);
     if (reusable) return;
     const outputPrerequisites = (dependencies.get(command.key) ?? []).map((producer) => {
-      if (needed.has(producer.key)) visit(producer);
+      const producerScheduled = needed.has(producer.key);
+      if (producerScheduled) visit(producer);
       else if (!producer.outputs?.length)
         blockedPrerequisites.push(
           `Missing output contract for ${producer.workspaceDirectories?.join(", ") ?? producer.key} required by ${observation.label}; declare workspaceOutputs in .codex/verification.json before reusing this build.`,
@@ -369,7 +370,9 @@ export function pendingVerificationPlan(
       return {
         key: producer.key,
         outputs: producer.outputs,
-        outputFingerprint: successful.get(producer.key)?.outputFingerprint,
+        outputFingerprint: producerScheduled
+          ? undefined
+          : successful.get(producer.key)?.outputFingerprint,
       };
     });
     scheduled.push({ ...command, outputPrerequisites });

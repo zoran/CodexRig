@@ -23,6 +23,7 @@ import {
 } from "./project-initialization-test-helpers.mjs";
 import { stageProjectExport } from "../framework/stage-project-export.mjs";
 import { validateGeneratedProject } from "../framework/validate-staged-project.mjs";
+import { parsePortableToml } from "../contracts/portable-toml.mjs";
 import { documentContextSections } from "../docs/document-context.mjs";
 import { markdownFileLinks, markdownHeadingContract } from "../docs/document-references.mjs";
 import { buildFrameworkUpgradePlan } from "../framework/framework-upgrade.mjs";
@@ -87,7 +88,10 @@ test("generated children receive canonical task, planning, documentation, mainte
     ["Long-Session Course Checks", "<!-- current-course-check-policy -->"],
     ["Verification Selection And Runtime", "<!-- current-verification-runtime-policy -->"],
     ["Delegated Release", "<!-- current-delegated-release-policy -->"],
+    ["Coherent Component Updates And Release Batching", null],
+    ["Continuous Delivery And Manual Testing", null],
     ["Admission, Intelligence, And Provenance", "<!-- current-agent-admission-policy -->"],
+    ["Continuous Quality And Performance", null],
     ["Agent Lifecycle And Idle Cleanup", "<!-- current-agent-lifecycle-policy -->"],
     ["Peer Coordination", "<!-- current-peer-coordination-policy -->"],
     [
@@ -103,13 +107,20 @@ test("generated children receive canonical task, planning, documentation, mainte
       await normalizedMarkdown(policyBody(generatedInstructions, heading)),
       await normalizedMarkdown(policyBody(sourceInstructions, heading)),
     );
-    assert.equal(generatedInstructions.includes(marker), false);
+    if (marker) assert.equal(generatedInstructions.includes(marker), false);
   }
   const { anchors } = markdownHeadingContract("instructions.md", generatedInstructions);
   for (const reference of markdownFileLinks(
     policyBody(generatedInstructions, "Task Reading Routes"),
   ))
     assert.ok(anchors.has(reference.slice(1)), `Generated task route must resolve: ${reference}`);
+  for (const file of [".codex/config.toml", ".codex/agents/worker.toml"]) {
+    const { developer_instructions: prompt } = parsePortableToml(
+      readFileSync(path.join(target, file), "utf8"),
+    );
+    for (const [, anchor] of prompt.matchAll(/instructions\.md#([a-z0-9-]+)/gu))
+      assert.ok(anchors.has(anchor), `${file} refers to a missing generated rule: #${anchor}`);
+  }
   await validateGeneratedProject(target);
   const contextPath = path.join(target, "docs/project-context.md");
   const marker = /`([a-z]+-work-state)`/u.exec(generatedInstructions)?.[1];

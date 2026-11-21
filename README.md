@@ -82,6 +82,8 @@ or explicitly defer it and develop requirements during
   [agent admission](instructions.md#admission-intelligence-and-provenance) and
   [delegated release](instructions.md#delegated-release).
 - [Delivery environments](instructions.md#delivery-environments),
+  [dependency preflight](instructions.md#coherent-component-updates-and-release-batching),
+  [continuous delivery and manual testing](instructions.md#continuous-delivery-and-manual-testing),
   [Infrastructure as Code](instructions.md#infrastructure-as-code) and
   [permission design](instructions.md#permission-design).
 - [Codex configuration](.codex/README.md): session, agent and private runtime settings.

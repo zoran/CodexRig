@@ -14,6 +14,7 @@ import path from "node:path";
 import { after, before, test } from "node:test";
 import {
   cleanupTemporaryRoots,
+  projectModel,
   root,
   run,
   temporaryRoot,
@@ -51,7 +52,7 @@ after(() => {
 
 const projectIntelligenceArguments = Object.freeze([
   "-c",
-  'model="gpt-6-astra"',
+  `model=${JSON.stringify(projectModel)}`,
   "-c",
   'model_reasoning_effort="max"',
 ]);
@@ -162,6 +163,7 @@ function controllerFixture() {
       'const {appendFileSync,closeSync,existsSync,mkdirSync,readFileSync,writeFileSync}=require("node:fs");',
       'const path=require("node:path");',
       "const args=process.argv.slice(2);",
+      `const projectModel=${JSON.stringify(projectModel)};`,
       'const fixtureControl=JSON.parse(readFileSync(process.argv[1]+".fixture.json","utf8"));',
       'const maliciousSource=`import {writeFileSync} from "node:fs";writeFileSync(${JSON.stringify(fixtureControl.marker)}, "executed");\\n`;',
 
@@ -196,7 +198,7 @@ function controllerFixture() {
       'if(behavior==="aborted-lifecycle-request"){const poisonSource=`const http=require("node:http");const request=http.request({host:"127.0.0.1",method:"POST",path:"/session-start",port:Number(process.env.CODEXRIG_SESSION_CONTROL_PORT),headers:{"content-length":"262145","x-codexrig-session-control":process.env.CODEXRIG_SESSION_CONTROL_TOKEN}},response=>{response.resume();response.on("end",()=>process.exit(0));});request.on("error",()=>process.exit(0));request.end(Buffer.alloc(262145));setTimeout(()=>process.exit(2),5000);`;const poisoned=spawnSync(process.execPath,["--eval",poisonSource],{encoding:"utf8",env:process.env,input:"",stdio:"pipe",timeout:10000});if(poisoned.status!==0){process.stderr.write(poisoned.stderr+poisoned.stdout);process.exit(89);}}',
       'const permissionMode=args.includes("--dangerously-bypass-approvals-and-sandbox")?"bypassPermissions":"default";',
       'const source=behavior==="new-session"?"startup":"resume";',
-      'const sessionInput=JSON.stringify({cwd:root,hook_event_name:"SessionStart",model:"gpt-6-astra",permission_mode:permissionMode,session_id:sessionId,source,transcript_path:path.join(root,"session.jsonl")});',
+      'const sessionInput=JSON.stringify({cwd:root,hook_event_name:"SessionStart",model:projectModel,permission_mode:permissionMode,session_id:sessionId,source,transcript_path:path.join(root,"session.jsonl")});',
       'if(behavior==="cancel-picker")process.exit(0);',
       'if(behavior==="delayed-picker"){waitForCodexBinding();writeFileSync(path.join(root,"picker-clock-advanced"),"ready");}',
       "const skipSessionStart=false;",
@@ -219,7 +221,7 @@ function controllerFixture() {
       'if(behavior==="active-mutate-exit")writeFileSync(path.join(root,"scripts/setup/startup-attestation.mjs"),maliciousSource);',
       'const stopSessionId=behavior==="forged-stop-id"?"01a08888-5678-7abc-8def-0123456789ab":sessionId;',
       'const stopTranscript=behavior==="forged-stop-id"?path.join(root,"forged-transcript.jsonl"):null;',
-      'const stopped=spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[1].command],{cwd:root,encoding:"utf8",env:process.env,input:JSON.stringify({cwd:root,hook_event_name:"Stop",last_assistant_message:null,model:"gpt-6-astra",permission_mode:permissionMode,session_id:stopSessionId,stop_hook_active:false,transcript_path:stopTranscript,turn_id:"turn-fixture"}),stdio:"pipe"});',
+      'const stopped=spawnSync(process.env.SHELL??"/bin/sh",["-c",expectedHooks[1].command],{cwd:root,encoding:"utf8",env:process.env,input:JSON.stringify({cwd:root,hook_event_name:"Stop",last_assistant_message:null,model:projectModel,permission_mode:permissionMode,session_id:stopSessionId,stop_hook_active:false,transcript_path:stopTranscript,turn_id:"turn-fixture"}),stdio:"pipe"});',
       "if(stopped.status!==0){process.stderr.write(stopped.stderr+stopped.stdout);process.exit(91);}",
       'if(behavior==="forged-stop-id"&&!/does not match the active verified Codex session/.test(stopped.stdout)){process.stderr.write(stopped.stdout);process.exit(92);}',
       "}",
@@ -382,7 +384,7 @@ test("controller accepts non-executable Codex model preferences beneath project 
   writeFileSync(
     path.join(runtimeDirectory, "config.toml"),
     [
-      'model = "gpt-6-astra"',
+      'model = "gpt-6.2-sol"',
       'model_reasoning_effort = "ultra"',
       "[tui]",
       "screen_reader_detection_done = true",
@@ -402,6 +404,7 @@ test("controller accepts non-executable Codex model preferences beneath project 
     projectIntelligenceArguments,
   );
   assert.equal(call.args.includes('model_reasoning_effort="ultra"'), false);
+  assert.equal(call.args.includes('model="gpt-6.2-sol"'), false);
   assert.equal(inspectRuntimeSessionLease({ root: fixture.project }).status, "absent");
   assert.equal(inspectRuntimeSessionRecovery({ root: fixture.project }).status, "present");
 });

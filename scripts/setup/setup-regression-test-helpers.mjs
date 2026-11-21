@@ -60,10 +60,12 @@ export function run(executable, args, options = {}) {
   });
 }
 
-// Exercise the shipped policy, not a separately maintained prose fixture.
-export const validPrimaryInstructions = parsePortableToml(
+// Reuse the shipped policy and default model in fixtures that load the tracked role files.
+const projectCodexConfig = parsePortableToml(
   readFileSync(path.join(root, ".codex/config.toml"), "utf8"),
-).developer_instructions;
+);
+export const validPrimaryInstructions = projectCodexConfig.developer_instructions;
+export const projectModel = projectCodexConfig.model;
 
 export const validPortableConfig = `# Portable policy; assignments in comments do not count.
 developer_instructions = """
@@ -75,7 +77,7 @@ model_verbosity = "medium"
 web_search = "cached"
 cli_auth_credentials_store = "file"
 mcp_oauth_credentials_store = "file"
-model = "gpt-6-astra"
+model = "${projectModel}"
 approvals_reviewer = "user"
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
@@ -85,7 +87,7 @@ network_access = false
 
 [agents]
 enabled = true
-default_subagent_model = "gpt-6-astra"
+default_subagent_model = "${projectModel}"
 default_subagent_reasoning_effort = "max"
 max_concurrent_threads_per_session = 12
 interrupt_message = true

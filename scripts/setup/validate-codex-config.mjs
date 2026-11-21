@@ -102,13 +102,10 @@ const requiredPrimaryInstructionFragments = Object.freeze([
   "Maintenance Scope And Verification",
   "Delegated Release",
   "exactly one current internal contract",
-  "Default to four useful concurrent subagents",
-  "additional user-started agents",
-  "at most twelve live",
   "never pass a model or reasoning override",
-  "exact GPT Astra model",
-  "max reasoning",
   "instructions.md#agent-lifecycle-and-idle-cleanup",
+  "instructions.md#continuous-quality-and-performance",
+  "instructions.md#coherent-component-updates-and-release-batching",
   "effective runtime permissions",
   "live parent permission overrides",
   "already-authorized YOLO override",
@@ -522,6 +519,7 @@ export function parseProjectAgentConfig(content, expectedName) {
           "Delegated Release",
           "frozen candidate",
           "scope closure",
+          "instructions.md#continuous-quality-and-performance",
         ]
       : []),
   ]) {

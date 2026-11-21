@@ -25,15 +25,18 @@ At most two active minutes apart, check the primary and every task-owned agent a
 acceptance condition. Correct drift and repeated work under
 [course checks](instructions.md#long-session-course-checks); do not adopt unrelated threads.
 
-Before child tools apply the
-[agent rules](instructions.md#subagent-orchestration-and-integration-authority): admission,
-effective permissions, current capacity, owned scope and lifecycle. The primary owns protected
-policy and integration. Follow capacity recovery before critical classification; a successful
-critical handover seal is terminal.
+For parallel work apply the
+[agent rules](instructions.md#subagent-orchestration-and-integration-authority), including
+admission, effective permissions, capacity, dispatch and
+[quality and performance oversight](instructions.md#continuous-quality-and-performance). The primary
+owns protected policy and integration. Follow capacity recovery before critical classification. A
+successful critical handover seal is terminal.
 
 After each completed slice inspect worktrees and perform canonical settlement. Preserve active
-runtime and accounts; full runtime reset requires session exit. Publication and deployment require
-their own authority. End final repository responses with the combined command under
+runtime and accounts. For authorized release increments use
+[dependency preflight](instructions.md#coherent-component-updates-and-release-batching) and
+[continuous delivery](instructions.md#continuous-delivery-and-manual-testing). End final repository
+responses with the combined command under
 [Publication Guidance](instructions.md#verification-and-publication-gates); displaying it grants no
 authority.
 <!-- codexrig:portable-agent-entry:end -->

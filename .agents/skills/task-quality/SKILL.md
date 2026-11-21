@@ -33,9 +33,10 @@ Review-only requests stay read-only; repairs need existing implementation author
    active/private/unrelated state; preservation alone is not completion.
 6. Publication requires its own authority and
    [delegated release](../../../instructions.md#delegated-release) gates. Assemble complete
-   candidate coverage once from valid and missing units; local handoff does not require a
-   preliminary full suite. Later edits reopen only affected evidence. Critical capacity follows the
-   canonical terminal drain, never fabricated completion.
+   candidate coverage once from valid and missing units, then apply
+   [continuous delivery](../../../instructions.md#continuous-delivery-and-manual-testing) for an
+   authorized target. Later edits reopen only affected evidence. Critical capacity follows the
+   canonical terminal drain.
 
 Continue unfinished authorized work after checkpoints. Final handoff states concrete changes,
 observed evidence/review, material limits and any actual remaining action. Create no review,

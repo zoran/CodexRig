@@ -227,6 +227,35 @@ test("missing or changed producer outputs rerun only that producer and its actua
   );
   rmSync(path.join(repositoryRoot, "core.out"));
   writeFileSync(path.join(repositoryRoot, "core.out"), "valid");
+  // Keep the last valid bytes in place while a selected rebuild of Core fails.
+  const failedRebuild = commands
+    .filter((command) => command.phase === "workspace-build")
+    .map((command) => ({
+      ...command,
+      label: command.key,
+      artifactOwners: [command.key],
+      serialGroup: "workspace-builds",
+      args: command.key === "build-core" ? ["--eval", "process.exit(1)"] : command.args,
+    }));
+  const changedBuilds = new Map(fingerprints)
+    .set("build-core", "b".repeat(64))
+    .set("build-independent", "b".repeat(64));
+  const failedPlan = pendingVerificationPlan(
+    { ...base, workspaceCommands: failedRebuild },
+    changedBuilds,
+    checks,
+    { completeCommands: failedRebuild, repositoryRoot },
+  );
+  writeFileSync(path.join(repositoryRoot, "dispatch.log"), "");
+  await assert.rejects(
+    withVerificationSessionLock(() => runPlan(failedPlan, { repositoryRoot }), {
+      repositoryRoot,
+    }),
+    /Workspace build failed: build-core, build-app/u,
+  );
+  assert.equal(readFileSync(path.join(repositoryRoot, "core.out"), "utf8"), "valid");
+  assert.equal(readFileSync(path.join(repositoryRoot, "dispatch.log"), "utf8"), "independent\n");
+
   const undeclared = commands.map((command) =>
     command.key === "build-core" ? { ...command, outputs: undefined } : command,
   );

@@ -23,7 +23,13 @@ import {
   verificationChildEnvironment,
 } from "./verification-runtime-identity.mjs";
 
-const executionPhaseOrder = ["preflight", "broad", "workspace-build", "workspace-test", "delivery"];
+const executionPhases = [
+  ["preflight", "Preflight verification checks failed"],
+  ["broad", "Broad regression checks failed"],
+  ["workspace-build", "Workspace build failed"],
+  ["workspace-test", "Workspace test failed"],
+  ["delivery", "Target delivery verification failed"],
+];
 const activeVerificationSupervisors = new Set();
 
 export { verificationChildEnvironment };
@@ -43,7 +49,7 @@ function safeField(value) {
 }
 
 function commandsByExecutionPhase(plan) {
-  const phases = new Map(executionPhaseOrder.map((phase) => [phase, []]));
+  const phases = new Map(executionPhases.map(([phase]) => [phase, []]));
   for (const command of [...plan.readOnlyCommands, ...plan.workspaceCommands]) {
     const commands = phases.get(command.phase);
     if (!commands) {
@@ -70,7 +76,7 @@ export function printPlan(plan) {
   console.log(`Admission reason: ${safeField(plan.admission.reason)}`);
 
   const phases = commandsByExecutionPhase(plan);
-  const commands = executionPhaseOrder.flatMap((phase) => phases.get(phase));
+  const commands = [...phases.values()].flat();
   if (plan.admission.coverageBlockedReason)
     console.log(safeField(plan.admission.coverageBlockedReason));
   if (plan.evidence) {
@@ -290,7 +296,7 @@ async function withVerificationSignalForwarding(action) {
     process.on(signal, handler);
   }
   try {
-    const result = await action();
+    const result = await action(() => handledSignal !== null);
     if (handledSignal) throw new Error(`Verification interrupted by ${handledSignal}.`);
     return result;
   } finally {
@@ -405,13 +411,11 @@ function artifactOwnerSet(command) {
   return new Set([
     ...(command.artifactOwners ?? []),
     ...(command.outputs ?? []).map((file) => `output:${file}`),
-    ...(command.serialGroup ? [`serial-test-suite:${command.serialGroup}`] : []),
   ]);
 }
 
-function artifactShards(commands) {
+function artifactShards(commands, owners) {
   const parents = commands.map((_, index) => index);
-  const owners = commands.map(artifactOwnerSet);
   const find = (index) => {
     while (parents[index] !== index) {
       parents[index] = parents[parents[index]];
@@ -425,9 +429,14 @@ function artifactShards(commands) {
     if (leftRoot !== rightRoot) parents[rightRoot] = leftRoot;
   };
   for (let left = 0; left < commands.length; left += 1) {
-    if (owners[left].size === 0) continue;
+    const serialGroup = commands[left].serialGroup;
+    if (!serialGroup && owners[left].size === 0) continue;
     for (let right = left + 1; right < commands.length; right += 1) {
-      if ([...owners[left]].some((owner) => owners[right].has(owner))) union(left, right);
+      if (
+        (serialGroup && commands[right].serialGroup === serialGroup) ||
+        [...owners[left]].some((owner) => owners[right].has(owner))
+      )
+        union(left, right);
     }
   }
   const groups = new Map();
@@ -445,23 +454,33 @@ async function runArtifactSafeCommands(
   repositoryRoot,
   onResult,
   completed,
+  interrupted,
 ) {
   if (commands.length === 0) return [];
   const results = new Array(commands.length);
   // Recovery and held commands need lifecycle locking before verification policy exists.
   // Load policy-dependent output validation only when executing planned checks.
   const { verificationOutputFingerprint } = await import("./verification-check-inputs.mjs");
-  const shards = artifactShards(commands);
+  const owners = commands.map(artifactOwnerSet);
+  const shards = artifactShards(commands, owners);
   let nextShard = 0;
-  let phaseFailed = false;
+  let stopAdmission = false;
   const worker = async () => {
-    while (!phaseFailed && nextShard < shards.length) {
+    while (!stopAdmission && !interrupted() && nextShard < shards.length) {
       const shard = shards[nextShard++];
+      const failedOwners = new Set();
       for (const index of shard) {
-        if (phaseFailed) break;
+        if (stopAdmission || interrupted()) break;
+        const command = commands[index];
+        if ([...owners[index]].some((owner) => failedOwners.has(owner))) {
+          console.log(
+            `[verification:blocked] ${safeField(command.key)} shares mutable state with a failed check.`,
+          );
+          continue;
+        }
         const startedAt = performance.now();
         try {
-          for (const prerequisite of commands[index].outputPrerequisites ?? []) {
+          for (const prerequisite of command.outputPrerequisites ?? []) {
             const produced = completed.get(prerequisite.key);
             if (produced && !prerequisite.outputs?.length) continue;
             const expected = produced?.outputFingerprint ?? prerequisite.outputFingerprint;
@@ -470,46 +489,50 @@ async function runArtifactSafeCommands(
               verificationOutputFingerprint(prerequisite, { repositoryRoot }) !== expected
             )
               throw new Error(
-                `Build output prerequisite changed before ${commands[index].key}: ${prerequisite.key}. Replan this producer and its consumers.`,
+                `Build output prerequisite changed before ${command.key}: ${prerequisite.key}. Replan this producer and its consumers.`,
               );
           }
-          results[index] = await runCommand(commands[index], repositoryRoot, () => {
-            phaseFailed = true;
-          });
+          try {
+            results[index] = await runCommand(command, repositoryRoot, () => {
+              stopAdmission = true;
+            });
+          } catch (error) {
+            // Startup or cleanup uncertainty can affect the shared execution boundary.
+            stopAdmission = true;
+            throw error;
+          }
           const result = results[index];
+          if (result.error || result.signal) stopAdmission = true;
           if (!result.error && result.status === 0 && !result.diagnosticRequired) {
-            const outputFingerprint = verificationOutputFingerprint(commands[index], {
+            const outputFingerprint = verificationOutputFingerprint(command, {
               repositoryRoot,
             });
             if (outputFingerprint === null)
               throw new Error(
-                `Successful command ${commands[index].key} did not retain every declared output.`,
+                `Successful command ${command.key} did not retain every declared output.`,
               );
             if (outputFingerprint !== undefined) result.outputFingerprint = outputFingerprint;
-            completed.set(commands[index].key, result);
+            completed.set(command.key, result);
           }
         } catch (error) {
           results[index] = {
-            command: commands[index],
+            command,
             elapsedMs: Math.round(performance.now() - startedAt),
             error,
             status: null,
           };
         }
-        printResult(results[index]);
-        if (
-          results[index].error ||
-          results[index].status !== 0 ||
-          results[index].diagnosticRequired
-        )
-          phaseFailed = true;
-        await onResult?.(results[index]);
+        const result = results[index];
+        printResult(result);
+        if (result.error || result.status !== 0 || result.diagnosticRequired)
+          for (const owner of owners[index]) failedOwners.add(owner);
+        await onResult?.(result);
       }
     }
   };
   const workers = Array.from({ length: Math.min(parallelLimit(), shards.length) }, () =>
     worker().catch((error) => {
-      phaseFailed = true;
+      stopAdmission = true;
       throw error;
     }),
   );
@@ -540,53 +563,21 @@ export async function runPlan(plan, { repositoryRoot = root, onResult } = {}) {
 
   const phases = commandsByExecutionPhase(plan);
   const completed = new Map();
-  const successfulCommandKeys = await withVerificationSignalForwarding(async () => {
+  const successfulCommandKeys = await withVerificationSignalForwarding(async (interrupted) => {
     const successful = [];
-    successful.push(
-      ...(await runArtifactSafeCommands(
-        phases.get("preflight"),
-        "Preflight verification checks failed",
-        repositoryRoot,
-        onResult,
-        completed,
-      )),
-    );
-    successful.push(
-      ...(await runArtifactSafeCommands(
-        phases.get("broad"),
-        "Broad regression checks failed",
-        repositoryRoot,
-        onResult,
-        completed,
-      )),
-    );
-    successful.push(
-      ...(await runArtifactSafeCommands(
-        phases.get("workspace-build"),
-        "Workspace build failed",
-        repositoryRoot,
-        onResult,
-        completed,
-      )),
-    );
-    successful.push(
-      ...(await runArtifactSafeCommands(
-        phases.get("workspace-test"),
-        "Workspace test failed",
-        repositoryRoot,
-        onResult,
-        completed,
-      )),
-    );
-    successful.push(
-      ...(await runArtifactSafeCommands(
-        phases.get("delivery"),
-        "Target delivery verification failed",
-        repositoryRoot,
-        onResult,
-        completed,
-      )),
-    );
+    for (const [phase, failurePrefix] of executionPhases) {
+      if (interrupted()) break;
+      successful.push(
+        ...(await runArtifactSafeCommands(
+          phases.get(phase),
+          failurePrefix,
+          repositoryRoot,
+          onResult,
+          completed,
+          interrupted,
+        )),
+      );
+    }
     return successful;
   });
   console.log("\nDeterministic verification passed.");

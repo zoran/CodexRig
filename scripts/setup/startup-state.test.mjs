@@ -53,6 +53,7 @@ import {
   captureProcessIdentity,
   inspectProcessIdentity,
 } from "../repository/runtime-process-identity.mjs";
+import { projectModel } from "./setup-regression-test-helpers.mjs";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..", "..");
 const temporaryRoots = [];
@@ -201,7 +202,7 @@ function sessionStartHookInput(root, overrides = {}) {
     cwd: root,
     hook_event_name: "SessionStart",
     transcript_path: path.join(root, "session.jsonl"),
-    model: "gpt-6-astra",
+    model: projectModel,
     permission_mode: "default",
     session_id: "01a01234-5678-7abc-8def-0123456789ab",
     source: "startup",
@@ -879,7 +880,7 @@ test("startup attestation accepts only the YOLO permission mode for a YOLO launc
     controlPolicy,
   });
   assert.equal(verified.permissionMode, "bypassPermissions");
-  assert.equal(verified.model, "gpt-6-astra");
+  assert.equal(verified.model, projectModel);
   assert.equal(releaseCurrentRuntimeSession(root), true);
 });
 

@@ -494,7 +494,7 @@ test("failed preflight stops broad regressions, builds, and tests", async (t) =>
   );
 });
 
-test("a failed command does not schedule the remaining same-phase suffix", async (t) => {
+test("ordinary failures finish independent checks but block commands sharing their outputs", async (t) => {
   const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), "verification-phase-suffix-"));
   const markerFile = path.join(fixtureRoot, "order.txt");
   const previousParallel = process.env.VERIFY_MAX_PARALLEL;
@@ -509,16 +509,30 @@ test("a failed command does not schedule the remaining same-phase suffix", async
     runLockedPlan(
       executionPlan(
         [
-          markerCommand(markerFile, "first-failure", "preflight", 1),
-          markerCommand(markerFile, "missing-suffix", "preflight"),
+          ...[
+            {
+              ...markerCommand(markerFile, "first-failure", "preflight", 1),
+              artifactOwners: ["shared-output"],
+            },
+            {
+              ...markerCommand(markerFile, "blocked-dependent", "preflight"),
+              artifactOwners: ["shared-output"],
+            },
+            markerCommand(markerFile, "independent-success", "preflight"),
+          ].map((command) => ({ ...command, serialGroup: "serial-for-capacity" })),
+          markerCommand(markerFile, "independent-failure", "preflight", 1),
         ],
         [],
       ),
       fixtureRoot,
     ),
-    /Preflight verification checks failed: first-failure/u,
+    /Preflight verification checks failed: first-failure, independent-failure/u,
   );
-  assert.deepEqual(readFileSync(markerFile, "utf8").trim().split("\n"), ["first-failure"]);
+  assert.deepEqual(readFileSync(markerFile, "utf8").trim().split("\n"), [
+    "first-failure",
+    "independent-success",
+    "independent-failure",
+  ]);
 });
 
 test("a failure is reported while a same-phase peer is still running", async (t) => {
