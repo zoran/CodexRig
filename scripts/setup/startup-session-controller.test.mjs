@@ -467,6 +467,11 @@ test("the framework resets all threads after exit and retries an interrupted res
   const recovery = path.join(project, ".project-state/dependency-update");
   mkdirSync(recovery, { recursive: true });
   writeFileSync(path.join(recovery, "journal.json"), "{}");
+  const scratch = path.join(project, ".project-state/child-maintenance");
+  const proposed = path.join(scratch, "review/proposed");
+  mkdirSync(path.join(proposed, ".codex/agents"), { recursive: true });
+  writeFileSync(path.join(proposed, "package.json"), '{"name":"review-copy"}\n');
+  writeFileSync(path.join(proposed, ".codex/agents/default.toml"), 'name = "default"\n');
   assert.equal(settlePostUpdateReset(project, { request: true }), "pending");
   assert.equal(existsSync(archived), true);
   unlinkSync(path.join(recovery, "journal.json"));
@@ -474,6 +479,8 @@ test("the framework resets all threads after exit and retries an interrupted res
   assert.equal(restarted.status, 0, restarted.stderr);
   assert.match(restarted.stdout, /session reset complete/u);
   assert.equal(existsSync(archived), false);
+  assert.equal(existsSync(scratch), false);
+  assert.equal(settlePostUpdateReset(project), "none");
 
   mkdirSync(archived);
   const work = {

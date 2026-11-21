@@ -52,8 +52,9 @@ import { inspectVerificationSessionLock } from "../verify/verification-session-l
 
 const verificationEvidencePath = `${repositoryCodexRuntimeCacheDirectory}/project-verification/evidence.json`;
 const verificationLockPath = `${repositoryCodexRuntimeCacheDirectory}/project-verification/session.lock`;
+const childMaintenancePath = ".project-state/child-maintenance";
 const removableTrees = [
-  ".project-state/child-maintenance",
+  childMaintenancePath,
   "dist/exports",
   "docs/goals",
   "docs/handoffs",
@@ -279,12 +280,18 @@ function requirePreservedFile(target, label) {
   return stats;
 }
 
-function containsProjectState(entries) {
-  return (
-    entries.some(({ name }) => protectedSourceEntries.has(name)) ||
-    (entries.some(({ name }) => name === ".codex") &&
-      entries.some(({ name }) => name === "package.json"))
-  );
+function containsProjectState(entries, scratchDirectory) {
+  if (entries.some(({ name }) => protectedSourceEntries.has(name))) return true;
+  const segments = scratchDirectory?.split(path.sep) ?? [];
+  const codexIndex = segments.indexOf(".codex");
+  if (codexIndex !== -1) {
+    const policyPath = segments.slice(codexIndex).join("/");
+    return entries.some(({ name }) => !isPortableCodexPath(`${policyPath}/${name}`));
+  }
+  const codex = entries.find(({ name }) => name === ".codex");
+  if (!codex) return false;
+  if (scratchDirectory === undefined) return entries.some(({ name }) => name === "package.json");
+  return !codex.isDirectory() || entries.some(({ name }) => isRepositoryCodexHomePath(name));
 }
 
 function scanSourceResidue(root, nestedProjects) {
@@ -493,11 +500,15 @@ export function removeResetCandidate(root, target, { expectedIdentity, testHooks
         ? "file"
         : null;
   if (!expectedType) fail(`Reset refused special filesystem content: ${relative}.`);
+  const runtime = isPrivateCodexRuntimePath(relative);
+  // Child maintenance scratch can mirror a project's portable policy and package metadata.
+  const preserveProjectState = (entries, directory) =>
+    containsProjectState(entries, relative === childMaintenancePath ? directory : undefined);
   claimAndRemove({
     // Codex launcher/plugin temp trees intentionally contain executable wrapper links. Other reset
     // candidates retain the generic fail-closed policy for nested symlinks.
-    allowSymlinkEntries: isPrivateCodexRuntimePath(relative),
-    preserveDirectory: isPrivateCodexRuntimePath(relative) ? undefined : containsProjectState,
+    allowSymlinkEntries: runtime,
+    preserveDirectory: runtime ? undefined : preserveProjectState,
     artifactPath: target,
     expectedIdentity,
     expectedType,
@@ -525,7 +536,7 @@ function updateResetCandidates(root) {
   const candidates = new Set();
   addLocalRuntimeCandidates(root, candidates);
   candidates.delete(updateResetRequest);
-  for (const relative of [".project-state/child-maintenance", projectContextRelativePath]) {
+  for (const relative of [childMaintenancePath, projectContextRelativePath]) {
     if (entryStats(absolutePath(root, relative))) candidates.add(relative);
   }
   return [...candidates].sort();

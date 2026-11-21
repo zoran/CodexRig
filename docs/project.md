@@ -431,7 +431,7 @@ It supplies no application, public service, product data model, deployment targe
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `8.0.0`.
+- Framework version: `8.1.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

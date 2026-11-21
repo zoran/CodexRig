@@ -144,12 +144,14 @@ bash -p scripts/setup/run-project.sh pnpm framework:publish --message "<commit m
 ```
 
 Keep source-side notes, patches, reproductions and saved reports from child updates or repairs in
-`.project-state/child-maintenance/`. Framework publication clears this scratch and recognizes loose
-untracked upgrade previews and reconciliation JSON by their content. It checks the candidate and
-outgoing local commits for misplaced review documents, loose patches and concrete external checkout
+`.project-state/child-maintenance/`. This scratch can include review copies of `package.json` and
+portable `.codex` policy. Framework publication clears this scratch and recognizes loose untracked
+upgrade previews and reconciliation JSON by their content. It checks the candidate and outgoing
+local commits for misplaced review documents, loose patches and concrete external checkout
 references. A finding identifies the source file for review. Cleanup preserves nested checkouts,
-local build pipelines, releases and infrastructure state. Unfinished update or recovery journals
-defer cleanup until their owner settles them.
+local build pipelines, releases and infrastructure state. It protects private Codex state within the
+scratch directory. Unfinished update or recovery journals defer cleanup until their owner settles
+them.
 
 When invoked with publication authority, the command cleans, verifies, commits and pushes reviewed
 non-ignored source on `main`, then confirms the remote commit. Failures preserve source and local

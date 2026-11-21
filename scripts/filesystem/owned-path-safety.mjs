@@ -451,7 +451,7 @@ export function validateRemovalTree(
   while (pending.length > 0) {
     const directory = pending.pop();
     const entries = readdirSync(directory, { withFileTypes: true });
-    if (preserveDirectory?.(entries))
+    if (preserveDirectory?.(entries, path.relative(rootPath, directory)))
       throw new Error(
         `Owned path safety preserved a nested repository or private state in ${label}.`,
       );

@@ -178,7 +178,7 @@ test("operator recovery invokes the reset owner for preview, apply, and clean pr
   }
 });
 
-test("source cleanup preserves nested child checkouts and their account data", (t) => {
+test("source cleanup preserves child checkouts and private state and clears portable review copies", (t) => {
   const root = fixture();
   t.after(() => rmSync(root, { force: true, recursive: true }));
   const git = (...args) => {
@@ -235,8 +235,24 @@ test("source cleanup preserves nested child checkouts and their account data", (
     "child-owned plan\n",
   );
   rmSync(path.join(root, ".project-state"), { recursive: true });
+  const proposed = `${scratch}/review/proposed`;
+  write(root, `${proposed}/package.json`, '{"name":"review-copy"}\n');
+  write(root, `${proposed}/.codex/agents/default.toml`, 'name = "default"\n');
+  for (const [directory, file] of [
+    [".codex/runtime", "lease.json"],
+    ["sessions", "thread.jsonl"],
+  ]) {
+    const runtime = `${proposed}/${directory}/${file}`;
+    write(root, runtime, "private fixture state\n");
+    const blocked = run(root, ["--publication", "--apply"]);
+    assert.equal(blocked.status, 1);
+    assert.match(blocked.stderr, /preserved a nested repository or private state/u);
+    assert.equal(readFileSync(path.join(root, runtime), "utf8"), "private fixture state\n");
+    rmSync(path.join(root, proposed, directory), { recursive: true });
+  }
   const safe = run(root, ["--publication", "--apply"]);
   assert.equal(safe.status, 0, safe.stderr);
+  assert.equal(existsSync(path.join(root, scratch)), false);
   assert.equal(
     readFileSync(path.join(root, "gitless-child/docs/plans/implementation-plan.md"), "utf8"),
     "preserve child work\n",
