@@ -1,10 +1,27 @@
-/** Verifies complete local Mise resolution before a command can fall back to a host runtime. */
+/** Verifies the installed project runtime for commands and for session startup after a failed refresh. */
 import { realpathSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { validateMinimalMiseTools } from "../contracts/mise-toolchain-configuration.mjs";
-import { readRepositoryFile } from "../filesystem/repository-files.mjs";
+import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
+import { parseJsonFile, readRepositoryFile, toolingRoot } from "../filesystem/repository-files.mjs";
 import { userToolPaths, assertUserToolParents } from "../repository/user-tool-storage.mjs";
 import { spawnSyncWithBoundedIo } from "../repository/runtime-process-io.mjs";
+import { assertCandidateToolchainLock } from "./toolchain-maintenance-inputs.mjs";
+import {
+  projectManagedToolLayout,
+  verifyProjectToolBundle,
+} from "../repository/project-tool-executables.mjs";
+import {
+  assertTrustedPnpmConfiguration,
+  pnpmHooksDisabledEnvironment,
+} from "../repository/pnpm-workspace-manifests.mjs";
+import {
+  acquireRuntimeLifecycleLock,
+  releaseRuntimeLifecycleLock,
+} from "../repository/runtime-session-lease.mjs";
+import { reconcileRepositoryWorktreeState } from "../repository/worktree-recovery.mjs";
+import { formatContextError } from "../terminal/terminal-output.mjs";
 
 /** Mise can warn and continue after failed resolution even with --locked; require actual installs. */
 export function assertInstalledProjectTools({
@@ -122,4 +139,64 @@ export function assertInstalledProjectTools({
     throw new Error(
       `Project runtime bin paths are missing for ${omitted.join(", ")}; host fallback is forbidden.`,
     );
+}
+
+function requireIdleStartupWorktrees(root) {
+  const { inventory, blockingFindings } = reconcileRepositoryWorktreeState({ root });
+  if (
+    !inventory.complete ||
+    blockingFindings.length ||
+    inventory.worktrees.some(({ session }) => session.status === "active")
+  )
+    throw new Error(
+      "Installed toolchain startup requires settled worktrees with no active session.",
+    );
+}
+
+/** A failed refresh can leave the existing installation usable. Check it under both lifecycle
+ * locks without installing tools, replaying a journal or adopting any candidate inputs. */
+export function checkInstalledStartupToolchain(root = toolingRoot) {
+  requireIdleStartupWorktrees(root);
+  const owner = acquireRuntimeLifecycleLock({ root, operation: "toolchain-maintenance" });
+  try {
+    const shared = userToolPaths().lifecycle;
+    const installation = acquireRuntimeLifecycleLock({
+      root: shared,
+      operation: "toolchain-maintenance",
+    });
+    try {
+      requireIdleStartupWorktrees(root);
+      const current = readToolchainConfiguration(root);
+      assertTrustedPnpmConfiguration({ repositoryRoot: root });
+      assertCandidateToolchainLock(root, current);
+      if (
+        parseJsonFile(root, "package.json", "Project package manifest").packageManager !==
+        `pnpm@${current.stable.pnpm.version}`
+      )
+        throw new Error("The project package manager does not match the installed toolchain pin.");
+      const environment = pnpmHooksDisabledEnvironment(process.env, root);
+      const layout = projectManagedToolLayout(root, current, { environment });
+      verifyProjectToolBundle(root, layout.codex);
+      const miseExecutable = verifyProjectToolBundle(root, layout.mise);
+      assertInstalledProjectTools({ root, miseExecutable, environment });
+    } finally {
+      releaseRuntimeLifecycleLock({ root: shared, owner: installation });
+    }
+  } finally {
+    releaseRuntimeLifecycleLock({ root, owner });
+  }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  try {
+    if (process.argv.length !== 2)
+      throw new Error("Installed toolchain admission takes no arguments.");
+    checkInstalledStartupToolchain();
+    console.log("Installed project toolchain verified for session startup.");
+  } catch (error) {
+    console.error(
+      `Installed toolchain admission failed: ${formatContextError(error, toolingRoot)}`,
+    );
+    process.exitCode = 1;
+  }
 }

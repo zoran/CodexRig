@@ -68,6 +68,11 @@ if ! command -v node >/dev/null 2>&1; then
   echo "Bootstrap Node.js is unavailable. Install a supported read-only Node.js bootstrap before retrying." >&2
   exit 127
 fi
-node scripts/deps/maintain-toolchain.mjs --startup
+node scripts/deps/maintain-toolchain.mjs --startup || {
+  maintenance_status=$?
+  if ((maintenance_status >= 128)); then exit "$maintenance_status"; fi
+  printf '\n  [WARN] Toolchain maintenance exited with status %d. Checking the installed project toolchain for session startup.\n' "$maintenance_status" >&2
+  node scripts/deps/project-runtime-admission.mjs
+}
 exec node scripts/setup/project-command.mjs -- \
   bash scripts/setup/start-codex-session.sh "$startup_control_policy"

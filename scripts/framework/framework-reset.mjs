@@ -536,13 +536,14 @@ function applyReset(root, candidates, expectedFiles) {
 }
 
 function updateResetCandidates(root) {
-  const candidates = new Set();
-  addLocalRuntimeCandidates(root, candidates);
-  candidates.delete(updateResetRequest);
-  for (const relative of [childMaintenancePath, projectContextRelativePath]) {
-    if (entryStats(absolutePath(root, relative))) candidates.add(relative);
-  }
-  return [...candidates].sort();
+  const runtime = new Set();
+  addLocalRuntimeCandidates(root, runtime);
+  runtime.delete(updateResetRequest);
+  // A protected scratch tree must stop disposal before any session or recovery data is removed.
+  const maintenance = [childMaintenancePath, projectContextRelativePath].filter((relative) =>
+    entryStats(absolutePath(root, relative)),
+  );
+  return maintenance.concat([...runtime].sort());
 }
 
 /** A successful child apply arms one source-bound request. The launcher retries it after exit and
@@ -589,7 +590,6 @@ export function settlePostUpdateReset(
       hasPendingAccountPause({ root: canonical })
     )
       return "pending";
-    // The requested session reset includes abandoned local work notes after all owners exit.
     applyReset(canonical, updateResetCandidates(canonical), new Map());
     if (updateResetCandidates(canonical).length) fail("Framework post-update reset is incomplete.");
     removeOwnedRegularFile(canonical, target, label, { expectedIdentity: pending.stats });

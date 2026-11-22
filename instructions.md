@@ -314,7 +314,9 @@ select `--yolo` for unrestricted native execution and
 [advance task approval](#yolo-session-approval). The launcher owns release lookup, isolated
 candidate validation, verified input publication and runtime admission. Inspect it before using it
 for maintenance; active owners can block installation. Use locked preparation for reproducible local
-builds. Normal startup uses release discovery.
+builds. Normal startup uses release discovery. A failed refresh may use the current installation
+after verifying its pins, integrity and ownership. Report optional diagnostics and deferred cleanup
+and continue to the picker when session admission succeeds.
 
 Runtime/tool changes require a full launcher restart. After critical handover, exit with `/quit` and
 launch again from the repository terminal. `/new` and `/resume` inside the running CLI do not

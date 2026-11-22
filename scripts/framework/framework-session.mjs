@@ -4,13 +4,22 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { settlePostUpdateReset } from "./framework-reset.mjs";
 import { toolingRoot } from "../filesystem/repository-files.mjs";
+import { formatContextError } from "../terminal/terminal-output.mjs";
 import {
   runStartupSessionController,
   startupControllerFailureMessage,
 } from "../setup/startup-session-controller.mjs";
 
 function finishPendingReset(root) {
-  const status = settlePostUpdateReset(root);
+  let status;
+  try {
+    status = settlePostUpdateReset(root);
+  } catch (error) {
+    console.warn(
+      `Framework post-update reset deferred. ${formatContextError(error, root)} The launcher retries cleanup on exit and before the next session.`,
+    );
+    return;
+  }
   if (status === "complete") console.log("Framework post-update session reset complete.");
   if (status === "pending")
     console.warn(

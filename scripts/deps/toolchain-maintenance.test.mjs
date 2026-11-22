@@ -25,7 +25,10 @@ import {
   runtimeLifecycleBusyErrorCode,
 } from "../repository/runtime-session-lease.mjs";
 import { maintainToolchain } from "./maintain-toolchain.mjs";
-import { assertInstalledProjectTools } from "./project-runtime-admission.mjs";
+import {
+  assertInstalledProjectTools,
+  checkInstalledStartupToolchain,
+} from "./project-runtime-admission.mjs";
 import { validateMinimalMiseTools } from "../contracts/mise-toolchain-configuration.mjs";
 import {
   projectManagedToolLayout,
@@ -165,6 +168,57 @@ process.stdout.write(process.argv[2] === "ls" ? JSON.stringify(data.inventory) :
   write(paths.join("\n") + "\n");
   return { executable, paths, write };
 }
+
+test("startup can use an intact installed toolchain after a failed refresh", async (t) => {
+  const root = fixture(t);
+  const runtime = installedRuntimeFixture(root, { productPins: false });
+  const { mise, codex } = projectManagedToolLayout(root);
+  for (const tool of [mise, codex]) {
+    mkdirSync(path.dirname(tool.executable), { recursive: true, mode: 0o700 });
+    writeFileSync(
+      tool.executable,
+      tool === mise ? readFileSync(runtime.executable) : "fixture Codex",
+      { mode: 0o700 },
+    );
+    sealProjectToolBundle(root, tool.directory, tool);
+  }
+  const lock = path.join(root, ".codex/mise.lock");
+  const original = readFileSync(lock, "utf8");
+  await assert.rejects(
+    maintainToolchain({
+      root,
+      startup: true,
+      prepareStorage() {},
+      candidateResolver() {
+        throw new Error("offline registry");
+      },
+    }),
+    /offline registry/u,
+  );
+  const pending = path.join(root, ".project-state/dependency-update/plan.json");
+  mkdirSync(path.dirname(pending), { recursive: true });
+  writeFileSync(pending, "pending operator review");
+  checkInstalledStartupToolchain(root);
+  assert.equal(readFileSync(lock, "utf8"), original);
+  assert.equal(readFileSync(pending, "utf8"), "pending operator review");
+  assert.match(readFileSync(path.join(root, "runtime-calls"), "utf8"), /bin-paths --locked/u);
+  const shared = prepareUserToolDirectories().lifecycle;
+  const owner = acquireRuntimeLifecycleLock({ root: shared, operation: "toolchain-maintenance" });
+  try {
+    assert.throws(() => checkInstalledStartupToolchain(root), {
+      code: runtimeLifecycleBusyErrorCode,
+    });
+  } finally {
+    releaseRuntimeLifecycleLock({ root: shared, owner });
+  }
+  writeFileSync(lock, omitForeignArtifact(original));
+  assert.throws(() => checkInstalledStartupToolchain(root), /toolchain lock is invalid/u);
+  writeFileSync(lock, original);
+  writeFileSync(codex.executable, "damaged installation");
+  assert.throws(() => checkInstalledStartupToolchain(root), /installation changed/u);
+  assert.equal(inspectRuntimeLifecycleLock({ root }).status, "absent");
+  assert.equal(inspectRuntimeLifecycleLock({ root: shared }).status, "absent");
+});
 
 test("runtime admission requires canonical bin directories for every pinned tool and version", (t) => {
   const root = fixture(t);

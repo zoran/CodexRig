@@ -151,7 +151,8 @@ It supplies no application, public service, product data model, deployment targe
 - Runtime and technology: Node.js ESM.
 - Public contract: `deps:install`, `deps:report`, `deps:update*` and `maintain-toolchain.mjs`;
   `--startup` discovers releases, `--locked` reproduces frozen local build inputs. Existing
-  lockfiles reproduce offline through the same owner.
+  lockfiles reproduce offline through the same owner. After a failed refresh the launcher verifies
+  the installed project pins and bundles under the lifecycle locks before entering the session.
 - Private internals: Resolution/install journals, lifecycle locks, staged revalidation and rollback;
   project-private Mise tracking and shared verified installations. Housekeeping retains shared
   runtime and bootstrap versions. Native collectors manage package data and download caches.
@@ -196,8 +197,9 @@ It supplies no application, public service, product data model, deployment targe
   leases across the target clone. Source-side child maintenance scratch lives under
   `.project-state/child-maintenance/`. The source session controller consumes the private
   post-update reset request after session exit or before admission. The reset owner clears local
-  session history and update scratch after proving quiescence. Housekeeping reuses valid native pnpm
-  installation state.
+  update scratch before session history after proving quiescence. A failed automatic reset stays
+  pending while the controller admits the picker and returns its own exit status. Housekeeping
+  reuses valid native pnpm installation state.
 - Owned data and migrations: `.codexrig/framework.json`, `.codexrig/compatibility.json` and
   `.codexrig/project-tools.json`; transient target `.project-state/framework-upgrade/` journals.
   Generation and updates project the same portable instructions/AGENTS blocks and verification
@@ -316,7 +318,8 @@ It supplies no application, public service, product data model, deployment targe
   generation and local verification use the same portable contracts.
 - Private internals: Preloaded controller, exact SessionStart/Stop hooks, supervisor, PID/terminal
   proofs and current attestations. SessionStart conveys the verified approval mode, including
-  advance operator approval for the scope of a YOLO task.
+  advance operator approval for the scope of a YOLO task. Interactive launch reports optional
+  development-tool and project doctor findings while retaining runtime and policy checks.
 - Owned data and migrations: Disposable current-schema startup attestation under
   `.codex/runtime/cache/codexrig/` plus the installed local Git hook. Repository Boundaries owns the
   short-lived writer lease and separate latest-session recovery marker that Setup coordinates.
@@ -433,7 +436,7 @@ It supplies no application, public service, product data model, deployment targe
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `8.2.0`.
+- Framework version: `8.3.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

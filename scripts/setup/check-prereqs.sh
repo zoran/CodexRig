@@ -18,12 +18,14 @@ missing_system=()
 runtime_issues=()
 optional_missing=()
 check_codex=0
+session_only=0
 
 for argument in "$@"; do
   case "$argument" in
     --codex) check_codex=1 ;;
+    --session) check_codex=1; session_only=1 ;;
     --help | -h)
-      echo "Usage: bash scripts/setup/check-prereqs.sh [--codex]"
+      echo "Usage: bash scripts/setup/check-prereqs.sh [--codex|--session]"
       exit 0
       ;;
     *)
@@ -39,7 +41,7 @@ require_system_command() {
   fi
 }
 
-for command_name in bash git rg shellcheck tar; do
+for command_name in rg shellcheck tar; do
   require_system_command "$command_name"
 done
 
@@ -50,6 +52,14 @@ if [[ "$host_platform" == linux ]]; then
     missing_system+=("python3 (Python 3 with ctypes for process-cancellation verification)")
   fi
 fi
+if ((session_only && ${#missing_system[@]})); then
+  printf 'These development or verification tools are missing. The session can run without them.\n' >&2
+  printf '  - %s\n' "${missing_system[@]}" >&2
+  missing_system=()
+fi
+for command_name in bash git; do
+  require_system_command "$command_name"
+done
 
 if ! command -v mise >/dev/null 2>&1; then
   runtime_issues+=("mise")

@@ -16,7 +16,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { toolingRoot as root } from "../filesystem/repository-files.mjs";
 
-test("launcher maintains before admission, fails closed, and admits only native picker controls", (t) => {
+test("launcher maintains before admission and uses verified installed tools for repair", (t) => {
   const launchInvocation = JSON.parse(
     readFileSync(path.join(root, "package.json"), "utf8"),
   ).scripts["codex:start"].split(/\s+/u);
@@ -79,6 +79,7 @@ test("launcher maintains before admission, fails closed, and admits only native 
       'if [[ "${FAKE_FAIL_COMMAND:-}" == "node $*" ]]; then exit 74; fi',
       'case "$1" in',
       '  scripts/deps/maintain-toolchain.mjs) [[ "$*" == "scripts/deps/maintain-toolchain.mjs --startup" ]] || exit 89; exit "${FAKE_UPDATE_STATUS:-0}" ;;',
+      '  scripts/deps/project-runtime-admission.mjs) [[ "$#" == 1 ]] || exit 89; exit "${FAKE_INSTALLED_STATUS:-0}" ;;',
       '  scripts/setup/project-command.mjs) [[ "$2" == -- ]] || exit 89; shift 2; export CODEX_HOME="$PWD"; exec "$@" ;;',
       '  --input-type=module) printf "%s\\n" "$FAKE_CODEX_EXECUTABLE" ;;',
       "esac",
@@ -98,7 +99,11 @@ test("launcher maintains before admission, fails closed, and admits only native 
   const pnpm = path.join(bin, "pnpm");
   writeFileSync(
     pnpm,
-    [...captureShell, '[[ "${FAKE_FAIL_COMMAND:-}" != "pnpm $*" ]] || exit 74', ""].join("\n"),
+    [
+      ...captureShell,
+      '[[ "${FAKE_FAIL_COMMAND:-}" != "pnpm $*" ]] || exit "${FAKE_DOCTOR_STATUS:-74}"',
+      "",
+    ].join("\n"),
   );
   chmodSync(pnpm, 0o755);
 
@@ -174,7 +179,7 @@ test("launcher maintains before admission, fails closed, and admits only native 
       checked.map((call) => [call.executable, ...call.args]),
       [
         ["node", "scripts/deps/verify-pnpm-execution-policy.mjs"],
-        ["check-prereqs.sh", "--codex"],
+        ["check-prereqs.sh", "--session"],
         ["node", "scripts/setup/validate-codex-model-policy.mjs"],
         ["pnpm", "tooling:doctor"],
         [
@@ -193,14 +198,31 @@ test("launcher maintains before admission, fails closed, and admits only native 
     }
   }
   const updateFailure = invoke([], { FAKE_UPDATE_STATUS: "37" });
-  assert.equal(updateFailure.status, 37);
+  assert.equal(updateFailure.status, 0, updateFailure.stderr);
+  assert.match(updateFailure.stderr, /Checking the installed project toolchain/u);
+  assert.deepEqual(calls()[1].args, ["scripts/deps/project-runtime-admission.mjs"]);
+  assert.equal(calls().at(-1).args[0], "scripts/framework/framework-session.mjs");
+  const unusable = invoke([], { FAKE_UPDATE_STATUS: "37", FAKE_INSTALLED_STATUS: "76" });
+  assert.equal(unusable.status, 76);
+  assert.equal(calls().length, 2);
+  const interrupted = invoke([], { FAKE_UPDATE_STATUS: "130" });
+  assert.equal(interrupted.status, 130);
   assert.equal(calls().length, 1);
+  const doctor = invoke([], { FAKE_FAIL_COMMAND: "pnpm tooling:doctor" });
+  assert.equal(doctor.status, 0, doctor.stderr);
+  assert.match(doctor.stderr, /diagnostics failed/u);
+  assert.equal(calls().at(-1).args[0], "scripts/framework/framework-session.mjs");
+  const cancelledDoctor = invoke([], {
+    FAKE_FAIL_COMMAND: "pnpm tooling:doctor",
+    FAKE_DOCTOR_STATUS: "130",
+  });
+  assert.equal(cancelledDoctor.status, 130);
+  assert.equal(calls().at(-1).executable, "pnpm");
 
   for (const command of [
     "node scripts/deps/verify-pnpm-execution-policy.mjs",
-    "bash scripts/setup/check-prereqs.sh --codex",
+    "bash scripts/setup/check-prereqs.sh --session",
     "node scripts/setup/validate-codex-model-policy.mjs",
-    "pnpm tooling:doctor",
   ]) {
     const failure = invoke([], { FAKE_FAIL_COMMAND: command });
     assert.equal(failure.status, 74);

@@ -435,12 +435,61 @@ test("native picker cancellation releases its lease without claiming a session",
   assert.equal(inspectRuntimeSessionRecovery({ root: fixture.project }).status, "absent");
 });
 
-test("the framework resets all threads after exit and retries an interrupted reset before the picker", () => {
+function frameworkControllerFixture() {
   const fixture = controllerFixture();
   const { project } = fixture;
   writeFileSync(path.join(project, "README.md"), "# CodexRig Framework\n");
   mkdirSync(path.join(project, ".agents/skills/reset-framework"), { recursive: true });
   writeFileSync(path.join(project, ".agents/skills/reset-framework/SKILL.md"), "# Fixture\n");
+  return fixture;
+}
+
+test("protected update scratch leaves the picker usable and cleanup retryable", () => {
+  const fixture = frameworkControllerFixture();
+  const { project } = fixture;
+  const scratch = path.join(project, ".project-state/child-maintenance");
+  const gitFile = path.join(scratch, "review/.git");
+  mkdirSync(path.dirname(gitFile), { recursive: true });
+  writeFileSync(gitFile, "gitdir: child-owned\n");
+  const history = path.join(project, "history.jsonl");
+  writeFileSync(history, "previous thread\n");
+  const request = path.join(project, ".codex/runtime/post-update-reset.json");
+  assert.throws(
+    () => settlePostUpdateReset(project, { request: true }),
+    /preserved a nested repository or private state/u,
+  );
+  const pending = readFileSync(request);
+
+  const opened = runController(fixture);
+  assert.equal(opened.status, 0, opened.stderr);
+  assert.match(opened.stderr, /reset deferred.*child-maintenance/iu);
+  assert.doesNotMatch(opened.stdout, /session reset complete/u);
+  assert.equal(capturedCalls(fixture).length, 1);
+  assert.equal(inspectRuntimeSessionRecovery({ root: project }).status, "present");
+
+  const denied = runController(fixture, { behavior: "preflight-untrusted" });
+  assert.equal(denied.status, 1, denied.stderr);
+  assert.match(denied.stderr, /Codex session controller failed:.*trusted session-control hook/u);
+  assert.equal(capturedCalls(fixture).length, 1);
+  const failed = runController(fixture, { behavior: "resume-fail" });
+  assert.equal(failed.status, 42, failed.stderr);
+  assert.equal(capturedCalls(fixture).length, 2);
+  assert.deepEqual(readFileSync(request), pending);
+  assert.equal(readFileSync(gitFile, "utf8"), "gitdir: child-owned\n");
+  assert.equal(readFileSync(history, "utf8"), "previous thread\n");
+
+  unlinkSync(gitFile);
+  const retried = runController(fixture, { behavior: "cancel-picker" });
+  assert.equal(retried.status, 0, retried.stderr);
+  assert.match(retried.stdout, /session reset complete/u);
+  assert.equal(existsSync(request), false);
+  assert.equal(existsSync(history), false);
+  assert.equal(existsSync(scratch), false);
+});
+
+test("the framework resets all threads after exit and retries an interrupted reset before the picker", () => {
+  const fixture = frameworkControllerFixture();
+  const { project } = fixture;
   const archived = path.join(project, "archived_sessions");
   mkdirSync(archived);
   writeFileSync(path.join(archived, "prior.jsonl"), "older framework thread");

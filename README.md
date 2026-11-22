@@ -26,6 +26,12 @@ boundaries.
 One canonical Codex session owns writes across a project and its linked Git worktrees. Exit that
 session before opening the picker in another worktree of the same clone.
 
+If a tool or dependency refresh fails, the launcher reports the error and checks the installed
+project toolchain against its pins, lockfile and installation records. When those checks pass, it
+opens the usual picker. Missing verification utilities and project doctor findings are reported in
+the terminal so you can repair them in the session. Runtime integrity, project policy, writer
+ownership and trusted session hooks are required for admission.
+
 For initial preparation without opening Codex:
 
 ```bash
@@ -291,9 +297,11 @@ CodexRig with `/quit`. The launcher then clears all framework threads, including
 their indexes and databases, the local work-context cache, and the source-side child maintenance
 scratch. A terminal update can finish the reset immediately when the source is idle. After an
 interrupted exit, the next launch retries before opening the session picker. Active sessions,
-verification and unfinished recovery defer cleanup. Accounts, installation identity, source files
-and the updated project are preserved. Previews, failed applies and already-current projects leave
-session history in place.
+verification and unfinished recovery defer cleanup. If the scratch contains a protected checkout or
+private state, the launcher reports the refusal and opens the picker with the previous history
+available. The reset request stays pending and cleanup retries at session exit and the next start.
+Accounts, installation identity, source files and the updated project are preserved. Previews,
+failed applies and already-current projects leave session history in place.
 
 [Lifecycle](instructions.md#framework-lifecycle-compatibility-and-git-platforms) and
 [update scope](instructions.md#repository-update-scope) own reconciliation.

@@ -112,6 +112,8 @@ bash -p scripts/setup/start-codex.sh
 
 The launcher uses \`--startup\` maintenance to discover compatible releases; \`--locked\` separately
 prepares frozen inputs for local builds. Do not repeat preparation when its required state is already valid.
+If a refresh fails, startup checks the installed pinned tools and opens the picker when they pass.
+The launcher reports missing verification utilities and project doctor findings for repair in the session.
 \`node --test scripts/setup/codex-launcher.test.mjs\` checks the invocation without installation.
 Launch with \`bash -p scripts/setup/start-codex.sh --yolo\` to preapprove all steps of the requested
 outcome, including publication and deployment for a go-live. The startup hook confirms the current

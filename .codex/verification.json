@@ -1250,6 +1250,7 @@
     ],
     "scripts/deps/project-runtime-admission.mjs": [
       "scripts/repository/project-tool-environment.test.mjs",
+      "scripts/deps/toolchain-maintenance.test.mjs",
       "scripts/framework/toolchain-maintenance.test.mjs"
     ],
     "scripts/setup/project-command.mjs": [

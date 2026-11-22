@@ -76,6 +76,9 @@ test(
     assert.equal(missing.status, 1, "Missing Python must fail before mandatory lifecycle evidence");
     assert.match(missing.stderr, /python3.*ctypes/u);
     assert.doesNotMatch(missing.stderr, /Runtime issues/u);
+    const noCodex = check(["--session"]);
+    assert.equal(noCodex.status, 1);
+    assert.match(noCodex.stderr, /codex \(verified user installation\)/u);
     for (const platform of ["darwin", "win32"]) {
       assert.equal(check([], { PREREQ_PLATFORM: platform }).status, 0);
     }
@@ -95,6 +98,14 @@ test(
     assert.match(codexMissing.stderr, /codex \(verified user installation\)/u);
     tool("codex", "exit 0");
     assert.equal(check(["--codex"]).status, 0);
+    rmSync(path.join(bin, "shellcheck"));
+    rmSync(path.join(bin, "python3"));
+    const repair = check(["--session"]);
+    assert.equal(repair.status, 0, repair.stderr);
+    assert.match(repair.stderr, /shellcheck/u);
+    assert.match(repair.stderr, /python3.*ctypes/u);
+    assert.equal(check(["--codex"]).status, 1);
+    assert.equal(check(["--session"], { PREREQ_PNPM_VERSION: "0.0.0" }).status, 1);
     const mismatch = check([], { PREREQ_PNPM_VERSION: "0.0.0" });
     assert.equal(mismatch.status, 1);
     assert.match(mismatch.stderr, /Runtime issues:[\s\S]*pnpm@11\.0\.0/u);
