@@ -150,6 +150,8 @@ Use \`bash -p scripts/setup/run-project.sh <command> [arguments]\` from a host s
 locked and isolated environment. Mise inputs live explicitly in \`.codex/mise.toml\` and
 \`.codex/mise.lock\`; host-shell discovery does not activate them after exit. pnpm uses the official
 npm distribution and its integrity-bound graph in \`.codex/.mise/locks/pnpm/current/\`.
+Normal startup migrates Mise lock formats 0 and 1 in staging, even when the pins stay the same.
+Frozen runs require a graph-capable lock and verify its digest.
 
 | Purpose | Command |
 | --- | --- |

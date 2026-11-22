@@ -1,8 +1,11 @@
 /** Owns toolchain maintenance input projection for shared host tools and package-manager selection. */
 import { inputRecord, readOptionalFile } from "../deps/dependency-inputs.mjs";
-import { serializeCanonicalJson } from "../filesystem/repository-files.mjs";
-import { validateMinimalMiseTools } from "../contracts/mise-toolchain-configuration.mjs";
-import { pnpmGraphPaths } from "./pnpm-toolchain-graph.mjs";
+import { readRepositoryFile, serializeCanonicalJson } from "../filesystem/repository-files.mjs";
+import {
+  candidateMiseLockFindings,
+  validateMinimalMiseTools,
+} from "../contracts/mise-toolchain-configuration.mjs";
+import { pnpmGraphPaths, readPnpmToolchainGraph } from "./pnpm-toolchain-graph.mjs";
 
 export const toolchainConfigurationPaths = [
   ".codex/toolchain.json",
@@ -10,6 +13,22 @@ export const toolchainConfigurationPaths = [
   ".codex/mise.lock",
   ...pnpmGraphPaths,
 ];
+
+/** Startup and export admit the same complete lock, including the bytes of the pnpm graph. */
+export function assertCandidateToolchainLock(root, candidate) {
+  const configuration = validateMinimalMiseTools(readRepositoryFile(root, ".codex/mise.toml"));
+  const lock = readRepositoryFile(root, ".codex/mise.lock");
+  const findings = [
+    ...configuration.errors,
+    ...candidateMiseLockFindings(lock, configuration.versionLists),
+  ];
+  for (const tool of ["node", "pnpm"])
+    if (configuration.versions[tool] !== candidate.stable[tool].version)
+      findings.push(`mise.toml ${tool} must match the selected candidate version`);
+  if (findings.length)
+    throw new Error(`Candidate toolchain lock is invalid: ${findings.join("; ")}.`);
+  readPnpmToolchainGraph(root, lock, candidate.stable.pnpm.version);
+}
 
 /** Captures project-local toolchain inputs before an atomic maintenance transaction. */
 export function toolchainMaintenanceInputs(root) {

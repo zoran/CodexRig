@@ -5,6 +5,7 @@ lockfile_version = 4
 [[tools.node]]
 version = "24.22.3"
 backend = "core:node"
+specifiers = ["24.22.3"]
 
 [tools.node."platforms.linux-arm64"]
 checksum = "sha256:261af2af250dfd7e9f25cf151d1b2713a0adf8f10a9ad116c4947f68627affe8"
@@ -35,7 +36,7 @@ checksum = "sha256:e612af99f626ab415ea225af6bce5c971feb448cb5cae250bb1c3fa50c5f7
 url = "https://nodejs.org/dist/v24.22.3/node-v24.22.3-win-x64.zip"
 
 [[tools.pnpm]]
-version = "11.28.13"
-aube = { path = ".mise/locks/pnpm/current", digest = "sha256:d7d8107f3f6089caccc1151b37ffe35bf12cf7df73b3d03e8a20e960d1d22d96" }
+version = "11.29.0"
+aube = { path = ".mise/locks/pnpm/current", digest = "sha256:dc3610b8879cc13c53d4a18dc5b13ef41ba332238df59b398b6031c4bcb7d873" }
 backend = "npm:pnpm"
-specifiers = ["11.28.13"]
+specifiers = ["11.29.0"]

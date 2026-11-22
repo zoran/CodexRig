@@ -3,4 +3,4 @@ backend = "npm:pnpm"
 
 [tools]
 node = "24.22.3"
-pnpm = "11.28.13"
+pnpm = "11.29.0"

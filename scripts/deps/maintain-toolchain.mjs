@@ -6,10 +6,7 @@ import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
-import {
-  candidateMiseLockFindings,
-  validateMinimalMiseTools,
-} from "../contracts/mise-toolchain-configuration.mjs";
+import { miseLockNeedsPnpmGraphUpgrade } from "../contracts/mise-toolchain-configuration.mjs";
 import { readToolingConfiguration } from "../contracts/tooling-configuration.mjs";
 import { toolingRoot, serializeCanonicalJson } from "../filesystem/repository-files.mjs";
 import { verifyInputRecords } from "../deps/dependency-inputs.mjs";
@@ -28,7 +25,7 @@ import {
 import { installProjectBootstrapTools } from "./project-tool-installation.mjs";
 import { assertInstalledProjectTools } from "./project-runtime-admission.mjs";
 import { pnpmHooksDisabledEnvironment } from "../repository/pnpm-workspace-manifests.mjs";
-import { projectPnpmToolchainGraph, readPnpmToolchainGraph } from "./pnpm-toolchain-graph.mjs";
+import { projectPnpmToolchainGraph } from "./pnpm-toolchain-graph.mjs";
 import {
   acquireRuntimeLifecycleLock,
   releaseRuntimeLifecycleLock,
@@ -48,6 +45,7 @@ import { formatContextError, sanitizeForTerminal } from "../terminal/terminal-ou
 import { showStartupIntro, startupStatus } from "../terminal/startup-presentation.mjs";
 import { resolveToolchainReleases } from "./toolchain-releases.mjs";
 import {
+  assertCandidateToolchainLock,
   projectToolchainConfiguration,
   toolchainConfigurationPaths,
   toolchainMaintenanceInputs,
@@ -71,29 +69,6 @@ function stageWrite(stage, relativePath, content) {
   const target = path.join(stage, relativePath);
   mkdirSync(path.dirname(target), { recursive: true });
   writeFileSync(target, content, { mode: 0o600 });
-}
-
-function assertCandidateLock(stage, candidate) {
-  const configuration = validateMinimalMiseTools(
-    readFileSync(path.join(stage, ".codex/mise.toml"), "utf8"),
-  );
-  const findings = [
-    ...configuration.errors,
-    ...candidateMiseLockFindings(
-      readFileSync(path.join(stage, ".codex/mise.lock"), "utf8"),
-      configuration.versionLists,
-    ),
-  ];
-  for (const tool of ["node", "pnpm"])
-    if (configuration.versions[tool] !== candidate.stable[tool].version)
-      findings.push(`mise.toml ${tool} must match the selected candidate version`);
-  if (findings.length)
-    throw new Error(`Candidate toolchain lock is invalid: ${findings.join("; ")}.`);
-  readPnpmToolchainGraph(
-    stage,
-    readFileSync(path.join(stage, ".codex/mise.lock"), "utf8"),
-    candidate.stable.pnpm.version,
-  );
 }
 
 function compatibleMise(
@@ -364,14 +339,20 @@ export async function maintainToolchain({
         MISE_CEILING_PATHS: path.dirname(stage),
       },
     };
-    if (
+    const pinsChanged =
       current.stable.node.version !== candidate.stable.node.version ||
-      current.stable.pnpm.version !== candidate.stable.pnpm.version
-    ) {
-      run(bootstrap.mise, ["lock", "node", "pnpm"], stageOptions);
+      current.stable.pnpm.version !== candidate.stable.pnpm.version;
+    const upgradeLock =
+      (!locked || pinsChanged) && miseLockNeedsPnpmGraphUpgrade(projected[".codex/mise.lock"]);
+    if (pinsChanged || upgradeLock) {
+      run(
+        bootstrap.mise,
+        upgradeLock ? ["lock", "--upgrade"] : ["lock", "node", "pnpm"],
+        stageOptions,
+      );
       projectPnpmToolchainGraph(stage, candidate.stable.pnpm.version);
     }
-    assertCandidateLock(stage, candidate);
+    assertCandidateToolchainLock(stage, candidate);
     onProgress("Installing and validating the isolated candidate toolchain and dependency graph.");
     run(bootstrap.mise, ["install", "--locked"], stageOptions);
     admitProjectTools({
@@ -393,7 +374,7 @@ export async function maintainToolchain({
       ],
       { ...stageOptions, delegation: { operation: "dependency", role: "toolchain-dependency" } },
     );
-    assertCandidateLock(stage, candidate);
+    assertCandidateToolchainLock(stage, candidate);
     const desired = Object.fromEntries(
       [...toolchainConfigurationPaths, "package.json", "pnpm-lock.yaml"].map((relativePath) => [
         relativePath,

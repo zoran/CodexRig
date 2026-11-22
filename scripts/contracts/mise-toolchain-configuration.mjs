@@ -4,6 +4,15 @@ import { parsePortableToml } from "./portable-toml.mjs";
 
 export const pnpmMiseAlias = '[tool_alias.pnpm]\nbackend = "npm:pnpm"';
 
+/** Mise preserves the existing lock format. Version 2 introduced npm graph sidecars. */
+export function miseLockNeedsPnpmGraphUpgrade(content) {
+  const header = content.split(/^[\t ]*\[/mu, 1)[0];
+  const { lockfile_version: version = 0 } = parsePortableToml(header);
+  if (!Number.isSafeInteger(version) || version < 0)
+    throw new Error("mise.lock format version must be a nonnegative integer");
+  return version < 2;
+}
+
 export function validateMinimalMiseTools(content) {
   const versions = Object.create(null);
   const versionLists = Object.create(null);
@@ -177,6 +186,14 @@ function uniqueLockedField(block, field) {
  */
 export function candidateMiseLockFindings(content, versionLists) {
   const findings = miseLockFindings(content, versionLists);
+  try {
+    if (miseLockNeedsPnpmGraphUpgrade(content))
+      findings.push(
+        "mise.lock needs format 2 or later for pnpm graphs; run normal startup to migrate",
+      );
+  } catch (error) {
+    findings.push(`Invalid mise.lock header: ${error.message}`);
+  }
   const blocks = miseLockBlocks(content);
   for (const tool of ["node", "pnpm"]) {
     const version = versionLists[tool]?.[0];

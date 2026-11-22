@@ -412,6 +412,17 @@ test("generated launcher verification rejects locked maintenance in the normal s
   assert.match(rejected.stdout, /# fail 1\b/u);
 });
 
+test("export rejects legacy Mise formats and checks the published pnpm graph bytes", async () => {
+  const target = stage();
+  const lock = path.join(target, ".codex/mise.lock");
+  const current = readFileSync(lock, "utf8");
+  writeFileSync(lock, current.replace(/^lockfile_version = \d+\r?\n/mu, ""));
+  await assert.rejects(validateGeneratedProject(target), /format 2 or later/u);
+  writeFileSync(lock, current);
+  appendFileSync(path.join(target, ".codex/.mise/locks/pnpm/current/aube-lock.yaml"), "\n");
+  await assert.rejects(validateGeneratedProject(target), /graph integrity differs/u);
+});
+
 test("source validation accepts the independent output and scans final staged bytes", async () => {
   const target = stage();
   await validateGeneratedProject(target);

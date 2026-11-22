@@ -50,9 +50,11 @@ stop release selection and never justify a downgrade.
 pnpm uses the official npm distribution on the pinned Node runtime. Its native GitHub builds are not
 required for other platforms. Mise binds the portable graph under
 `.codex/.mise/locks/pnpm/current/`; generation and transactional updates carry it with the pins.
-Mise tracks this project's configurations under `.auth/project-tools/state/mise/`. Startup checks
-the project's own pins and reuses verified shared installations even when another project uses
-different versions or settings.
+Normal startup migrates Mise lock formats 0 and 1 in staging, even when the pins stay the same.
+Frozen runs and the project generator require a graph-capable lock and verify its digest. Mise
+tracks this project's configurations under `.auth/project-tools/state/mise/`. Startup checks the
+project's own pins and reuses verified shared installations even when another project uses different
+versions or settings.
 
 After framework changes, `/quit` and relaunch from the terminal; `/new` and `/resume` retain the
 running launcher. `/side` opens an independent temporary conversation. For startup defects, update
@@ -145,9 +147,10 @@ bash -p scripts/setup/run-project.sh pnpm framework:publish --message "<commit m
 
 Keep source-side notes, patches, reproductions and saved reports from child updates or repairs in
 `.project-state/child-maintenance/`. This scratch can include review copies of `package.json` and
-portable `.codex` policy. Framework publication clears this scratch and recognizes loose untracked
-upgrade previews and reconciliation JSON by their content. It checks the candidate and outgoing
-local commits for misplaced review documents, loose patches and concrete external checkout
+portable `.codex` policy. Cleanup recognizes Mise's versioned pnpm graph files and unlinks scratch
+symlinks without following them. Framework publication clears this scratch and recognizes loose
+untracked upgrade previews and reconciliation JSON by their content. It checks the candidate and
+outgoing local commits for misplaced review documents, loose patches and concrete external checkout
 references. A finding identifies the source file for review. Cleanup preserves nested checkouts,
 local build pipelines, releases and infrastructure state. It protects private Codex state within the
 scratch directory. Unfinished update or recovery journals defer cleanup until their owner settles

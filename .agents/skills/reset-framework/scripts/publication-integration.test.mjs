@@ -1,6 +1,6 @@
 /** Verifies source publication from its owning session through the documented command and actual pre-push. */
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, symlinkSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import {
@@ -49,8 +49,18 @@ test("the framework command preserves its session through real reset, verificati
     ]);
     f.run("git", ["add", "--all"]);
     const candidate = `${f.run("git", ["rev-parse", "HEAD"]).trim()}:${f.run("git", ["write-tree"]).trim()}`;
-    const scratch = ".project-state/child-maintenance/reproduction.patch";
-    f.write(scratch, "workspace-only fix\n");
+    const scratch = ".project-state/child-maintenance";
+    f.write(`${scratch}/reproduction.patch`, "workspace-only fix\n");
+    const nativeGraph = `${scratch}/.codex/.mise/locks/pnpm/11.29.0`;
+    f.write(`${nativeGraph}/package.json`, '{"private":true}\n');
+    f.write(`${nativeGraph}/aube-lock.yaml`, "lockfileVersion: 1\n");
+    const trackedConfigs = path.join(f.root, scratch, "state/tracked-configs");
+    mkdirSync(trackedConfigs, { recursive: true });
+    const miseConfig = path.join(f.root, ".codex/mise.toml");
+    const configBeforePublication = readFileSync(miseConfig);
+    symlinkSync(miseConfig, path.join(trackedConfigs, "config"));
+    symlinkSync(path.dirname(miseConfig), path.join(trackedConfigs, "config-directory"), "dir");
+    symlinkSync("missing-config", path.join(trackedConfigs, "stale-config"));
     const output = f.run("bash", [
       "scripts/setup/run-project.sh",
       "pnpm",
@@ -68,6 +78,7 @@ test("the framework command preserves its session through real reset, verificati
     );
     assert.equal(existsSync(path.join(f.root, "docs/project-context.md")), false);
     assert.equal(existsSync(path.join(f.root, scratch)), false);
+    assert.deepEqual(readFileSync(miseConfig), configBeforePublication);
     assert.equal(f.run("git", ["ls-tree", "--name-only", "HEAD", "--", scratch]).trim(), "");
     assert.equal(f.run("git", ["status", "--porcelain"]).trim(), "");
     assert.equal(f.counter().length, 1);

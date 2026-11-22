@@ -74,6 +74,39 @@ function omitForeignArtifact(content) {
   return altered;
 }
 
+test("toolchain maintenance migrates a legacy Mise lock exactly once, even with unchanged pins", async (t) => {
+  const root = fixture(t);
+  const lock = path.join(root, ".codex/mise.lock");
+  const current = readFileSync(lock, "utf8");
+  const legacy = current.replace(/^lockfile_version = \d+\r?\n/mu, "");
+  assert.notEqual(current, legacy);
+  writeFileSync(lock, legacy);
+  const lockCommands = [];
+  const options = {
+    root,
+    candidateResolver: async (matrix) => matrix,
+    prepareStorage() {},
+    installBootstrapTools: async () => ({ mise: "mise", codex: "codex" }),
+    admitProjectTools() {},
+    runCommand(_command, args, options) {
+      if (args[0] === "lock") {
+        lockCommands.push(args);
+        assert.notEqual(options.cwd, root);
+        assert.equal(readFileSync(lock, "utf8"), legacy);
+        writeFileSync(path.join(options.cwd, ".codex/mise.lock"), current);
+      }
+      return "";
+    },
+  };
+  await assert.rejects(maintainToolchain({ ...options, locked: true }), /format 2 or later/u);
+  assert.deepEqual(lockCommands, []);
+  assert.equal(readFileSync(lock, "utf8"), legacy);
+  await maintainToolchain(options);
+  assert.equal(readFileSync(lock, "utf8"), current);
+  await maintainToolchain(options);
+  assert.deepEqual(lockCommands, [["lock", "--upgrade"]]);
+});
+
 function nodeSourceFallback(lock) {
   const altered = lock.replace(
     /url = "https:\/\/unofficial-builds\.nodejs\.org\/download\/release\/v([^/]+)\/node-v[^/]+-linux-arm64-musl\.tar\.gz"/u,

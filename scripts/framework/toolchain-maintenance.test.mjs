@@ -408,6 +408,7 @@ for (const failure of ["network", "peer", "reproduce", "concurrent", "pending", 
       calls.push([command, ...args]);
       if (args[0] === "--version") return matrix.ci.miseVersion;
       if (args[0] === "lock" && ["none", "reproduce"].includes(failure)) {
+        assert.deepEqual(args, ["lock", "node", "pnpm"]);
         const file = path.join(options.cwd, ".codex/mise.lock");
         writeFileSync(
           file,
@@ -549,8 +550,13 @@ test("compatibility selectors resolve before installation and reject a wrong reg
   );
 });
 
-test("disposable compatibility preparation preserves dependencies and passes the real release gate", async (t) => {
+test("a compatibility pin change migrates a legacy Mise graph and passes the release gate", async (t) => {
   const root = fixture(t);
+  const lock = path.join(root, ".codex/mise.lock");
+  const currentLock = readFileSync(lock, "utf8");
+  const legacyLock = currentLock.replace(/^lockfile_version = \d+\r?\n/mu, "");
+  assert.notEqual(currentLock, legacyLock);
+  writeFileSync(lock, legacyLock);
   const remote = mkdtempSync(path.join(os.tmpdir(), "toolchain-remote-"));
   t.after(() => rmSync(remote, { recursive: true, force: true }));
   for (const file of [
@@ -649,7 +655,9 @@ test("disposable compatibility preparation preserves dependencies and passes the
     runCommand: (command, args, options = {}) => {
       calls.push(args);
       if (args[0] === "lock") {
+        assert.deepEqual(args, ["lock", "--upgrade"]);
         const file = path.join(options.cwd, ".codex/mise.lock");
+        assert.equal(readFileSync(file, "utf8"), legacyLock);
         for (const name of ["package.json", "aube-lock.yaml"]) {
           const graphFile = path.join(options.cwd, ".codex/.mise/locks/pnpm/current", name);
           writeFileSync(
@@ -664,7 +672,7 @@ test("disposable compatibility preparation preserves dependencies and passes the
           .digest("hex");
         writeFileSync(
           file,
-          readFileSync(file, "utf8")
+          currentLock
             .replaceAll(matrix.stable.node.version, "26.1.0")
             .replaceAll(matrix.stable.pnpm.version, "11.27.0")
             .replace(/digest = "sha256:[a-f0-9]{64}"/u, `digest = "sha256:${digest}"`),

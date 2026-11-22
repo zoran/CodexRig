@@ -241,6 +241,8 @@ test("source cleanup preserves child checkouts and private state and clears port
   for (const [directory, file] of [
     [".codex/runtime", "lease.json"],
     ["sessions", "thread.jsonl"],
+    [".codex/.mise/locks/pnpm/11.29.0", "auth.json"],
+    [".codex/.mise/locks/pnpm/11.29.0-copy", "package.json"],
   ]) {
     const runtime = `${proposed}/${directory}/${file}`;
     write(root, runtime, "private fixture state\n");
@@ -707,7 +709,7 @@ test("reset unlinks top-level and nested runtime symlinks without touching their
   assert.equal(run(root).status, 0);
 });
 
-test("reset keeps nested symlinks strict outside private Codex runtime", (t) => {
+test("reset refuses nested symlinks in planning documents", (t) => {
   const root = fixture("reset-framework-strict-symlink-");
   const outside = mkdtempSync(path.join(os.tmpdir(), "reset-framework-strict-outside-"));
   t.after(() => {

@@ -53,6 +53,8 @@ import { inspectVerificationSessionLock } from "../verify/verification-session-l
 const verificationEvidencePath = `${repositoryCodexRuntimeCacheDirectory}/project-verification/evidence.json`;
 const verificationLockPath = `${repositoryCodexRuntimeCacheDirectory}/project-verification/session.lock`;
 const childMaintenancePath = ".project-state/child-maintenance";
+const nativePnpmGraphDirectory =
+  /^(\.codex\/\.mise\/locks\/pnpm\/)(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){2}(?=\/|$)/u;
 const removableTrees = [
   childMaintenancePath,
   "dist/exports",
@@ -286,7 +288,10 @@ function containsProjectState(entries, scratchDirectory) {
   const codexIndex = segments.indexOf(".codex");
   if (codexIndex !== -1) {
     const policyPath = segments.slice(codexIndex).join("/");
-    return entries.some(({ name }) => !isPortableCodexPath(`${policyPath}/${name}`));
+    return entries.some(({ name }) => {
+      const portablePath = `${policyPath}/${name}`.replace(nativePnpmGraphDirectory, "$1current");
+      return !isPortableCodexPath(portablePath);
+    });
   }
   const codex = entries.find(({ name }) => name === ".codex");
   if (!codex) return false;
@@ -501,13 +506,11 @@ export function removeResetCandidate(root, target, { expectedIdentity, testHooks
         : null;
   if (!expectedType) fail(`Reset refused special filesystem content: ${relative}.`);
   const runtime = isPrivateCodexRuntimePath(relative);
-  // Child maintenance scratch can mirror a project's portable policy and package metadata.
+  const childMaintenance = relative === childMaintenancePath;
   const preserveProjectState = (entries, directory) =>
-    containsProjectState(entries, relative === childMaintenancePath ? directory : undefined);
+    containsProjectState(entries, childMaintenance ? directory : undefined);
   claimAndRemove({
-    // Codex launcher/plugin temp trees intentionally contain executable wrapper links. Other reset
-    // candidates retain the generic fail-closed policy for nested symlinks.
-    allowSymlinkEntries: runtime,
+    allowSymlinkEntries: runtime || childMaintenance,
     preserveDirectory: runtime ? undefined : preserveProjectState,
     artifactPath: target,
     expectedIdentity,

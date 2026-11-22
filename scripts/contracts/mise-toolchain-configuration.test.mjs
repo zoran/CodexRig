@@ -36,10 +36,33 @@ function nativeBlock(tool, version, urls) {
 
 function candidate() {
   return (
+    "lockfile_version = 4\n\n" +
     nativeBlock("node", pins.node[0], nodeArtifacts) +
     `[[tools.pnpm]]\nversion = "${pins.pnpm[0]}"\nbackend = "npm:pnpm"\naube = { path = ".mise/locks/pnpm/current", digest = "${checksum}" }\n`
   );
 }
+
+test("pnpm graph admission requires a graph-capable top-level Mise lock format", () => {
+  const lock = candidate();
+  for (const version of [2, 3, 4])
+    assert.deepEqual(
+      candidateMiseLockFindings(lock.replace("version = 4", `version = ${version}`), pins),
+      [],
+    );
+  for (const header of ["", "lockfile_version = 0", "lockfile_version = 1"])
+    assert.match(
+      candidateMiseLockFindings(
+        lock.replace("lockfile_version = 4", header) + "\nlockfile_version = 4\n",
+        pins,
+      ).join("\n"),
+      /format 2 or later/u,
+    );
+  for (const header of ['lockfile_version = "4"', "lockfile_version = 4\nlockfile_version = 4"])
+    assert.match(
+      candidateMiseLockFindings(lock.replace("lockfile_version = 4", header), pins).join("\n"),
+      /Invalid mise.lock header/u,
+    );
+});
 
 test("native Node release admission retains all seven exact supported binary URLs", () => {
   assert.deepEqual(nativeNodeArtifactUrls("24.21.0"), nodeArtifacts);

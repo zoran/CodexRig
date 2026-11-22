@@ -10,6 +10,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { assertPortableContextContract } from "../context/portable-context-contract.mjs";
+import { readToolchainConfiguration } from "../contracts/toolchain-configuration.mjs";
+import { assertCandidateToolchainLock } from "../deps/toolchain-maintenance-inputs.mjs";
 import { formatContextError } from "../terminal/terminal-output.mjs";
 import { listStagedTransferFiles } from "../repository/source-inventory.mjs";
 import { assertSafeTransferSource } from "../repository/validate-transfer-source.mjs";
@@ -85,6 +87,8 @@ function assertStaticModuleImports(binding) {
 }
 
 async function validateBoundStagedProject(binding) {
+  assertStageRootBinding(binding);
+  assertCandidateToolchainLock(binding.root, readToolchainConfiguration(binding.root));
   assertStageRootBinding(binding);
   validateCodexConfig(binding.root);
   assertStageRootBinding(binding);

@@ -145,7 +145,9 @@ It supplies no application, public service, product data model, deployment targe
   transactional pin publication and offline reproduction. pnpm uses the official portable npm
   distribution through Mise; its integrity-bound graph lives under
   `.codex/.mise/locks/pnpm/current/` and travels with the toolchain transaction and generator.
-  Native Node artifacts still cover the supported platform matrix.
+  Normal startup migrates Mise lock formats 0 and 1 in staging. Frozen runs and project export
+  require a graph-capable lock and verify the pnpm graph digest. Native Node artifacts cover the
+  supported platform matrix.
 - Runtime and technology: Node.js ESM.
 - Public contract: `deps:install`, `deps:report`, `deps:update*` and `maintain-toolchain.mjs`;
   `--startup` discovers releases, `--locked` reproduces frozen local build inputs. Existing
@@ -431,7 +433,7 @@ It supplies no application, public service, product data model, deployment targe
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `8.1.0`.
+- Framework version: `8.2.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->
