@@ -2,13 +2,20 @@
 /** Reads included Codex account capacity and checkpoints a drained session at the ordinary pause threshold. */
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { toolingRoot } from "../filesystem/repository-files.mjs";
+import { sha256, toolingRoot } from "../filesystem/repository-files.mjs";
 import { projectToolEnvironment } from "../repository/project-tool-environment.mjs";
 import {
   projectManagedToolLayout,
   verifyProjectToolBundle,
 } from "../repository/project-tool-executables.mjs";
 import { formatContextError } from "../terminal/terminal-output.mjs";
+
+import {
+  createAccountPauseHandover,
+  hasSelectedAccountWindow,
+} from "./critical-budget-handover.mjs";
+
+const ordinaryPausePercent = 3;
 
 function startNativeServer(root) {
   const executable = verifyProjectToolBundle(root, projectManagedToolLayout(root).codex);
@@ -209,7 +216,7 @@ export function classifyAccountCapacity(response, { now = Date.now() } = {}) {
     );
   if (!binding)
     return decision("unknown", "No current, valid ordinary account window was reported.");
-  if (remainingPercent <= 5)
+  if (remainingPercent <= ordinaryPausePercent)
     return decision(
       "pause",
       "Drain owned work, update docs/project-context.md and run pnpm handover:check to save the pause handover.",
@@ -217,9 +224,39 @@ export function classifyAccountCapacity(response, { now = Date.now() } = {}) {
   return decision("continue", "Ordinary work may continue within the remaining capacity.");
 }
 
-async function createPause(options) {
-  const { createAccountPauseHandover } = await import("./critical-budget-handover.mjs");
-  return createAccountPauseHandover(options);
+/** Identity excludes percentages so further usage cannot undo the operator's selection.
+ * A newly low bucket or a reported reset changes the set. Undated buckets remain session-bound. */
+function pauseWindowKey(response, decision) {
+  if (decision.action !== "pause") return null;
+  const windows = bindingWindows(
+    response.rateLimits,
+    response.rateLimitsByLimitId,
+    Date.parse(decision.observedAt),
+  );
+  const identities = windows
+    .filter((window) => window.remainingPercent <= ordinaryPausePercent)
+    .map(({ name, windowDurationMins, resetsAt }) =>
+      JSON.stringify([name, windowDurationMins, resetsAt]),
+    );
+  return sha256(
+    JSON.stringify([
+      response.accountId ?? null,
+      response.rateLimits.limitId ?? "codex",
+      [...new Set(identities)].sort(),
+    ]),
+  );
+}
+
+export async function readPauseWindowForSelection(
+  root,
+  { read = readAccountRateLimits, now = Date.now } = {},
+) {
+  try {
+    const response = await read({ root });
+    return pauseWindowKey(response, classifyAccountCapacity(response, { now: now() }));
+  } catch {
+    return null;
+  }
 }
 
 /** Use inspect during work. The default command is the primary's post-drain checkpoint. */
@@ -227,7 +264,8 @@ export async function checkAccountCapacity({
   root = toolingRoot,
   inspect = false,
   read = readAccountRateLimits,
-  createHandover = createPause,
+  createHandover = createAccountPauseHandover,
+  selectedWindow = hasSelectedAccountWindow,
   now = Date.now,
 } = {}) {
   const observe = async () => {
@@ -237,7 +275,17 @@ export async function checkAccountCapacity({
     } catch {
       response = null;
     }
-    return { response, decision: classifyAccountCapacity(response, { now: now() }) };
+    let decision = classifyAccountCapacity(response, { now: now() });
+    const windowKey = pauseWindowKey(response, decision);
+    if (windowKey && selectedWindow(root, windowKey)) {
+      decision = {
+        ...decision,
+        action: "continue",
+        message:
+          "The operator selected this handover to use the remaining ordinary capacity in this session.",
+      };
+    }
+    return { response, decision };
   };
   const first = await observe();
   if (inspect || first.decision.action !== "pause") return first.decision;
@@ -254,7 +302,7 @@ export async function checkAccountCapacity({
     ...refreshed.decision,
     message: "The session is paused. Explicitly accept the saved handover to resume.",
     handover,
-    resumePrompt: `Setze die Übergabe ${handover.relativePath} in dieser Sitzung als Goal fort.`,
+    resumePrompt: `Setze die Übergabe ${handover.relativePath} mit der verbleibenden Kapazität fort.`,
   };
 }
 

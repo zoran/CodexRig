@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /** Owns repository-bound terminal and account-pause handovers, full receipt and exact-file acknowledgement. */
 import { randomBytes } from "node:crypto";
-import { existsSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -10,9 +9,7 @@ import { toolingRoot, sha256 } from "../filesystem/repository-files.mjs";
 import {
   closeOwnedDirectoryBinding,
   createExclusiveOwnedFile,
-  ensureOwnedPrivateDirectory,
   listOwnedDirectory,
-  openPrivateOwnedDirectory,
   readStableOwnedFile,
   removeStableOwnedFile,
   sameStableIdentity,
@@ -30,12 +27,18 @@ import {
   recordedAccountPauseSequence,
   acknowledgedPauseSequence,
   markPauseAcknowledgement,
+  sessionWindowKey,
   pauseFilenamePattern,
 } from "./account-pause-state.mjs";
 import { findSecretMatches } from "../security/secret-patterns.mjs";
 import { readProjectWorkContext, workContextResumeBoundary } from "./project-work-state.mjs";
 
-export const criticalHandoverDirectory = "tmp/codexrig-handovers";
+import {
+  criticalHandoverDirectory,
+  handoverStore,
+  repositoryBinding,
+} from "./handover-storage.mjs";
+export { criticalHandoverDirectory };
 export const criticalHandoverMaxAgeMilliseconds = 72 * 60 * 60 * 1_000;
 
 const handoverMaxBytes = 128 * 1_024;
@@ -51,53 +54,6 @@ const requiredDrainLines = Object.freeze([
   "- Owned background tasks: none live; queued work is cancelled and atomic sections are complete.",
   "- Foreign agents and tasks: not contacted, interrupted, or changed.",
 ]);
-
-function canonicalRoot(root) {
-  const canonical = realpathSync.native(root);
-  const stats = statSync(canonical, { bigint: true });
-  if (!stats.isDirectory()) throw new Error("Handover root must be a real repository directory.");
-  return { canonical, stats };
-}
-
-function repositoryBinding(root) {
-  const { canonical, stats } = canonicalRoot(root);
-  return sha256(
-    JSON.stringify({ device: String(stats.dev), inode: String(stats.ino), path: canonical }),
-  );
-}
-
-function handoverStore(root, { create = false, testHooks } = {}) {
-  const { canonical } = canonicalRoot(root);
-  const directory = path.join(canonical, ...criticalHandoverDirectory.split("/"));
-  const handoverRoot = path.dirname(directory);
-  if (!existsSync(handoverRoot) && !create) return null;
-  if (create) {
-    try {
-      ensureOwnedPrivateDirectory(canonical, handoverRoot, "critical-budget handover root", {
-        repairMode: false,
-        testHooks,
-      });
-    } catch {
-      throw new Error("Critical-budget handover storage is unsafe.");
-    }
-  }
-  if (!existsSync(directory) && !create) return null;
-  if (create) {
-    try {
-      ensureOwnedPrivateDirectory(canonical, directory, "critical-budget handover directory", {
-        repairMode: false,
-        testHooks,
-      });
-    } catch {
-      throw new Error("Critical-budget handover storage is unsafe.");
-    }
-  }
-  try {
-    return openPrivateOwnedDirectory(canonical, directory, "critical-budget handover directory");
-  } catch {
-    throw new Error("Critical-budget handover storage is unsafe.");
-  }
-}
 
 function exactKeys(value, expected) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -497,6 +453,32 @@ export function hasPendingAccountPause({ root = toolingRoot, testHooks } = {}) {
   }
 }
 
+/** A selected pause releases only this live session and window after completed acknowledgement. */
+export function hasSelectedAccountWindow(root, windowKey) {
+  const session = inspectRuntimeSessionLease({ root });
+  if (
+    session.status !== "active" ||
+    session.lease.phase !== "active" ||
+    hasPendingAccountPause({ root }) ||
+    hasCriticalBudgetHandoverForSession({ root, sealingSessionId: session.lease.sessionId })
+  )
+    return false;
+  const store = handoverStore(root);
+  try {
+    return Boolean(
+      store &&
+      acknowledgedPauseSequence(
+        root,
+        store,
+        repositoryBinding(root),
+        sessionWindowKey(session.lease.sessionId, windowKey),
+      ),
+    );
+  } finally {
+    if (store) closeOwnedDirectoryBinding(store);
+  }
+}
+
 export function discoverRecentHandover({ root = toolingRoot, now = Date.now, testHooks } = {}) {
   const currentTime = now();
   const critical = discoverRecentCriticalBudgetHandover({
@@ -595,6 +577,7 @@ export function acknowledgeCriticalBudgetHandover({
   root = toolingRoot,
   relativePath,
   expectedSha256,
+  windowKey = null,
   testHooks,
 } = {}) {
   if (typeof expectedSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(expectedSha256)) {
@@ -618,7 +601,8 @@ export function acknowledgeCriticalBudgetHandover({
             current.content !== snapshot.content
           )
             throw new Error("The selected account pause changed before acknowledgement.");
-          markPauseAcknowledgement(root, store, metadata, filename, expectedSha256);
+          const resumeKey = windowKey ? sessionWindowKey(sessionId, windowKey) : null;
+          markPauseAcknowledgement(root, store, metadata, filename, expectedSha256, resumeKey);
         }
         removeStableOwnedFile(
           store,
@@ -643,7 +627,7 @@ function usage() {
   ].join("\n");
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
   if (args.length === 2 && args[0] === "create" && args[1] === "--critical") {
     const handover = createCriticalBudgetHandover();
@@ -675,7 +659,13 @@ function main() {
     return;
   }
   if (args.length === 4 && args[0] === "acknowledge" && args[2] === "--sha256") {
+    let windowKey = null;
+    if (pauseFilenamePattern.test(path.basename(args[1]))) {
+      const { readPauseWindowForSelection } = await import("./account-capacity.mjs");
+      windowKey = await readPauseWindowForSelection(toolingRoot);
+    }
     const consumed = acknowledgeCriticalBudgetHandover({
+      windowKey,
       relativePath: args[1],
       expectedSha256: args[3],
     });
@@ -689,10 +679,8 @@ function main() {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  try {
-    main();
-  } catch (error) {
+  main().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;
-  }
+  });
 }

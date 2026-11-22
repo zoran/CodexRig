@@ -55,13 +55,15 @@
     ],
     "context": [
       "scripts/context/critical-budget-handover.mjs",
+      "scripts/context/handover-storage.mjs",
       "scripts/context/portable-context-contract.mjs",
       "scripts/context/project-work-state.mjs",
       "scripts/context/session-stop-lifecycle.mjs",
       "scripts/context/context-budget.mjs",
       "scripts/context/context-cli.mjs",
       "scripts/context/account-capacity.mjs",
-      "scripts/context/account-pause-state.mjs"
+      "scripts/context/account-pause-state.mjs",
+      "scripts/context/account-capacity.test.mjs"
     ],
     "contracts": [
       "scripts/contracts/delivery-configuration.mjs",

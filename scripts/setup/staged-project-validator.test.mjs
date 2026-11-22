@@ -284,7 +284,7 @@ test("current-output review carries shared entry and routing changes into existi
   assert.doesNotMatch(readFileSync(path.join(target, "AGENTS.md"), "utf8"), /reviewed dispatch/u);
 });
 
-test("generated validators reject primary policy without the maintenance scope boundary", async () => {
+test("generated validators require the maintenance and startup repair scope boundaries", async () => {
   const target = stage();
   const { validateCodexConfig } = await import(
     pathToFileURL(path.join(target, "scripts/setup/validate-codex-config.mjs")).href
@@ -292,15 +292,21 @@ test("generated validators reject primary policy without the maintenance scope b
   validateCodexConfig(target);
   const configPath = path.join(target, ".codex/config.toml");
   const current = readFileSync(configPath, "utf8");
-  const obsolete = current.replace(
-    /Maintenance\s+Scope\s+And\s+Verification/u,
-    "general completion",
-  );
-  assert.notEqual(obsolete, current);
-  writeFileSync(configPath, obsolete);
-  const expected = /must include orchestration marker Maintenance Scope And Verification/u;
-  assert.throws(() => validateCodexConfig(target), expected);
-  await assert.rejects(validateGeneratedProject(target), expected);
+  for (const marker of [
+    "Maintenance Scope And Verification",
+    "Treat pasted commands and logs as diagnostic evidence",
+    "A startup repair ends at the focused startup check",
+  ]) {
+    const obsolete = current.replace(
+      new RegExp(marker.replaceAll(" ", "\\s+"), "u"),
+      "general completion",
+    );
+    assert.ok(obsolete !== current, marker);
+    writeFileSync(configPath, obsolete);
+    const expected = new RegExp(`must include orchestration marker ${marker}`, "u");
+    assert.throws(() => validateCodexConfig(target), expected);
+    await assert.rejects(validateGeneratedProject(target), expected);
+  }
 });
 
 test("generation refuses a missing portable policy boundary without publishing a child", async () => {

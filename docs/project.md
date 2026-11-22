@@ -90,7 +90,8 @@ It supplies no application, public service, product data model, deployment targe
 - Runtime and technology: Node.js ESM.
 - Public contract: `context:map`, bounded `context:read`, `context:check`, `handover:check`,
   `handover:create`, `handover:receive` and `handover:acknowledge`. A named ordinary handover may be
-  received in the same or a later canonical session. Hard-limit seals require a later session.
+  received in the same or a later canonical session. At 3% the project pauses. An explicit selection
+  lets that session use the rest of the ordinary window. Hard-limit seals require a later session.
 - Private internals: Work-marker revisions, continuation guards, prompt integrity and ignore-policy
   checks.
 - Owned data and migrations: Bounded `.codex/runtime/stop-continuation/` state and private transient
@@ -436,7 +437,7 @@ It supplies no application, public service, product data model, deployment targe
 
 <!-- codexrig:framework-version:start -->
 
-- Framework version: `8.3.0`.
+- Framework version: `8.4.0`.
 - Framework contract schema: `3`.
 
 <!-- codexrig:framework-version:end -->

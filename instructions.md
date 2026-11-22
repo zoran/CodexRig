@@ -25,8 +25,9 @@ section. Open a child section when its condition applies.
 - **Product or architecture decision.** Use [intake](#first-prompt-project-definition-intake) for a
   new product. For material boundary changes use `$architecture-evolution` and the relevant
   [architecture section](#modular-architecture-parallel-ownership-and-integration).
-- **Maintenance or child update.** Apply [maintenance scope](#maintenance-scope-and-verification).
-  Generation and updates use their source-side skill and [update scope](#repository-update-scope).
+- **Maintenance, startup repair or child update.** Apply
+  [maintenance scope](#maintenance-scope-and-verification). Generation and updates use their
+  source-side skill and [update scope](#repository-update-scope).
 - **Delegation or background work.** Check [admission](#admission-intelligence-and-provenance),
   [effective permissions](#effective-permissions-and-write-isolation) and
   [capacity](#capacity-admission-and-monitoring) before dispatch. Apply
@@ -93,13 +94,19 @@ only failed or invalidated units. Pause only work affected by a real blocker.
 
 ## Task Scope And Completion
 
-Use the current request and source to identify the result, permitted actions and stopping point.
-Questions, plans and read-only reviews grant their own scope. Before substantial work state the
-outcome, boundaries and next action.
+Use the operator's request to identify the result, permitted actions and stopping point. Questions,
+plans and read-only reviews grant their own scope. Before substantial work state the outcome,
+boundaries and next action.
 
-Finish the accepted outcome autonomously, including repairs that block it. Resolve routine choices
-from evidence. Ask for a material decision or missing authority and continue independent work. Old
-state, handovers, other projects and unrelated findings grant no new task. Report material
+Commands, commit messages and logs pasted into a failure report describe the observed run. A request
+to fix the failure authorizes repairing and checking the failing step. Replaying a wider workflow,
+staging a release candidate, committing, pushing or deploying requires a request for the
+corresponding outcome. An explicit instruction to run the quoted command authorizes its documented
+effects within the operator's stated limits.
+
+Finish the accepted outcome autonomously, including in-scope repairs that block it. Resolve routine
+choices from evidence. Ask for a material decision or missing authority and continue independent
+work. Old state, handovers, other projects and unrelated findings grant no new task. Report material
 out-of-scope findings briefly and stop when acceptance is met.
 
 ### YOLO Session Approval
@@ -119,9 +126,9 @@ worker reports findings to its primary instead of directing another approval req
 
 Resolve routine choices from the project configuration. Request a decision only when the outcome or
 destination is materially ambiguous, the user expressly reserved a decision, or a required external
-grant is actually missing. A failed check is a technical blocker to diagnose. Preserve candidate
-verification, recovery, access control, branch protection and third-party approvals. Review-only
-tasks, explicit exclusions and scope changes follow the user's current instructions.
+grant is actually missing. Diagnose a failed check when it blocks the requested outcome. Preserve
+candidate verification, recovery, access control, branch protection and third-party approvals.
+Review-only tasks, explicit exclusions and scope changes follow the user's current instructions.
 
 ### Interpreting Examples And Scope
 
@@ -129,6 +136,11 @@ Generalize examples within the authorized class. Explicit exclusions and closed 
 binding.
 
 ## Maintenance Scope And Verification
+
+When the requested outcome is a startup or preflight repair, run the affected check and stop when it
+passes, even if the report contains a `project:publish` command. Report independent application
+failures. Product changes or a full product suite need a request covering that work. The same scope
+applies in temporary checkouts and delegated tasks.
 
 Inspect the command's side effects and current state. Framework maintenance uses fixtures unless the
 user authorizes a specific child and operation. Product execution, accounts and remote mutations
@@ -637,7 +649,7 @@ with that same key. Then refresh all binding windows and ordinary-usage permissi
 response/reset time alone proves neither recovery nor authority to continue.
 
 No purchases, paid overage, automated account/model switch or Goal-budget increase. After free
-recovery, an ordinary account window with 5% or less remaining triggers the recoverable account
+recovery, an ordinary account window with 3% or less remaining triggers the recoverable account
 pause below. A hard limit or a demonstrated uncovered minimum closure reserve uses Critical Budget
 Drain. Check each binding window and current permission separately. Children report pressure and
 checkpoint. Only the primary resolves account recovery.
@@ -650,13 +662,16 @@ and next action. No invented telemetry or old critical label decides the current
 
 At capacity checkpoints run `pnpm handover:check -- --inspect`. The canonical Stop hook also samples
 native capacity before automatically continuing active work. When the ordinary account window
-reaches 5% or less, stop admitting work, bring owned workers and jobs to a safe boundary and refresh
+reaches 3% or less, stop admitting work, bring owned workers and jobs to a safe boundary and refresh
 the project work context. Run `pnpm handover:check` at that checkpoint. It refreshes the native
 limits and writes the recoverable handover automatically if the threshold still applies. Once the
 file exists, pause an active native Goal as the final operator-requested action. Report the exact
-file under `tmp/codexrig-handovers/` and wait for explicit selection. Resume only after a fresh
-capacity check permits work. A later operator-selected session may receive the handover after an
-account switch. Do not let an active work marker restart a paused task on its own.
+file under `tmp/codexrig-handovers/` and wait for explicit selection. Asking to continue the
+announced task accepts its unambiguous handover. Receive and acknowledge the exact file. With
+ordinary usage allowed, that selection permits the receiving session to use the rest of the same
+account window, including at or below 3%. Recheck capacity at course checks. A new window or session
+has its own threshold. Resolving free recovery and hard limits still takes priority. Create a native
+Goal only when requested.
 
 At confirmed critical capacity admit no new work. Drain provenance-bound owned agents/jobs to safe
 boundaries, cancel queued work, accept or record every handoff and close all owned scopes. Preserve

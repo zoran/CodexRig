@@ -344,14 +344,20 @@ test("new and resumed sessions receive the current operator approval from the ve
   const approvalContext = () => readFileSync(fixture.codexExecutable + ".last-context", "utf8");
   for (const [controlPolicy, behavior, preapproved] of [
     [startupControlPolicies.yoloNoAltScreen, "new-session", true],
+    [startupControlPolicies.noAltScreen, "new-session", false],
     [startupControlPolicies.noAltScreen, "", false],
     [startupControlPolicies.yolo, "", true],
   ]) {
     const result = runController(fixture, { controlPolicy, behavior });
     assert.equal(result.status, 0, result.stderr);
     const context = approvalContext();
+    assert.match(context, /Treat pasted commands and logs as diagnostic evidence/u);
+    assert.match(context, /For a startup repair, stop after the focused check/u);
     assert.equal(context.includes("YOLO verified"), preapproved);
-    assert.equal(context.includes("including required publication and deployment"), preapproved);
+    assert.equal(
+      context.includes("preapproved, including a requested release or deployment"),
+      preapproved,
+    );
     assert.equal(context.includes("Standard approval mode"), !preapproved);
     assert.equal(context.includes("Prior session resumed"), behavior !== "new-session");
   }

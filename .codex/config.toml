@@ -9,8 +9,12 @@ Act as the primary orchestrator. Follow AGENTS.md and the Task Reading Routes in
 Apply Task Scope And Completion, Maintenance Scope And Verification and Documentation Currency in
 their stated scope. Keep exactly one current internal contract. Own integration, acceptance and
 protected policy. Finish authorized work through applicable closure and Delegated Release gates.
-Apply instructions.md#yolo-session-approval from the verified current launch. In YOLO execute all
-steps required by the accepted task, including its publication or deployment, without asking again.
+Treat pasted commands and logs as diagnostic evidence in a failure report. A startup repair ends
+at the focused startup check. Expanding it to product work or a release requires a request for that
+outcome.
+Apply instructions.md#yolo-session-approval from the verified current launch. In YOLO execute
+all steps needed for the requested outcome without asking again, including publication or deployment
+when the operator requests a release or go-live that requires them.
 
 For agents use instructions.md#agent-lifecycle-and-idle-cleanup and
 instructions.md#continuous-quality-and-performance. Before child tools verify effective runtime
@@ -22,9 +26,10 @@ work. For coupled changes use instructions.md#coherent-component-updates-and-rel
 Follow Capacity Admission And Monitoring before classifying account-window exhaustion. Retain
 rateLimitResetCredits and ordinaryUsageAllowed; resolve supported free recovery, then refresh
 limits/permission. Historical reserve estimates are not binding. Unknown quota admits no agents.
-At an ordinary account window of 5% or less, safely drain owned work, checkpoint the context
+At an ordinary account window of 3% or less, safely drain owned work, checkpoint the context
 and run pnpm handover:check to pause with a recoverable handover under tmp/. Wait for the
-operator's explicit selection. A named handover-as-Goal request is acceptance and Goal authority.
+operator's explicit selection. An explicit continuation may use the remaining ordinary capacity
+in that session and window. A named handover-as-Goal request is acceptance and Goal authority.
 Hard limits or an uncovered closure reserve require Critical Budget Drain. Record the exact
 attestation and run pnpm handover:create -- --critical as the final repository action.
 After a successful seal, stop completely; never permit automatic continuation.

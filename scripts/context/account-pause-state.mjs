@@ -1,5 +1,6 @@
 /** Owns account-pause identities and the boundary established by an explicit exact-file acknowledgement. */
 import { lstatSync } from "node:fs";
+import { sha256 } from "../filesystem/repository-files.mjs";
 import {
   atomicReplaceOwnedFile,
   closeOwnedDirectoryBinding,
@@ -35,7 +36,7 @@ export function accountPauseFilename(metadata) {
 }
 
 /** A crash between the durable acknowledgement and unlink keeps the selected pause in effect. */
-export function acknowledgedPauseSequence(root, store, repositoryBinding) {
+export function acknowledgedPauseSequence(root, store, repositoryBinding, resumeKey = null) {
   const record = runtimeFile(root, receiptName, "account pause acknowledgement", 4096);
   try {
     if (record.status === "absent") {
@@ -44,10 +45,14 @@ export function acknowledgedPauseSequence(root, store, repositoryBinding) {
       return 0;
     }
     const receipt = JSON.parse(record.snapshot.buffer.toString("utf8"));
+    const extended = receipt.schemaVersion === 2;
+    const fields = extended
+      ? "filename,previousSequence,repositoryBinding,resumeKey,schemaVersion,sequence,sha256"
+      : "filename,previousSequence,repositoryBinding,schemaVersion,sequence,sha256";
     if (
-      Object.keys(receipt).sort().join(",") !==
-        "filename,previousSequence,repositoryBinding,schemaVersion,sequence,sha256" ||
-      receipt.schemaVersion !== 1 ||
+      Object.keys(receipt).sort().join(",") !== fields ||
+      (!extended && receipt.schemaVersion !== 1) ||
+      (extended && !/^[a-f0-9]{64}$/u.test(receipt.resumeKey)) ||
       receipt.repositoryBinding !== repositoryBinding ||
       !Number.isSafeInteger(receipt.sequence) ||
       receipt.sequence < 1 ||
@@ -58,18 +63,30 @@ export function acknowledgedPauseSequence(root, store, repositoryBinding) {
       !/^[a-f0-9]{64}$/u.test(receipt.sha256)
     )
       throw new Error("Account pause acknowledgement is invalid.");
+    if (resumeKey && receipt.resumeKey !== resumeKey) return 0;
     if (!store) return receipt.sequence;
     const selected = ownedDirectoryChildPath(store, receipt.filename, "acknowledged account pause");
-    return lstatSync(selected, { throwIfNoEntry: false })
-      ? receipt.previousSequence
-      : receipt.sequence;
+    if (lstatSync(selected, { throwIfNoEntry: false }))
+      return resumeKey ? 0 : receipt.previousSequence;
+    return receipt.sequence;
   } finally {
     closeRuntimeFile(record);
   }
 }
 
+export function sessionWindowKey(sessionId, windowKey) {
+  return sha256(JSON.stringify([sessionId, windowKey]));
+}
+
 /** Only a validated acknowledgement under the common lifecycle mutex can advance this watermark. */
-export function markPauseAcknowledgement(root, store, metadata, filename, sha256) {
+export function markPauseAcknowledgement(
+  root,
+  store,
+  metadata,
+  filename,
+  receivedDigest,
+  resumeKey,
+) {
   const previousSequence = acknowledgedPauseSequence(root, store, metadata.repositoryBinding);
   if (metadata.pauseSequence <= previousSequence) return;
   const runtime = openRuntimeDirectory(root, "account pause acknowledgement");
@@ -79,10 +96,11 @@ export function markPauseAcknowledgement(root, store, metadata, filename, sha256
       runtime,
       receiptName,
       JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: resumeKey ? 2 : 1,
+        ...(resumeKey ? { resumeKey } : {}),
         repositoryBinding: metadata.repositoryBinding,
         filename,
-        sha256,
+        sha256: receivedDigest,
         previousSequence,
         sequence: metadata.pauseSequence,
       }) + "\n",

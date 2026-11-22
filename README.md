@@ -126,7 +126,7 @@ pnpm verify                             # explicit complete coverage
 pnpm project:export -- --name "<Project Name>"
 pnpm framework:reset                    # preview; add --apply after sessions exit
 pnpm handover:check -- --inspect          # read current native account windows
-pnpm handover:check                      # at a safe checkpoint, pause automatically at 5% or less
+pnpm handover:check                      # at a safe checkpoint, pause automatically at 3% or less
 pnpm handover:create -- --critical       # terminal seal for a confirmed hard limit
 ```
 
@@ -172,10 +172,10 @@ Candidate pinning and isolated release clones follow
 [Delegated Release](instructions.md#delegated-release); see
 [publication gates](instructions.md#verification-and-publication-gates) for authority and evidence.
 
-An ordinary 5% account pause saves unfinished work in the project's private
-`tmp/codexrig-handovers/` directory. After switching accounts, tell Codex “Mache mit dem Handover
-`<genauer Pfad>` als Goal weiter.” This selects the handover and authorizes the native Goal. A
-hard-limit seal requires a separate canonical session.
+At 3% or less, the project saves unfinished work in its private `tmp/codexrig-handovers/` directory
+and waits. Ask Codex to continue the announced task to use the remaining ordinary capacity in the
+same window. You can select the handover in the current session or a later one. To start a native
+Goal, name the handover and request a Goal. A hard-limit seal requires a separate canonical session.
 [Capacity policy](instructions.md#capacity-admission-and-monitoring) owns admission and recovery.
 
 ## Local Builds

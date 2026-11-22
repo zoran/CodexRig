@@ -125,10 +125,10 @@ Mise tracks project settings locally and reuses verified shared tool versions an
 Cancellable verification checks drain when their caller exits; other operations retain their
 completion boundary. Never remove a lock or interrupt another owner to bypass admission.
 
-At 5% ordinary account capacity the framework pauses and saves the handover in
-\`tmp/codexrig-handovers/\`. After switching accounts, name its exact path and ask to continue it as a
-Goal. This accepts the file and authorizes the native Goal. A hard-limit seal requires a separate
-canonical session. Preserve private runtime, history and recovery. See
+At 3% or less, the project pauses and saves the handover in \`tmp/codexrig-handovers/\`. Ask to
+continue the announced task to use the remaining ordinary capacity in that window. Select the
+handover in the current session or a later one. To start a native Goal, name the handover and
+request a Goal. A hard-limit seal requires a separate canonical session. Preserve private runtime, history and recovery. See
 [session lifecycle](instructions.md#session-start) and [capacity](instructions.md#capacity-admission-and-monitoring).
 
 ## First Prompt: Define The Project

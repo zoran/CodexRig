@@ -276,7 +276,6 @@
         "scripts/context/portable-context-contract.test.mjs",
         "scripts/context/document-context.test.mjs",
         "scripts/context/context-budget.test.mjs",
-        "scripts/context/account-capacity.test.mjs",
         "scripts/context/account-pause.test.mjs"
       ],
       "artifactOwners": [],
@@ -486,12 +485,14 @@
       "args": [
         "--test",
         "scripts/setup/runtime-safety.test.mjs",
-        "scripts/setup/repository-storage.test.mjs"
+        "scripts/setup/repository-storage.test.mjs",
+        "scripts/context/account-capacity.test.mjs"
       ],
       "artifactOwners": [],
       "coveredTestPaths": [
         "scripts/setup/runtime-safety.test.mjs",
-        "scripts/setup/repository-storage.test.mjs"
+        "scripts/setup/repository-storage.test.mjs",
+        "scripts/context/account-capacity.test.mjs"
       ],
       "phase": "preflight",
       "reason": "retained runtime trust boundaries need their negative evidence"
@@ -1526,7 +1527,8 @@
     "scripts/context/session-stop-lifecycle.mjs": [
       "scripts/setup/runtime-safety.test.mjs",
       "scripts/context/account-pause.test.mjs",
-      "scripts/context/context-lifecycle.test.mjs"
+      "scripts/context/context-lifecycle.test.mjs",
+      "scripts/context/account-capacity.test.mjs"
     ],
     ".codex/toolchain.json": [
       "scripts/framework/framework-upgrade.test.mjs",
@@ -1710,11 +1712,18 @@
       "scripts/setup/startup-session-controller.test.mjs"
     ],
     "scripts/context/account-pause-state.mjs": [
-      "scripts/context/account-pause.test.mjs"
+      "scripts/context/account-pause.test.mjs",
+      "scripts/context/account-capacity.test.mjs"
     ],
     "scripts/context/critical-budget-handover.mjs": [
       "scripts/context/account-pause.test.mjs",
-      "scripts/context/context-lifecycle.test.mjs"
+      "scripts/context/context-lifecycle.test.mjs",
+      "scripts/context/account-capacity.test.mjs"
+    ],
+    "scripts/context/handover-storage.mjs": [
+      "scripts/context/account-pause.test.mjs",
+      "scripts/context/context-lifecycle.test.mjs",
+      "scripts/context/account-capacity.test.mjs"
     ]
   },
   "exactConsumers": {
@@ -2026,6 +2035,9 @@
       "context-regressions"
     ],
     "scripts/context/account-pause-state.mjs": [
+      "context-regressions"
+    ],
+    "scripts/context/handover-storage.mjs": [
       "context-regressions"
     ]
   },

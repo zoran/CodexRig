@@ -243,7 +243,8 @@ export function ensureOwnedPrivateDirectory(
         throw new Error(`Repository path safety detected an identity change in ${label}.`);
       }
       if ((opened.mode & 0o077) !== 0) {
-        if (!repairMode) {
+        // A native tmp directory can start out readable. A shared writer could have planted contents.
+        if (!repairMode || (repairMode === "owner-write-only" && (opened.mode & 0o022) !== 0)) {
           throw new Error(`Repository path safety requires private mode for ${label}.`);
         }
         testHooks?.beforeDirectoryModeRepair?.({ directoryPath: directory, label, parent });

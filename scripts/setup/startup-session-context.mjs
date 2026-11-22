@@ -17,9 +17,15 @@ export function sessionStartSuccess(attestation, { root = toolingRoot, now = Dat
       : "";
   const approvalContext =
     attestation.permissionMode === "bypassPermissions"
-      ? " YOLO verified. All steps of the accepted task are preapproved, including required publication and deployment. Proceed without asking again. See instructions.md#yolo-session-approval."
+      ? " YOLO verified. In-scope steps are preapproved, including a requested release or deployment. See instructions.md#yolo-session-approval."
       : " Standard approval mode is active for this launch.";
-  const additionalContext = `Project tooling verified. First, before intake/writes, follow Startup Repository Reconstruction in instructions.md. Run pnpm worktree:status -- --json and pnpm context:map. The hook does not replace that full inventory.${approvalContext}${recoveryContext}${handoverContext}`;
+  const additionalContext =
+    "First, before intake/writes, follow Startup Repository Reconstruction in instructions.md. " +
+    "Run pnpm worktree:status -- --json and pnpm context:map. The hook does not replace that full inventory. " +
+    "Treat pasted commands and logs as diagnostic evidence in a failure report. For a startup repair, stop after the focused check." +
+    approvalContext +
+    recoveryContext +
+    handoverContext;
   if (Buffer.byteLength(additionalContext, "utf8") > sessionStartAdditionalContextMaximumBytes) {
     throw new Error("SessionStart reconstruction context exceeds its attested output limit.");
   }

@@ -197,6 +197,7 @@ test("empty generation excludes source capabilities, private markers and new uns
       "scripts/terminal/terminal-output.test.mjs",
       "scripts/setup/runtime-safety.test.mjs",
       "scripts/setup/repository-storage.test.mjs",
+      "scripts/context/account-capacity.test.mjs",
       "scripts/goals/project-publication.test.mjs",
       "scripts/repository/global-git-credential.test.mjs",
       "scripts/goals/publication-command.test.mjs",

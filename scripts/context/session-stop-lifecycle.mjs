@@ -338,7 +338,7 @@ export async function runStopLifecycle({
         return {
           decision: "block",
           reason:
-            "The verified ordinary account window reached 5% or less. Perform only the recoverable pause now. Drain owned work to a safe checkpoint, refresh docs/project-context.md and run pnpm handover:check. Once the handover exists, pause any active Goal, report the project tmp/ path and wait for explicit selection.",
+            "The verified ordinary account window reached 3% or less. Perform only the recoverable pause now. Drain owned work to a safe checkpoint, refresh docs/project-context.md and run pnpm handover:check. Once the handover exists, pause any active Goal, report the project tmp/ path and wait for explicit selection.",
         };
       }
       if (action === "recovery-required" || action === "critical-drain") {

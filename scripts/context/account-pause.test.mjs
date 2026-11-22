@@ -26,6 +26,7 @@ import {
   criticalHandoverMaxAgeMilliseconds,
   discoverRecentHandover,
   hasPendingAccountPause,
+  hasSelectedAccountWindow,
   receiveCriticalBudgetHandover,
 } from "./critical-budget-handover.mjs";
 import { repositoryRoot, temporaryDirectory, write } from "./context-regression-helpers.mjs";
@@ -89,8 +90,8 @@ function project() {
       }),
     });
   const receive = ({ relativePath }) => receiveCriticalBudgetHandover({ root, relativePath });
-  const acknowledge = ({ relativePath, sha256 }) =>
-    acknowledgeCriticalBudgetHandover({ root, relativePath, expectedSha256: sha256 });
+  const acknowledge = ({ relativePath, sha256, windowKey }) =>
+    acknowledgeCriticalBudgetHandover({ root, relativePath, expectedSha256: sha256, windowKey });
   const origin = session();
   context();
   return {
@@ -125,7 +126,7 @@ test("automatic durable continuation at the ordinary threshold asks the primary 
   f.acknowledge(f.receive(saved));
 });
 
-test("a 5% account pause is private, retryable and resumable by an explicit selection in the same runtime", async () => {
+test("a 3% account pause is private, retryable and resumable by an explicit selection in the same runtime", async () => {
   const f = project();
   const original = readFileSync(path.join(f.root, "docs/project-context.md"));
   const selected = f.pause();
@@ -143,7 +144,11 @@ test("a 5% account pause is private, retryable and resumable by an explicit sele
   assert.match(received.resumeBoundary, /current capacity/u);
   assert.equal((await f.stop()).decision, undefined);
   assert.throws(() => f.acknowledge({ ...received, sha256: "0".repeat(64) }), /digest/u);
-  f.acknowledge(received);
+  const windowKey = "1".repeat(64);
+  f.acknowledge({ ...received, windowKey });
+  assert.equal(hasSelectedAccountWindow(f.root, windowKey), true);
+  f.session();
+  assert.equal(hasSelectedAccountWindow(f.root, windowKey), false);
   assert.deepEqual(readFileSync(path.join(f.root, "docs/project-context.md")), original);
   assert.equal(hasPendingAccountPause({ root: f.root }), false);
   assert.deepEqual(readdirSync(path.dirname(path.join(f.root, selected.relativePath))), []);
